@@ -213,7 +213,7 @@ int __init stack_depot_early_init(void)
 	pr_info("allocating space for %u stack pools via memblock\n",
 		stack_max_pools);
 	stack_pools =
-		memblock_alloc(stack_max_pools * sizeof(void *), PAGE_SIZE);
+		memblock_alloc(stack_max_pools * sizeof(void *), PG_SIZE);
 	if (!stack_pools) {
 		pr_err("stack pools allocation failed, disabling\n");
 		memblock_free(stack_table, entries * sizeof(struct list_head));
@@ -248,10 +248,10 @@ int stack_depot_init(void)
 		entries = nr_free_buffer_pages();
 		entries = roundup_pow_of_two(entries);
 
-		if (scale > PAGE_SHIFT)
-			entries >>= (scale - PAGE_SHIFT);
+		if (scale > PG_SHIFT)
+			entries >>= (scale - PG_SHIFT);
 		else
-			entries <<= (PAGE_SHIFT - scale);
+			entries <<= (PG_SHIFT - scale);
 	}
 
 	if (entries < 1UL << STACK_BUCKET_NUMBER_ORDER_MIN)

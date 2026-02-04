@@ -124,14 +124,14 @@ static inline int current_is_kswapd(void)
  * old reserved area - some extra information. Note that the first
  * kilobyte is reserved for boot loader or disk label stuff...
  *
- * Having the magic at the end of the PAGE_SIZE makes detecting swap
+ * Having the magic at the end of the PG_SIZE makes detecting swap
  * areas somewhat tricky on machines that support multiple page sizes.
  * For 2.5 we'll probably want to move the magic to just beyond the
  * bootbits...
  */
 union swap_header {
 	struct {
-		char reserved[PAGE_SIZE - 10];
+		char reserved[PG_SIZE - 10];
 		char magic[10];			/* SWAP-SPACE or SWAPSPACE2 */
 	} magic;
 	struct {
@@ -181,12 +181,12 @@ struct writeback_control;
 struct zone;
 
 /*
- * A swap extent maps a range of a swapfile's PAGE_SIZE pages onto a range of
+ * A swap extent maps a range of a swapfile's PG_SIZE pages onto a range of
  * disk blocks.  A rbtree of swap extents maps the entire swapfile (Where the
  * term `swapfile' refers to either a blockdevice or an IS_REG file). Apart
  * from setup, they're handled identically.
  *
- * We always assume that blocks are of size PAGE_SIZE.
+ * We always assume that blocks are of size PG_SIZE.
  */
 struct swap_extent {
 	struct rb_node rb_node;

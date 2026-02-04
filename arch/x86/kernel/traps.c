@@ -783,7 +783,7 @@ static enum kernel_gp_hint get_kernel_gp_address(struct pt_regs *regs,
 	 * can result in a #GP when LASS is active. Provide the same
 	 * hint in the rare case that the condition is hit without LASS.
 	 */
-	if (*addr < PAGE_SIZE)
+	if (*addr < PTE_SIZE)
 		return GP_NULL_POINTER;
 
 	/*

@@ -179,7 +179,7 @@ static inline int slab_order(const struct slab *slab)
 
 static inline size_t slab_size(const struct slab *slab)
 {
-	return PAGE_SIZE << slab_order(slab);
+	return PG_SIZE << slab_order(slab);
 }
 
 /*
@@ -646,7 +646,7 @@ static inline unsigned int large_kmalloc_order(const struct page *page)
 
 static inline size_t large_kmalloc_size(const struct page *page)
 {
-	return PAGE_SIZE << large_kmalloc_order(page);
+	return PG_SIZE << large_kmalloc_order(page);
 }
 
 #ifdef CONFIG_SLUB_DEBUG

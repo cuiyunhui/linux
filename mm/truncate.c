@@ -251,7 +251,7 @@ bool truncate_inode_partial_folio(struct folio *folio, loff_t start, loff_t end)
 		return true;
 
 	min_order = mapping_min_folio_order(folio->mapping);
-	split_at = folio_page(folio, PAGE_ALIGN_DOWN(offset) / PAGE_SIZE);
+	split_at = folio_page(folio, PG_ALIGN_DOWN(offset) / PG_SIZE);
 	if (!try_folio_split_or_unmap(folio, split_at, min_order)) {
 		/*
 		 * try to split at offset + length to make sure folios within
@@ -264,7 +264,7 @@ bool truncate_inode_partial_folio(struct folio *folio, loff_t start, loff_t end)
 			goto no_split;
 
 		split_at2 = folio_page(folio,
-				PAGE_ALIGN_DOWN(offset + length) / PAGE_SIZE);
+				PG_ALIGN_DOWN(offset + length) / PG_SIZE);
 		folio2 = page_folio(split_at2);
 
 		if (!folio_try_get(folio2))
@@ -384,7 +384,7 @@ void truncate_inode_pages_range(struct address_space *mapping,
 	 * start of the range and 'partial_end' at the end of the range.
 	 * Note that 'end' is exclusive while 'lend' is inclusive.
 	 */
-	start = (lstart + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	start = (lstart + PG_SIZE - 1) >> PG_SHIFT;
 	if (lend == -1)
 		/*
 		 * lend == -1 indicates end-of-file so we have to set 'end'
@@ -393,7 +393,7 @@ void truncate_inode_pages_range(struct address_space *mapping,
 		 */
 		end = -1;
 	else
-		end = (lend + 1) >> PAGE_SHIFT;
+		end = (lend + 1) >> PG_SHIFT;
 
 	folio_batch_init(&fbatch);
 	index = start;
@@ -409,8 +409,8 @@ void truncate_inode_pages_range(struct address_space *mapping,
 		cond_resched();
 	}
 
-	same_folio = (lstart >> PAGE_SHIFT) == (lend >> PAGE_SHIFT);
-	folio = __filemap_get_folio(mapping, lstart >> PAGE_SHIFT, FGP_LOCK, 0);
+	same_folio = (lstart >> PG_SHIFT) == (lend >> PG_SHIFT);
+	folio = __filemap_get_folio(mapping, lstart >> PG_SHIFT, FGP_LOCK, 0);
 	if (!IS_ERR(folio)) {
 		same_folio = lend < folio_next_pos(folio);
 		if (!truncate_inode_partial_folio(folio, lstart, lend)) {
@@ -424,7 +424,7 @@ void truncate_inode_pages_range(struct address_space *mapping,
 	}
 
 	if (!same_folio) {
-		folio = __filemap_get_folio(mapping, lend >> PAGE_SHIFT,
+		folio = __filemap_get_folio(mapping, lend >> PG_SHIFT,
 						FGP_LOCK, 0);
 		if (!IS_ERR(folio)) {
 			if (!truncate_inode_partial_folio(folio, lstart, lend))
@@ -779,7 +779,7 @@ EXPORT_SYMBOL_GPL(invalidate_inode_pages2);
 void truncate_pagecache(struct inode *inode, loff_t newsize)
 {
 	struct address_space *mapping = inode->i_mapping;
-	loff_t holebegin = round_up(newsize, PAGE_SIZE);
+	loff_t holebegin = round_up(newsize, PG_SIZE);
 
 	/*
 	 * unmap_mapping_range is called twice, first simply for
@@ -847,14 +847,14 @@ void pagecache_isize_extended(struct inode *inode, loff_t from, loff_t to)
 
 	WARN_ON(to > inode->i_size);
 
-	if (from >= to || bsize >= PAGE_SIZE)
+	if (from >= to || bsize >= PG_SIZE)
 		return;
 	/* Page straddling @from will not have any hole block created? */
 	rounded_from = round_up(from, bsize);
-	if (to <= rounded_from || !(rounded_from & (PAGE_SIZE - 1)))
+	if (to <= rounded_from || !(rounded_from & (PG_SIZE - 1)))
 		return;
 
-	folio = filemap_lock_folio(inode->i_mapping, from / PAGE_SIZE);
+	folio = filemap_lock_folio(inode->i_mapping, from / PG_SIZE);
 	/* Folio not cached? Nothing to do */
 	if (IS_ERR(folio))
 		return;
@@ -900,8 +900,8 @@ EXPORT_SYMBOL(pagecache_isize_extended);
 void truncate_pagecache_range(struct inode *inode, loff_t lstart, loff_t lend)
 {
 	struct address_space *mapping = inode->i_mapping;
-	loff_t unmap_start = round_up(lstart, PAGE_SIZE);
-	loff_t unmap_end = round_down(1 + lend, PAGE_SIZE) - 1;
+	loff_t unmap_start = round_up(lstart, PG_SIZE);
+	loff_t unmap_end = round_down(1 + lend, PG_SIZE) - 1;
 	/*
 	 * This rounding is currently just for example: unmap_mapping_range
 	 * expands its hole outwards, whereas we want it to contract the hole

@@ -109,7 +109,7 @@ __early_ioremap(resource_size_t phys_addr, unsigned long size, pgprot_t prot)
 {
 	unsigned long offset;
 	resource_size_t last_addr;
-	unsigned int nrpages;
+	unsigned int nrptes;
 	enum fixed_addresses idx;
 	int i, slot;
 
@@ -136,15 +136,15 @@ __early_ioremap(resource_size_t phys_addr, unsigned long size, pgprot_t prot)
 	/*
 	 * Mappings have to be page-aligned
 	 */
-	offset = offset_in_page(phys_addr);
-	phys_addr &= PAGE_MASK;
-	size = PAGE_ALIGN(last_addr + 1) - phys_addr;
+	offset = offset_in_pg(phys_addr);
+	phys_addr &= PG_MASK;
+	size = PG_ALIGN(last_addr + 1) - phys_addr;
 
 	/*
 	 * Mappings have to fit in the FIX_BTMAP area.
 	 */
-	nrpages = size >> PAGE_SHIFT;
-	if (WARN_ON(nrpages > NR_FIX_BTMAPS))
+	nrptes = size >> PTE_SHIFT;
+	if (WARN_ON(nrptes > NR_FIX_BTMAPS))
 		return NULL;
 
 	early_ioremap_dbg("%s(%pa, %08lx) [%d] => %08lx + %08lx\n",
@@ -154,14 +154,14 @@ __early_ioremap(resource_size_t phys_addr, unsigned long size, pgprot_t prot)
 	 * Ok, go for it..
 	 */
 	idx = FIX_BTMAP_BEGIN - NR_FIX_BTMAPS*slot;
-	while (nrpages > 0) {
+	while (nrptes > 0) {
 		if (after_paging_init)
 			__late_set_fixmap(idx, phys_addr, prot);
 		else
 			__early_set_fixmap(idx, phys_addr, prot);
-		phys_addr += PAGE_SIZE;
+		phys_addr += PTE_SIZE;
 		--idx;
-		--nrpages;
+		--nrptes;
 	}
 
 	prev_map[slot] = (void __iomem *)(offset + slot_virt[slot]);
@@ -199,8 +199,8 @@ void __init early_iounmap(void __iomem *addr, unsigned long size)
 	if (WARN_ON(virt_addr < fix_to_virt(FIX_BTMAP_BEGIN)))
 		return;
 
-	offset = offset_in_page(virt_addr);
-	nrpages = PAGE_ALIGN(offset + size) >> PAGE_SHIFT;
+	offset = offset_in_pg(virt_addr);
+	nrpages = PG_ALIGN(offset + size) >> PG_SHIFT;
 
 	idx = FIX_BTMAP_BEGIN - NR_FIX_BTMAPS*slot;
 	while (nrpages > 0) {
@@ -251,7 +251,7 @@ early_memremap_prot(resource_size_t phys_addr, unsigned long size,
 }
 #endif
 
-#define MAX_MAP_CHUNK	(NR_FIX_BTMAPS << PAGE_SHIFT)
+#define MAX_MAP_CHUNK	(NR_FIX_BTMAPS << PG_SHIFT)
 
 /*
  * If no empty slot, handle that and return -ENOMEM.
@@ -262,11 +262,11 @@ int __init copy_from_early_mem(void *dest, phys_addr_t src, unsigned long size)
 	char *p;
 
 	while (size) {
-		slop = offset_in_page(src);
+		slop = offset_in_pg(src);
 		clen = size;
 		if (clen > MAX_MAP_CHUNK - slop)
 			clen = MAX_MAP_CHUNK - slop;
-		p = early_memremap(src & PAGE_MASK, clen + slop);
+		p = early_memremap(src & PG_MASK, clen + slop);
 		if (!p)
 			return -ENOMEM;
 		memcpy(dest, p + slop, clen);

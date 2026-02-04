@@ -97,7 +97,7 @@ static inline void __user *mask_user_address(const void __user *ptr)
  */
 static inline bool __access_ok(const void __user *ptr, unsigned long size)
 {
-	if (__builtin_constant_p(size <= PAGE_SIZE) && size <= PAGE_SIZE) {
+	if (__builtin_constant_p(size <= PG_SIZE) && size <= PG_SIZE) {
 		return valid_user_address(ptr);
 	} else {
 		unsigned long sum = size + (__force unsigned long)ptr;

@@ -260,7 +260,7 @@ static int uart_alloc_xmit_buf(struct tty_port *port)
 	if (!state->port.xmit_buf) {
 		state->port.xmit_buf = (unsigned char *)page;
 		kfifo_init(&state->port.xmit_fifo, state->port.xmit_buf,
-				PAGE_SIZE);
+				PG_SIZE);
 		uart_port_unlock_deref(uport, flags);
 	} else {
 		uart_port_unlock_deref(uport, flags);

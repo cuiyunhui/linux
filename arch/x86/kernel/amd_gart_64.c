@@ -650,7 +650,7 @@ static __init int init_amd_gatt(struct agp_kern_info *info)
 					get_order(gatt_size));
 	if (!gatt)
 		panic("Cannot allocate GATT table");
-	if (set_memory_uc((unsigned long)gatt, gatt_size >> PAGE_SHIFT))
+	if (set_memory_uc((unsigned long)gatt, gatt_size >> PTE_SHIFT))
 		panic("Could not set GART PTEs to uncacheable pages");
 
 	agp_gatt_table = gatt;

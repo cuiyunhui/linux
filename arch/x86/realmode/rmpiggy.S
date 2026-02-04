@@ -8,7 +8,7 @@
 
 	.section ".init.data","aw"
 
-	.balign PAGE_SIZE
+	.balign PTE_SIZE
 
 SYM_DATA_START(real_mode_blob)
 	.incbin	"arch/x86/realmode/rm/realmode.bin"

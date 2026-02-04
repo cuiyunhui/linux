@@ -1230,7 +1230,7 @@ static int __dump_emit(struct coredump_params *cprm, const void *addr, int nr)
 
 static int __dump_skip(struct coredump_params *cprm, size_t nr)
 {
-	static char zeroes[PAGE_SIZE];
+	static char zeroes[PG_SIZE];
 	struct file *file = cprm->file;
 
 	if (file->f_mode & FMODE_LSEEK) {
@@ -1240,10 +1240,10 @@ static int __dump_skip(struct coredump_params *cprm, size_t nr)
 		return 1;
 	}
 
-	while (nr > PAGE_SIZE) {
-		if (!__dump_emit(cprm, zeroes, PAGE_SIZE))
+	while (nr > PG_SIZE) {
+		if (!__dump_emit(cprm, zeroes, PG_SIZE))
 			return 0;
-		nr -= PAGE_SIZE;
+		nr -= PG_SIZE;
 	}
 
 	return __dump_emit(cprm, zeroes, nr);
@@ -1289,19 +1289,19 @@ static int dump_emit_page(struct coredump_params *cprm, struct page *page)
 			return 0;
 		cprm->to_skip = 0;
 	}
-	if (cprm->written + PAGE_SIZE > cprm->limit)
+	if (cprm->written + PG_SIZE > cprm->limit)
 		return 0;
 	if (dump_interrupted())
 		return 0;
 	pos = file->f_pos;
-	bvec_set_page(&bvec, page, PAGE_SIZE, 0);
-	iov_iter_bvec(&iter, ITER_SOURCE, &bvec, 1, PAGE_SIZE);
+	bvec_set_page(&bvec, page, PG_SIZE, 0);
+	iov_iter_bvec(&iter, ITER_SOURCE, &bvec, 1, PG_SIZE);
 	n = __kernel_write_iter(cprm->file, &iter, &pos);
-	if (n != PAGE_SIZE)
+	if (n != PG_SIZE)
 		return 0;
 	file->f_pos = pos;
-	cprm->written += PAGE_SIZE;
-	cprm->pos += PAGE_SIZE;
+	cprm->written += PG_SIZE;
+	cprm->pos += PG_SIZE;
 
 	return 1;
 }
@@ -1319,7 +1319,7 @@ static int dump_emit_page(struct coredump_params *cprm, struct page *page)
 static struct page *dump_page_copy(struct page *src, struct page *dst)
 {
 	void *buf = kmap_local_page(src);
-	size_t left = copy_mc_to_kernel(page_address(dst), buf, PAGE_SIZE);
+	size_t left = copy_mc_to_kernel(page_address(dst), buf, PG_SIZE);
 	kunmap_local(buf);
 	return left ? NULL : dst;
 }
@@ -1348,7 +1348,7 @@ int dump_user_range(struct coredump_params *cprm, unsigned long start,
 
 	ret = 0;
 	locked = 0;
-	for (addr = start; addr < start + len; addr += PAGE_SIZE) {
+	for (addr = start; addr < start + len; addr += PG_SIZE) {
 		struct page *page;
 
 		if (!locked) {
@@ -1375,7 +1375,7 @@ int dump_user_range(struct coredump_params *cprm, unsigned long start,
 			if (stop)
 				goto out;
 		} else {
-			dump_skip(cprm, PAGE_SIZE);
+			dump_skip(cprm, PG_SIZE);
 		}
 
 		if (dump_interrupted())
@@ -1647,9 +1647,9 @@ static unsigned long vma_dump_size(struct vm_area_struct *vma,
 	 * dump the first page to aid in determining what was mapped here.
 	 */
 	if (FILTER(ELF_HEADERS) &&
-	    vma->vm_pgoff == 0 && (vma->vm_flags & VM_READ)) {
+	    vma->vm_pteoff == 0 && (vma->vm_flags & VM_READ)) {
 		if ((READ_ONCE(file_inode(vma->vm_file)->i_mode) & 0111) != 0)
-			return PAGE_SIZE;
+			return PG_SIZE;
 
 		/*
 		 * ELF libraries aren't always executable.
@@ -1749,7 +1749,7 @@ static bool dump_vma_snapshot(struct coredump_params *cprm)
 		m->end = vma->vm_end;
 		m->flags = vma->vm_flags;
 		m->dump_size = vma_dump_size(vma, cprm->mm_flags);
-		m->pgoff = vma->vm_pgoff;
+		m->pteoff = vma->vm_pteoff;
 		m->file = vma->vm_file;
 		if (m->file)
 			get_file(m->file);
@@ -1768,7 +1768,7 @@ static bool dump_vma_snapshot(struct coredump_params *cprm)
 					memcmp(elfmag, ELFMAG, SELFMAG) != 0) {
 				m->dump_size = 0;
 			} else {
-				m->dump_size = PAGE_SIZE;
+				m->dump_size = PG_SIZE;
 			}
 		}
 

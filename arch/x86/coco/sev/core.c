@@ -138,7 +138,7 @@ static u64 __init get_snp_jump_table_addr(void)
 	void __iomem *mem;
 	u64 addr;
 
-	mem = ioremap_encrypted(sev_secrets_pa, PAGE_SIZE);
+	mem = ioremap_encrypted(sev_secrets_pa, PTE_SIZE);
 	if (!mem) {
 		pr_err("Unable to locate AP jump table address: failed to map the SNP secrets page.\n");
 		return 0;
@@ -210,7 +210,7 @@ static void pval_pages(struct snp_psc_desc *desc)
 		if (rc == PVALIDATE_FAIL_SIZEMISMATCH && size == RMP_PG_SIZE_2M) {
 			unsigned long vaddr_end = vaddr + PMD_SIZE;
 
-			for (; vaddr < vaddr_end; vaddr += PAGE_SIZE, pfn++) {
+			for (; vaddr < vaddr_end; vaddr += PTE_SIZE, pfn++) {
 				rc = pvalidate(vaddr, RMP_PG_SIZE_4K, validate);
 				if (rc)
 					__pval_terminate(pfn, validate, RMP_PG_SIZE_4K, rc, 0);
@@ -341,7 +341,7 @@ static unsigned long __set_pages_state(struct snp_psc_desc *data, unsigned long 
 			pfn = vmalloc_to_pfn((void *)vaddr);
 			use_large_entry = false;
 		} else {
-			pfn = __pa(vaddr) >> PAGE_SHIFT;
+			pfn = __pa(vaddr) >> PTE_SHIFT;
 			use_large_entry = true;
 		}
 
@@ -354,7 +354,7 @@ static unsigned long __set_pages_state(struct snp_psc_desc *data, unsigned long 
 			vaddr += PMD_SIZE;
 		} else {
 			e->pagesize = RMP_PG_SIZE_4K;
-			vaddr += PAGE_SIZE;
+			vaddr += PTE_SIZE;
 		}
 
 		e++;
@@ -400,8 +400,8 @@ static void set_pages_state(unsigned long vaddr, unsigned long npages, int op)
 		return early_set_pages_state(vaddr, __pa(vaddr), npages, &d);
 	}
 
-	vaddr = vaddr & PAGE_MASK;
-	vaddr_end = vaddr + (npages << PAGE_SHIFT);
+	vaddr = vaddr & PTE_MASK;
+	vaddr_end = vaddr + (npages << PTE_SHIFT);
 
 	while (vaddr < vaddr_end)
 		vaddr = __set_pages_state(&desc, vaddr, vaddr_end, op);
@@ -431,7 +431,7 @@ void snp_accept_memory(phys_addr_t start, phys_addr_t end)
 		return;
 
 	vaddr = (unsigned long)__va(start);
-	npages = (end - start) >> PAGE_SHIFT;
+	npages = (end - start) >> PTE_SHIFT;
 
 	set_pages_state(vaddr, npages, SNP_PAGE_STATE_PRIVATE);
 }
@@ -561,7 +561,7 @@ static void unshare_all_memory(void)
 	while (addr < end) {
 		pte = lookup_address(addr, &level);
 		size = page_level_size(level);
-		npages = size / PAGE_SIZE;
+		npages = size / PTE_SIZE;
 		skipped_addr = false;
 
 		if (!pte || !pte_decrypted(*pte) || pte_none(*pte)) {
@@ -595,9 +595,9 @@ static void unshare_all_memory(void)
 	/* Unshare all bss decrypted memory. */
 	addr = (unsigned long)__start_bss_decrypted;
 	end  = (unsigned long)__start_bss_decrypted_unused;
-	npages = (end - addr) >> PAGE_SHIFT;
+	npages = (end - addr) >> PTE_SHIFT;
 
-	for (; addr < end; addr += PAGE_SIZE) {
+	for (; addr < end; addr += PTE_SIZE) {
 		pte = lookup_address(addr, &level);
 		if (!pte || !pte_decrypted(*pte) || pte_none(*pte))
 			continue;
@@ -668,7 +668,7 @@ static void shutdown_all_aps(void)
 			 * so that is excluded and not touched by makedumpfile
 			 * while generating vmcore during kdump.
 			 */
-			p = pfn_to_online_page(pa >> PAGE_SHIFT);
+			p = pfn_to_online_page(pa >> PTE_SHIFT);
 			if (p)
 				__SetPageOffline(p);
 			continue;
@@ -723,7 +723,7 @@ void snp_kexec_finish(void)
 		/* Handle the case of a huge page containing the GHCB page */
 		addr = (unsigned long)ghcb & page_level_mask(level);
 		set_pte_enc(pte, level, (void *)addr);
-		snp_set_memory_private(addr, (size / PAGE_SIZE));
+		snp_set_memory_private(addr, (size / PTE_SIZE));
 	}
 }
 
@@ -912,16 +912,16 @@ int __init sev_es_setup_ap_jump_table(struct real_mode_header *rmh)
 		return 0;
 
 	/* Check if AP Jump Table is page-aligned */
-	if (jump_table_addr & ~PAGE_MASK)
+	if (jump_table_addr & ~PTE_MASK)
 		return -EINVAL;
 
-	jump_table_pa = jump_table_addr & PAGE_MASK;
+	jump_table_pa = jump_table_addr & PTE_MASK;
 
 	startup_cs = (u16)(rmh->trampoline_start >> 4);
 	startup_ip = (u16)(rmh->sev_es_trampoline_start -
 			   rmh->trampoline_start);
 
-	jump_table = ioremap_encrypted(jump_table_pa, PAGE_SIZE);
+	jump_table = ioremap_encrypted(jump_table_pa, PTE_SIZE);
 	if (!jump_table)
 		return -EIO;
 
@@ -957,7 +957,7 @@ int __init sev_es_efi_map_ghcbs_cas(pgd_t *pgd)
 		data = per_cpu(runtime_data, cpu);
 
 		address = __pa(&data->ghcb_page);
-		pfn = address >> PAGE_SHIFT;
+		pfn = address >> PTE_SHIFT;
 
 		if (kernel_map_pages_in_pgd(pgd, pfn, address, 1, pflags))
 			return 1;
@@ -967,7 +967,7 @@ int __init sev_es_efi_map_ghcbs_cas(pgd_t *pgd)
 			if (!address)
 				return 1;
 
-			pfn = address >> PAGE_SHIFT;
+			pfn = address >> PTE_SHIFT;
 			if (kernel_map_pages_in_pgd(pgd, pfn, address, 1, pflags_enc))
 				return 1;
 		}
@@ -1118,7 +1118,7 @@ void setup_ghcb(void)
 	 * Clear the boot_ghcb. The first exception comes in before the bss
 	 * section is cleared.
 	 */
-	memset(&boot_ghcb_page, 0, PAGE_SIZE);
+	memset(&boot_ghcb_page, 0, PTE_SIZE);
 
 	/* Alright - Make the boot-ghcb public */
 	boot_ghcb = &boot_ghcb_page;
@@ -1191,7 +1191,7 @@ static void __init alloc_runtime_data(int cpu)
 {
 	struct sev_es_runtime_data *data;
 
-	data = memblock_alloc_node(sizeof(*data), PAGE_SIZE, cpu_to_node(cpu));
+	data = memblock_alloc_node(sizeof(*data), PTE_SIZE, cpu_to_node(cpu));
 	if (!data)
 		panic("Can't allocate SEV-ES runtime data");
 
@@ -1201,7 +1201,7 @@ static void __init alloc_runtime_data(int cpu)
 		struct svsm_ca *caa;
 
 		/* Allocate the SVSM CA page if an SVSM is present */
-		caa = cpu ? memblock_alloc_or_panic(sizeof(*caa), PAGE_SIZE)
+		caa = cpu ? memblock_alloc_or_panic(sizeof(*caa), PTE_SIZE)
 			  : &boot_svsm_ca_page;
 
 		per_cpu(svsm_caa, cpu) = caa;
@@ -1231,7 +1231,7 @@ void __init sev_es_init_vc_handling(void)
 {
 	int cpu;
 
-	BUILD_BUG_ON(offsetof(struct sev_es_runtime_data, ghcb_page) % PAGE_SIZE);
+	BUILD_BUG_ON(offsetof(struct sev_es_runtime_data, ghcb_page) % PTE_SIZE);
 
 	if (!cc_platform_has(CC_ATTR_GUEST_STATE_ENCRYPT))
 		return;
@@ -1476,7 +1476,7 @@ arch_initcall(sev_sysfs_init);
 
 static void free_shared_pages(void *buf, size_t sz)
 {
-	unsigned int npages = PAGE_ALIGN(sz) >> PAGE_SHIFT;
+	unsigned int npages = PAGE_ALIGN(sz) >> PTE_SHIFT;
 	int ret;
 
 	if (!buf)
@@ -1493,7 +1493,7 @@ static void free_shared_pages(void *buf, size_t sz)
 
 static void *alloc_shared_pages(size_t sz)
 {
-	unsigned int npages = PAGE_ALIGN(sz) >> PAGE_SHIFT;
+	unsigned int npages = PAGE_ALIGN(sz) >> PTE_SHIFT;
 	struct page *page;
 	int ret;
 
@@ -1589,13 +1589,13 @@ struct snp_msg_desc *snp_msg_alloc(void)
 	struct snp_msg_desc *mdesc;
 	void __iomem *mem;
 
-	BUILD_BUG_ON(sizeof(struct snp_guest_msg) > PAGE_SIZE);
+	BUILD_BUG_ON(sizeof(struct snp_guest_msg) > PTE_SIZE);
 
 	mdesc = kzalloc_obj(struct snp_msg_desc);
 	if (!mdesc)
 		return ERR_PTR(-ENOMEM);
 
-	mem = ioremap_encrypted(sev_secrets_pa, PAGE_SIZE);
+	mem = ioremap_encrypted(sev_secrets_pa, PTE_SIZE);
 	if (!mem)
 		goto e_free_mdesc;
 
@@ -2032,7 +2032,7 @@ void __init snp_secure_tsc_init(void)
 	if (!cc_platform_has(CC_ATTR_GUEST_SNP_SECURE_TSC))
 		return;
 
-	mem = early_memremap_encrypted(sev_secrets_pa, PAGE_SIZE);
+	mem = early_memremap_encrypted(sev_secrets_pa, PTE_SIZE);
 	if (!mem) {
 		pr_err("Unable to get TSC_FACTOR: failed to map the SNP secrets page.\n");
 		sev_es_terminate(SEV_TERM_SET_LINUX, GHCB_TERM_SECURE_TSC);
@@ -2051,5 +2051,5 @@ void __init snp_secure_tsc_init(void)
 	x86_platform.calibrate_cpu = securetsc_get_tsc_khz;
 	x86_platform.calibrate_tsc = securetsc_get_tsc_khz;
 
-	early_memunmap(mem, PAGE_SIZE);
+	early_memunmap(mem, PTE_SIZE);
 }

@@ -246,7 +246,7 @@ int mtrr_add_page(unsigned long base, unsigned long size,
 	}
 
 	if ((base | (base + size - 1)) >>
-	    (boot_cpu_data.x86_phys_bits - PAGE_SHIFT)) {
+	    (boot_cpu_data.x86_phys_bits - PTE_SHIFT)) {
 		pr_warn("base or size exceeds the MTRR width\n");
 		return -EINVAL;
 	}
@@ -323,7 +323,7 @@ int mtrr_add_page(unsigned long base, unsigned long size,
 
 static int mtrr_check(unsigned long base, unsigned long size)
 {
-	if ((base & (PAGE_SIZE - 1)) || (size & (PAGE_SIZE - 1))) {
+	if ((base & (PTE_SIZE - 1)) || (size & (PTE_SIZE - 1))) {
 		pr_warn("size and base must be multiples of 4 kiB\n");
 		Dprintk("size: 0x%lx  base: 0x%lx\n", size, base);
 		dump_stack();
@@ -374,7 +374,7 @@ int mtrr_add(unsigned long base, unsigned long size, unsigned int type,
 		return -ENODEV;
 	if (mtrr_check(base, size))
 		return -EINVAL;
-	return mtrr_add_page(base >> PAGE_SHIFT, size >> PAGE_SHIFT, type,
+	return mtrr_add_page(base >> PTE_SHIFT, size >> PTE_SHIFT, type,
 			     increment);
 }
 
@@ -462,7 +462,7 @@ int mtrr_del(int reg, unsigned long base, unsigned long size)
 		return -ENODEV;
 	if (mtrr_check(base, size))
 		return -EINVAL;
-	return mtrr_del_page(reg, base >> PAGE_SHIFT, size >> PAGE_SHIFT);
+	return mtrr_del_page(reg, base >> PTE_SHIFT, size >> PTE_SHIFT);
 }
 
 /**

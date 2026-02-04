@@ -14,7 +14,7 @@ bool copy_from_kernel_nofault_allowed(const void *unsafe_src, size_t size)
 	 * Do not allow userspace addresses.  This disallows
 	 * normal userspace and the userspace guard page:
 	 */
-	if (vaddr < TASK_SIZE_MAX + PAGE_SIZE)
+	if (vaddr < TASK_SIZE_MAX + PG_SIZE)
 		return false;
 
 	/*

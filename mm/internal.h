@@ -105,7 +105,7 @@ void page_writeback_init(void);
 /*
  * If a 16GB hugetlb folio were mapped by PTEs of all of its 4kB pages,
  * its nr_pages_mapped would be 0x400000: choose the ENTIRELY_MAPPED bit
- * above that range, instead of 2*(PMD_SIZE/PAGE_SIZE).  Hugetlb currently
+ * above that range, instead of 2*(PMD_SIZE/PTE_SIZE).  Hugetlb currently
  * leaves nr_pages_mapped at 0, but avoid surprise if it participates later.
  */
 #define ENTIRELY_MAPPED		0x800000
@@ -343,7 +343,7 @@ static inline unsigned int folio_pte_batch_flags(struct folio *folio,
 	unsigned int nr, cur_nr;
 
 	VM_WARN_ON_FOLIO(!pte_present(pte), folio);
-	VM_WARN_ON_FOLIO(!folio_test_large(folio) || max_nr < 1, folio);
+	VM_WARN_ON_FOLIO(folio_nr_ptes(folio) <= 1 || max_nr < 1, folio);
 	VM_WARN_ON_FOLIO(page_folio(pfn_to_page(pte_pfn(pte))) != folio, folio);
 	/*
 	 * Ensure this is a pointer to a copy not a pointer into a page table.
@@ -354,7 +354,7 @@ static inline unsigned int folio_pte_batch_flags(struct folio *folio,
 
 	/* Limit max_nr to the actual remaining PFNs in the folio we could batch. */
 	max_nr = min_t(unsigned long, max_nr,
-		       folio_pfn(folio) + folio_nr_pages(folio) - pte_pfn(pte));
+		       folio_pfn(folio) + folio_nr_ptes(folio) - pte_pfn(pte));
 
 	nr = pte_batch_hint(ptep, pte);
 	expected_pte = __pte_batch_clear_ignored(pte_advance_pfn(pte, nr), flags);
@@ -626,7 +626,7 @@ pmd_t *mm_find_pmd(struct mm_struct *mm, unsigned long address);
 /*
  * in mm/page_alloc.c
  */
-#define K(x) ((x) << (PAGE_SHIFT-10))
+#define K(x) ((x) << (PG_SHIFT-10))
 
 extern char * const zone_names[MAX_NR_ZONES];
 
@@ -755,7 +755,7 @@ static inline bool page_is_buddy(struct page *page, struct page *buddy,
 static inline unsigned long
 __find_buddy_pfn(unsigned long page_pfn, unsigned int order)
 {
-	return page_pfn ^ (1 << order);
+	return page_pfn ^ ((1 << order) * PTES_PER_PAGE);
 }
 
 /*
@@ -778,7 +778,7 @@ static inline struct page *find_buddy_page_pfn(struct page *page,
 	unsigned long __buddy_pfn = __find_buddy_pfn(pfn, order);
 	struct page *buddy;
 
-	buddy = page + (__buddy_pfn - pfn);
+	buddy = page + (__buddy_pfn - pfn)/PTES_PER_PAGE;
 	if (buddy_pfn)
 		*buddy_pfn = __buddy_pfn;
 
@@ -1068,8 +1068,8 @@ static inline bool
 folio_within_range(struct folio *folio, struct vm_area_struct *vma,
 		unsigned long start, unsigned long end)
 {
-	pgoff_t pgoff, addr;
-	unsigned long vma_pglen = vma_pages(vma);
+	pgoff_t pteoff, addr;
+	unsigned long vma_ptelen = vma_ptes(vma);
 
 	VM_WARN_ON_FOLIO(folio_test_ksm(folio), folio);
 	if (start > end)
@@ -1081,13 +1081,13 @@ folio_within_range(struct folio *folio, struct vm_area_struct *vma,
 	if (end > vma->vm_end)
 		end = vma->vm_end;
 
-	pgoff = folio_pgoff(folio);
+	pteoff = folio_pteoff(folio);
 
 	/* if folio start address is not in vma range */
-	if (!in_range(pgoff, vma->vm_pgoff, vma_pglen))
+	if (!in_range(pteoff, vma->vm_pteoff, vma_ptelen))
 		return false;
 
-	addr = vma->vm_start + ((pgoff - vma->vm_pgoff) << PAGE_SHIFT);
+	addr = vma->vm_start + ((pteoff - vma->vm_pteoff) << PTE_SHIFT);
 
 	return !(addr < start || end - addr < folio_size(folio));
 }
@@ -1157,17 +1157,19 @@ extern pmd_t maybe_pmd_mkwrite(pmd_t pmd, struct vm_area_struct *vma);
  * where any of these pages appear.  Otherwise, return -EFAULT.
  */
 static inline unsigned long vma_address(const struct vm_area_struct *vma,
-		pgoff_t pgoff, unsigned long nr_pages)
+		pgoff_t pgoff, unsigned long nr_ptes)
 {
-	unsigned long address;
+	unsigned long address, pteoff;
 
-	if (pgoff >= vma->vm_pgoff) {
+	pteoff = pgoff * PTES_PER_PAGE;
+
+	if (pteoff >= vma->vm_pteoff) {
 		address = vma->vm_start +
-			((pgoff - vma->vm_pgoff) << PAGE_SHIFT);
+			((pteoff - vma->vm_pteoff) << PTE_SHIFT);
 		/* Check for address beyond vma (or wrapped through 0?) */
 		if (address < vma->vm_start || address >= vma->vm_end)
 			address = -EFAULT;
-	} else if (pgoff + nr_pages - 1 >= vma->vm_pgoff) {
+	} else if (pteoff + nr_ptes - 1 >= vma->vm_pteoff) {
 		/* Test above avoids possibility of wrap to 0 on 32-bit */
 		address = vma->vm_start;
 	} else {
@@ -1183,15 +1185,15 @@ static inline unsigned long vma_address(const struct vm_area_struct *vma,
 static inline unsigned long vma_address_end(struct page_vma_mapped_walk *pvmw)
 {
 	struct vm_area_struct *vma = pvmw->vma;
-	pgoff_t pgoff;
+	pgoff_t pteoff;
 	unsigned long address;
 
 	/* Common case, plus ->pgoff is invalid for KSM */
-	if (pvmw->nr_pages == 1)
-		return pvmw->address + PAGE_SIZE;
+	if (pvmw->nr_ptes == 1)
+		return pvmw->address + PTE_SIZE;
 
-	pgoff = pvmw->pgoff + pvmw->nr_pages;
-	address = vma->vm_start + ((pgoff - vma->vm_pgoff) << PAGE_SHIFT);
+	pteoff = pvmw->pteoff + pvmw->nr_ptes;
+	address = vma->vm_start + ((pteoff - vma->vm_pteoff) << PTE_SHIFT);
 	/* Check for address beyond vma (or wrapped through 0?) */
 	if (address < vma->vm_start || address > vma->vm_end)
 		address = vma->vm_end;
@@ -1619,11 +1621,11 @@ void memblock_free_all(void);
 
 static __always_inline void vma_set_range(struct vm_area_struct *vma,
 					  unsigned long start, unsigned long end,
-					  pgoff_t pgoff)
+					  unsigned long pteoff)
 {
 	vma->vm_start = start;
 	vma->vm_end = end;
-	vma->vm_pgoff = pgoff;
+	vma->vm_pteoff = pteoff;
 }
 
 static inline bool vma_soft_dirty_enabled(struct vm_area_struct *vma)

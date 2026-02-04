@@ -140,9 +140,9 @@ static u8 get_var_mtrr_state(unsigned int reg, u64 *start, u64 *size)
 	if (!(mtrr->mask_lo & MTRR_PHYSMASK_V))
 		return MTRR_TYPE_INVALID;
 
-	*start = (((u64)mtrr->base_hi) << 32) + (mtrr->base_lo & PAGE_MASK);
+	*start = (((u64)mtrr->base_hi) << 32) + (mtrr->base_lo & PTE_MASK);
 	*size = get_mtrr_size((((u64)mtrr->mask_hi) << 32) +
-			      (mtrr->mask_lo & PAGE_MASK));
+			      (mtrr->mask_lo & PTE_MASK));
 
 	return mtrr->base_lo & MTRR_PHYSBASE_TYPE;
 }
@@ -664,7 +664,7 @@ static void __init print_mtrr_state(void)
 	}
 	pr_info("MTRR variable ranges %s:\n",
 		str_enabled_disabled(mtrr_state.enabled & MTRR_STATE_MTRR_ENABLED));
-	high_width = (boot_cpu_data.x86_phys_bits - (32 - PAGE_SHIFT) + 3) / 4;
+	high_width = (boot_cpu_data.x86_phys_bits - (32 - PTE_SHIFT) + 3) / 4;
 
 	for (i = 0; i < num_var_ranges; ++i) {
 		if (mtrr_state.var_ranges[i].mask_lo & MTRR_PHYSMASK_V)
@@ -829,7 +829,7 @@ static void generic_get_mtrr(unsigned int reg, unsigned long *base,
 	rdmsr(MTRRphysBase_MSR(reg), base_lo, base_hi);
 
 	/* Work out the shifted address mask: */
-	tmp = (u64)mask_hi << 32 | (mask_lo & PAGE_MASK);
+	tmp = (u64)mask_hi << 32 | (mask_lo & PTE_MASK);
 	mask = (u64)phys_hi_rsvd << 32 | tmp;
 
 	/* Expand tmp with high bits to all 1s: */
@@ -848,8 +848,8 @@ static void generic_get_mtrr(unsigned int reg, unsigned long *base,
 	 * This works correctly if size is a power of two, i.e. a
 	 * contiguous range:
 	 */
-	*size = -mask >> PAGE_SHIFT;
-	*base = (u64)base_hi << (32 - PAGE_SHIFT) | base_lo >> PAGE_SHIFT;
+	*size = -mask >> PTE_SHIFT;
+	*base = (u64)base_hi << (32 - PTE_SHIFT) | base_lo >> PTE_SHIFT;
 	*type = base_lo & MTRR_PHYSBASE_TYPE;
 
 out_put_cpu:
@@ -1004,10 +1004,10 @@ static void generic_set_mtrr(unsigned int reg, unsigned long base,
 		mtrr_wrmsr(MTRRphysMask_MSR(reg), 0, 0);
 		memset(vr, 0, sizeof(struct mtrr_var_range));
 	} else {
-		vr->base_lo = base << PAGE_SHIFT | type;
-		vr->base_hi = (base >> (32 - PAGE_SHIFT)) & ~phys_hi_rsvd;
-		vr->mask_lo = -size << PAGE_SHIFT | MTRR_PHYSMASK_V;
-		vr->mask_hi = (-size >> (32 - PAGE_SHIFT)) & ~phys_hi_rsvd;
+		vr->base_lo = base << PTE_SHIFT | type;
+		vr->base_hi = (base >> (32 - PTE_SHIFT)) & ~phys_hi_rsvd;
+		vr->mask_lo = -size << PTE_SHIFT | MTRR_PHYSMASK_V;
+		vr->mask_hi = (-size >> (32 - PTE_SHIFT)) & ~phys_hi_rsvd;
 
 		mtrr_wrmsr(MTRRphysBase_MSR(reg), vr->base_lo, vr->base_hi);
 		mtrr_wrmsr(MTRRphysMask_MSR(reg), vr->mask_lo, vr->mask_hi);
@@ -1028,7 +1028,7 @@ int generic_validate_add_page(unsigned long base, unsigned long size,
 	 */
 	if (mtrr_if == &generic_mtrr_ops && boot_cpu_data.x86_vfm == INTEL_PENTIUM_PRO &&
 	    boot_cpu_data.x86_stepping <= 7) {
-		if (base & ((1 << (22 - PAGE_SHIFT)) - 1)) {
+		if (base & ((1 << (22 - PTE_SHIFT)) - 1)) {
 			pr_warn("mtrr: base(0x%lx000) is not 4 MiB aligned\n", base);
 			return -EINVAL;
 		}

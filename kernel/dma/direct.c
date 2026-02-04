@@ -39,7 +39,7 @@ static inline struct page *dma_direct_to_page(struct device *dev,
 
 u64 dma_direct_get_required_mask(struct device *dev)
 {
-	phys_addr_t phys = (phys_addr_t)(max_pfn - 1) << PAGE_SHIFT;
+	phys_addr_t phys = (phys_addr_t)(max_pfn - 1) << PTE_SHIFT;
 	u64 max_dma = phys_to_dma_direct(dev, phys);
 
 	return (1ULL << (fls64(max_dma) - 1)) * 2 - 1;
@@ -123,7 +123,7 @@ static struct page *__dma_direct_alloc_pages(struct device *dev, size_t size,
 	struct page *page;
 	u64 phys_limit;
 
-	WARN_ON_ONCE(!PAGE_ALIGNED(size));
+	WARN_ON_ONCE(!PG_ALIGNED(size));
 
 	if (is_swiotlb_for_alloc(dev))
 		return dma_direct_alloc_swiotlb(dev, size);
@@ -207,7 +207,7 @@ void *dma_direct_alloc(struct device *dev, size_t size,
 	struct page *page;
 	void *ret;
 
-	size = PAGE_ALIGN(size);
+	size = PG_ALIGN(size);
 	if (attrs & DMA_ATTR_NO_WARN)
 		gfp |= __GFP_NOWARN;
 
@@ -335,7 +335,7 @@ void dma_direct_free(struct device *dev, size_t size,
 
 	/* If cpu_addr is not from an atomic pool, dma_free_from_pool() fails */
 	if (IS_ENABLED(CONFIG_DMA_COHERENT_POOL) &&
-	    dma_free_from_pool(dev, cpu_addr, PAGE_ALIGN(size)))
+	    dma_free_from_pool(dev, cpu_addr, PG_ALIGN(size)))
 		return;
 
 	if (is_vmalloc_addr(cpu_addr)) {
@@ -504,7 +504,7 @@ int dma_direct_get_sgtable(struct device *dev, struct sg_table *sgt,
 
 	ret = sg_alloc_table(sgt, 1, GFP_KERNEL);
 	if (!ret)
-		sg_set_page(sgt->sgl, page, PAGE_ALIGN(size), 0);
+		sg_set_page(sgt->sgl, page, PG_ALIGN(size), 0);
 	return ret;
 }
 
@@ -519,7 +519,7 @@ int dma_direct_mmap(struct device *dev, struct vm_area_struct *vma,
 		unsigned long attrs)
 {
 	unsigned long user_count = vma_pages(vma);
-	unsigned long count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+	unsigned long count = PG_ALIGN(size) >> PTE_SHIFT;
 	unsigned long pfn = PHYS_PFN(dma_to_phys(dev, dma_addr));
 	int ret = -ENXIO;
 
@@ -532,15 +532,15 @@ int dma_direct_mmap(struct device *dev, struct vm_area_struct *vma,
 	if (dma_mmap_from_global_coherent(vma, cpu_addr, size, &ret))
 		return ret;
 
-	if (vma->vm_pgoff >= count || user_count > count - vma->vm_pgoff)
+	if (vma->vm_pteoff >= count || user_count > count - vma->vm_pteoff)
 		return -ENXIO;
-	return remap_pfn_range(vma, vma->vm_start, pfn + vma->vm_pgoff,
-			user_count << PAGE_SHIFT, vma->vm_page_prot);
+	return remap_pfn_range(vma, vma->vm_start, pfn + vma->vm_pteoff,
+			user_count << PTE_SHIFT, vma->vm_page_prot);
 }
 
 int dma_direct_supported(struct device *dev, u64 mask)
 {
-	u64 min_mask = (max_pfn - 1) << PAGE_SHIFT;
+	u64 min_mask = (max_pfn - 1) << PTE_SHIFT;
 
 	/*
 	 * Because 32-bit DMA masks are so common we expect every architecture

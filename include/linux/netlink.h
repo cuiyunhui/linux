@@ -267,10 +267,10 @@ netlink_skb_clone(struct sk_buff *skb, gfp_t gfp_mask)
  *	skb should fit one page. This choice is good for headerless malloc.
  *	But we should limit to 8K so that userspace does not have to
  *	use enormous buffer sizes on recvmsg() calls just to avoid
- *	MSG_TRUNC when PAGE_SIZE is very large.
+ *	MSG_TRUNC when PG_SIZE is very large.
  */
-#if PAGE_SIZE < 8192UL
-#define NLMSG_GOODSIZE	SKB_WITH_OVERHEAD(PAGE_SIZE)
+#if PG_SIZE < 8192UL
+#define NLMSG_GOODSIZE	SKB_WITH_OVERHEAD(PG_SIZE)
 #else
 #define NLMSG_GOODSIZE	SKB_WITH_OVERHEAD(8192UL)
 #endif

@@ -219,7 +219,7 @@ char *parse_args(const char *doing,
 	}								\
 	int param_get_##name(char *buffer, const struct kernel_param *kp) \
 	{								\
-		return scnprintf(buffer, PAGE_SIZE, format "\n",	\
+		return scnprintf(buffer, PG_SIZE, format "\n",	\
 				*((type *)kp->arg));			\
 	}								\
 	const struct kernel_param_ops param_ops_##name = {			\
@@ -289,7 +289,7 @@ EXPORT_SYMBOL(param_set_charp);
 
 int param_get_charp(char *buffer, const struct kernel_param *kp)
 {
-	return scnprintf(buffer, PAGE_SIZE, "%s\n", *((char **)kp->arg));
+	return scnprintf(buffer, PG_SIZE, "%s\n", *((char **)kp->arg));
 }
 EXPORT_SYMBOL(param_get_charp);
 
@@ -528,7 +528,7 @@ EXPORT_SYMBOL(param_set_copystring);
 int param_get_string(char *buffer, const struct kernel_param *kp)
 {
 	const struct kparam_string *kps = kp->str;
-	return scnprintf(buffer, PAGE_SIZE, "%s\n", kps->string);
+	return scnprintf(buffer, PG_SIZE, "%s\n", kps->string);
 }
 EXPORT_SYMBOL(param_get_string);
 
@@ -852,7 +852,7 @@ ssize_t __modver_version_show(const struct module_attribute *mattr,
 	const struct module_version_attribute *vattr =
 		container_of_const(mattr, struct module_version_attribute, mattr);
 
-	return scnprintf(buf, PAGE_SIZE, "%s\n", vattr->version);
+	return scnprintf(buf, PG_SIZE, "%s\n", vattr->version);
 }
 
 extern const struct module_version_attribute __start___modver[];

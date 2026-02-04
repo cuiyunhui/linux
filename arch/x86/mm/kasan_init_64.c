@@ -20,7 +20,7 @@
 
 extern struct range pfn_mapped[E820_MAX_ENTRIES];
 
-static p4d_t tmp_p4d_table[MAX_PTRS_PER_P4D] __initdata __aligned(PAGE_SIZE);
+static p4d_t tmp_p4d_table[MAX_PTRS_PER_P4D] __initdata __aligned(PTE_SIZE);
 
 static __init void *early_alloc(size_t size, int nid, bool should_panic)
 {
@@ -51,7 +51,7 @@ static void __init kasan_populate_pmd(pmd_t *pmd, unsigned long addr,
 			memblock_free(p, PMD_SIZE);
 		}
 
-		p = early_alloc(PAGE_SIZE, nid, true);
+		p = early_alloc(PTE_SIZE, nid, true);
 		pmd_populate_kernel(&init_mm, pmd, p);
 	}
 
@@ -63,10 +63,10 @@ static void __init kasan_populate_pmd(pmd_t *pmd, unsigned long addr,
 		if (!pte_none(*pte))
 			continue;
 
-		p = early_alloc(PAGE_SIZE, nid, true);
+		p = early_alloc(PTE_SIZE, nid, true);
 		entry = pfn_pte(PFN_DOWN(__pa(p)), PAGE_KERNEL);
 		set_pte_at(&init_mm, addr, pte, entry);
-	} while (pte++, addr += PAGE_SIZE, addr != end);
+	} while (pte++, addr += PTE_SIZE, addr != end);
 }
 
 static void __init kasan_populate_pud(pud_t *pud, unsigned long addr,
@@ -87,7 +87,7 @@ static void __init kasan_populate_pud(pud_t *pud, unsigned long addr,
 			memblock_free(p, PUD_SIZE);
 		}
 
-		p = early_alloc(PAGE_SIZE, nid, true);
+		p = early_alloc(PTE_SIZE, nid, true);
 		pud_populate(&init_mm, pud, p);
 	}
 
@@ -106,7 +106,7 @@ static void __init kasan_populate_p4d(p4d_t *p4d, unsigned long addr,
 	unsigned long next;
 
 	if (p4d_none(*p4d)) {
-		void *p = early_alloc(PAGE_SIZE, nid, true);
+		void *p = early_alloc(PTE_SIZE, nid, true);
 
 		p4d_populate(&init_mm, p4d, p);
 	}
@@ -127,7 +127,7 @@ static void __init kasan_populate_pgd(pgd_t *pgd, unsigned long addr,
 	unsigned long next;
 
 	if (pgd_none(*pgd)) {
-		p = early_alloc(PAGE_SIZE, nid, true);
+		p = early_alloc(PTE_SIZE, nid, true);
 		pgd_populate(&init_mm, pgd, p);
 	}
 
@@ -145,7 +145,7 @@ static void __init kasan_populate_shadow(unsigned long addr, unsigned long end,
 	unsigned long next;
 
 	addr = addr & PAGE_MASK;
-	end = round_up(end, PAGE_SIZE);
+	end = round_up(end, PTE_SIZE);
 	pgd = pgd_offset_k(addr);
 	do {
 		next = pgd_addr_end(addr, end);
@@ -254,7 +254,7 @@ static void __init kasan_shallow_populate_p4ds(pgd_t *pgd,
 		next = p4d_addr_end(addr, end);
 
 		if (p4d_none(*p4d)) {
-			p = early_alloc(PAGE_SIZE, NUMA_NO_NODE, true);
+			p = early_alloc(PTE_SIZE, NUMA_NO_NODE, true);
 			p4d_populate(&init_mm, p4d, p);
 		}
 	} while (p4d++, addr = next, addr != end);
@@ -272,7 +272,7 @@ static void __init kasan_shallow_populate_pgds(void *start, void *end)
 		next = pgd_addr_end(addr, (unsigned long)end);
 
 		if (pgd_none(*pgd)) {
-			p = early_alloc(PAGE_SIZE, NUMA_NO_NODE, true);
+			p = early_alloc(PTE_SIZE, NUMA_NO_NODE, true);
 			pgd_populate(&init_mm, pgd, p);
 		}
 
@@ -319,14 +319,14 @@ static unsigned long kasan_mem_to_shadow_align_down(unsigned long va)
 {
 	unsigned long shadow = (unsigned long)kasan_mem_to_shadow((void *)va);
 
-	return round_down(shadow, PAGE_SIZE);
+	return round_down(shadow, PTE_SIZE);
 }
 
 static unsigned long kasan_mem_to_shadow_align_up(unsigned long va)
 {
 	unsigned long shadow = (unsigned long)kasan_mem_to_shadow((void *)va);
 
-	return round_up(shadow, PAGE_SIZE);
+	return round_up(shadow, PTE_SIZE);
 }
 
 void __init kasan_populate_shadow_for_vaddr(void *va, size_t size, int nid)
@@ -436,7 +436,7 @@ void __init kasan_init(void)
 	 * it may contain some garbage. Now we can clear and write protect it,
 	 * since after the TLB flush no one should write to it.
 	 */
-	memset(kasan_early_shadow_page, 0, PAGE_SIZE);
+	memset(kasan_early_shadow_page, 0, PTE_SIZE);
 	for (i = 0; i < PTRS_PER_PTE; i++) {
 		pte_t pte;
 		pgprot_t prot;

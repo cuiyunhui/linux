@@ -297,7 +297,7 @@ int __blk_rq_map_sg(struct request *rq, struct scatterlist *sglist,
 
 		WARN_ON_ONCE(overflows_type(vec.len, unsigned int));
 		sg_set_page(*last_sg, phys_to_page(vec.paddr), vec.len,
-				offset_in_page(vec.paddr));
+				offset_in_pg(vec.paddr));
 		nsegs++;
 	}
 
@@ -419,7 +419,7 @@ int blk_rq_map_integrity_sg(struct request *rq, struct scatterlist *sglist)
 
 		WARN_ON_ONCE(overflows_type(vec.len, unsigned int));
 		sg_set_page(sg, phys_to_page(vec.paddr), vec.len,
-				offset_in_page(vec.paddr));
+				offset_in_pg(vec.paddr));
 		segments++;
 	}
 

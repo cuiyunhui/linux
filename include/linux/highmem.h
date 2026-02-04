@@ -157,7 +157,7 @@ static inline void *kmap_local_folio(const struct folio *folio, size_t offset);
  *   void *vaddr = kmap_atomic(page);
  *
  *   // Do something to the contents of that page.
- *   memset(vaddr, 0, PAGE_SIZE);
+ *   memset(vaddr, 0, PG_SIZE);
  *
  *   // Unmap that page.
  *   kunmap_atomic(vaddr);
@@ -171,7 +171,7 @@ static inline void *kmap_local_folio(const struct folio *folio, size_t offset);
  * vaddr1 = kmap_atomic(page1);
  * vaddr2 = kmap_atomic(page2);
  *
- * memcpy(vaddr1, vaddr2, PAGE_SIZE);
+ * memcpy(vaddr1, vaddr2, PG_SIZE);
  *
  * kunmap_atomic(vaddr2);
  * kunmap_atomic(vaddr1);
@@ -356,7 +356,7 @@ static inline bool tag_clear_highpages(struct page *page, int numpages)
 #endif
 
 /*
- * If we pass in a base or tail page, we can zero up to PAGE_SIZE.
+ * If we pass in a base or tail page, we can zero up to PG_SIZE.
  * If we pass in a head page, we can zero up to the size of the compound page.
  */
 #ifdef CONFIG_HIGHMEM
@@ -400,7 +400,7 @@ static inline void copy_user_highpage(struct page *to, struct page *from,
 	vfrom = kmap_local_page(from);
 	vto = kmap_local_page(to);
 	copy_user_page(vto, vfrom, vaddr, to);
-	kmsan_unpoison_memory(page_address(to), PAGE_SIZE);
+	kmsan_unpoison_memory(page_address(to), PG_SIZE);
 	kunmap_local(vto);
 	kunmap_local(vfrom);
 }
@@ -438,9 +438,9 @@ static inline int copy_mc_user_highpage(struct page *to, struct page *from,
 
 	vfrom = kmap_local_page(from);
 	vto = kmap_local_page(to);
-	ret = copy_mc_to_kernel(vto, vfrom, PAGE_SIZE);
+	ret = copy_mc_to_kernel(vto, vfrom, PG_SIZE);
 	if (!ret)
-		kmsan_unpoison_memory(page_address(to), PAGE_SIZE);
+		kmsan_unpoison_memory(page_address(to), PG_SIZE);
 	kunmap_local(vto);
 	kunmap_local(vfrom);
 
@@ -457,7 +457,7 @@ static inline int copy_mc_highpage(struct page *to, struct page *from)
 
 	vfrom = kmap_local_page(from);
 	vto = kmap_local_page(to);
-	ret = copy_mc_to_kernel(vto, vfrom, PAGE_SIZE);
+	ret = copy_mc_to_kernel(vto, vfrom, PG_SIZE);
 	if (!ret)
 		kmsan_copy_page_meta(to, from);
 	kunmap_local(vto);
@@ -490,7 +490,7 @@ static inline void memcpy_page(struct page *dst_page, size_t dst_off,
 	char *dst = kmap_local_page(dst_page);
 	char *src = kmap_local_page(src_page);
 
-	VM_BUG_ON(dst_off + len > PAGE_SIZE || src_off + len > PAGE_SIZE);
+	VM_BUG_ON(dst_off + len > PG_SIZE || src_off + len > PG_SIZE);
 	memcpy(dst + dst_off, src + src_off, len);
 	kunmap_local(src);
 	kunmap_local(dst);
@@ -508,11 +508,11 @@ static inline void memcpy_folio(struct folio *dst_folio, size_t dst_off,
 		size_t chunk = len;
 
 		if (folio_test_highmem(dst_folio) &&
-		    chunk > PAGE_SIZE - offset_in_page(dst_off))
-			chunk = PAGE_SIZE - offset_in_page(dst_off);
+		    chunk > PG_SIZE - offset_in_pg(dst_off))
+			chunk = PG_SIZE - offset_in_pg(dst_off);
 		if (folio_test_highmem(src_folio) &&
-		    chunk > PAGE_SIZE - offset_in_page(src_off))
-			chunk = PAGE_SIZE - offset_in_page(src_off);
+		    chunk > PG_SIZE - offset_in_pg(src_off))
+			chunk = PG_SIZE - offset_in_pg(src_off);
 		memcpy(dst, src, chunk);
 		kunmap_local(src);
 		kunmap_local(dst);
@@ -528,7 +528,7 @@ static inline void memset_page(struct page *page, size_t offset, int val,
 {
 	char *addr = kmap_local_page(page);
 
-	VM_BUG_ON(offset + len > PAGE_SIZE);
+	VM_BUG_ON(offset + len > PG_SIZE);
 	memset(addr + offset, val, len);
 	kunmap_local(addr);
 }
@@ -538,7 +538,7 @@ static inline void memcpy_from_page(char *to, struct page *page,
 {
 	char *from = kmap_local_page(page);
 
-	VM_BUG_ON(offset + len > PAGE_SIZE);
+	VM_BUG_ON(offset + len > PG_SIZE);
 	memcpy(to, from + offset, len);
 	kunmap_local(from);
 }
@@ -548,7 +548,7 @@ static inline void memcpy_to_page(struct page *page, size_t offset,
 {
 	char *to = kmap_local_page(page);
 
-	VM_BUG_ON(offset + len > PAGE_SIZE);
+	VM_BUG_ON(offset + len > PG_SIZE);
 	memcpy(to + offset, from, len);
 	flush_dcache_page(page);
 	kunmap_local(to);
@@ -558,7 +558,7 @@ static inline void memzero_page(struct page *page, size_t offset, size_t len)
 {
 	char *addr = kmap_local_page(page);
 
-	VM_BUG_ON(offset + len > PAGE_SIZE);
+	VM_BUG_ON(offset + len > PG_SIZE);
 	memset(addr + offset, 0, len);
 	flush_dcache_page(page);
 	kunmap_local(addr);
@@ -581,8 +581,8 @@ static inline void memcpy_from_folio(char *to, struct folio *folio,
 		size_t chunk = len;
 
 		if (folio_test_partial_kmap(folio) &&
-		    chunk > PAGE_SIZE - offset_in_page(offset))
-			chunk = PAGE_SIZE - offset_in_page(offset);
+		    chunk > PG_SIZE - offset_in_pg(offset))
+			chunk = PG_SIZE - offset_in_pg(offset);
 		memcpy(to, from, chunk);
 		kunmap_local(from);
 
@@ -609,8 +609,8 @@ static inline void memcpy_to_folio(struct folio *folio, size_t offset,
 		size_t chunk = len;
 
 		if (folio_test_partial_kmap(folio) &&
-		    chunk > PAGE_SIZE - offset_in_page(offset))
-			chunk = PAGE_SIZE - offset_in_page(offset);
+		    chunk > PG_SIZE - offset_in_pg(offset))
+			chunk = PG_SIZE - offset_in_pg(offset);
 		memcpy(to, from, chunk);
 		kunmap_local(to);
 
@@ -642,14 +642,14 @@ static inline __must_check void *folio_zero_tail(struct folio *folio,
 	size_t len = folio_size(folio) - offset;
 
 	if (folio_test_partial_kmap(folio)) {
-		size_t max = PAGE_SIZE - offset_in_page(offset);
+		size_t max = PG_SIZE - offset_in_pg(offset);
 
 		while (len > max) {
 			memset(kaddr, 0, max);
 			kunmap_local(kaddr);
 			len -= max;
 			offset += max;
-			max = PAGE_SIZE;
+			max = PG_SIZE;
 			kaddr = kmap_local_folio(folio, offset);
 		}
 	}
@@ -680,7 +680,7 @@ static inline void folio_fill_tail(struct folio *folio, size_t offset,
 	VM_BUG_ON(offset + len > folio_size(folio));
 
 	if (folio_test_partial_kmap(folio)) {
-		size_t max = PAGE_SIZE - offset_in_page(offset);
+		size_t max = PG_SIZE - offset_in_pg(offset);
 
 		while (len > max) {
 			memcpy(to, from, max);
@@ -688,7 +688,7 @@ static inline void folio_fill_tail(struct folio *folio, size_t offset,
 			len -= max;
 			from += max;
 			offset += max;
-			max = PAGE_SIZE;
+			max = PG_SIZE;
 			to = kmap_local_folio(folio, offset);
 		}
 	}
@@ -705,7 +705,7 @@ static inline void folio_fill_tail(struct folio *folio, size_t offset,
  * @pos: The position in the file.
  * @len: The maximum number of bytes to copy.
  *
- * Copy up to @len bytes from this folio.  This may be limited by PAGE_SIZE
+ * Copy up to @len bytes from this folio.  This may be limited by PG_SIZE
  * if the folio comes from HIGHMEM, and by the size of the folio.
  *
  * Return: The number of bytes copied from the folio.
@@ -717,8 +717,8 @@ static inline size_t memcpy_from_file_folio(char *to, struct folio *folio,
 	char *from = kmap_local_folio(folio, offset);
 
 	if (folio_test_partial_kmap(folio)) {
-		offset = offset_in_page(offset);
-		len = min_t(size_t, len, PAGE_SIZE - offset);
+		offset = offset_in_pg(offset);
+		len = min_t(size_t, len, PG_SIZE - offset);
 	} else
 		len = min(len, folio_size(folio) - offset);
 

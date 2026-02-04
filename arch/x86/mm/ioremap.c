@@ -45,7 +45,7 @@ struct ioremap_desc {
 int ioremap_change_attr(unsigned long vaddr, unsigned long size,
 			enum page_cache_mode pcm)
 {
-	unsigned long nrpages = size >> PAGE_SHIFT;
+	unsigned long nrpages = size >> PTE_SHIFT;
 	int err;
 
 	switch (pcm) {
@@ -76,8 +76,8 @@ static unsigned int __ioremap_check_ram(struct resource *res)
 	if ((res->flags & IORESOURCE_SYSTEM_RAM) != IORESOURCE_SYSTEM_RAM)
 		return 0;
 
-	start_pfn = (res->start + PAGE_SIZE - 1) >> PAGE_SHIFT;
-	stop_pfn = (res->end + 1) >> PAGE_SHIFT;
+	start_pfn = (res->start + PTE_SIZE - 1) >> PTE_SHIFT;
+	stop_pfn = (res->end + 1) >> PTE_SHIFT;
 	if (stop_pfn > start_pfn) {
 		for_each_valid_pfn(pfn, start_pfn, stop_pfn)
 			if (!PageReserved(pfn_to_page(pfn)))
@@ -221,9 +221,9 @@ __ioremap_caller(resource_size_t phys_addr, unsigned long size,
 	/*
 	 * Mappings have to be page-aligned
 	 */
-	offset = phys_addr & ~PAGE_MASK;
-	phys_addr &= PAGE_MASK;
-	size = PAGE_ALIGN(last_addr+1) - phys_addr;
+	offset = phys_addr & ~PG_MASK;
+	phys_addr &= PG_MASK;
+	size = PG_ALIGN(last_addr+1) - phys_addr;
 
 	/*
 	 * Mask out any bits not part of the actual physical
@@ -476,7 +476,7 @@ void iounmap(volatile void __iomem *addr)
 	mmiotrace_iounmap(addr);
 
 	addr = (volatile void __iomem *)
-		(PAGE_MASK & (unsigned long __force)addr);
+		(PG_MASK & (unsigned long __force)addr);
 
 	/* Use the vm area unlocked, assuming the caller
 	   ensures there isn't another iounmap for the same address
@@ -516,12 +516,12 @@ void *arch_memremap_wb(phys_addr_t phys_addr, size_t size, unsigned long flags)
  */
 void *xlate_dev_mem_ptr(phys_addr_t phys)
 {
-	unsigned long start  = phys &  PAGE_MASK;
-	unsigned long offset = phys & ~PAGE_MASK;
+	unsigned long start  = phys &  PG_MASK;
+	unsigned long offset = phys & ~PG_MASK;
 	void *vaddr;
 
 	/* memremap() maps if RAM, otherwise falls back to ioremap() */
-	vaddr = memremap(start, PAGE_SIZE, MEMREMAP_WB);
+	vaddr = memremap(start, PG_SIZE, MEMREMAP_WB);
 
 	/* Only add the offset on success and return NULL if memremap() failed */
 	if (vaddr)
@@ -532,7 +532,7 @@ void *xlate_dev_mem_ptr(phys_addr_t phys)
 
 void unxlate_dev_mem_ptr(phys_addr_t phys, void *addr)
 {
-	memunmap((void *)((unsigned long)addr & PAGE_MASK));
+	memunmap((void *)((unsigned long)addr & PG_MASK));
 }
 
 #ifdef CONFIG_AMD_MEM_ENCRYPT
@@ -821,7 +821,7 @@ void __init *early_memremap_decrypted_wp(resource_size_t phys_addr,
 }
 #endif	/* CONFIG_AMD_MEM_ENCRYPT */
 
-static pte_t bm_pte[PAGE_SIZE/sizeof(pte_t)] __page_aligned_bss;
+static pte_t bm_pte[PTE_SIZE/sizeof(pte_t)] __page_aligned_bss;
 
 static inline pmd_t * __init early_ioremap_pmd(unsigned long addr)
 {
@@ -842,7 +842,7 @@ static inline pte_t * __init early_ioremap_pte(unsigned long addr)
 
 bool __init is_early_ioremap_ptep(pte_t *ptep)
 {
-	return ptep >= &bm_pte[0] && ptep < &bm_pte[PAGE_SIZE/sizeof(pte_t)];
+	return ptep >= &bm_pte[0] && ptep < &bm_pte[PTE_SIZE/sizeof(pte_t)];
 }
 
 void __init early_ioremap_init(void)
@@ -850,9 +850,9 @@ void __init early_ioremap_init(void)
 	pmd_t *pmd;
 
 #ifdef CONFIG_X86_64
-	BUILD_BUG_ON((fix_to_virt(0) + PAGE_SIZE) & ((1 << PMD_SHIFT) - 1));
+	BUILD_BUG_ON((fix_to_virt(0) + PTE_SIZE) & ((1 << PMD_SHIFT) - 1));
 #else
-	WARN_ON((fix_to_virt(0) + PAGE_SIZE) & ((1 << PMD_SHIFT) - 1));
+	WARN_ON((fix_to_virt(0) + PTE_SIZE) & ((1 << PMD_SHIFT) - 1));
 #endif
 
 	early_ioremap_setup();
@@ -865,7 +865,7 @@ void __init early_ioremap_init(void)
 	 * The boot-ioremap range spans multiple pmds, for which
 	 * we are not prepared:
 	 */
-#define __FIXADDR_TOP (-PAGE_SIZE)
+#define __FIXADDR_TOP (-PTE_SIZE)
 	BUILD_BUG_ON((__fix_to_virt(FIX_BTMAP_BEGIN) >> PMD_SHIFT)
 		     != (__fix_to_virt(FIX_BTMAP_END) >> PMD_SHIFT));
 #undef __FIXADDR_TOP
@@ -900,7 +900,7 @@ void __init __early_set_fixmap(enum fixed_addresses idx,
 	pgprot_val(flags) &= __supported_pte_mask;
 
 	if (pgprot_val(flags))
-		set_pte(pte, pfn_pte(phys >> PAGE_SHIFT, flags));
+		set_pte(pte, pfn_pte(phys >> PTE_SHIFT, flags));
 	else
 		pte_clear(&init_mm, addr, pte);
 	flush_tlb_one_kernel(addr);

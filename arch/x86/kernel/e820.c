@@ -692,7 +692,7 @@ __init void e820__setup_pci_gap(void)
 
 	if (!found) {
 #ifdef CONFIG_X86_64
-		max_gap_start = (max_pfn << PAGE_SHIFT) + SZ_1M;
+		max_gap_start = (max_pfn << PTE_SHIFT) + SZ_1M;
 		pr_err("Cannot find an available gap in the 32-bit address range\n");
 		pr_err("PCI devices with unassigned 32-bit BARs may not work!\n");
 #else
@@ -842,12 +842,12 @@ __init u64 e820__memblock_alloc_reserved(u64 size, u64 align)
 
 #ifdef CONFIG_X86_32
 # ifdef CONFIG_X86_PAE
-#  define MAX_ARCH_PFN		(1ULL<<(36-PAGE_SHIFT))
+#  define MAX_ARCH_PFN		(1ULL<<(36-PTE_SHIFT))
 # else
-#  define MAX_ARCH_PFN		(1ULL<<(32-PAGE_SHIFT))
+#  define MAX_ARCH_PFN		(1ULL<<(32-PTE_SHIFT))
 # endif
 #else /* CONFIG_X86_32 */
-# define MAX_ARCH_PFN MAXMEM>>PAGE_SHIFT
+# define MAX_ARCH_PFN MAXMEM>>PTE_SHIFT
 #endif
 
 /*
@@ -868,8 +868,8 @@ __init static unsigned long e820__end_ram_pfn(unsigned long limit_pfn)
 		    entry->type != E820_TYPE_ACPI)
 			continue;
 
-		start_pfn = entry->addr >> PAGE_SHIFT;
-		end_pfn = (entry->addr + entry->size) >> PAGE_SHIFT;
+		start_pfn = entry->addr >> PTE_SHIFT;
+		end_pfn = (entry->addr + entry->size) >> PTE_SHIFT;
 
 		if (start_pfn >= limit_pfn)
 			continue;
@@ -896,7 +896,7 @@ __init unsigned long e820__end_of_ram_pfn(void)
 
 __init unsigned long e820__end_of_low_ram_pfn(void)
 {
-	return e820__end_ram_pfn(1UL << (32 - PAGE_SHIFT));
+	return e820__end_ram_pfn(1UL << (32 - PTE_SHIFT));
 }
 
 __initdata static int userdef;
@@ -1370,7 +1370,7 @@ __init void e820__memblock_setup(void)
 		memblock_remove(PFN_PHYS(max_pfn), -1);
 
 	/* Throw away partial pages: */
-	memblock_trim_memory(PAGE_SIZE);
+	memblock_trim_memory(PG_SIZE);
 
 	memblock_dump_all();
 }

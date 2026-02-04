@@ -8,7 +8,7 @@
 #include <linux/mm_types_task.h>
 #include <linux/types.h>
 
-#if (PAGE_SIZE < PAGE_FRAG_CACHE_MAX_SIZE)
+#if (PG_SIZE < PAGE_FRAG_CACHE_MAX_SIZE)
 /* Use a full byte here to enable assembler optimization as the shift
  * operation is usually expecting a byte.
  */

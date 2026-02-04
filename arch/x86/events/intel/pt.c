@@ -99,7 +99,7 @@ static ssize_t pt_cap_show(struct device *cdev,
 		container_of(attr, struct dev_ext_attribute, attr);
 	enum pt_capabilities cap = (long)ea->var;
 
-	return snprintf(buf, PAGE_SIZE, "%x\n", intel_pt_validate_hw_cap(cap));
+	return snprintf(buf, PG_SIZE, "%x\n", intel_pt_validate_hw_cap(cap));
 }
 
 static struct attribute_group pt_cap_group __ro_after_init = {
@@ -608,7 +608,7 @@ struct topa {
  */
 
 #define TENTS_PER_PAGE	\
-	((PAGE_SIZE - sizeof(struct topa)) / sizeof(struct topa_entry))
+	((PG_SIZE - sizeof(struct topa)) / sizeof(struct topa_entry))
 
 /**
  * struct topa_page - page-sized ToPA table with metadata at the top
@@ -627,7 +627,7 @@ static inline struct topa_page *topa_to_page(struct topa *topa)
 
 static inline struct topa_page *topa_entry_to_page(struct topa_entry *te)
 {
-	return (struct topa_page *)((unsigned long)te & PAGE_MASK);
+	return (struct topa_page *)((unsigned long)te & PG_MASK);
 }
 
 static inline phys_addr_t topa_pfn(struct topa *topa)
@@ -651,7 +651,7 @@ static void pt_config_buffer(struct pt_buffer *buf)
 
 	if (buf->single) {
 		base = buf->data_pages[0];
-		mask = (buf->nr_pages * PAGE_SIZE - 1) >> 7;
+		mask = (buf->nr_pages * PG_SIZE - 1) >> 7;
 	} else {
 		base = topa_to_page(buf->cur)->table;
 		mask = (u64)buf->cur_idx;
@@ -892,9 +892,9 @@ static void pt_update_head(struct pt *pt)
 		local_set(&buf->data_size, base);
 	} else {
 		old = (local64_xchg(&buf->head, base) &
-		       ((buf->nr_pages << PAGE_SHIFT) - 1));
+		       ((buf->nr_pages << PG_SHIFT) - 1));
 		if (base < old || (base == old && wrapped))
-			base += buf->nr_pages << PAGE_SHIFT;
+			base += buf->nr_pages << PG_SHIFT;
 
 		local_add(base - old, &buf->data_size);
 	}
@@ -1018,7 +1018,7 @@ pt_topa_entry_for_page(struct pt_buffer *buf, unsigned int pg)
 	 * order allocations, there shouldn't be many of these.
 	 */
 	list_for_each_entry(topa, &buf->tables, list) {
-		if (topa->offset + topa->size > (unsigned long)pg << PAGE_SHIFT)
+		if (topa->offset + topa->size > (unsigned long)pg << PG_SHIFT)
 			goto found;
 	}
 
@@ -1074,7 +1074,7 @@ found:
 static struct topa_entry *
 pt_topa_prev_entry(struct pt_buffer *buf, struct topa_entry *te)
 {
-	unsigned long table = (unsigned long)te & ~(PAGE_SIZE - 1);
+	unsigned long table = (unsigned long)te & ~(PG_SIZE - 1);
 	struct topa_page *tp;
 	struct topa *topa;
 
@@ -1137,13 +1137,13 @@ static int pt_buffer_reset_markers(struct pt_buffer *buf,
 		buf->intr_te->intr = 0;
 
 	/* how many pages till the STOP marker */
-	npages = handle->size >> PAGE_SHIFT;
+	npages = handle->size >> PG_SHIFT;
 
 	/* if it's on a page boundary, fill up one more page */
-	if (!offset_in_page(head + handle->size + 1))
+	if (!offset_in_pg(head + handle->size + 1))
 		npages++;
 
-	idx = (head >> PAGE_SHIFT) + npages;
+	idx = (head >> PG_SHIFT) + npages;
 	idx &= buf->nr_pages - 1;
 
 	if (idx != buf->stop_pos) {
@@ -1152,10 +1152,10 @@ static int pt_buffer_reset_markers(struct pt_buffer *buf,
 		buf->stop_te = pt_topa_prev_entry(buf, buf->stop_te);
 	}
 
-	wakeup = handle->wakeup >> PAGE_SHIFT;
+	wakeup = handle->wakeup >> PG_SHIFT;
 
 	/* in the worst case, wake up the consumer one page before hard stop */
-	idx = (head >> PAGE_SHIFT) + npages - 1;
+	idx = (head >> PG_SHIFT) + npages - 1;
 	if (idx > wakeup)
 		idx = wakeup;
 
@@ -1195,10 +1195,10 @@ static void pt_buffer_reset_offsets(struct pt_buffer *buf, unsigned long head)
 	int pg;
 
 	if (buf->snapshot)
-		head &= (buf->nr_pages << PAGE_SHIFT) - 1;
+		head &= (buf->nr_pages << PG_SHIFT) - 1;
 
 	if (!buf->single) {
-		pg = (head >> PAGE_SHIFT) & (buf->nr_pages - 1);
+		pg = (head >> PG_SHIFT) & (buf->nr_pages - 1);
 		te = pt_topa_entry_for_page(buf, pg);
 
 		cur_tp = topa_entry_to_page(te);
@@ -1697,7 +1697,7 @@ static void pt_event_stop(struct perf_event *event, int mode)
 		if (buf->snapshot)
 			pt->handle.head =
 				local_xchg(&buf->data_size,
-					   buf->nr_pages << PAGE_SHIFT);
+					   buf->nr_pages << PG_SHIFT);
 		perf_aux_output_end(&pt->handle, local_xchg(&buf->data_size, 0));
 	}
 }
@@ -1735,7 +1735,7 @@ static long pt_event_snapshot_aux(struct perf_event *event,
 
 	to = local_read(&buf->data_size);
 	if (to < size)
-		from = buf->nr_pages << PAGE_SHIFT;
+		from = buf->nr_pages << PG_SHIFT;
 	from += to - size;
 
 	ret = perf_output_copy_aux(&pt->handle, handle, from, to);
@@ -1832,7 +1832,7 @@ static __init int pt_init(void)
 {
 	int ret, cpu, prior_warn = 0;
 
-	BUILD_BUG_ON(sizeof(struct topa) > PAGE_SIZE);
+	BUILD_BUG_ON(sizeof(struct topa) > PG_SIZE);
 
 	if (!boot_cpu_has(X86_FEATURE_INTEL_PT))
 		return -ENODEV;

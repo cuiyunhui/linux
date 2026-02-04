@@ -21,18 +21,18 @@
 #endif
 
 /* minimum unit size, also is the maximum supported allocation size */
-#define PCPU_MIN_UNIT_SIZE		PFN_ALIGN(32 << 10)
+#define PCPU_MIN_UNIT_SIZE		PG_ALIGN(32 << 10)
 
 /* minimum allocation size and shift in bytes */
 #define PCPU_MIN_ALLOC_SHIFT		2
 #define PCPU_MIN_ALLOC_SIZE		(1 << PCPU_MIN_ALLOC_SHIFT)
 
 /*
- * The PCPU_BITMAP_BLOCK_SIZE must be the same size as PAGE_SIZE as the
+ * The PCPU_BITMAP_BLOCK_SIZE must be the same size as PG_SIZE as the
  * updating of hints is used to manage the nr_empty_pop_pages in both
  * the chunk and globally.
  */
-#define PCPU_BITMAP_BLOCK_SIZE		PAGE_SIZE
+#define PCPU_BITMAP_BLOCK_SIZE		PG_SIZE
 #define PCPU_BITMAP_BLOCK_BITS		(PCPU_BITMAP_BLOCK_SIZE >>	\
 					 PCPU_MIN_ALLOC_SHIFT)
 
@@ -41,7 +41,7 @@
 # define PERCPU_DYNAMIC_SIZE_SHIFT      13
 # else
 # define PERCPU_DYNAMIC_SIZE_SHIFT      12
-#endif /* LOCKDEP and PAGE_SIZE > 4KiB */
+#endif /* LOCKDEP and PG_SIZE > 4KiB */
 #else
 #define PERCPU_DYNAMIC_SIZE_SHIFT      10
 #endif

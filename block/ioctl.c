@@ -709,7 +709,7 @@ static int blkdev_common_ioctl(struct block_device *bdev, blk_mode_t mode,
 	case BLKFRASET:
 		if(!capable(CAP_SYS_ADMIN))
 			return -EACCES;
-		bdev->bd_disk->bdi->ra_pages = (arg * 512) / PAGE_SIZE;
+		bdev->bd_disk->bdi->ra_pages = (arg * 512) / PG_SIZE;
 		return 0;
 	case BLKRRPART:
 		if (!capable(CAP_SYS_ADMIN))
@@ -773,7 +773,7 @@ long blkdev_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 		if (!argp)
 			return -EINVAL;
 		return put_long(argp,
-			(bdev->bd_disk->bdi->ra_pages * PAGE_SIZE) / 512);
+			(bdev->bd_disk->bdi->ra_pages * PG_SIZE) / 512);
 	case BLKGETSIZE:
 		if (bdev_nr_sectors(bdev) > ~0UL)
 			return -EFBIG;
@@ -834,7 +834,7 @@ long compat_blkdev_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 		if (!argp)
 			return -EINVAL;
 		return compat_put_long(argp,
-			(bdev->bd_disk->bdi->ra_pages * PAGE_SIZE) / 512);
+			(bdev->bd_disk->bdi->ra_pages * PG_SIZE) / 512);
 	case BLKGETSIZE:
 		if (bdev_nr_sectors(bdev) > ~(compat_ulong_t)0)
 			return -EFBIG;

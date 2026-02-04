@@ -50,7 +50,7 @@
 
 #include "../mm/internal.h"	/* For the trace_print_flags arrays */
 
-#include <asm/page.h>		/* for PAGE_SIZE */
+#include <asm/page.h>		/* for PG_SIZE */
 #include <asm/byteorder.h>	/* cpu_to_le16 */
 #include <linux/unaligned.h>
 
@@ -707,7 +707,7 @@ static const char *check_pointer_msg(const void *ptr)
 	if (!ptr)
 		return "(null)";
 
-	if ((unsigned long)ptr < PAGE_SIZE || IS_ERR_VALUE(ptr))
+	if ((unsigned long)ptr < PG_SIZE || IS_ERR_VALUE(ptr))
 		return "(efault)";
 
 	return NULL;

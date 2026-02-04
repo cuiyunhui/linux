@@ -2086,7 +2086,7 @@ _name##_show(struct device *dev,					\
 			       struct device_attribute *attr,		\
 			       char *page)				\
 {									\
-	BUILD_BUG_ON(sizeof(_format) >= PAGE_SIZE);			\
+	BUILD_BUG_ON(sizeof(_format) >= PG_SIZE);			\
 	return sprintf(page, _format "\n");				\
 }									\
 

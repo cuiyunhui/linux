@@ -130,7 +130,7 @@ SYSCALL_DEFINE2(fsopen, const char __user *, _fs_name, unsigned int, flags)
 	if (flags & ~FSOPEN_CLOEXEC)
 		return -EINVAL;
 
-	fs_name = strndup_user(_fs_name, PAGE_SIZE);
+	fs_name = strndup_user(_fs_name, PG_SIZE);
 	if (IS_ERR(fs_name))
 		return PTR_ERR(fs_name);
 

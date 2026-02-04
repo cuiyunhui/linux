@@ -975,10 +975,10 @@ static bool bvec_try_merge_page(struct bio_vec *bv, struct page *page,
 	if (xen_domain() && !xen_biovec_phys_mergeable(bv, page))
 		return false;
 
-	if ((vec_end_addr & PAGE_MASK) != ((page_addr + off) & PAGE_MASK)) {
+	if ((vec_end_addr & PG_MASK) != ((page_addr + off) & PG_MASK)) {
 		if (IS_ENABLED(CONFIG_KMSAN))
 			return false;
-		if (bv->bv_page + bv_end / PAGE_SIZE != page + off / PAGE_SIZE)
+		if (bv->bv_page + bv_end / PG_SIZE != page + off / PG_SIZE)
 			return false;
 	}
 
@@ -1045,7 +1045,7 @@ EXPORT_SYMBOL_GPL(__bio_add_page);
  */
 void bio_add_virt_nofail(struct bio *bio, void *vaddr, unsigned len)
 {
-	__bio_add_page(bio, virt_to_page(vaddr), len, offset_in_page(vaddr));
+	__bio_add_page(bio, virt_to_page(vaddr), len, offset_in_pg(vaddr));
 }
 EXPORT_SYMBOL_GPL(bio_add_virt_nofail);
 
@@ -1089,10 +1089,10 @@ EXPORT_SYMBOL(bio_add_page);
 void bio_add_folio_nofail(struct bio *bio, struct folio *folio, size_t len,
 			  size_t off)
 {
-	unsigned long nr = off / PAGE_SIZE;
+	unsigned long nr = off / PG_SIZE;
 
 	WARN_ON_ONCE(len > BIO_MAX_SIZE);
-	__bio_add_page(bio, folio_page(folio, nr), len, off % PAGE_SIZE);
+	__bio_add_page(bio, folio_page(folio, nr), len, off % PG_SIZE);
 }
 EXPORT_SYMBOL_GPL(bio_add_folio_nofail);
 
@@ -1105,7 +1105,7 @@ EXPORT_SYMBOL_GPL(bio_add_folio_nofail);
  *
  * Filesystems that use folios can call this function instead of calling
  * bio_add_page() for each page in the folio.  If @off is bigger than
- * PAGE_SIZE, this function can create a bio_vec that starts in a page
+ * PG_SIZE, this function can create a bio_vec that starts in a page
  * after the bv_page.  BIOs do not support folios that are 4GiB or larger.
  *
  * Return: Whether the addition was successful.
@@ -1113,11 +1113,11 @@ EXPORT_SYMBOL_GPL(bio_add_folio_nofail);
 bool bio_add_folio(struct bio *bio, struct folio *folio, size_t len,
 		   size_t off)
 {
-	unsigned long nr = off / PAGE_SIZE;
+	unsigned long nr = off / PG_SIZE;
 
 	if (len > BIO_MAX_SIZE)
 		return false;
-	return bio_add_page(bio, folio_page(folio, nr), len, off % PAGE_SIZE) > 0;
+	return bio_add_page(bio, folio_page(folio, nr), len, off % PG_SIZE) > 0;
 }
 EXPORT_SYMBOL(bio_add_folio);
 
@@ -1137,9 +1137,9 @@ EXPORT_SYMBOL(bio_add_folio);
  */
 unsigned int bio_add_vmalloc_chunk(struct bio *bio, void *vaddr, unsigned len)
 {
-	unsigned int offset = offset_in_page(vaddr);
+	unsigned int offset = offset_in_pg(vaddr);
 
-	len = min(len, PAGE_SIZE - offset);
+	len = min(len, PG_SIZE - offset);
 	if (bio_add_page(bio, vmalloc_to_page(vaddr), len, offset) < len)
 		return 0;
 	if (op_is_write(bio_op(bio)))
@@ -1188,8 +1188,8 @@ void __bio_release_pages(struct bio *bio, bool mark_dirty)
 			folio_mark_dirty(fi.folio);
 			folio_unlock(fi.folio);
 		}
-		nr_pages = (fi.offset + fi.length - 1) / PAGE_SIZE -
-			   fi.offset / PAGE_SIZE + 1;
+		nr_pages = (fi.offset + fi.length - 1) / PG_SIZE -
+			   fi.offset / PG_SIZE + 1;
 		unpin_user_folio(fi.folio, nr_pages);
 	}
 }
@@ -1304,7 +1304,7 @@ static struct folio *folio_alloc_greedy(gfp_t gfp, size_t *size)
 {
 	struct folio *folio;
 
-	while (*size > PAGE_SIZE) {
+	while (*size > PG_SIZE) {
 		folio = folio_alloc(gfp | __GFP_NORETRY, get_order(*size));
 		if (folio)
 			return folio;
@@ -1342,7 +1342,7 @@ static int bio_iov_iter_bounce_write(struct bio *bio, struct iov_iter *iter)
 		size_t this_len = min(total_len, SZ_1M);
 		struct folio *folio;
 
-		if (this_len > PAGE_SIZE * 2)
+		if (this_len > PG_SIZE * 2)
 			this_len = rounddown_pow_of_two(this_len);
 
 		if (bio->bi_iter.bi_size > BIO_MAX_SIZE - this_len)
@@ -1425,8 +1425,8 @@ int bio_iov_iter_bounce(struct bio *bio, struct iov_iter *iter)
 static void bvec_unpin(struct bio_vec *bv, bool mark_dirty)
 {
 	struct folio *folio = page_folio(bv->bv_page);
-	size_t nr_pages = (bv->bv_offset + bv->bv_len - 1) / PAGE_SIZE -
-			bv->bv_offset / PAGE_SIZE + 1;
+	size_t nr_pages = (bv->bv_offset + bv->bv_len - 1) / PG_SIZE -
+			bv->bv_offset / PG_SIZE + 1;
 
 	if (mark_dirty)
 		folio_mark_dirty_lock(folio);

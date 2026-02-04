@@ -74,7 +74,7 @@ static int buf_nr_pages(struct page *page)
 
 static size_t buf_size(struct page *page)
 {
-	return buf_nr_pages(page) * PAGE_SIZE;
+	return buf_nr_pages(page) * PG_SIZE;
 }
 
 static void *
@@ -86,7 +86,7 @@ bts_buffer_setup_aux(struct perf_event *event, void **pages,
 	int cpu = event->cpu;
 	int node = (cpu == -1) ? cpu : cpu_to_node(cpu);
 	unsigned long offset;
-	size_t size = nr_pages << PAGE_SHIFT;
+	size_t size = nr_pages << PG_SHIFT;
 	int pg, nr_buf, pad;
 
 	/* count all the high order buffers */
@@ -125,7 +125,7 @@ bts_buffer_setup_aux(struct perf_event *event, void **pages,
 		bb->buf[nr_buf].size -= pad;
 
 		pg += __nr_pages;
-		offset += __nr_pages << PAGE_SHIFT;
+		offset += __nr_pages << PG_SHIFT;
 	}
 
 	return bb;
@@ -325,7 +325,7 @@ static void bts_event_stop(struct perf_event *event, int flags)
 			if (bb->snapshot)
 				bts->handle.head =
 					local_xchg(&bb->data_size,
-						   bb->nr_pages << PAGE_SHIFT);
+						   bb->nr_pages << PG_SHIFT);
 			perf_aux_output_end(&bts->handle,
 					    local_xchg(&bb->data_size, 0));
 		}
@@ -393,7 +393,7 @@ bts_buffer_reset(struct bts_buffer *bb, struct perf_output_handle *handle)
 	if (bb->snapshot)
 		return 0;
 
-	head = handle->head & ((bb->nr_pages << PAGE_SHIFT) - 1);
+	head = handle->head & ((bb->nr_pages << PG_SHIFT) - 1);
 
 	phys = &bb->buf[bb->cur_buf];
 	space = phys->offset + phys->displacement + phys->size - head;

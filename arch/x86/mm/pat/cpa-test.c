@@ -55,7 +55,7 @@ static int print_split(struct split_state *s)
 	s->min_exec = ~0UL;
 	s->max_exec = 0;
 	for (i = 0; i < max_pfn_mapped; ) {
-		unsigned long addr = (unsigned long)__va(i << PAGE_SHIFT);
+		unsigned long addr = (unsigned long)__va(i << PTE_SHIFT);
 		unsigned int level;
 		pte_t *pte;
 
@@ -68,7 +68,7 @@ static int print_split(struct split_state *s)
 
 		if (level == PG_LEVEL_1G && sizeof(long) == 8) {
 			s->gpg++;
-			i += GPS/PAGE_SIZE;
+			i += GPS/PTE_SIZE;
 		} else if (level == PG_LEVEL_2M) {
 			if ((pte_val(*pte) & _PAGE_PRESENT) && !(pte_val(*pte) & _PAGE_PSE)) {
 				printk(KERN_ERR
@@ -77,7 +77,7 @@ static int print_split(struct split_state *s)
 				err = 1;
 			}
 			s->lpg++;
-			i += LPS/PAGE_SIZE;
+			i += LPS/PTE_SIZE;
 		} else {
 			s->spg++;
 			i++;
@@ -98,7 +98,7 @@ static int print_split(struct split_state *s)
 			s->max_exec, missed);
 	}
 
-	expected = (s->gpg*GPS + s->lpg*LPS)/PAGE_SIZE + s->spg + missed;
+	expected = (s->gpg*GPS + s->lpg*LPS)/PTE_SIZE + s->spg + missed;
 	if (expected != i) {
 		printk(KERN_ERR "CPA max_pfn_mapped %lu but expected %lu\n",
 			max_pfn_mapped, expected);
@@ -138,7 +138,7 @@ static int pageattr_test(void)
 	for (i = 0; i < NTEST; i++) {
 		unsigned long pfn = get_random_u32_below(max_pfn_mapped);
 
-		addr[i] = (unsigned long)__va(pfn << PAGE_SHIFT);
+		addr[i] = (unsigned long)__va(pfn << PTE_SHIFT);
 		len[i] = get_random_u32_below(NPAGES);
 		len[i] = min_t(unsigned long, len[i], max_pfn_mapped - pfn - 1);
 
@@ -149,7 +149,7 @@ static int pageattr_test(void)
 		pte0 = pfn_pte(0, __pgprot(0)); /* shut gcc up */
 
 		for (k = 0; k < len[i]; k++) {
-			pte = lookup_address(addr[i] + k*PAGE_SIZE, &level);
+			pte = lookup_address(addr[i] + k*PTE_SIZE, &level);
 			if (!pte || pgprot_val(pte_pgprot(*pte)) == 0 ||
 			    !(pte_val(*pte) & _PAGE_PRESENT)) {
 				addr[i] = 0;
@@ -169,7 +169,7 @@ static int pageattr_test(void)
 				break;
 			}
 			__set_bit(pfn + k, bm);
-			addrs[k] = addr[i] + k*PAGE_SIZE;
+			addrs[k] = addr[i] + k*PTE_SIZE;
 			pages[k] = pfn_to_page(pfn + k);
 		}
 		if (!addr[i] || !pte || !k) {

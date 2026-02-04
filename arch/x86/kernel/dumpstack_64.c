@@ -64,20 +64,20 @@ const char *stack_type_name(enum stack_type type)
  */
 struct estack_pages {
 	u32	offs;
-	u16	size;
+	u32	size;
 	u16	type;
 };
 
 #define EPAGERANGE(st)							\
-	[PFN_DOWN(CEA_ESTACK_OFFS(st)) ...				\
-	 PFN_DOWN(CEA_ESTACK_OFFS(st) + CEA_ESTACK_SIZE(st) - 1)] = {	\
+	[CEA_ESTACK_OFFS(st) >> PG_SHIFT ...				\
+	 (CEA_ESTACK_OFFS(st) + CEA_ESTACK_SIZE(st) - 1) >> PG_SHIFT] = {	\
 		.offs	= CEA_ESTACK_OFFS(st),				\
 		.size	= CEA_ESTACK_SIZE(st),				\
 		.type	= STACK_TYPE_EXCEPTION + ESTACK_ ##st, }
 
 /*
  * Array of exception stack page descriptors. If the stack is larger than
- * PAGE_SIZE, all pages covering a particular stack will have the same
+ * PG_SIZE, all pages covering a particular stack will have the same
  * info. The guard pages including the not mapped DB2 stack are zeroed
  * out.
  */
@@ -114,7 +114,7 @@ static __always_inline bool in_exception_stack(unsigned long *stack, struct stac
 		return false;
 
 	/* Calc page offset from start of exception stacks */
-	k = (stk - begin) >> PAGE_SHIFT;
+	k = (stk - begin) >> PG_SHIFT;
 	/* Lookup the page descriptor */
 	ep = &estack_pages[k];
 	/* Guard page? */

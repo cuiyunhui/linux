@@ -351,7 +351,7 @@ create_trampoline(struct ftrace_ops *ops, unsigned int *tramp_size)
 		return 0;
 
 	*tramp_size = size + RET_SIZE + sizeof(void *);
-	npages = DIV_ROUND_UP(*tramp_size, PAGE_SIZE);
+	npages = DIV_ROUND_UP(*tramp_size, PTE_SIZE);
 
 	/* Copy ftrace_caller onto the trampoline memory */
 	ret = copy_from_kernel_nofault(trampoline, (void *)start_offset, size);
@@ -446,7 +446,7 @@ void set_ftrace_ops_ro(void)
 		}
 		size = end_offset - start_offset;
 		size = size + RET_SIZE + sizeof(void *);
-		npages = DIV_ROUND_UP(size, PAGE_SIZE);
+		npages = DIV_ROUND_UP(size, PTE_SIZE);
 		set_memory_ro((unsigned long)ops->trampoline, npages);
 	} while_for_each_ftrace_op(ops);
 }

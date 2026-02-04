@@ -121,7 +121,7 @@ struct its_array its_pages;
 
 static void *__its_alloc(struct its_array *pages)
 {
-	void *page __free(execmem) = execmem_alloc_rw(EXECMEM_MODULE_TEXT, PAGE_SIZE);
+	void *page __free(execmem) = execmem_alloc_rw(EXECMEM_MODULE_TEXT, PG_SIZE);
 	if (!page)
 		return NULL;
 
@@ -174,7 +174,7 @@ static void its_pages_protect(struct its_array *pages)
 {
 	for (int i = 0; i < pages->num; i++) {
 		void *page = pages->pages[i];
-		execmem_restore_rox(page, PAGE_SIZE);
+		execmem_restore_rox(page, PG_SIZE);
 	}
 }
 
@@ -260,13 +260,13 @@ static void *its_allocate_thunk(int reg)
 		size += 3;
 #endif
 
-	if (!its_page || (its_offset + size - 1) >= PAGE_SIZE) {
+	if (!its_page || (its_offset + size - 1) >= PG_SIZE) {
 		its_page = its_alloc();
 		if (!its_page) {
 			pr_err("ITS page allocation failed\n");
 			return NULL;
 		}
-		memset(its_page, INT3_INSN_OPCODE, PAGE_SIZE);
+		memset(its_page, INT3_INSN_OPCODE, PG_SIZE);
 		its_offset = 32;
 	}
 
@@ -2704,7 +2704,7 @@ void *text_poke_copy_locked(void *addr, const void *opcode, size_t len,
  * text_poke_copy - Copy instructions into (an unused part of) RX memory
  * @addr: address to modify
  * @opcode: source of the copy
- * @len: length to copy, could be more than 2x PAGE_SIZE
+ * @len: length to copy, could be more than 2x PG_SIZE
  *
  * Not safe against concurrent execution; useful for JITs to dump
  * new code blocks into unused regions of RX memory. Can be used in
@@ -2724,7 +2724,7 @@ void *text_poke_copy(void *addr, const void *opcode, size_t len)
  * text_poke_set - memset into (an unused part of) RX memory
  * @addr: address to modify
  * @c: the byte to fill the area with
- * @len: length to copy, could be more than 2x PAGE_SIZE
+ * @len: length to copy, could be more than 2x PG_SIZE
  *
  * This is useful to overwrite unused regions of RX memory with illegal
  * instructions.
@@ -2777,7 +2777,7 @@ struct smp_text_poke_loc {
 	u8 old;
 };
 
-#define TEXT_POKE_ARRAY_MAX (PAGE_SIZE / sizeof(struct smp_text_poke_loc))
+#define TEXT_POKE_ARRAY_MAX (PG_SIZE / sizeof(struct smp_text_poke_loc))
 
 static struct smp_text_poke_array {
 	struct smp_text_poke_loc vec[TEXT_POKE_ARRAY_MAX];

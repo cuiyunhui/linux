@@ -94,7 +94,7 @@ static void machine_kexec_page_table_set_one(
 	if (!(pmd_val(*pmd) & _PAGE_PRESENT))
 		set_pmd(pmd, __pmd(__pa(pte) | _PAGE_TABLE));
 	pte = pte_offset_kernel(pmd, vaddr);
-	set_pte(pte, pfn_pte(paddr >> PAGE_SHIFT, PAGE_KERNEL_EXEC));
+	set_pte(pte, pfn_pte(paddr >> PTE_SHIFT, PAGE_KERNEL_EXEC));
 }
 
 static void machine_kexec_prepare_page_tables(struct kimage *image)
@@ -199,7 +199,7 @@ void machine_kexec(struct kimage *image)
 
 	if (image->type == KEXEC_TYPE_DEFAULT)
 		page_list[PA_SWAP_PAGE] = (page_to_pfn(image->swap_page)
-						<< PAGE_SHIFT);
+						<< PTE_SHIFT);
 
 	/*
 	 * The segment registers are funny things, they have both a

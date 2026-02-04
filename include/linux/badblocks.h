@@ -23,7 +23,7 @@
  * 54 bits are sector number, 9 bits are extent size,
  * 1 bit is an 'acknowledged' flag.
  */
-#define MAX_BADBLOCKS	(PAGE_SIZE/8)
+#define MAX_BADBLOCKS	(PG_SIZE/8)
 
 struct badblocks {
 	struct device *dev;	/* set by devm_init_badblocks */

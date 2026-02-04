@@ -5,8 +5,8 @@
 #include <linux/pfn.h>
 #include <asm/pgtable.h>
 
-#define PMD_ORDER	(PMD_SHIFT - PAGE_SHIFT)
-#define PUD_ORDER	(PUD_SHIFT - PAGE_SHIFT)
+#define PMD_ORDER	(PMD_SHIFT - PG_SHIFT)
+#define PUD_ORDER	(PUD_SHIFT - PG_SHIFT)
 
 #ifndef __ASSEMBLY__
 #ifdef CONFIG_MMU
@@ -47,7 +47,7 @@
 
 static inline unsigned long pte_index(unsigned long address)
 {
-	return (address >> PAGE_SHIFT) & (PTRS_PER_PTE - 1);
+	return (address >> PTE_SHIFT) & (PTRS_PER_PTE - 1);
 }
 
 #ifndef pmd_index
@@ -659,7 +659,7 @@ static inline void clear_young_dirty_ptes(struct vm_area_struct *vma,
 		if (--nr == 0)
 			break;
 		ptep++;
-		addr += PAGE_SIZE;
+		addr += PTE_SIZE;
 	}
 }
 #endif
@@ -846,7 +846,7 @@ static inline pte_t get_and_clear_full_ptes(struct mm_struct *mm,
 	pte = ptep_get_and_clear_full(mm, addr, ptep, full);
 	while (--nr) {
 		ptep++;
-		addr += PAGE_SIZE;
+		addr += PTE_SIZE;
 		tmp_pte = ptep_get_and_clear_full(mm, addr, ptep, full);
 		if (pte_dirty(tmp_pte))
 			pte = pte_mkdirty(pte);
@@ -907,7 +907,7 @@ static inline void clear_full_ptes(struct mm_struct *mm, unsigned long addr,
 		if (--nr == 0)
 			break;
 		ptep++;
-		addr += PAGE_SIZE;
+		addr += PTE_SIZE;
 	}
 }
 #endif
@@ -994,7 +994,7 @@ static inline void clear_not_present_full_ptes(struct mm_struct *mm,
 		if (--nr == 0)
 			break;
 		ptep++;
-		addr += PAGE_SIZE;
+		addr += PTE_SIZE;
 	}
 }
 #endif
@@ -1063,7 +1063,7 @@ static inline void wrprotect_ptes(struct mm_struct *mm, unsigned long addr,
 		if (--nr == 0)
 			break;
 		ptep++;
-		addr += PAGE_SIZE;
+		addr += PTE_SIZE;
 	}
 }
 #endif
@@ -1096,7 +1096,7 @@ static inline int clear_flush_young_ptes(struct vm_area_struct *vma,
 		if (--nr == 0)
 			break;
 		ptep++;
-		addr += PAGE_SIZE;
+		addr += PTE_SIZE;
 	}
 
 	return young;
@@ -1322,8 +1322,8 @@ static inline void arch_do_swap_page_nr(struct mm_struct *mm,
 					pte_t pte, pte_t oldpte,
 					int nr)
 {
-	for (int i = 0; i < nr; i++) {
-		arch_do_swap_page(vma->vm_mm, vma, addr + i * PAGE_SIZE,
+	for (int i = 0; i < nr /* XXX */; i++) {
+		arch_do_swap_page(vma->vm_mm, vma, addr + i * PTE_SIZE,
 				pte_advance_pfn(pte, i),
 				pte_advance_pfn(oldpte, i));
 	}
@@ -1580,7 +1580,7 @@ static inline pte_t modify_prot_start_ptes(struct vm_area_struct *vma,
 	pte = ptep_modify_prot_start(vma, addr, ptep);
 	while (--nr) {
 		ptep++;
-		addr += PAGE_SIZE;
+		addr += PTE_SIZE;
 		tmp_pte = ptep_modify_prot_start(vma, addr, ptep);
 		if (pte_dirty(tmp_pte))
 			pte = pte_mkdirty(pte);
@@ -1617,7 +1617,7 @@ static inline void modify_prot_commit_ptes(struct vm_area_struct *vma, unsigned 
 {
 	int i;
 
-	for (i = 0; i < nr; ++i, ++ptep, addr += PAGE_SIZE) {
+	for (i = 0; i < nr; ++i, ++ptep, addr += PTE_SIZE) {
 		ptep_modify_prot_commit(vma, addr, ptep, old_pte, pte);
 
 		/* Advance PFN only, set same prot */
@@ -1914,7 +1914,7 @@ void pfnmap_untrack(unsigned long pfn, unsigned long size);
  */
 static inline void pfnmap_setup_cachemode_pfn(unsigned long pfn, pgprot_t *prot)
 {
-	pfnmap_setup_cachemode(pfn, PAGE_SIZE, prot);
+	pfnmap_setup_cachemode(pfn, PTE_SIZE, prot);
 }
 
 #ifdef CONFIG_MMU
@@ -1923,7 +1923,7 @@ static inline int is_zero_pfn(unsigned long pfn)
 {
 	extern unsigned long zero_pfn;
 	unsigned long offset_from_zero_pfn = pfn - zero_pfn;
-	return offset_from_zero_pfn <= (zero_page_mask >> PAGE_SHIFT);
+	return offset_from_zero_pfn <= (zero_page_mask >> PTE_SHIFT);
 }
 
 #define my_zero_pfn(addr)	page_to_pfn(ZERO_PAGE(addr))
@@ -2261,7 +2261,7 @@ static inline const char *pgtable_level_to_str(enum pgtable_level level)
  *   should have guarded this, but let's be crystal clear on this.
  *
  * - It should contain a huge PFN, which points to a huge page larger than
- *   PAGE_SIZE of the platform.  The PFN format isn't important here.
+ *   PTE_SIZE of the platform.  The PFN format isn't important here.
  *
  * - It should cover all kinds of huge mappings (i.e. pXd_trans_huge()
  *   or hugetlb mappings).
@@ -2293,14 +2293,14 @@ static inline const char *pgtable_level_to_str(enum pgtable_level level)
 #endif
 #ifndef __pte_leaf_size
 #ifndef pte_leaf_size
-#define pte_leaf_size(x) PAGE_SIZE
+#define pte_leaf_size(x) PTE_SIZE
 #endif
 #define __pte_leaf_size(x,y) pte_leaf_size(y)
 #endif
 
 /*
- * We always define pmd_pfn for all archs as it's used in lots of generic
- * code.  Now it happens too for pud_pfn (and can happen for larger
+ * We always define pmd_pfn/p4d_pfn for all archs as it's used in lots of
+ * generic code.  Now it happens too for pud_pfn (and can happen for larger
  * mappings too in the future; we're not there yet).  Instead of defining
  * it for all archs (like pmd_pfn), provide a fallback.
  *
@@ -2310,6 +2310,10 @@ static inline const char *pgtable_level_to_str(enum pgtable_level level)
  */
 #ifndef pud_pfn
 #define pud_pfn(x) 0
+#endif
+
+#ifndef p4d_pfn
+#define p4d_pfn(x) 0
 #endif
 
 /*

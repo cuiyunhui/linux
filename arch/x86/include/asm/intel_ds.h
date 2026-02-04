@@ -3,15 +3,15 @@
 
 #include <linux/percpu-defs.h>
 
-#define BTS_BUFFER_SIZE		(PAGE_SIZE << 4)
+#define BTS_BUFFER_SIZE		(PG_SIZE << 4)
 #define PEBS_BUFFER_SHIFT	4
-#define PEBS_BUFFER_SIZE	(PAGE_SIZE << PEBS_BUFFER_SHIFT)
+#define PEBS_BUFFER_SIZE	(PG_SIZE << PEBS_BUFFER_SHIFT)
 
 /*
  * The largest PEBS record could consume a page, ensure
  * a record at least can be written after triggering PMI.
  */
-#define ARCH_PEBS_THRESH_MULTI	((PEBS_BUFFER_SIZE - PAGE_SIZE) >> PEBS_BUFFER_SHIFT)
+#define ARCH_PEBS_THRESH_MULTI	((PEBS_BUFFER_SIZE - PG_SIZE) >> PEBS_BUFFER_SHIFT)
 #define ARCH_PEBS_THRESH_SINGLE	1
 
 /* The maximal number of PEBS events: */
@@ -35,7 +35,7 @@ struct debug_store {
 	u64	pebs_absolute_maximum;
 	u64	pebs_interrupt_threshold;
 	u64	pebs_event_reset[MAX_PEBS_EVENTS + MAX_FIXED_PEBS_EVENTS];
-} __aligned(PAGE_SIZE);
+} __aligned(PG_SIZE);
 
 DECLARE_PER_CPU_PAGE_ALIGNED(struct debug_store, cpu_debug_store);
 

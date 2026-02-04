@@ -153,7 +153,7 @@ static int __init do_mount_root(const char *name, const char *fs,
 		if (!p)
 			return -ENOMEM;
 		data_page = page_address(p);
-		strscpy_pad(data_page, data, PAGE_SIZE);
+		strscpy_pad(data_page, data, PG_SIZE);
 	}
 
 	ret = init_mount(name, "/root", fs, flags, data_page);
@@ -186,9 +186,9 @@ void __init mount_root_generic(char *name, char *pretty_name, int flags)
 	scnprintf(b, BDEVNAME_SIZE, "unknown-block(%u,%u)",
 		  MAJOR(ROOT_DEV), MINOR(ROOT_DEV));
 	if (root_fs_names)
-		num_fs = split_fs_names(fs_names, PAGE_SIZE);
+		num_fs = split_fs_names(fs_names, PG_SIZE);
 	else
-		num_fs = list_bdev_fs_names(fs_names, PAGE_SIZE);
+		num_fs = list_bdev_fs_names(fs_names, PG_SIZE);
 retry:
 	for (i = 0, p = fs_names; i < num_fs; i++, p += strlen(p)+1) {
 		int err;
@@ -217,7 +217,7 @@ retry:
 		printk_all_partitions();
 
 		if (root_fs_names)
-			num_fs = list_bdev_fs_names(fs_names, PAGE_SIZE);
+			num_fs = list_bdev_fs_names(fs_names, PG_SIZE);
 		if (!num_fs)
 			pr_err("Can't find any bdev filesystem to be used for mount!\n");
 		else {
@@ -346,7 +346,7 @@ static int __init mount_nodev_root(char *root_device_name)
 	fs_names = (void *)__get_free_page(GFP_KERNEL);
 	if (!fs_names)
 		return -EINVAL;
-	num_fs = split_fs_names(fs_names, PAGE_SIZE);
+	num_fs = split_fs_names(fs_names, PG_SIZE);
 
 	for (i = 0, fstype = fs_names; i < num_fs;
 	     i++, fstype += strlen(fstype) + 1) {

@@ -329,7 +329,7 @@ typedef int __bitwise rmap_t;
 #define RMAP_EXCLUSIVE		((__force rmap_t)BIT(0))
 
 static __always_inline void __folio_rmap_sanity_checks(const struct folio *folio,
-		const struct page *page, int nr_pages, enum pgtable_level level)
+		const struct page *page, int nr_ptes, enum pgtable_level level)
 {
 	/* hugetlb folios are handled separately. */
 	VM_WARN_ON_FOLIO(folio_test_hugetlb(folio), folio);
@@ -346,9 +346,10 @@ static __always_inline void __folio_rmap_sanity_checks(const struct folio *folio
 	 * we really only get rmappable folios.
 	 */
 
-	VM_WARN_ON_ONCE(nr_pages <= 0);
+	VM_WARN_ON_ONCE(nr_ptes <= 0);
 	VM_WARN_ON_FOLIO(page_folio(page) != folio, folio);
-	VM_WARN_ON_FOLIO(page_folio(page + nr_pages - 1) != folio, folio);
+	VM_WARN_ON_FOLIO(page_folio(page + DIV_ROUND_UP(nr_ptes, PTES_PER_PAGE) - 1) != folio,
+			 folio);
 
 	switch (level) {
 	case PGTABLE_LEVEL_PTE:
@@ -360,7 +361,7 @@ static __always_inline void __folio_rmap_sanity_checks(const struct folio *folio
 		 * a single "entire" mapping of the folio.
 		 */
 		VM_WARN_ON_FOLIO(folio_nr_pages(folio) != HPAGE_PMD_NR, folio);
-		VM_WARN_ON_FOLIO(nr_pages != HPAGE_PMD_NR, folio);
+		VM_WARN_ON_FOLIO(nr_ptes / PTES_PER_PAGE != HPAGE_PMD_NR, folio);
 		break;
 	case PGTABLE_LEVEL_PUD:
 		/*
@@ -368,7 +369,7 @@ static __always_inline void __folio_rmap_sanity_checks(const struct folio *folio
 		 * folio.
 		 */
 		VM_WARN_ON_FOLIO(folio_nr_pages(folio) != HPAGE_PUD_NR, folio);
-		VM_WARN_ON_FOLIO(nr_pages != HPAGE_PUD_NR, folio);
+		VM_WARN_ON_FOLIO(nr_ptes != HPAGE_PUD_NR * PTES_PER_PAGE, folio);
 		break;
 	default:
 		BUILD_BUG();
@@ -401,15 +402,15 @@ static __always_inline void __folio_rmap_sanity_checks(const struct folio *folio
  * rmap interfaces called when adding or removing pte of page
  */
 void folio_move_anon_rmap(struct folio *, struct vm_area_struct *);
-void folio_add_anon_rmap_ptes(struct folio *, struct page *, int nr_pages,
-		struct vm_area_struct *, unsigned long address, rmap_t flags);
-#define folio_add_anon_rmap_pte(folio, page, vma, address, flags) \
-	folio_add_anon_rmap_ptes(folio, page, 1, vma, address, flags)
+void folio_add_anon_rmap_ptes(struct folio *, struct page *, int nr_ptes,
+		struct vm_area_struct *, rmap_t flags);
+#define folio_add_anon_rmap_pte(folio, page, vma, flags) \
+	folio_add_anon_rmap_ptes(folio, page, 1, vma, flags)
 void folio_add_anon_rmap_pmd(struct folio *, struct page *,
-		struct vm_area_struct *, unsigned long address, rmap_t flags);
+		struct vm_area_struct *, rmap_t flags);
 void folio_add_new_anon_rmap(struct folio *, struct vm_area_struct *,
 		unsigned long address, rmap_t flags);
-void folio_add_file_rmap_ptes(struct folio *, struct page *, int nr_pages,
+void folio_add_file_rmap_ptes(struct folio *, struct page *, int nr_ptes,
 		struct vm_area_struct *);
 #define folio_add_file_rmap_pte(folio, page, vma) \
 	folio_add_file_rmap_ptes(folio, page, 1, vma)
@@ -417,7 +418,7 @@ void folio_add_file_rmap_pmd(struct folio *, struct page *,
 		struct vm_area_struct *);
 void folio_add_file_rmap_pud(struct folio *, struct page *,
 		struct vm_area_struct *);
-void folio_remove_rmap_ptes(struct folio *, struct page *, int nr_pages,
+void folio_remove_rmap_ptes(struct folio *, struct page *, int nr_ptes,
 		struct vm_area_struct *);
 #define folio_remove_rmap_pte(folio, page, vma) \
 	folio_remove_rmap_ptes(folio, page, 1, vma)
@@ -490,26 +491,30 @@ static inline void hugetlb_remove_rmap(struct folio *folio)
 }
 
 static __always_inline void __folio_dup_file_rmap(struct folio *folio,
-		struct page *page, int nr_pages, struct vm_area_struct *dst_vma,
+		struct page *page, int nr_ptes, struct vm_area_struct *dst_vma,
 		enum pgtable_level level)
 {
-	const int orig_nr_pages = nr_pages;
+	const int orig_nr_ptes = nr_ptes;
 
-	__folio_rmap_sanity_checks(folio, page, nr_pages, level);
+	__folio_rmap_sanity_checks(folio, page, nr_ptes, level);
 
 	switch (level) {
 	case PGTABLE_LEVEL_PTE:
 		if (!folio_test_large(folio)) {
-			atomic_inc(&folio->_mapcount);
+			atomic_add(nr_ptes, &folio->_mapcount);
 			break;
 		}
 
 		if (IS_ENABLED(CONFIG_PAGE_MAPCOUNT)) {
 			do {
-				atomic_inc(&page->_mapcount);
-			} while (page++, --nr_pages > 0);
+				int pfn = page_to_pfn(page);
+				int ptes = min_t(int, nr_ptes, PTES_PER_PAGE - (pfn % PTES_PER_PAGE));
+
+				atomic_add(ptes, &page->_mapcount);
+				nr_ptes -= ptes;
+			} while (page++, nr_ptes > 0);
 		}
-		folio_add_large_mapcount(folio, orig_nr_pages, dst_vma);
+		folio_add_large_mapcount(folio, orig_nr_ptes, dst_vma);
 		break;
 	case PGTABLE_LEVEL_PMD:
 	case PGTABLE_LEVEL_PUD:
@@ -533,9 +538,9 @@ static __always_inline void __folio_dup_file_rmap(struct folio *folio,
  * The caller needs to hold the page table lock.
  */
 static inline void folio_dup_file_rmap_ptes(struct folio *folio,
-		struct page *page, int nr_pages, struct vm_area_struct *dst_vma)
+		struct page *page, int nr_ptes, struct vm_area_struct *dst_vma)
 {
-	__folio_dup_file_rmap(folio, page, nr_pages, dst_vma, PGTABLE_LEVEL_PTE);
+	__folio_dup_file_rmap(folio, page, nr_ptes, dst_vma, PGTABLE_LEVEL_PTE);
 }
 
 static __always_inline void folio_dup_file_rmap_pte(struct folio *folio,
@@ -565,15 +570,15 @@ static inline void folio_dup_file_rmap_pmd(struct folio *folio,
 }
 
 static __always_inline int __folio_try_dup_anon_rmap(struct folio *folio,
-		struct page *page, int nr_pages, struct vm_area_struct *dst_vma,
+		struct page *page, int nr_ptes, struct vm_area_struct *dst_vma,
 		struct vm_area_struct *src_vma, enum pgtable_level level)
 {
-	const int orig_nr_pages = nr_pages;
+	const int orig_nr_ptes = nr_ptes;
 	bool maybe_pinned;
 	int i;
 
 	VM_WARN_ON_FOLIO(!folio_test_anon(folio), folio);
-	__folio_rmap_sanity_checks(folio, page, nr_pages, level);
+	__folio_rmap_sanity_checks(folio, page, nr_ptes, level);
 
 	/*
 	 * If this folio may have been pinned by the parent process,
@@ -593,25 +598,31 @@ static __always_inline int __folio_try_dup_anon_rmap(struct folio *folio,
 	switch (level) {
 	case PGTABLE_LEVEL_PTE:
 		if (unlikely(maybe_pinned)) {
-			for (i = 0; i < nr_pages; i++)
-				if (PageAnonExclusive(page + i))
+			for (i = 0; i < nr_ptes; i++) {
+				int pfn = page_to_pfn(page) + i;
+				if (PageAnonExclusive(folio_page(folio, pfn % folio_nr_ptes(folio))))
 					return -EBUSY;
+			}
 		}
 
 		if (!folio_test_large(folio)) {
 			if (PageAnonExclusive(page))
 				ClearPageAnonExclusive(page);
-			atomic_inc(&folio->_mapcount);
+			atomic_add(nr_ptes, &folio->_mapcount);
 			break;
 		}
 
 		do {
+			int pfn = page_to_pfn(page);
+			int ptes = min_t(int, nr_ptes, PTES_PER_PAGE - (pfn % PTES_PER_PAGE));
+
 			if (PageAnonExclusive(page))
 				ClearPageAnonExclusive(page);
 			if (IS_ENABLED(CONFIG_PAGE_MAPCOUNT))
-				atomic_inc(&page->_mapcount);
-		} while (page++, --nr_pages > 0);
-		folio_add_large_mapcount(folio, orig_nr_pages, dst_vma);
+				atomic_add(ptes, &page->_mapcount);
+			nr_ptes -= ptes;
+		} while (page++, nr_ptes > 0);
+		folio_add_large_mapcount(folio, orig_nr_ptes, dst_vma);
 		break;
 	case PGTABLE_LEVEL_PMD:
 	case PGTABLE_LEVEL_PUD:
@@ -654,10 +665,10 @@ static __always_inline int __folio_try_dup_anon_rmap(struct folio *folio,
  * Returns 0 if duplicating the mappings succeeded. Returns -EBUSY otherwise.
  */
 static inline int folio_try_dup_anon_rmap_ptes(struct folio *folio,
-		struct page *page, int nr_pages, struct vm_area_struct *dst_vma,
+		struct page *page, int nr_ptes, struct vm_area_struct *dst_vma,
 		struct vm_area_struct *src_vma)
 {
-	return __folio_try_dup_anon_rmap(folio, page, nr_pages, dst_vma,
+	return __folio_try_dup_anon_rmap(folio, page, nr_ptes, dst_vma,
 					 src_vma, PGTABLE_LEVEL_PTE);
 }
 
@@ -863,8 +874,8 @@ struct page *make_device_exclusive(struct mm_struct *mm, unsigned long addr,
 
 struct page_vma_mapped_walk {
 	unsigned long pfn;
-	unsigned long nr_pages;
-	pgoff_t pgoff;
+	unsigned long nr_ptes;
+	pgoff_t pteoff;
 	struct vm_area_struct *vma;
 	unsigned long address;
 	pmd_t *pmd;
@@ -876,8 +887,8 @@ struct page_vma_mapped_walk {
 #define DEFINE_FOLIO_VMA_WALK(name, _folio, _vma, _address, _flags)	\
 	struct page_vma_mapped_walk name = {				\
 		.pfn = folio_pfn(_folio),				\
-		.nr_pages = folio_nr_pages(_folio),			\
-		.pgoff = folio_pgoff(_folio),				\
+		.nr_ptes = folio_nr_ptes(_folio),			\
+		.pteoff = folio_pteoff(_folio),				\
 		.vma = _vma,						\
 		.address = _address,					\
 		.flags = _flags,					\
@@ -929,9 +940,9 @@ unsigned long page_address_in_vma(const struct folio *folio,
 int folio_mkclean(struct folio *);
 
 int mapping_wrprotect_range(struct address_space *mapping, pgoff_t pgoff,
-		unsigned long pfn, unsigned long nr_pages);
+		unsigned long pfn, unsigned long nr_ptes);
 
-int pfn_mkclean_range(unsigned long pfn, unsigned long nr_pages, pgoff_t pgoff,
+int pfn_mkclean_range(unsigned long pfn, unsigned long nr_ptes, pgoff_t pgoff,
 		      struct vm_area_struct *vma);
 
 void remove_migration_ptes(struct folio *src, struct folio *dst,

@@ -229,7 +229,7 @@ long oom_badness(struct task_struct *p, unsigned long totalpages)
 	 * task's rss, pagetable and swap space use.
 	 */
 	points = get_mm_rss_sum(p->mm) + get_mm_counter_sum(p->mm, MM_SWAPENTS) +
-		mm_pgtables_bytes(p->mm) / PAGE_SIZE;
+		mm_pgtables_bytes(p->mm) / PG_SIZE;
 	task_unlock(p);
 
 	/* Normalize to oom_score_adj units */

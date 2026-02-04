@@ -83,7 +83,7 @@ again:
 }
 
 /**
- * check_pte - check if [pvmw->pfn, @pvmw->pfn + @pvmw->nr_pages) is
+ * check_pte - check if [pvmw->pfn, @pvmw->pfn + @pvmw->nr_ptes) is
  * mapped at the @pvmw->pte
  * @pvmw: page_vma_mapped_walk struct, includes a pair pte and pfn range
  * for checking
@@ -96,10 +96,10 @@ again:
  * arbitrary page.
  *
  * If PVMW_MIGRATION flag is set, returns true if @pvmw->pte contains migration
- * entry that points to [pvmw->pfn, @pvmw->pfn + @pvmw->nr_pages)
+ * entry that points to [pvmw->pfn, @pvmw->pfn + @pvmw->nr_ptes)
  *
  * If PVMW_MIGRATION flag is not set, returns true if pvmw->pte points to
- * [pvmw->pfn, @pvmw->pfn + @pvmw->nr_pages)
+ * [pvmw->pfn, @pvmw->pfn + @pvmw->nr_ptes)
  *
  * Otherwise, return false.
  *
@@ -131,7 +131,7 @@ static bool check_pte(struct page_vma_mapped_walk *pvmw, unsigned long pte_nr)
 
 	if ((pfn + pte_nr - 1) < pvmw->pfn)
 		return false;
-	if (pfn > (pvmw->pfn + pvmw->nr_pages - 1))
+	if (pfn > (pvmw->pfn + pvmw->nr_ptes - 1))
 		return false;
 	return true;
 }
@@ -139,9 +139,9 @@ static bool check_pte(struct page_vma_mapped_walk *pvmw, unsigned long pte_nr)
 /* Returns true if the two ranges overlap.  Careful to not overflow. */
 static bool check_pmd(unsigned long pfn, struct page_vma_mapped_walk *pvmw)
 {
-	if ((pfn + HPAGE_PMD_NR - 1) < pvmw->pfn)
+	if ((pfn + HPAGE_PMD_NR * PTES_PER_PAGE - 1) < pvmw->pfn)
 		return false;
-	if (pfn > pvmw->pfn + pvmw->nr_pages - 1)
+	if (pfn > pvmw->pfn + pvmw->nr_ptes - 1)
 		return false;
 	return true;
 }
@@ -284,7 +284,7 @@ restart:
 			if ((pvmw->flags & PVMW_SYNC) &&
 			    thp_vma_suitable_order(vma, pvmw->address,
 						   PMD_ORDER) &&
-			    (pvmw->nr_pages >= HPAGE_PMD_NR)) {
+			    (pvmw->nr_ptes >= HPAGE_PMD_NR)) {
 				spinlock_t *ptl = pmd_lock(mm, pvmw->pmd);
 
 				spin_unlock(ptl);
@@ -302,11 +302,11 @@ this_pte:
 			return true;
 next_pte:
 		do {
-			pvmw->address += PAGE_SIZE;
+			pvmw->address += PTE_SIZE;
 			if (pvmw->address >= end)
 				return not_found(pvmw);
 			/* Did we cross page table boundary? */
-			if ((pvmw->address & (PMD_SIZE - PAGE_SIZE)) == 0) {
+			if ((pvmw->address & (PMD_SIZE - PTE_SIZE)) == 0) {
 				if (pvmw->ptl) {
 					spin_unlock(pvmw->ptl);
 					pvmw->ptl = NULL;
@@ -351,7 +351,7 @@ unsigned long page_mapped_in_vma(const struct page *page,
 	const struct folio *folio = page_folio(page);
 	struct page_vma_mapped_walk pvmw = {
 		.pfn = page_to_pfn(page),
-		.nr_pages = 1,
+		.nr_ptes = PTES_PER_PAGE,
 		.vma = vma,
 		.flags = PVMW_SYNC,
 	};

@@ -51,7 +51,7 @@ void ptdump_walk_user_pgd_level_checkwx(void);
  * ZERO_PAGE is a global shared page that is always zero: used
  * for zero-mapped memory areas etc..
  */
-extern unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)]
+extern unsigned long empty_zero_page[PG_SIZE / sizeof(unsigned long)]
 	__visible;
 #define ZERO_PAGE(vaddr) ((void)(vaddr),virt_to_page(empty_zero_page))
 
@@ -259,20 +259,20 @@ static inline int pte_special(pte_t pte)
 
 static inline u64 protnone_mask(u64 val);
 
-#define PFN_PTE_SHIFT	PAGE_SHIFT
+#define PFN_PTE_SHIFT	PTE_SHIFT
 
 static inline unsigned long pte_pfn(pte_t pte)
 {
 	phys_addr_t pfn = pte_val(pte);
 	pfn ^= protnone_mask(pfn);
-	return (pfn & PTE_PFN_MASK) >> PAGE_SHIFT;
+	return (pfn & PTE_PFN_MASK) >> PTE_SHIFT;
 }
 
 static inline unsigned long pmd_pfn(pmd_t pmd)
 {
 	phys_addr_t pfn = pmd_val(pmd);
 	pfn ^= protnone_mask(pfn);
-	return (pfn & pmd_pfn_mask(pmd)) >> PAGE_SHIFT;
+	return (pfn & pmd_pfn_mask(pmd)) >> PTE_SHIFT;
 }
 
 #define pud_pfn pud_pfn
@@ -280,17 +280,17 @@ static inline unsigned long pud_pfn(pud_t pud)
 {
 	phys_addr_t pfn = pud_val(pud);
 	pfn ^= protnone_mask(pfn);
-	return (pfn & pud_pfn_mask(pud)) >> PAGE_SHIFT;
+	return (pfn & pud_pfn_mask(pud)) >> PTE_SHIFT;
 }
 
 static inline unsigned long p4d_pfn(p4d_t p4d)
 {
-	return (p4d_val(p4d) & p4d_pfn_mask(p4d)) >> PAGE_SHIFT;
+	return (p4d_val(p4d) & p4d_pfn_mask(p4d)) >> PTE_SHIFT;
 }
 
 static inline unsigned long pgd_pfn(pgd_t pgd)
 {
-	return (pgd_val(pgd) & PTE_PFN_MASK) >> PAGE_SHIFT;
+	return (pgd_val(pgd) & PTE_PFN_MASK) >> PTE_SHIFT;
 }
 
 #define pte_page(pte)	pfn_to_page(pte_pfn(pte))
@@ -737,7 +737,7 @@ static inline pgprotval_t check_pgprot(pgprot_t pgprot)
 
 static inline pte_t pfn_pte(unsigned long page_nr, pgprot_t pgprot)
 {
-	phys_addr_t pfn = (phys_addr_t)page_nr << PAGE_SHIFT;
+	phys_addr_t pfn = (phys_addr_t)page_nr << PTE_SHIFT;
 	/* This bit combination is used to mark shadow stacks */
 	WARN_ON_ONCE((pgprot_val(pgprot) & (_PAGE_DIRTY | _PAGE_RW)) ==
 			_PAGE_DIRTY);
@@ -748,7 +748,7 @@ static inline pte_t pfn_pte(unsigned long page_nr, pgprot_t pgprot)
 
 static inline pmd_t pfn_pmd(unsigned long page_nr, pgprot_t pgprot)
 {
-	phys_addr_t pfn = (phys_addr_t)page_nr << PAGE_SHIFT;
+	phys_addr_t pfn = (phys_addr_t)page_nr << PTE_SHIFT;
 	pfn ^= protnone_mask(pgprot_val(pgprot));
 	pfn &= PHYSICAL_PMD_PAGE_MASK;
 	return __pmd(pfn | check_pgprot(pgprot));
@@ -756,7 +756,7 @@ static inline pmd_t pfn_pmd(unsigned long page_nr, pgprot_t pgprot)
 
 static inline pud_t pfn_pud(unsigned long page_nr, pgprot_t pgprot)
 {
-	phys_addr_t pfn = (phys_addr_t)page_nr << PAGE_SHIFT;
+	phys_addr_t pfn = (phys_addr_t)page_nr << PTE_SHIFT;
 	pfn ^= protnone_mask(pgprot_val(pgprot));
 	pfn &= PHYSICAL_PUD_PAGE_MASK;
 	return __pud(pfn | check_pgprot(pgprot));
@@ -1038,7 +1038,7 @@ static inline int pmd_bad(pmd_t pmd)
 
 static inline unsigned long pages_to_mb(unsigned long npg)
 {
-	return npg >> (20 - PAGE_SHIFT);
+	return npg >> (20 - PG_SHIFT);
 }
 
 #if CONFIG_PGTABLE_LEVELS > 2
@@ -1401,7 +1401,7 @@ static inline bool pgdp_maps_userspace(void *__ptr)
 {
 	unsigned long ptr = (unsigned long)__ptr;
 
-	return (((ptr & ~PAGE_MASK) / sizeof(pgd_t)) < PGD_KERNEL_START);
+	return (((ptr & ~PTE_MASK) / sizeof(pgd_t)) < PGD_KERNEL_START);
 }
 
 #ifdef CONFIG_MITIGATION_PAGE_TABLE_ISOLATION
@@ -1411,7 +1411,7 @@ static inline bool pgdp_maps_userspace(void *__ptr)
  * the user one is in the last 4k.  To switch between them, you
  * just need to flip the 12th bit in their addresses.
  */
-#define PTI_PGTABLE_SWITCH_BIT	PAGE_SHIFT
+#define PTI_PGTABLE_SWITCH_BIT	PTE_SHIFT
 
 /*
  * This generates better code than the inline assembly in
@@ -1479,7 +1479,7 @@ static inline int page_level_shift(enum pg_level level)
 {
 	unsigned int shift = ilog2(PTRS_PER_PTE);
 
-	return (PAGE_SHIFT - shift) + level * shift;
+	return (PTE_SHIFT - shift) + level * shift;
 }
 static inline unsigned long page_level_size(enum pg_level level)
 {

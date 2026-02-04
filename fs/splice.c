@@ -330,8 +330,8 @@ ssize_t copy_splice_read(struct file *in, loff_t *ppos,
 	/* Work out how much data we can actually add into the pipe */
 	used = pipe_buf_usage(pipe);
 	npages = max_t(ssize_t, pipe->max_usage - used, 0);
-	len = min_t(size_t, len, npages * PAGE_SIZE);
-	npages = DIV_ROUND_UP(len, PAGE_SIZE);
+	len = min_t(size_t, len, npages * PG_SIZE);
+	npages = DIV_ROUND_UP(len, PG_SIZE);
 
 	bv = kzalloc(array_size(npages, sizeof(bv[0])) +
 		     array_size(npages, sizeof(struct page *)), GFP_KERNEL);
@@ -345,10 +345,10 @@ ssize_t copy_splice_read(struct file *in, loff_t *ppos,
 		return -ENOMEM;
 	}
 
-	remain = len = min_t(size_t, len, npages * PAGE_SIZE);
+	remain = len = min_t(size_t, len, npages * PG_SIZE);
 
 	for (i = 0; i < npages; i++) {
-		chunk = min_t(size_t, PAGE_SIZE, remain);
+		chunk = min_t(size_t, PG_SIZE, remain);
 		bv[i].bv_page = pages[i];
 		bv[i].bv_offset = 0;
 		bv[i].bv_len = chunk;
@@ -362,7 +362,7 @@ ssize_t copy_splice_read(struct file *in, loff_t *ppos,
 	ret = in->f_op->read_iter(&kiocb, &to);
 
 	if (ret > 0) {
-		keep = DIV_ROUND_UP(ret, PAGE_SIZE);
+		keep = DIV_ROUND_UP(ret, PG_SIZE);
 		*ppos = kiocb.ki_pos;
 	}
 
@@ -382,7 +382,7 @@ ssize_t copy_splice_read(struct file *in, loff_t *ppos,
 	for (i = 0; i < keep; i++) {
 		struct pipe_buffer *buf = pipe_head_buf(pipe);
 
-		chunk = min_t(size_t, remain, PAGE_SIZE);
+		chunk = min_t(size_t, remain, PG_SIZE);
 		*buf = (struct pipe_buffer) {
 			.ops	= &default_pipe_buf_ops,
 			.page	= bv[i].bv_page,
@@ -964,7 +964,7 @@ static ssize_t do_splice_read(struct file *in, loff_t *ppos,
 
 	/* Don't try to read more the pipe has space for. */
 	p_space = pipe->max_usage - pipe_buf_usage(pipe);
-	len = min_t(size_t, len, p_space << PAGE_SHIFT);
+	len = min_t(size_t, len, p_space << PG_SHIFT);
 
 	if (unlikely(len > MAX_RW_COUNT))
 		len = MAX_RW_COUNT;
@@ -1463,9 +1463,9 @@ static ssize_t iter_to_pipe(struct iov_iter *from,
 			break;
 		}
 
-		n = DIV_ROUND_UP(left + start, PAGE_SIZE);
+		n = DIV_ROUND_UP(left + start, PG_SIZE);
 		for (i = 0; i < n; i++) {
-			int size = umin(left, PAGE_SIZE - start);
+			int size = umin(left, PG_SIZE - start);
 
 			buf.page = pages[i];
 			buf.offset = start;

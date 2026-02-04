@@ -6829,7 +6829,7 @@ static ssize_t branches_show(struct device *cdev,
 			     struct device_attribute *attr,
 			     char *buf)
 {
-	return snprintf(buf, PAGE_SIZE, "%d\n", x86_pmu.lbr_nr);
+	return snprintf(buf, PG_SIZE, "%d\n", x86_pmu.lbr_nr);
 }
 
 static DEVICE_ATTR_RO(branches);
@@ -6838,7 +6838,7 @@ static ssize_t branch_counter_nr_show(struct device *cdev,
 				      struct device_attribute *attr,
 				      char *buf)
 {
-	return snprintf(buf, PAGE_SIZE, "%d\n", fls(x86_pmu.lbr_counters));
+	return snprintf(buf, PG_SIZE, "%d\n", fls(x86_pmu.lbr_counters));
 }
 
 static DEVICE_ATTR_RO(branch_counter_nr);
@@ -6847,7 +6847,7 @@ static ssize_t branch_counter_width_show(struct device *cdev,
 					 struct device_attribute *attr,
 					 char *buf)
 {
-	return snprintf(buf, PAGE_SIZE, "%d\n", LBR_INFO_BR_CNTR_BITS);
+	return snprintf(buf, PG_SIZE, "%d\n", LBR_INFO_BR_CNTR_BITS);
 }
 
 static DEVICE_ATTR_RO(branch_counter_width);

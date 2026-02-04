@@ -1447,13 +1447,13 @@ static ssize_t available_clocksource_show(struct device *dev,
 		if (!tick_oneshot_mode_active() ||
 		    (src->flags & CLOCK_SOURCE_VALID_FOR_HRES))
 			count += snprintf(buf + count,
-				  max((ssize_t)PAGE_SIZE - count, (ssize_t)0),
+				  max((ssize_t)PG_SIZE - count, (ssize_t)0),
 				  "%s ", src->name);
 	}
 	mutex_unlock(&clocksource_mutex);
 
 	count += snprintf(buf + count,
-			  max((ssize_t)PAGE_SIZE - count, (ssize_t)0), "\n");
+			  max((ssize_t)PG_SIZE - count, (ssize_t)0), "\n");
 
 	return count;
 }

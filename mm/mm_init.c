@@ -268,9 +268,9 @@ static int __init cmdline_parse_core(char *p, unsigned long *core,
 	} else {
 		coremem = memparse(p, &p);
 		/* Paranoid check that UL is enough for the coremem value */
-		WARN_ON((coremem >> PAGE_SHIFT) > ULONG_MAX);
+		WARN_ON((coremem >> PG_SHIFT) > ULONG_MAX);
 
-		*core = coremem >> PAGE_SHIFT;
+		*core = coremem >> PG_SHIFT;
 		*percent = 0UL;
 	}
 	return 0;
@@ -318,7 +318,7 @@ static unsigned long __init early_calculate_totalpages(void)
 	int i, nid;
 
 	for_each_mem_pfn_range(i, MAX_NUMNODES, &start_pfn, &end_pfn, &nid) {
-		unsigned long pages = end_pfn - start_pfn;
+		unsigned long pages = PTES_TO_PAGES(end_pfn - start_pfn);
 
 		totalpages += pages;
 		if (pages)
@@ -379,7 +379,7 @@ static void __init find_zone_movable_pfns_for_nodes(void)
 
 			nid = memblock_get_region_node(r);
 
-			usable_startpfn = memblock_region_memory_base_pfn(r);
+			usable_startpfn = PTES_TO_PAGES(memblock_region_memory_base_pfn(r));
 			zone_movable_pfn[nid] = zone_movable_pfn[nid] ?
 				min(usable_startpfn, zone_movable_pfn[nid]) :
 				usable_startpfn;
@@ -497,6 +497,9 @@ restart:
 		for_each_mem_pfn_range(i, nid, &start_pfn, &end_pfn, NULL) {
 			unsigned long size_pages;
 
+			start_pfn = round_up(start_pfn, PTES_PER_PAGE);
+			end_pfn = round_up(end_pfn, PTES_PER_PAGE);
+
 			start_pfn = max(start_pfn, zone_movable_pfn[nid]);
 			if (start_pfn >= end_pfn)
 				continue;
@@ -504,8 +507,7 @@ restart:
 			/* Account for what is only usable for kernelcore */
 			if (start_pfn < usable_startpfn) {
 				unsigned long kernel_pages;
-				kernel_pages = min(end_pfn, usable_startpfn)
-								- start_pfn;
+				kernel_pages = PTES_TO_PAGES((min(end_pfn, usable_startpfn) - start_pfn));
 
 				kernelcore_remaining -= min(kernel_pages,
 							kernelcore_remaining);
@@ -532,7 +534,7 @@ restart:
 			 * start_pfn->end_pfn. Calculate size_pages as the
 			 * number of pages used as kernelcore
 			 */
-			size_pages = end_pfn - start_pfn;
+			size_pages = PTES_TO_PAGES(end_pfn - start_pfn);
 			if (size_pages > kernelcore_remaining)
 				size_pages = kernelcore_remaining;
 			zone_movable_pfn[nid] = start_pfn + size_pages;
@@ -566,7 +568,7 @@ out2:
 		unsigned long start_pfn, end_pfn;
 
 		zone_movable_pfn[nid] =
-			round_up(zone_movable_pfn[nid], MAX_ORDER_NR_PAGES);
+			round_up(zone_movable_pfn[nid], PAGES_TO_PTES(MAX_ORDER_NR_PAGES));
 
 		get_pfn_range_for_nid(nid, &start_pfn, &end_pfn);
 		if (zone_movable_pfn[nid] >= end_pfn)
@@ -592,7 +594,7 @@ void __meminit __init_single_page(struct page *page, unsigned long pfn,
 #ifdef WANT_PAGE_VIRTUAL
 	/* The shift won't overflow because ZONE_NORMAL is below 4G. */
 	if (!is_highmem_idx(zone))
-		set_page_address(page, __va(pfn << PAGE_SHIFT));
+		set_page_address(page, __va(pfn << PTE_SHIFT));
 #endif
 }
 
@@ -786,6 +788,9 @@ void __meminit reserve_bootmem_region(phys_addr_t start,
 	for_each_valid_pfn(pfn, PFN_DOWN(start), PFN_UP(end)) {
 		struct page *page = pfn_to_page(pfn);
 
+		if (pfn % PTES_PER_PAGE)
+			continue;
+
 		__init_deferred_page(pfn, nid);
 
 		/*
@@ -850,6 +855,8 @@ static void __init init_unavailable_range(unsigned long spfn,
 	u64 pgcnt = 0;
 
 	for_each_valid_pfn(pfn, spfn, epfn) {
+		if (pfn % PTES_PER_PAGE)
+			continue;
 		__init_single_page(pfn_to_page(pfn), pfn, zone, node);
 		__SetPageReserved(pfn_to_page(pfn));
 		pgcnt++;
@@ -900,6 +907,8 @@ void __meminit memmap_init_range(unsigned long size, int nid, unsigned long zone
 #endif
 
 	for (pfn = start_pfn; pfn < end_pfn; ) {
+		if (pfn % PTES_PER_PAGE)
+			goto next;
 		/*
 		 * There can be holes in boot-time mem_map[]s handed to this
 		 * function.  They do not exist on hotplugged memory.
@@ -934,6 +943,7 @@ void __meminit memmap_init_range(unsigned long size, int nid, unsigned long zone
 					isolate_pageblock);
 			cond_resched();
 		}
+next:
 		pfn++;
 	}
 }
@@ -944,7 +954,7 @@ static void __init memmap_init_zone_range(struct zone *zone,
 					  unsigned long *hole_pfn)
 {
 	unsigned long zone_start_pfn = zone->zone_start_pfn;
-	unsigned long zone_end_pfn = zone_start_pfn + zone->spanned_pages;
+	unsigned long zone_end_pfn = zone_start_pfn + PAGES_TO_PTES(zone->spanned_pages);
 	int nid = zone_to_nid(zone), zone_id = zone_idx(zone);
 
 	start_pfn = clamp(start_pfn, zone_start_pfn, zone_end_pfn);
@@ -1076,7 +1086,7 @@ static inline unsigned long compound_nr_pages(struct vmem_altmap *altmap,
 	if (!vmemmap_can_optimize(altmap, pgmap))
 		return pgmap_vmemmap_nr(pgmap);
 
-	return VMEMMAP_RESERVE_NR * (PAGE_SIZE / sizeof(struct page));
+	return VMEMMAP_RESERVE_NR * (PG_SIZE / sizeof(struct page));
 }
 
 static void __ref memmap_init_compound(struct page *head,
@@ -1192,16 +1202,16 @@ static unsigned long __init __absent_pages_in_range(int nid,
 				unsigned long range_start_pfn,
 				unsigned long range_end_pfn)
 {
-	unsigned long nr_absent = range_end_pfn - range_start_pfn;
+	unsigned long nr_absent_pfns = range_end_pfn - range_start_pfn;
 	unsigned long start_pfn, end_pfn;
 	int i;
 
 	for_each_mem_pfn_range(i, nid, &start_pfn, &end_pfn, NULL) {
 		start_pfn = clamp(start_pfn, range_start_pfn, range_end_pfn);
 		end_pfn = clamp(end_pfn, range_start_pfn, range_end_pfn);
-		nr_absent -= end_pfn - start_pfn;
+		nr_absent_pfns -= end_pfn - start_pfn;
 	}
-	return nr_absent;
+	return PTES_TO_PAGES(nr_absent_pfns);
 }
 
 /**
@@ -1248,11 +1258,11 @@ static unsigned long __init zone_absent_pages_in_node(int nid,
 
 			if (zone_type == ZONE_MOVABLE &&
 			    memblock_is_mirror(r))
-				nr_absent += end_pfn - start_pfn;
+				nr_absent += PTES_TO_PAGES(end_pfn - start_pfn);
 
 			if (zone_type == ZONE_NORMAL &&
 			    !memblock_is_mirror(r))
-				nr_absent += end_pfn - start_pfn;
+				nr_absent += PTES_TO_PAGES(end_pfn - start_pfn);
 		}
 	}
 
@@ -1288,7 +1298,7 @@ static unsigned long __init zone_spanned_pages_in_node(int nid,
 	*zone_start_pfn = max(*zone_start_pfn, node_start_pfn);
 
 	/* Return the spanned pages */
-	return *zone_end_pfn - *zone_start_pfn;
+	return PTES_TO_PAGES(*zone_end_pfn - *zone_start_pfn);
 }
 
 static void __init reset_memoryless_node_totalpages(struct pglist_data *pgdat)
@@ -1319,8 +1329,8 @@ static void __init calc_nr_kernel_pages(void)
 #endif
 
 	for_each_free_mem_range(u, NUMA_NO_NODE, MEMBLOCK_NONE, &start_addr, &end_addr, NULL) {
-		start_pfn = PFN_UP(start_addr);
-		end_pfn   = PFN_DOWN(end_addr);
+		start_pfn = PHYS_PFN(PG_ALIGN(start_addr));
+		end_pfn   = PHYS_PFN(PG_ALIGN_DOWN(end_addr));
 
 		if (start_pfn < end_pfn) {
 			nr_all_pages += end_pfn - start_pfn;
@@ -1516,7 +1526,7 @@ void __init set_pageblock_order(void)
 		return;
 
 	/* Don't let pageblocks exceed the maximum allocation granularity. */
-	if (HPAGE_SHIFT > PAGE_SHIFT && HUGETLB_PAGE_ORDER < order)
+	if (HPAGE_SHIFT > PG_SHIFT && HUGETLB_PAGE_ORDER < order)
 		order = HUGETLB_PAGE_ORDER;
 
 	/*
@@ -1665,7 +1675,7 @@ static void __init alloc_node_mem_map(struct pglist_data *pgdat)
 		panic("Failed to allocate %ld bytes for node %d memory map\n",
 		      size, pgdat->node_id);
 	pgdat->node_mem_map = map + offset;
-	memmap_boot_pages_add(DIV_ROUND_UP(size, PAGE_SIZE));
+	memmap_boot_pages_add(DIV_ROUND_UP(size, PG_SIZE));
 	pr_debug("%s: node %d, pgdat %08lx, node_mem_map %08lx\n",
 		 __func__, pgdat->node_id, (unsigned long)pgdat,
 		 (unsigned long)pgdat->node_mem_map);
@@ -1728,8 +1738,8 @@ static void __init free_area_init_node(int nid)
 
 	if (start_pfn != end_pfn) {
 		pr_info("Initmem setup node %d [mem %#018Lx-%#018Lx]\n", nid,
-			(u64)start_pfn << PAGE_SHIFT,
-			end_pfn ? ((u64)end_pfn << PAGE_SHIFT) - 1 : 0);
+			(u64)start_pfn << PTE_SHIFT,
+			end_pfn ? ((u64)end_pfn << PTE_SHIFT) - 1 : 0);
 
 		calculate_node_totalpages(pgdat, start_pfn, end_pfn);
 	} else {
@@ -1862,9 +1872,9 @@ static void __init free_area_init(void)
 		else
 			pr_cont("[mem %#018Lx-%#018Lx]\n",
 				(u64)arch_zone_lowest_possible_pfn[i]
-					<< PAGE_SHIFT,
+					<< PG_SHIFT,
 				((u64)arch_zone_highest_possible_pfn[i]
-					<< PAGE_SHIFT) - 1);
+					<< PG_SHIFT) - 1);
 	}
 
 	/* Print out the PFNs ZONE_MOVABLE begins at in each node */
@@ -1872,7 +1882,7 @@ static void __init free_area_init(void)
 	for (i = 0; i < MAX_NUMNODES; i++) {
 		if (zone_movable_pfn[i])
 			pr_info("  Node %d: %#018Lx\n", i,
-			       (u64)zone_movable_pfn[i] << PAGE_SHIFT);
+			       (u64)zone_movable_pfn[i] << PTE_SHIFT);
 	}
 
 	/*
@@ -1883,8 +1893,8 @@ static void __init free_area_init(void)
 	pr_info("Early memory node ranges\n");
 	for_each_mem_pfn_range(i, MAX_NUMNODES, &start_pfn, &end_pfn, &nid) {
 		pr_info("  node %3d: [mem %#018Lx-%#018Lx]\n", nid,
-			(u64)start_pfn << PAGE_SHIFT,
-			((u64)end_pfn << PAGE_SHIFT) - 1);
+			(u64)start_pfn << PTE_SHIFT,
+			((u64)end_pfn << PTE_SHIFT) - 1);
 		subsection_map_init(start_pfn, end_pfn - start_pfn);
 	}
 
@@ -1940,7 +1950,7 @@ static void __init free_area_init(void)
  * all the nodes.
  *
  * For example, if all nodes are 1GiB and aligned to 1GiB, the return value
- * would indicate 1GiB alignment with (1 << (30 - PAGE_SHIFT)).  If the
+ * would indicate 1GiB alignment with (1 << (30 - PG_SHIFT)).  If the
  * nodes are shifted by 256MiB, 256MiB.  Note that if only the last node is
  * shifted, 1GiB is enough and this function will indicate so.
  *
@@ -2004,7 +2014,7 @@ static void __init deferred_free_pages(unsigned long pfn,
 	}
 
 	/* Accept chunks smaller than MAX_PAGE_ORDER upfront */
-	accept_memory(PFN_PHYS(pfn), nr_pages * PAGE_SIZE);
+	accept_memory(PFN_PHYS(pfn), nr_pages * PG_SIZE);
 
 	for (i = 0; i < nr_pages; i++, page++, pfn++) {
 		if (pageblock_aligned(pfn))
@@ -2367,7 +2377,7 @@ void __init page_alloc_init_late(void)
 #if __BITS_PER_LONG > 32
 #define ADAPT_SCALE_BASE	(64ul << 30)
 #define ADAPT_SCALE_SHIFT	2
-#define ADAPT_SCALE_NPAGES	(ADAPT_SCALE_BASE >> PAGE_SHIFT)
+#define ADAPT_SCALE_NPAGES	(ADAPT_SCALE_BASE >> PG_SHIFT)
 #endif
 
 /*
@@ -2398,9 +2408,9 @@ void *__init alloc_large_system_hash(const char *tablename,
 		/* round applicable memory size up to nearest megabyte */
 		numentries = nr_kernel_pages;
 
-		/* It isn't necessary when PAGE_SIZE >= 1MB */
-		if (PAGE_SIZE < SZ_1M)
-			numentries = round_up(numentries, SZ_1M / PAGE_SIZE);
+		/* It isn't necessary when PG_SIZE >= 1MB */
+		if (PG_SIZE < SZ_1M)
+			numentries = round_up(numentries, SZ_1M / PG_SIZE);
 
 #if __BITS_PER_LONG > 32
 		if (!high_limit) {
@@ -2413,19 +2423,19 @@ void *__init alloc_large_system_hash(const char *tablename,
 #endif
 
 		/* limit to 1 bucket per 2^scale bytes of low memory */
-		if (scale > PAGE_SHIFT)
-			numentries >>= (scale - PAGE_SHIFT);
+		if (scale > PG_SHIFT)
+			numentries >>= (scale - PG_SHIFT);
 		else
-			numentries <<= (PAGE_SHIFT - scale);
+			numentries <<= (PG_SHIFT - scale);
 
-		if (unlikely((numentries * bucketsize) < PAGE_SIZE))
-			numentries = PAGE_SIZE / bucketsize;
+		if (unlikely((numentries * bucketsize) < PG_SIZE))
+			numentries = PG_SIZE / bucketsize;
 	}
 	numentries = roundup_pow_of_two(numentries);
 
 	/* limit allocation size to 1/16 total memory by default */
 	if (max == 0) {
-		max = ((unsigned long long)nr_all_pages << PAGE_SHIFT) >> 4;
+		max = ((unsigned long long)nr_all_pages << PG_SHIFT) >> 4;
 		do_div(max, bucketsize);
 	}
 	max = min(max, 0x80000000ULL);
@@ -2461,7 +2471,7 @@ void *__init alloc_large_system_hash(const char *tablename,
 			table = alloc_pages_exact(size, gfp_flags);
 			kmemleak_alloc(table, size, 1, gfp_flags);
 		}
-	} while (!table && size > PAGE_SIZE && --log2qty);
+	} while (!table && size > PG_SIZE && --log2qty);
 
 	if (!table)
 		panic("Failed to allocate %s hash table\n", tablename);

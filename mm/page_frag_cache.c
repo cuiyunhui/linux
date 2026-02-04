@@ -24,7 +24,7 @@ static unsigned long encoded_page_create(struct page *page, unsigned int order,
 					 bool pfmemalloc)
 {
 	BUILD_BUG_ON(PAGE_FRAG_CACHE_MAX_ORDER > PAGE_FRAG_CACHE_ORDER_MASK);
-	BUILD_BUG_ON(PAGE_FRAG_CACHE_PFMEMALLOC_BIT >= PAGE_SIZE);
+	BUILD_BUG_ON(PAGE_FRAG_CACHE_PFMEMALLOC_BIT >= PG_SIZE);
 
 	return (unsigned long)page_address(page) |
 		(order & PAGE_FRAG_CACHE_ORDER_MASK) |
@@ -38,7 +38,7 @@ static unsigned long encoded_page_decode_order(unsigned long encoded_page)
 
 static void *encoded_page_decode_virt(unsigned long encoded_page)
 {
-	return (void *)(encoded_page & PAGE_MASK);
+	return (void *)(encoded_page & PG_MASK);
 }
 
 static struct page *encoded_page_decode_page(unsigned long encoded_page)
@@ -53,7 +53,7 @@ static struct page *__page_frag_cache_refill(struct page_frag_cache *nc,
 	struct page *page = NULL;
 	gfp_t gfp = gfp_mask;
 
-#if (PAGE_SIZE < PAGE_FRAG_CACHE_MAX_SIZE)
+#if (PG_SIZE < PAGE_FRAG_CACHE_MAX_SIZE)
 	gfp_mask = (gfp_mask & ~__GFP_DIRECT_RECLAIM) |  __GFP_COMP |
 		   __GFP_NOWARN | __GFP_NORETRY | __GFP_NOMEMALLOC;
 	page = __alloc_pages(gfp_mask, PAGE_FRAG_CACHE_MAX_ORDER,
@@ -116,13 +116,13 @@ refill:
 		nc->offset = 0;
 	}
 
-	size = PAGE_SIZE << encoded_page_decode_order(encoded_page);
+	size = PG_SIZE << encoded_page_decode_order(encoded_page);
 	offset = __ALIGN_KERNEL_MASK(nc->offset, ~align_mask);
 	if (unlikely(offset + fragsz > size)) {
-		if (unlikely(fragsz > PAGE_SIZE)) {
+		if (unlikely(fragsz > PG_SIZE)) {
 			/*
 			 * The caller is trying to allocate a fragment
-			 * with fragsz > PAGE_SIZE but the cache isn't big
+			 * with fragsz > PG_SIZE but the cache isn't big
 			 * enough to satisfy the request, this may
 			 * happen in low memory conditions.
 			 * We don't release the cache page because

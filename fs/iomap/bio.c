@@ -91,7 +91,7 @@ static int iomap_bio_read_folio_range(const struct iomap_iter *iter,
 	    !bio_add_folio(bio, folio, plen, poff)) {
 		gfp_t gfp = mapping_gfp_constraint(folio->mapping, GFP_KERNEL);
 		gfp_t orig_gfp = gfp;
-		unsigned int nr_vecs = DIV_ROUND_UP(length, PAGE_SIZE);
+		unsigned int nr_vecs = DIV_ROUND_UP(length, PG_SIZE);
 
 		if (bio)
 			submit_bio(bio);

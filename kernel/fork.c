@@ -312,9 +312,9 @@ static int memcg_charge_kernel_stack(struct vm_struct *vm_area)
 	int ret;
 	int nr_charged = 0;
 
-	BUG_ON(vm_area->nr_pages != THREAD_SIZE / PAGE_SIZE);
+	BUG_ON(vm_area->nr_pages != THREAD_SIZE / PG_SIZE);
 
-	for (i = 0; i < THREAD_SIZE / PAGE_SIZE; i++) {
+	for (i = 0; i < THREAD_SIZE / PG_SIZE; i++) {
 		ret = memcg_kmem_charge_page(vm_area->pages[i], GFP_KERNEL, 0);
 		if (ret)
 			goto err;
@@ -386,10 +386,10 @@ static void free_thread_stack(struct task_struct *tsk)
 #else /* !CONFIG_VMAP_STACK */
 
 /*
- * Allocate pages if THREAD_SIZE is >= PAGE_SIZE, otherwise use a
+ * Allocate pages if THREAD_SIZE is >= PG_SIZE, otherwise use a
  * kmemcache based allocator.
  */
-#if THREAD_SIZE >= PAGE_SIZE
+#if THREAD_SIZE >= PG_SIZE
 
 static void thread_stack_free_rcu(struct rcu_head *rh)
 {
@@ -421,7 +421,7 @@ static void free_thread_stack(struct task_struct *tsk)
 	tsk->stack = NULL;
 }
 
-#else /* !(THREAD_SIZE >= PAGE_SIZE) */
+#else /* !(THREAD_SIZE >= PG_SIZE) */
 
 static struct kmem_cache *thread_stack_cache;
 
@@ -460,7 +460,7 @@ void thread_stack_cache_init(void)
 	BUG_ON(thread_stack_cache == NULL);
 }
 
-#endif /* THREAD_SIZE >= PAGE_SIZE */
+#endif /* THREAD_SIZE >= PG_SIZE */
 #endif /* CONFIG_VMAP_STACK */
 
 /* SLAB cache for signal_struct structures (tsk->signal) */
@@ -484,9 +484,9 @@ static void account_kernel_stack(struct task_struct *tsk, int account)
 		struct vm_struct *vm_area = task_stack_vm_area(tsk);
 		int i;
 
-		for (i = 0; i < THREAD_SIZE / PAGE_SIZE; i++)
+		for (i = 0; i < THREAD_SIZE / PG_SIZE; i++)
 			mod_lruvec_page_state(vm_area->pages[i], NR_KERNEL_STACK_KB,
-					      account * (PAGE_SIZE / 1024));
+					      account * (PG_SIZE / 1024));
 	} else {
 		void *stack = task_stack_page(tsk);
 
@@ -505,7 +505,7 @@ void exit_task_stack_account(struct task_struct *tsk)
 		int i;
 
 		vm_area = task_stack_vm_area(tsk);
-		for (i = 0; i < THREAD_SIZE / PAGE_SIZE; i++)
+		for (i = 0; i < THREAD_SIZE / PG_SIZE; i++)
 			memcg_kmem_uncharge_page(vm_area->pages[i], 0);
 	}
 }
@@ -814,10 +814,10 @@ static void __init set_max_threads(unsigned int max_threads_suggested)
 	 * The number of threads shall be limited such that the thread
 	 * structures may only consume a small part of the available memory.
 	 */
-	if (fls64(nr_pages) + fls64(PAGE_SIZE) > 64)
+	if (fls64(nr_pages) + fls64(PG_SIZE) > 64)
 		threads = MAX_THREADS;
 	else
-		threads = div64_u64((u64) nr_pages * (u64) PAGE_SIZE,
+		threads = div64_u64((u64) nr_pages * (u64) PG_SIZE,
 				    (u64) THREAD_SIZE * 8UL);
 
 	if (threads > max_threads_suggested)
@@ -2299,7 +2299,7 @@ __latent_entropy struct task_struct *copy_process(
 	}
 
 	p->nr_dirtied = 0;
-	p->nr_dirtied_pause = 128 >> (PAGE_SHIFT - 10);
+	p->nr_dirtied_pause = 128 >> (PG_SHIFT - 10);
 	p->dirty_paused_when = 0;
 
 	p->pdeath_signal = 0;
@@ -2811,7 +2811,7 @@ static noinline int copy_clone_args_from_user(struct kernel_clone_args *kargs,
 		     CLONE_ARGS_SIZE_VER2);
 	BUILD_BUG_ON(sizeof(struct clone_args) != CLONE_ARGS_SIZE_VER2);
 
-	if (unlikely(usize > PAGE_SIZE))
+	if (unlikely(usize > PG_SIZE))
 		return -E2BIG;
 	if (unlikely(usize < CLONE_ARGS_SIZE_VER0))
 		return -EINVAL;

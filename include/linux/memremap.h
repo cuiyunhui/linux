@@ -292,7 +292,7 @@ static inline bool pgmap_pfn_valid(struct dev_pagemap *pgmap, unsigned long pfn)
 /* when memremap_pages() is disabled all archs can remap a single page */
 static inline unsigned long memremap_compat_align(void)
 {
-	return PAGE_SIZE;
+	return PG_SIZE;
 }
 
 static inline void zone_device_private_split_cb(struct folio *original_folio,

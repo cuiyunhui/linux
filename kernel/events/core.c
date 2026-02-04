@@ -495,7 +495,7 @@ static __always_inline bool is_guest_mediated_pmu_loaded(void)
 int sysctl_perf_event_paranoid __read_mostly = 2;
 
 /* Minimum for 512 kiB + 1 user control page. 'free' kiB per user. */
-static int sysctl_perf_event_mlock __read_mostly = 512 + (PAGE_SIZE / 1024);
+static int sysctl_perf_event_mlock __read_mostly = 512 + (PG_SIZE / 1024);
 
 /*
  * max perf event sample rate
@@ -6806,7 +6806,7 @@ static void perf_event_init_userpage(struct perf_event *event)
 	/* Allow new userspace to detect that bit 0 is deprecated */
 	userpg->cap_bit0_is_deprecated = 1;
 	userpg->size = offsetof(struct perf_event_mmap_page, __reserved);
-	userpg->data_offset = PAGE_SIZE;
+	userpg->data_offset = PG_SIZE;
 	userpg->data_size = perf_data_size(rb);
 
 unlock:
@@ -6999,7 +6999,7 @@ static void perf_mmap_open(struct vm_area_struct *vma)
 	refcount_inc(&event->mmap_count);
 	refcount_inc(&event->rb->mmap_count);
 
-	if (vma->vm_pgoff)
+	if (vma->vm_pteoff)
 		refcount_inc(&event->rb->aux_mmap_count);
 
 	if (mapped)
@@ -7034,7 +7034,7 @@ static void perf_mmap_close(struct vm_area_struct *vma)
 	 * The AUX buffer is strictly a sub-buffer, serialize using aux_mutex
 	 * to avoid complications.
 	 */
-	if (rb_has_aux(rb) && vma->vm_pgoff == rb->aux_pgoff &&
+	if (rb_has_aux(rb) && vma->vm_pteoff == rb->aux_pteoff &&
 	    refcount_dec_and_mutex_lock(&rb->aux_mmap_count, &rb->aux_mutex)) {
 		/*
 		 * Stop all AUX events that are writing to this buffer,
@@ -7119,7 +7119,7 @@ again:
 	 * undo the VM accounting.
 	 */
 
-	atomic_long_sub((size >> PAGE_SHIFT) + 1 - mmap_locked,
+	atomic_long_sub((size >> PG_SHIFT) + 1 - mmap_locked,
 			&mmap_user->locked_vm);
 	atomic64_sub(mmap_locked, &vma->vm_mm->pinned_vm);
 	free_uid(mmap_user);
@@ -7131,7 +7131,7 @@ out_put:
 static vm_fault_t perf_mmap_pfn_mkwrite(struct vm_fault *vmf)
 {
 	/* The first page is the user control page, others are read-only. */
-	return vmf->pgoff == 0 ? 0 : VM_FAULT_SIGBUS;
+	return vmf->pteoff == 0 ? 0 : VM_FAULT_SIGBUS;
 }
 
 static int perf_mmap_may_split(struct vm_area_struct *vma, unsigned long addr)
@@ -7195,8 +7195,8 @@ static int map_range(struct perf_buffer *rb, struct vm_area_struct *vma)
 	 * this mapping is maintained correctly.
 	 */
 	for (pagenum = 0; pagenum < nr_pages; pagenum++) {
-		unsigned long va = vma->vm_start + PAGE_SIZE * pagenum;
-		struct page *page = perf_mmap_to_page(rb, vma->vm_pgoff + pagenum);
+		unsigned long va = vma->vm_start + PG_SIZE * pagenum;
+		struct page *page = perf_mmap_to_page(rb, vma->vm_pteoff + pagenum);
 
 		if (page == NULL) {
 			err = -EINVAL;
@@ -7204,7 +7204,7 @@ static int map_range(struct perf_buffer *rb, struct vm_area_struct *vma)
 		}
 
 		/* Map readonly, perf_mmap_pfn_mkwrite() called on write fault. */
-		err = remap_pfn_range(vma, va, page_to_pfn(page), PAGE_SIZE,
+		err = remap_pfn_range(vma, va, page_to_pfn(page), PG_SIZE,
 				      vm_get_page_prot(vma->vm_flags & ~VM_SHARED));
 		if (err)
 			break;
@@ -7213,7 +7213,7 @@ static int map_range(struct perf_buffer *rb, struct vm_area_struct *vma)
 #ifdef CONFIG_MMU
 	/* Clear any partial mappings on error. */
 	if (err)
-		zap_page_range_single(vma, vma->vm_start, nr_pages * PAGE_SIZE, NULL);
+		zap_page_range_single(vma, vma->vm_start, nr_pages * PG_SIZE, NULL);
 #endif
 
 	return err;
@@ -7224,7 +7224,7 @@ static bool perf_mmap_calc_limits(struct vm_area_struct *vma, long *user_extra, 
 	unsigned long user_locked, user_lock_limit, locked, lock_limit;
 	struct user_struct *user = current_user();
 
-	user_lock_limit = sysctl_perf_event_mlock >> (PAGE_SHIFT - 10);
+	user_lock_limit = sysctl_perf_event_mlock >> (PG_SHIFT - 10);
 	/* Increase the limit linearly with more CPUs */
 	user_lock_limit *= num_online_cpus();
 
@@ -7248,7 +7248,7 @@ static bool perf_mmap_calc_limits(struct vm_area_struct *vma, long *user_extra, 
 	}
 
 	lock_limit = rlimit(RLIMIT_MEMLOCK);
-	lock_limit >>= PAGE_SHIFT;
+	lock_limit >>= PG_SHIFT;
 	locked = atomic64_read(&vma->vm_mm->pinned_vm) + *extra;
 
 	return locked <= lock_limit || !perf_is_paranoid() || capable(CAP_IPC_LOCK);
@@ -7362,17 +7362,17 @@ static int perf_mmap_aux(struct vm_area_struct *vma, struct perf_event *event,
 	aux_offset = READ_ONCE(rb->user_page->aux_offset);
 	aux_size = READ_ONCE(rb->user_page->aux_size);
 
-	if (aux_offset < perf_data_size(rb) + PAGE_SIZE)
+	if (aux_offset < perf_data_size(rb) + PG_SIZE)
 		return -EINVAL;
 
-	if (aux_offset != vma->vm_pgoff << PAGE_SHIFT)
+	if (aux_offset != vma->vm_pteoff << PG_SHIFT)
 		return -EINVAL;
 
 	/* already mapped with a different offset */
-	if (rb_has_aux(rb) && rb->aux_pgoff != vma->vm_pgoff)
+	if (rb_has_aux(rb) && rb->aux_pteoff != vma->vm_pteoff)
 		return -EINVAL;
 
-	if (aux_size != nr_pages * PAGE_SIZE)
+	if (aux_size != nr_pages * PG_SIZE)
 		return -EINVAL;
 
 	/* already mapped with a different size */
@@ -7399,7 +7399,7 @@ static int perf_mmap_aux(struct vm_area_struct *vma, struct perf_event *event,
 		if (vma->vm_flags & VM_WRITE)
 			rb_flags |= RING_BUFFER_WRITABLE;
 
-		ret = rb_alloc_aux(rb, event, vma->vm_pgoff, nr_pages,
+		ret = rb_alloc_aux(rb, event, vma->vm_pteoff, nr_pages,
 				   event->attr.aux_watermark, rb_flags);
 		if (ret) {
 			refcount_dec(&rb->mmap_count);
@@ -7439,12 +7439,12 @@ static int perf_mmap(struct file *file, struct vm_area_struct *vma)
 		return ret;
 
 	vma_size = vma->vm_end - vma->vm_start;
-	nr_pages = vma_size / PAGE_SIZE;
+	nr_pages = vma_size / PG_SIZE;
 
 	if (nr_pages > INT_MAX)
 		return -ENOMEM;
 
-	if (vma_size != PAGE_SIZE * nr_pages)
+	if (vma_size != PG_SIZE * nr_pages)
 		return -EINVAL;
 
 	scoped_guard (mutex, &event->mmap_mutex) {
@@ -7456,7 +7456,7 @@ static int perf_mmap(struct file *file, struct vm_area_struct *vma)
 		if (event->state <= PERF_EVENT_STATE_REVOKED)
 			return -ENODEV;
 
-		if (vma->vm_pgoff == 0)
+		if (vma->vm_pteoff == 0)
 			ret = perf_mmap_rb(vma, event, nr_pages);
 		else
 			ret = perf_mmap_aux(vma, event, nr_pages);
@@ -8395,7 +8395,7 @@ static u64 perf_virt_to_phys(u64 virt)
 
 			pagefault_disable();
 			if (get_user_page_fast_only(virt, 0, &p)) {
-				phys_addr = page_to_phys(p) + virt % PAGE_SIZE;
+				phys_addr = page_to_phys(p) + virt % PG_SIZE;
 				put_page(p);
 			}
 			pagefault_enable();
@@ -9599,7 +9599,7 @@ struct perf_mmap_event {
 		u32				tid;
 		u64				start;
 		u64				len;
-		u64				pgoff;
+		u64				pteoff;
 	} event_id;
 };
 
@@ -9817,7 +9817,7 @@ static bool perf_addr_filter_vma_adjust(struct perf_addr_filter *filter,
 					struct perf_addr_filter_range *fr)
 {
 	unsigned long vma_size = vma->vm_end - vma->vm_start;
-	unsigned long off = vma->vm_pgoff << PAGE_SHIFT;
+	unsigned long off = vma->vm_pteoff << PTE_SHIFT;
 	struct file *file = vma->vm_file;
 
 	if (!perf_addr_filter_match(filter, file, off, vma_size))
@@ -9907,7 +9907,7 @@ void perf_event_mmap(struct vm_area_struct *vma)
 			/* .tid */
 			.start  = vma->vm_start,
 			.len    = vma->vm_end - vma->vm_start,
-			.pgoff  = (u64)vma->vm_pgoff << PAGE_SHIFT,
+			.pteoff  = (u64)vma->vm_pteoff << PG_SHIFT,
 		},
 		/* .maj (attr_mmap2 only) */
 		/* .min (attr_mmap2 only) */
@@ -12136,7 +12136,7 @@ static int perf_event_set_filter(struct perf_event *event, void __user *arg)
 	int ret = -EINVAL;
 	char *filter_str;
 
-	filter_str = strndup_user(arg, PAGE_SIZE);
+	filter_str = strndup_user(arg, PG_SIZE);
 	if (IS_ERR(filter_str))
 		return PTR_ERR(filter_str);
 
@@ -13518,7 +13518,7 @@ static int perf_copy_attr(struct perf_event_attr __user *uattr,
 	/* ABI compatibility quirk: */
 	if (!size)
 		size = PERF_ATTR_SIZE_VER0;
-	if (size < PERF_ATTR_SIZE_VER0 || size > PAGE_SIZE)
+	if (size < PERF_ATTR_SIZE_VER0 || size > PG_SIZE)
 		goto err_size;
 
 	ret = copy_struct_from_user(attr, sizeof(*attr), uattr, size);

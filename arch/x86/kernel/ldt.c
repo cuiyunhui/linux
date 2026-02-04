@@ -31,7 +31,7 @@
 
 #include <xen/xen.h>
 
-/* This is a multiple of PAGE_SIZE. */
+/* This is a multiple of PG_SIZE. */
 #define LDT_SLOT_STRIDE (LDT_ENTRIES * LDT_ENTRY_SIZE)
 
 static inline void *ldt_slot_va(int slot)
@@ -165,9 +165,9 @@ static struct ldt_struct *alloc_ldt_struct(unsigned int num_entries)
 	 * Xen is very picky: it requires a page-aligned LDT that has no
 	 * trailing nonzero bytes in any page that contains LDT descriptors.
 	 * Keep it simple: zero the whole allocation and never allocate less
-	 * than PAGE_SIZE.
+	 * than PG_SIZE.
 	 */
-	if (alloc_size > PAGE_SIZE)
+	if (alloc_size > PG_SIZE)
 		new_ldt->entries = __vmalloc(alloc_size, GFP_KERNEL_ACCOUNT | __GFP_ZERO);
 	else
 		new_ldt->entries = (void *)get_zeroed_page(GFP_KERNEL_ACCOUNT);
@@ -306,10 +306,10 @@ map_ldt_struct(struct mm_struct *mm, struct ldt_struct *ldt, int slot)
 
 	is_vmalloc = is_vmalloc_addr(ldt->entries);
 
-	nr_pages = DIV_ROUND_UP(ldt->nr_entries * LDT_ENTRY_SIZE, PAGE_SIZE);
+	nr_pages = DIV_ROUND_UP(ldt->nr_entries * LDT_ENTRY_SIZE, PTE_SIZE);
 
 	for (i = 0; i < nr_pages; i++) {
-		unsigned long offset = i << PAGE_SHIFT;
+		unsigned long offset = i << PTE_SHIFT;
 		const void *src = (char *)ldt->entries + offset;
 		unsigned long pfn;
 		pgprot_t pte_prot;
@@ -358,10 +358,10 @@ static void unmap_ldt_struct(struct mm_struct *mm, struct ldt_struct *ldt)
 	if (!boot_cpu_has(X86_FEATURE_PTI))
 		return;
 
-	nr_pages = DIV_ROUND_UP(ldt->nr_entries * LDT_ENTRY_SIZE, PAGE_SIZE);
+	nr_pages = DIV_ROUND_UP(ldt->nr_entries * LDT_ENTRY_SIZE, PTE_SIZE);
 
 	for (i = 0; i < nr_pages; i++) {
-		unsigned long offset = i << PAGE_SHIFT;
+		unsigned long offset = i << PTE_SHIFT;
 		spinlock_t *ptl;
 		pte_t *ptep;
 
@@ -374,7 +374,7 @@ static void unmap_ldt_struct(struct mm_struct *mm, struct ldt_struct *ldt)
 	}
 
 	va = (unsigned long)ldt_slot_va(ldt->slot);
-	flush_tlb_mm_range(mm, va, va + nr_pages * PAGE_SIZE, PAGE_SHIFT, false);
+	flush_tlb_mm_range(mm, va, va + nr_pages * PTE_SIZE, PTE_SHIFT, false);
 }
 
 #else /* !CONFIG_MITIGATION_PAGE_TABLE_ISOLATION */
@@ -437,7 +437,7 @@ static void free_ldt_struct(struct ldt_struct *ldt)
 		return;
 
 	paravirt_free_ldt(ldt->entries, ldt->nr_entries);
-	if (ldt->nr_entries * LDT_ENTRY_SIZE > PAGE_SIZE)
+	if (ldt->nr_entries * LDT_ENTRY_SIZE > PG_SIZE)
 		vfree_atomic(ldt->entries);
 	else
 		free_page((unsigned long)ldt->entries);

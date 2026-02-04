@@ -258,7 +258,7 @@ struct io_apic {
 static __attribute_const__ struct io_apic __iomem *io_apic_base(int idx)
 {
 	return (void __iomem *) __fix_to_virt(FIX_IO_APIC_BASE_0 + idx)
-		+ (mpc_ioapic_addr(idx) & ~PAGE_MASK);
+		+ (mpc_ioapic_addr(idx) & ~PG_MASK);
 }
 
 static inline void io_apic_eoi(unsigned int apic, unsigned int vector)
@@ -2571,13 +2571,13 @@ void __init io_apic_init_mappings(void)
 #ifdef CONFIG_X86_32
 fake_ioapic_page:
 #endif
-			ioapic_phys = (unsigned long)memblock_alloc_or_panic(PAGE_SIZE,
-								    PAGE_SIZE);
+			ioapic_phys = (unsigned long)memblock_alloc_or_panic(PG_SIZE,
+								    PG_SIZE);
 			ioapic_phys = __pa(ioapic_phys);
 		}
 		io_apic_set_fixmap(idx, ioapic_phys);
 		apic_pr_verbose("mapped IOAPIC to %08lx (%08lx)\n",
-				__fix_to_virt(idx) + (ioapic_phys & ~PAGE_MASK), ioapic_phys);
+				__fix_to_virt(idx) + (ioapic_phys & ~PG_MASK), ioapic_phys);
 		idx++;
 
 		ioapic_res->start = ioapic_phys;

@@ -11,7 +11,7 @@
  *     parameter to reflect time remaining.
  *
  *  24 January 2000
- *     Changed sys_poll()/do_poll() to use PAGE_SIZE chunk-based allocation 
+ *     Changed sys_poll()/do_poll() to use PG_SIZE chunk-based allocation 
  *     of fds to overcome nfds < 16390 descriptors limit (Tigran Aivazian).
  */
 
@@ -99,7 +99,7 @@ struct poll_table_page {
 };
 
 #define POLL_TABLE_FULL(table) \
-	((unsigned long)((table)->entry+1) > PAGE_SIZE + (unsigned long)(table))
+	((unsigned long)((table)->entry+1) > PG_SIZE + (unsigned long)(table))
 
 /*
  * Ok, Peter made a complicated, but straightforward multiple_wait() function.
@@ -837,7 +837,7 @@ struct poll_list {
 	struct pollfd entries[] __counted_by(len);
 };
 
-#define POLLFD_PER_PAGE  ((PAGE_SIZE-sizeof(struct poll_list)) / sizeof(struct pollfd))
+#define POLLFD_PER_PAGE  ((PG_SIZE-sizeof(struct poll_list)) / sizeof(struct pollfd))
 
 /*
  * Fish for pollable events on the pollfd->fd file descriptor. We're only

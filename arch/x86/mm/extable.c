@@ -147,7 +147,7 @@ static bool gp_fault_address_ok(unsigned long fault_address)
 		return true;
 
 	/* .. or just above it? */
-	fault_address -= PAGE_SIZE;
+	fault_address -= PG_SIZE;
 	if (valid_user_address(fault_address))
 		return true;
 #endif

@@ -104,7 +104,7 @@ static void do_test_bulk_ioremapping(void)
 	int i;
 
 	for (i = 0; i < 10; ++i) {
-		p = ioremap(mmio_address, PAGE_SIZE);
+		p = ioremap(mmio_address, PTE_SIZE);
 		if (p)
 			iounmap(p);
 	}

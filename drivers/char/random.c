@@ -467,8 +467,8 @@ static ssize_t get_random_bytes_user(struct iov_iter *iter)
 		if (!iov_iter_count(iter) || copied != sizeof(block))
 			break;
 
-		BUILD_BUG_ON(PAGE_SIZE % sizeof(block) != 0);
-		if (ret % PAGE_SIZE == 0) {
+		BUILD_BUG_ON(PG_SIZE % sizeof(block) != 0);
+		if (ret % PG_SIZE == 0) {
 			if (signal_pending(current))
 				break;
 			cond_resched();
@@ -1432,8 +1432,8 @@ static ssize_t write_pool_user(struct iov_iter *iter)
 		if (!iov_iter_count(iter) || copied != sizeof(block))
 			break;
 
-		BUILD_BUG_ON(PAGE_SIZE % sizeof(block) != 0);
-		if (ret % PAGE_SIZE == 0) {
+		BUILD_BUG_ON(PG_SIZE % sizeof(block) != 0);
+		if (ret % PG_SIZE == 0) {
 			if (signal_pending(current))
 				break;
 			cond_resched();

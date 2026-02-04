@@ -2419,7 +2419,7 @@ static ssize_t dev_attr_show(struct kobject *kobj, struct attribute *attr,
 
 	if (dev_attr->show)
 		ret = dev_attr->show(dev, dev_attr, buf);
-	if (ret >= (ssize_t)PAGE_SIZE) {
+	if (ret >= (ssize_t)PG_SIZE) {
 		printk("dev_attr_show: %pS returned bad count\n",
 				dev_attr->show);
 	}

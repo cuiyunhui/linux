@@ -45,7 +45,7 @@ bool get_stack_guard_info(unsigned long *stack, struct stack_info *info)
 	if (get_stack_info_noinstr(stack, current, info))
 		return false;
 	/* but if it is in the page below it, we hit a guard */
-	return get_stack_info_noinstr((void *)stack + PAGE_SIZE, current, info);
+	return get_stack_info_noinstr((void *)stack + PG_SIZE, current, info);
 }
 
 const char *stack_type_name(enum stack_type type);

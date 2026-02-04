@@ -316,7 +316,7 @@ static phys_addr_t __init_memblock memblock_find_in_range_node(phys_addr_t size,
 		end = memblock.current_limit;
 
 	/* avoid allocating the first page */
-	start = max_t(phys_addr_t, start, PAGE_SIZE);
+	start = max_t(phys_addr_t, start, PG_SIZE);
 	end = max(start, end);
 
 	if (memblock_bottom_up())
@@ -388,7 +388,7 @@ void __init memblock_discard(void)
 
 	if (memblock.reserved.regions != memblock_reserved_init_regions) {
 		addr = __pa(memblock.reserved.regions);
-		size = PAGE_ALIGN(sizeof(struct memblock_region) *
+		size = PG_ALIGN(sizeof(struct memblock_region) *
 				  memblock.reserved.max);
 		if (memblock_reserved_in_slab)
 			kfree(memblock.reserved.regions);
@@ -398,7 +398,7 @@ void __init memblock_discard(void)
 
 	if (memblock.memory.regions != memblock_memory_init_regions) {
 		addr = __pa(memblock.memory.regions);
-		size = PAGE_ALIGN(sizeof(struct memblock_region) *
+		size = PG_ALIGN(sizeof(struct memblock_region) *
 				  memblock.memory.max);
 		if (memblock_memory_in_slab)
 			kfree(memblock.memory.regions);
@@ -445,11 +445,11 @@ static int __init_memblock memblock_double_array(struct memblock_type *type,
 	old_size = type->max * sizeof(struct memblock_region);
 	new_size = old_size << 1;
 	/*
-	 * We need to allocated new one align to PAGE_SIZE,
+	 * We need to allocated new one align to PG_SIZE,
 	 *   so we can free them completely later.
 	 */
-	old_alloc_size = PAGE_ALIGN(old_size);
-	new_alloc_size = PAGE_ALIGN(new_size);
+	old_alloc_size = PG_ALIGN(old_size);
+	new_alloc_size = PG_ALIGN(new_size);
 
 	/* Retrieve the slab flag */
 	if (type == &memblock.memory)
@@ -468,11 +468,11 @@ static int __init_memblock memblock_double_array(struct memblock_type *type,
 
 		addr = memblock_find_in_range(new_area_start + new_area_size,
 						memblock.current_limit,
-						new_alloc_size, PAGE_SIZE);
+						new_alloc_size, PG_SIZE);
 		if (!addr && new_area_size)
 			addr = memblock_find_in_range(0,
 				min(new_area_start, memblock.current_limit),
-				new_alloc_size, PAGE_SIZE);
+				new_alloc_size, PG_SIZE);
 
 		if (addr) {
 			/* The memory may not have been accepted, yet. */
@@ -780,10 +780,10 @@ bool __init_memblock memblock_validate_numa_coverage(unsigned long threshold_byt
 			nr_pages += end_pfn - start_pfn;
 	}
 
-	if ((nr_pages << PAGE_SHIFT) > threshold_bytes) {
+	if ((nr_pages << PG_SHIFT) > threshold_bytes) {
 		mem_size_mb = memblock_phys_mem_size() / SZ_1M;
 		pr_err("NUMA: no nodes coverage for %luMB of %luMB RAM\n",
-		       (nr_pages << PAGE_SHIFT) / SZ_1M, mem_size_mb);
+		       (nr_pages << PG_SHIFT) / SZ_1M, mem_size_mb);
 		return false;
 	}
 
@@ -2132,8 +2132,8 @@ static void __init free_memmap(unsigned long start_pfn, unsigned long end_pfn)
 	 * Convert to physical addresses, and round start upwards and end
 	 * downwards.
 	 */
-	pg = PAGE_ALIGN(__pa(start_pg));
-	pgend = PAGE_ALIGN_DOWN(__pa(end_pg));
+	pg = PG_ALIGN(__pa(start_pg));
+	pgend = PG_ALIGN_DOWN(__pa(end_pg));
 
 	/*
 	 * If there are free pages between these, free the section of the
@@ -2201,6 +2201,9 @@ static void __init __free_pages_memory(unsigned long start, unsigned long end)
 {
 	int order;
 
+	start = round_up(start, PTES_PER_PAGE);
+	end = round_down(end, PTES_PER_PAGE);
+
 	while (start < end) {
 		/*
 		 * Free the pages in the largest chunks alignment allows.
@@ -2210,16 +2213,16 @@ static void __init __free_pages_memory(unsigned long start, unsigned long end)
 		 * the case.
 		 */
 		if (start)
-			order = min_t(int, MAX_PAGE_ORDER, __ffs(start));
+			order = min_t(int, MAX_PAGE_ORDER, __ffs(start/PTES_PER_PAGE));
 		else
 			order = MAX_PAGE_ORDER;
 
-		while (start + (1UL << order) > end)
+		while (start + (1UL << order) * PTES_PER_PAGE > end)
 			order--;
 
 		memblock_free_pages(start, order);
 
-		start += (1UL << order);
+		start += (1UL << order) * PTES_PER_PAGE;
 	}
 }
 
@@ -2237,7 +2240,7 @@ static unsigned long __init __free_memory_core(phys_addr_t start,
 
 	__free_pages_memory(start_pfn, end_pfn);
 
-	return end_pfn - start_pfn;
+	return (end_pfn - start_pfn) / PTES_PER_PAGE;
 }
 
 static void __init memmap_init_reserved_pages(void)
@@ -2490,7 +2493,7 @@ static int __init prepare_kho_fdt(void)
 	if (err)
 		goto err_free_fdt;
 
-	err |= fdt_create(fdt, PAGE_SIZE);
+	err |= fdt_create(fdt, PG_SIZE);
 	err |= fdt_finish_reservemap(fdt);
 	err |= fdt_begin_node(fdt, "");
 	err |= fdt_property_string(fdt, "compatible", MEMBLOCK_KHO_NODE_COMPATIBLE);

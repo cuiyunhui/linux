@@ -49,10 +49,10 @@ mtrr_file_add(unsigned long base, unsigned long size,
 		FILE_FCOUNT(file) = fcount;
 	}
 	if (!page) {
-		if ((base & (PAGE_SIZE - 1)) || (size & (PAGE_SIZE - 1)))
+		if ((base & (PTE_SIZE - 1)) || (size & (PTE_SIZE - 1)))
 			return -EINVAL;
-		base >>= PAGE_SHIFT;
-		size >>= PAGE_SHIFT;
+		base >>= PTE_SHIFT;
+		size >>= PTE_SHIFT;
 	}
 	reg = mtrr_add_page(base, size, type, true);
 	if (reg >= 0)
@@ -68,10 +68,10 @@ mtrr_file_del(unsigned long base, unsigned long size,
 	int reg;
 
 	if (!page) {
-		if ((base & (PAGE_SIZE - 1)) || (size & (PAGE_SIZE - 1)))
+		if ((base & (PTE_SIZE - 1)) || (size & (PTE_SIZE - 1)))
 			return -EINVAL;
-		base >>= PAGE_SHIFT;
-		size >>= PAGE_SHIFT;
+		base >>= PTE_SHIFT;
+		size >>= PTE_SHIFT;
 	}
 	reg = mtrr_del_page(-1, base, size);
 	if (reg < 0)
@@ -141,8 +141,8 @@ mtrr_write(struct file *file, const char __user *buf, size_t len, loff_t * ppos)
 	if (i < 0)
 		return i;
 
-	base >>= PAGE_SHIFT;
-	size >>= PAGE_SHIFT;
+	base >>= PTE_SHIFT;
+	size >>= PTE_SHIFT;
 	err = mtrr_add_page((unsigned long)base, (unsigned long)size, i, true);
 	if (err < 0)
 		return err;
@@ -252,12 +252,12 @@ mtrr_ioctl(struct file *file, unsigned int cmd, unsigned long __arg)
 		mtrr_if->get(gentry.regnum, &base, &size, &type);
 
 		/* Hide entries that go above 4GB */
-		if (base + size - 1 >= (1UL << (8 * sizeof(gentry.size) - PAGE_SHIFT))
-		    || size >= (1UL << (8 * sizeof(gentry.size) - PAGE_SHIFT)))
+		if (base + size - 1 >= (1UL << (8 * sizeof(gentry.size) - PTE_SHIFT))
+		    || size >= (1UL << (8 * sizeof(gentry.size) - PTE_SHIFT)))
 			gentry.base = gentry.size = gentry.type = 0;
 		else {
-			gentry.base = base << PAGE_SHIFT;
-			gentry.size = size << PAGE_SHIFT;
+			gentry.base = base << PTE_SHIFT;
+			gentry.size = size << PTE_SHIFT;
 			gentry.type = type;
 		}
 
@@ -366,17 +366,17 @@ static int mtrr_seq_show(struct seq_file *seq, void *offset)
 			mtrr_usage_table[i] = 0;
 			continue;
 		}
-		if (size < (0x100000 >> PAGE_SHIFT)) {
+		if (size < (0x100000 >> PTE_SHIFT)) {
 			/* less than 1MB */
 			factor = 'K';
-			size <<= PAGE_SHIFT - 10;
+			size <<= PTE_SHIFT - 10;
 		} else {
 			factor = 'M';
-			size >>= 20 - PAGE_SHIFT;
+			size >>= 20 - PTE_SHIFT;
 		}
 		/* Base can be > 32bit */
 		seq_printf(seq, "reg%02i: base=0x%06lx000 (%5luMB), size=%5lu%cB, count=%d: %s\n",
-			   i, base, base >> (20 - PAGE_SHIFT),
+			   i, base, base >> (20 - PTE_SHIFT),
 			   size, factor,
 			   mtrr_usage_table[i], mtrr_attrib_to_str(type));
 	}

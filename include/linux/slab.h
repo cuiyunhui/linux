@@ -571,7 +571,7 @@ static inline unsigned int arch_slab_minalign(void)
  */
 #define __assume_kmalloc_alignment __assume_aligned(ARCH_KMALLOC_MINALIGN)
 #define __assume_slab_alignment __assume_aligned(ARCH_SLAB_MINALIGN)
-#define __assume_page_alignment __assume_aligned(PAGE_SIZE)
+#define __assume_page_alignment __assume_aligned(PG_SIZE)
 
 /*
  * Kmalloc array related definitions
@@ -579,10 +579,10 @@ static inline unsigned int arch_slab_minalign(void)
 
 /*
  * SLUB directly allocates requests fitting in to an order-1 page
- * (PAGE_SIZE*2).  Larger requests are passed to the page allocator.
+ * (PG_SIZE*2).  Larger requests are passed to the page allocator.
  */
-#define KMALLOC_SHIFT_HIGH	(PAGE_SHIFT + 1)
-#define KMALLOC_SHIFT_MAX	(MAX_PAGE_ORDER + PAGE_SHIFT)
+#define KMALLOC_SHIFT_HIGH	(PG_SHIFT + 1)
+#define KMALLOC_SHIFT_MAX	(MAX_PAGE_ORDER + PG_SHIFT)
 #ifndef KMALLOC_SHIFT_LOW
 #define KMALLOC_SHIFT_LOW	3
 #endif
@@ -592,7 +592,7 @@ static inline unsigned int arch_slab_minalign(void)
 /* Maximum size for which we actually use a slab cache */
 #define KMALLOC_MAX_CACHE_SIZE	(1UL << KMALLOC_SHIFT_HIGH)
 /* Maximum order allocatable via the slab allocator */
-#define KMALLOC_MAX_ORDER	(KMALLOC_SHIFT_MAX - PAGE_SHIFT)
+#define KMALLOC_MAX_ORDER	(KMALLOC_SHIFT_MAX - PG_SHIFT)
 
 /*
  * Kmalloc subsystem.
@@ -748,7 +748,7 @@ static __always_inline unsigned int __kmalloc_index(size_t size,
 	/* Will never be reached. Needed because the compiler may complain */
 	return -1;
 }
-static_assert(PAGE_SHIFT <= 20);
+static_assert(PG_SHIFT <= 20);
 #define kmalloc_index(s) __kmalloc_index(s, true)
 
 #include <linux/alloc_tag.h>

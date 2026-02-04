@@ -46,7 +46,7 @@ struct page_counter {
 #if BITS_PER_LONG == 32
 #define PAGE_COUNTER_MAX LONG_MAX
 #else
-#define PAGE_COUNTER_MAX (LONG_MAX / PAGE_SIZE)
+#define PAGE_COUNTER_MAX (LONG_MAX / PG_SIZE)
 #endif
 
 /*

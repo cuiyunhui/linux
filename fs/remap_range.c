@@ -159,7 +159,7 @@ static int generic_remap_check_len(struct inode *inode_in,
 /* Read a page's worth of file data into the page cache. */
 static struct folio *vfs_dedupe_get_folio(struct file *file, loff_t pos)
 {
-	return read_mapping_folio(file->f_mapping, pos >> PAGE_SHIFT, file);
+	return read_mapping_folio(file->f_mapping, pos >> PG_SHIFT, file);
 }
 
 /*
@@ -199,8 +199,8 @@ static int vfs_dedupe_file_range_compare(struct file *src, loff_t srcoff,
 	while (len) {
 		struct folio *src_folio, *dst_folio;
 		void *src_addr, *dst_addr;
-		loff_t cmp_len = min(PAGE_SIZE - offset_in_page(srcoff),
-				     PAGE_SIZE - offset_in_page(dstoff));
+		loff_t cmp_len = min(PG_SIZE - offset_in_pg(srcoff),
+				     PG_SIZE - offset_in_pg(dstoff));
 
 		cmp_len = min(cmp_len, len);
 		if (cmp_len <= 0)

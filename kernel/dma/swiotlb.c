@@ -53,7 +53,7 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/swiotlb.h>
 
-#define SLABS_PER_PAGE (1 << (PAGE_SHIFT - IO_TLB_SHIFT))
+#define SLABS_PER_PAGE (1 << (PG_SHIFT - IO_TLB_SHIFT))
 
 /*
  * Minimum IO TLB size to bother booting with.  Systems with mainly
@@ -261,8 +261,8 @@ void __init swiotlb_update_mem_attributes(void)
 
 	if (!mem->nslabs || mem->late_alloc)
 		return;
-	bytes = PAGE_ALIGN(mem->nslabs << IO_TLB_SHIFT);
-	set_memory_decrypted((unsigned long)mem->vaddr, bytes >> PAGE_SHIFT);
+	bytes = PG_ALIGN(mem->nslabs << IO_TLB_SHIFT);
+	set_memory_decrypted((unsigned long)mem->vaddr, bytes >> PG_SHIFT);
 }
 
 static void swiotlb_init_io_tlb_pool(struct io_tlb_pool *mem, phys_addr_t start,
@@ -318,7 +318,7 @@ static void __init *swiotlb_memblock_alloc(unsigned long nslabs,
 		unsigned int flags,
 		int (*remap)(void *tlb, unsigned long nslabs))
 {
-	size_t bytes = PAGE_ALIGN(nslabs << IO_TLB_SHIFT);
+	size_t bytes = PG_ALIGN(nslabs << IO_TLB_SHIFT);
 	void *tlb;
 
 	/*
@@ -327,9 +327,9 @@ static void __init *swiotlb_memblock_alloc(unsigned long nslabs,
 	 * memory encryption.
 	 */
 	if (flags & SWIOTLB_ANY)
-		tlb = memblock_alloc(bytes, PAGE_SIZE);
+		tlb = memblock_alloc(bytes, PG_SIZE);
 	else
-		tlb = memblock_alloc_low(bytes, PAGE_SIZE);
+		tlb = memblock_alloc_low(bytes, PG_SIZE);
 
 	if (!tlb) {
 		pr_warn("%s: Failed to allocate %zu bytes tlb structure\n",
@@ -338,7 +338,7 @@ static void __init *swiotlb_memblock_alloc(unsigned long nslabs,
 	}
 
 	if (remap && remap(tlb, nslabs) < 0) {
-		memblock_free(tlb, PAGE_ALIGN(bytes));
+		memblock_free(tlb, PG_ALIGN(bytes));
 		pr_warn("%s: Failed to remap %zu bytes\n", __func__, bytes);
 		return NULL;
 	}
@@ -394,11 +394,11 @@ void __init swiotlb_init_remap(bool addressing_limit, unsigned int flags,
 		default_nslabs = nslabs;
 	}
 
-	alloc_size = PAGE_ALIGN(array_size(sizeof(*mem->slots), nslabs));
-	mem->slots = memblock_alloc(alloc_size, PAGE_SIZE);
+	alloc_size = PG_ALIGN(array_size(sizeof(*mem->slots), nslabs));
+	mem->slots = memblock_alloc(alloc_size, PG_SIZE);
 	if (!mem->slots) {
 		pr_warn("%s: Failed to allocate %zu bytes align=0x%lx\n",
-			__func__, alloc_size, PAGE_SIZE);
+			__func__, alloc_size, PG_SIZE);
 		return;
 	}
 
@@ -490,7 +490,7 @@ retry:
 
 	if (retried) {
 		pr_warn("only able to allocate %ld MB\n",
-			(PAGE_SIZE << order) >> 20);
+			(PG_SIZE << order) >> 20);
 	}
 
 	nareas = limit_nareas(default_nareas, nslabs);
@@ -506,7 +506,7 @@ retry:
 		goto error_slots;
 
 	set_memory_decrypted((unsigned long)vstart,
-			     (nslabs << IO_TLB_SHIFT) >> PAGE_SHIFT);
+			     (nslabs << IO_TLB_SHIFT) >> PG_SHIFT);
 	swiotlb_init_io_tlb_pool(mem, virt_to_phys(vstart), nslabs, true,
 				 nareas);
 	add_mem_pool(&io_tlb_default_mem, mem);
@@ -536,10 +536,10 @@ void __init swiotlb_exit(void)
 
 	pr_info("tearing down default memory pool\n");
 	tbl_vaddr = (unsigned long)phys_to_virt(mem->start);
-	tbl_size = PAGE_ALIGN(mem->end - mem->start);
-	slots_size = PAGE_ALIGN(array_size(sizeof(*mem->slots), mem->nslabs));
+	tbl_size = PG_ALIGN(mem->end - mem->start);
+	slots_size = PG_ALIGN(array_size(sizeof(*mem->slots), mem->nslabs));
 
-	set_memory_encrypted(tbl_vaddr, tbl_size >> PAGE_SHIFT);
+	set_memory_encrypted(tbl_vaddr, tbl_size >> PG_SHIFT);
 	if (mem->late_alloc) {
 		area_order = get_order(array_size(sizeof(*mem->areas),
 			mem->nareas));
@@ -892,13 +892,13 @@ static void swiotlb_bounce(struct device *dev, phys_addr_t tlb_addr, size_t size
 	}
 
 	if (PageHighMem(pfn_to_page(pfn))) {
-		unsigned int offset = orig_addr & ~PAGE_MASK;
+		unsigned int offset = orig_addr & ~PG_MASK;
 		struct page *page;
 		unsigned int sz = 0;
 		unsigned long flags;
 
 		while (size) {
-			sz = min_t(size_t, PAGE_SIZE - offset, size);
+			sz = min_t(size_t, PG_SIZE - offset, size);
 
 			local_irq_save(flags);
 			page = pfn_to_page(pfn);
@@ -1049,15 +1049,15 @@ static int swiotlb_search_pool_area(struct device *dev, struct io_tlb_pool *pool
 	BUG_ON(area_index >= pool->nareas);
 
 	/*
-	 * Historically, swiotlb allocations >= PAGE_SIZE were guaranteed to be
+	 * Historically, swiotlb allocations >= PG_SIZE were guaranteed to be
 	 * page-aligned in the absence of any other alignment requirements.
 	 * 'alloc_align_mask' was later introduced to specify the alignment
 	 * explicitly, however this is passed as zero for streaming mappings
 	 * and so we preserve the old behaviour there in case any drivers are
 	 * relying on it.
 	 */
-	if (!alloc_align_mask && !iotlb_align_mask && alloc_size >= PAGE_SIZE)
-		alloc_align_mask = PAGE_SIZE - 1;
+	if (!alloc_align_mask && !iotlb_align_mask && alloc_size >= PG_SIZE)
+		alloc_align_mask = PG_SIZE - 1;
 
 	/*
 	 * Ensure that the allocation is at least slot-aligned and update
@@ -1404,13 +1404,13 @@ phys_addr_t swiotlb_tbl_map_single(struct device *dev, phys_addr_t orig_addr,
 		pr_warn_once("Memory encryption is active and system is using DMA bounce buffers\n");
 
 	/*
-	 * The default swiotlb memory pool is allocated with PAGE_SIZE
+	 * The default swiotlb memory pool is allocated with PG_SIZE
 	 * alignment. If a mapping is requested with larger alignment,
 	 * the mapping may be unable to use the initial slot(s) in all
 	 * sets of IO_TLB_SEGSIZE slots. In such case, a mapping request
 	 * of or near the maximum mapping size would always fail.
 	 */
-	dev_WARN_ONCE(dev, alloc_align_mask > ~PAGE_MASK,
+	dev_WARN_ONCE(dev, alloc_align_mask > ~PG_MASK,
 		"Alloc alignment may prevent fulfilling requests with max mapping_size\n");
 
 	offset = swiotlb_align_offset(dev, alloc_align_mask, orig_addr);
@@ -1774,13 +1774,13 @@ struct page *swiotlb_alloc(struct device *dev, size_t size)
 	if (!mem)
 		return NULL;
 
-	align = (1 << (get_order(size) + PAGE_SHIFT)) - 1;
+	align = (1 << (get_order(size) + PG_SHIFT)) - 1;
 	index = swiotlb_find_slots(dev, 0, size, align, &pool);
 	if (index == -1)
 		return NULL;
 
 	tlb_addr = slot_addr(pool->start, index);
-	if (unlikely(!PAGE_ALIGNED(tlb_addr))) {
+	if (unlikely(!PG_ALIGNED(tlb_addr))) {
 		dev_WARN_ONCE(dev, 1, "Cannot allocate pages from non page-aligned swiotlb addr 0x%pa.\n",
 			      &tlb_addr);
 		swiotlb_release_slots(dev, tlb_addr, pool);
@@ -1845,7 +1845,7 @@ static int rmem_swiotlb_device_init(struct reserved_mem *rmem,
 		}
 
 		set_memory_decrypted((unsigned long)phys_to_virt(rmem->base),
-				     rmem->size >> PAGE_SHIFT);
+				     rmem->size >> PG_SHIFT);
 		swiotlb_init_io_tlb_pool(pool, rmem->base, nslabs,
 					 false, nareas);
 		mem->force_bounce = true;

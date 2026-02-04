@@ -35,7 +35,7 @@ struct page;
 
 struct page_frag {
 	struct page *page;
-#if (BITS_PER_LONG > 32) || (PAGE_SIZE >= 65536)
+#if (BITS_PER_LONG > 32) || (PG_SIZE >= 65536)
 	__u32 offset;
 	__u32 size;
 #else
@@ -44,7 +44,7 @@ struct page_frag {
 #endif
 };
 
-#define PAGE_FRAG_CACHE_MAX_SIZE	__ALIGN_MASK(32768, ~PAGE_MASK)
+#define PAGE_FRAG_CACHE_MAX_SIZE	__ALIGN_MASK(32768, ~PG_MASK)
 #define PAGE_FRAG_CACHE_MAX_ORDER	get_order(PAGE_FRAG_CACHE_MAX_SIZE)
 struct page_frag_cache {
 	/* encoded_page consists of the virtual address, pfmemalloc bit and
@@ -55,7 +55,7 @@ struct page_frag_cache {
 	/* we maintain a pagecount bias, so that we dont dirty cache line
 	 * containing page->_refcount every time we allocate a fragment.
 	 */
-#if (PAGE_SIZE < PAGE_FRAG_CACHE_MAX_SIZE) && (BITS_PER_LONG <= 32)
+#if (PG_SIZE < PAGE_FRAG_CACHE_MAX_SIZE) && (BITS_PER_LONG <= 32)
 	__u16 offset;
 	__u16 pagecnt_bias;
 #else

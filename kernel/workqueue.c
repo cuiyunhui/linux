@@ -7116,7 +7116,7 @@ static int wq_affn_dfl_set(const char *val, const struct kernel_param *kp)
 
 static int wq_affn_dfl_get(char *buffer, const struct kernel_param *kp)
 {
-	return scnprintf(buffer, PAGE_SIZE, "%s\n", wq_affn_names[wq_affn_dfl]);
+	return scnprintf(buffer, PG_SIZE, "%s\n", wq_affn_names[wq_affn_dfl]);
 }
 
 static const struct kernel_param_ops wq_affn_dfl_ops = {
@@ -7159,7 +7159,7 @@ static ssize_t per_cpu_show(struct device *dev, struct device_attribute *attr,
 {
 	struct workqueue_struct *wq = dev_to_wq(dev);
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", (bool)!(wq->flags & WQ_UNBOUND));
+	return scnprintf(buf, PG_SIZE, "%d\n", (bool)!(wq->flags & WQ_UNBOUND));
 }
 static DEVICE_ATTR_RO(per_cpu);
 
@@ -7168,7 +7168,7 @@ static ssize_t max_active_show(struct device *dev,
 {
 	struct workqueue_struct *wq = dev_to_wq(dev);
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", wq->saved_max_active);
+	return scnprintf(buf, PG_SIZE, "%d\n", wq->saved_max_active);
 }
 
 static ssize_t max_active_store(struct device *dev,
@@ -7200,7 +7200,7 @@ static ssize_t wq_nice_show(struct device *dev, struct device_attribute *attr,
 	int written;
 
 	mutex_lock(&wq->mutex);
-	written = scnprintf(buf, PAGE_SIZE, "%d\n", wq->unbound_attrs->nice);
+	written = scnprintf(buf, PG_SIZE, "%d\n", wq->unbound_attrs->nice);
 	mutex_unlock(&wq->mutex);
 
 	return written;
@@ -7253,7 +7253,7 @@ static ssize_t wq_cpumask_show(struct device *dev,
 	int written;
 
 	mutex_lock(&wq->mutex);
-	written = scnprintf(buf, PAGE_SIZE, "%*pb\n",
+	written = scnprintf(buf, PG_SIZE, "%*pb\n",
 			    cpumask_pr_args(wq->unbound_attrs->cpumask));
 	mutex_unlock(&wq->mutex);
 	return written;
@@ -7291,11 +7291,11 @@ static ssize_t wq_affn_scope_show(struct device *dev,
 
 	mutex_lock(&wq->mutex);
 	if (wq->unbound_attrs->affn_scope == WQ_AFFN_DFL)
-		written = scnprintf(buf, PAGE_SIZE, "%s (%s)\n",
+		written = scnprintf(buf, PG_SIZE, "%s (%s)\n",
 				    wq_affn_names[WQ_AFFN_DFL],
 				    wq_affn_names[wq_affn_dfl]);
 	else
-		written = scnprintf(buf, PAGE_SIZE, "%s\n",
+		written = scnprintf(buf, PG_SIZE, "%s\n",
 				    wq_affn_names[wq->unbound_attrs->affn_scope]);
 	mutex_unlock(&wq->mutex);
 
@@ -7330,7 +7330,7 @@ static ssize_t wq_affinity_strict_show(struct device *dev,
 {
 	struct workqueue_struct *wq = dev_to_wq(dev);
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n",
+	return scnprintf(buf, PG_SIZE, "%d\n",
 			 wq->unbound_attrs->affn_strict);
 }
 
@@ -7409,7 +7409,7 @@ static ssize_t __wq_cpumask_show(struct device *dev,
 	int written;
 
 	mutex_lock(&wq_pool_mutex);
-	written = scnprintf(buf, PAGE_SIZE, "%*pb\n", cpumask_pr_args(mask));
+	written = scnprintf(buf, PG_SIZE, "%*pb\n", cpumask_pr_args(mask));
 	mutex_unlock(&wq_pool_mutex);
 
 	return written;

@@ -55,7 +55,7 @@ void __init reserve_real_mode(void)
 	WARN_ON(slab_is_available());
 
 	/* Has to be under 1M so we can execute real-mode AP code. */
-	mem = memblock_phys_alloc_range(size, PAGE_SIZE, 0, 1<<20);
+	mem = memblock_phys_alloc_range(size, PTE_SIZE, 0, 1<<20);
 	if (!mem)
 		pr_info("No sub-1M memory is available for the trampoline\n");
 	else
@@ -97,7 +97,7 @@ static void __init setup_real_mode(void)
 	unsigned char *base;
 	unsigned long phys_base;
 	struct trampoline_header *trampoline_header;
-	size_t size = PAGE_ALIGN(real_mode_blob_end - real_mode_blob);
+	size_t size = PG_ALIGN(real_mode_blob_end - real_mode_blob);
 #ifdef CONFIG_X86_64
 	u64 *trampoline_pgd;
 	u64 efer;
@@ -112,7 +112,7 @@ static void __init setup_real_mode(void)
 	 * successfully. This is not needed for SEV.
 	 */
 	if (cc_platform_has(CC_ATTR_HOST_MEM_ENCRYPT))
-		set_memory_decrypted((unsigned long)base, size >> PAGE_SHIFT);
+		set_memory_decrypted((unsigned long)base, size >> PTE_SHIFT);
 
 	memcpy(base, real_mode_blob, size);
 
@@ -188,22 +188,22 @@ static void __init setup_real_mode(void)
 static void __init set_real_mode_permissions(void)
 {
 	unsigned char *base = (unsigned char *) real_mode_header;
-	size_t size = PAGE_ALIGN(real_mode_blob_end - real_mode_blob);
+	size_t size = PG_ALIGN(real_mode_blob_end - real_mode_blob);
 
 	size_t ro_size =
-		PAGE_ALIGN(real_mode_header->ro_end) -
+		PG_ALIGN(real_mode_header->ro_end) -
 		__pa(base);
 
 	size_t text_size =
-		PAGE_ALIGN(real_mode_header->ro_end) -
+		PG_ALIGN(real_mode_header->ro_end) -
 		real_mode_header->text_start;
 
 	unsigned long text_start =
 		(unsigned long) __va(real_mode_header->text_start);
 
-	set_memory_nx((unsigned long) base, size >> PAGE_SHIFT);
-	set_memory_ro((unsigned long) base, ro_size >> PAGE_SHIFT);
-	set_memory_x((unsigned long) text_start, text_size >> PAGE_SHIFT);
+	set_memory_nx((unsigned long) base, size >> PTE_SHIFT);
+	set_memory_ro((unsigned long) base, ro_size >> PTE_SHIFT);
+	set_memory_x((unsigned long) text_start, text_size >> PTE_SHIFT);
 }
 
 void __init init_real_mode(void)

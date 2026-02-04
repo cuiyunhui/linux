@@ -335,22 +335,22 @@ void vma_set_file(struct vm_area_struct *vma, struct file *file)
 EXPORT_SYMBOL(vma_set_file);
 
 #ifndef STACK_RND_MASK
-#define STACK_RND_MASK (0x7ff >> (PAGE_SHIFT - 12))     /* 8MB of VA */
+#define STACK_RND_MASK (0x7ff >> (PG_SHIFT - 12))     /* 8MB of VA */
 #endif
 
 unsigned long randomize_stack_top(unsigned long stack_top)
 {
 	unsigned long random_variable = 0;
 
-	if (current->flags & PF_RANDOMIZE) {
+	if (current->flags & PF_RANDOMIZE && 0) {
 		random_variable = get_random_long();
 		random_variable &= STACK_RND_MASK;
-		random_variable <<= PAGE_SHIFT;
+		random_variable <<= PG_SHIFT;
 	}
 #ifdef CONFIG_STACK_GROWSUP
-	return PAGE_ALIGN(stack_top) + random_variable;
+	return PG_ALIGN(stack_top) + random_variable;
 #else
-	return PAGE_ALIGN(stack_top) - random_variable;
+	return PG_ALIGN(stack_top) - random_variable;
 #endif
 }
 
@@ -370,20 +370,20 @@ unsigned long randomize_stack_top(unsigned long stack_top)
  */
 unsigned long randomize_page(unsigned long start, unsigned long range)
 {
-	if (!PAGE_ALIGNED(start)) {
-		range -= PAGE_ALIGN(start) - start;
-		start = PAGE_ALIGN(start);
+	if (!PG_ALIGNED(start)) {
+		range -= PG_ALIGN(start) - start;
+		start = PG_ALIGN(start);
 	}
 
 	if (start > ULONG_MAX - range)
 		range = ULONG_MAX - start;
 
-	range >>= PAGE_SHIFT;
+	range >>= PG_SHIFT;
 
 	if (range == 0)
 		return start;
 
-	return start + (get_random_long() % range << PAGE_SHIFT);
+	return start + (get_random_long() % range << PG_SHIFT);
 }
 
 #ifdef CONFIG_ARCH_WANT_DEFAULT_TOPDOWN_MMAP_LAYOUT
@@ -407,7 +407,7 @@ unsigned long arch_mmap_rnd(void)
 #endif /* CONFIG_HAVE_ARCH_MMAP_RND_COMPAT_BITS */
 		rnd = get_random_long() & ((1UL << mmap_rnd_bits) - 1);
 
-	return rnd << PAGE_SHIFT;
+	return rnd << PG_SHIFT;
 }
 
 static int mmap_is_legacy(const struct rlimit *rlim_stack)
@@ -440,14 +440,14 @@ static unsigned long mmap_base(const unsigned long rnd, const struct rlimit *rli
 	 * task. mmap_base starts directly below the stack and grows
 	 * downwards.
 	 */
-	return PAGE_ALIGN_DOWN(mmap_upper_limit(rlim_stack) - rnd);
+	return PG_ALIGN_DOWN(mmap_upper_limit(rlim_stack) - rnd);
 #else
 	unsigned long gap = rlim_stack->rlim_cur;
 	unsigned long pad = stack_guard_gap;
 
 	/* Account for stack randomization if necessary */
 	if (current->flags & PF_RANDOMIZE)
-		pad += (STACK_RND_MASK << PAGE_SHIFT);
+		pad += (STACK_RND_MASK << PG_SHIFT);
 
 	/* Values close to RLIM_INFINITY can overflow. */
 	if (gap + pad > gap)
@@ -458,7 +458,7 @@ static unsigned long mmap_base(const unsigned long rnd, const struct rlimit *rli
 	else if (gap > MAX_GAP)
 		gap = MAX_GAP;
 
-	return PAGE_ALIGN(STACK_TOP - gap - rnd);
+	return PG_ALIGN(STACK_TOP - gap - rnd);
 #endif
 }
 
@@ -514,7 +514,7 @@ int __account_locked_vm(struct mm_struct *mm, unsigned long pages, bool inc,
 	locked_vm = mm->locked_vm;
 	if (inc) {
 		if (!bypass_rlim) {
-			limit = task_rlimit(task, RLIMIT_MEMLOCK) >> PAGE_SHIFT;
+			limit = task_rlimit(task, RLIMIT_MEMLOCK) >> PG_SHIFT;
 			if (locked_vm + pages > limit)
 				ret = -ENOMEM;
 		}
@@ -526,8 +526,8 @@ int __account_locked_vm(struct mm_struct *mm, unsigned long pages, bool inc,
 	}
 
 	pr_debug("%s: [%d] caller %ps %c%lu %lu/%lu%s\n", __func__, task->pid,
-		 (void *)_RET_IP_, (inc) ? '+' : '-', pages << PAGE_SHIFT,
-		 locked_vm << PAGE_SHIFT, task_rlimit(task, RLIMIT_MEMLOCK),
+		 (void *)_RET_IP_, (inc) ? '+' : '-', pages << PG_SHIFT,
+		 locked_vm << PG_SHIFT, task_rlimit(task, RLIMIT_MEMLOCK),
 		 ret ? " - exceeded" : "");
 
 	return ret;
@@ -566,7 +566,7 @@ unsigned long vm_mmap_pgoff(struct file *file, unsigned long addr,
 	unsigned long len, unsigned long prot,
 	unsigned long flag, unsigned long pgoff)
 {
-	loff_t off = (loff_t)pgoff << PAGE_SHIFT;
+	loff_t off = (loff_t)pgoff << PTE_SHIFT;
 	unsigned long ret;
 	struct mm_struct *mm = current->mm;
 	unsigned long populate;
@@ -609,12 +609,12 @@ unsigned long vm_mmap(struct file *file, unsigned long addr,
 	unsigned long len, unsigned long prot,
 	unsigned long flag, unsigned long offset)
 {
-	if (unlikely(offset + PAGE_ALIGN(len) < offset))
+	if (unlikely(offset + PG_ALIGN(len) < offset))
 		return -EINVAL;
-	if (unlikely(offset_in_page(offset)))
+	if (unlikely(offset_in_pte(offset)))
 		return -EINVAL;
 
-	return vm_mmap_pgoff(file, addr, len, prot, flag, offset >> PAGE_SHIFT);
+	return vm_mmap_pgoff(file, addr, len, prot, flag, offset >> PTE_SHIFT);
 }
 EXPORT_SYMBOL(vm_mmap);
 
@@ -877,7 +877,7 @@ unsigned long vm_commit_limit(void)
 	unsigned long allowed;
 
 	if (sysctl_overcommit_kbytes)
-		allowed = sysctl_overcommit_kbytes >> (PAGE_SHIFT - 10);
+		allowed = sysctl_overcommit_kbytes >> (PG_SHIFT - 10);
 	else
 		allowed = ((totalram_pages() - hugetlb_total_pages())
 			   * sysctl_overcommit_ratio / 100);
@@ -951,13 +951,13 @@ int __vm_enough_memory(const struct mm_struct *mm, long pages, int cap_sys_admin
 	 * Reserve some for root
 	 */
 	if (!cap_sys_admin)
-		allowed -= sysctl_admin_reserve_kbytes >> (PAGE_SHIFT - 10);
+		allowed -= sysctl_admin_reserve_kbytes >> (PG_SHIFT - 10);
 
 	/*
 	 * Don't let a single process grow so big a user can't recover
 	 */
 	if (mm) {
-		long reserve = sysctl_user_reserve_kbytes >> (PAGE_SHIFT - 10);
+		long reserve = sysctl_user_reserve_kbytes >> (PG_SHIFT - 10);
 
 		allowed -= min_t(long, mm->total_vm / 32, reserve);
 	}
@@ -965,7 +965,7 @@ int __vm_enough_memory(const struct mm_struct *mm, long pages, int cap_sys_admin
 	if (percpu_counter_read_positive(&vm_committed_as) < allowed)
 		return 0;
 error:
-	bytes_failed = pages << PAGE_SHIFT;
+	bytes_failed = pages << PG_SHIFT;
 	pr_warn_ratelimited("%s: pid: %d, comm: %s, bytes: %lu not enough memory for the allocation\n",
 			    __func__, current->pid, current->comm, bytes_failed);
 	vm_unacct_memory(pages);
@@ -1039,7 +1039,7 @@ int __weak memcmp_pages(struct page *page1, struct page *page2)
 
 	addr1 = kmap_local_page(page1);
 	addr2 = kmap_local_page(page2);
-	ret = memcmp(addr1, addr2, PAGE_SIZE);
+	ret = memcmp(addr1, addr2, PG_SIZE);
 	kunmap_local(addr2);
 	kunmap_local(addr1);
 	return ret;
@@ -1152,7 +1152,7 @@ int __compat_vma_mmap(const struct file_operations *f_op,
 		.start = vma->vm_start,
 		.end = vma->vm_end,
 
-		.pgoff = vma->vm_pgoff,
+		.pteoff = vma->vm_pteoff,
 		.vm_file = vma->vm_file,
 		.vma_flags = vma->flags,
 		.page_prot = vma->vm_page_prot,
@@ -1292,7 +1292,7 @@ static int mmap_action_finish(struct mmap_action *action,
 	 * invoked if we do NOT merge, so we only clean up the VMA we created.
 	 */
 	if (err) {
-		const size_t len = vma_pages(vma) << PAGE_SHIFT;
+		const size_t len = vma_ptes(vma) << PTE_SHIFT;
 
 		do_munmap(current->mm, vma->vm_start, len, NULL);
 

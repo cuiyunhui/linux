@@ -129,7 +129,7 @@ static inline int sparse_early_nid(struct mem_section *section)
 static void __meminit mminit_validate_memmodel_limits(unsigned long *start_pfn,
 						unsigned long *end_pfn)
 {
-	unsigned long max_sparsemem_pfn = (DIRECT_MAP_PHYSMEM_END + 1) >> PAGE_SHIFT;
+	unsigned long max_sparsemem_pfn = (DIRECT_MAP_PHYSMEM_END + 1) >> PG_SHIFT;
 
 	/*
 	 * Sanity checks - do not allow an architecture to pass
@@ -334,9 +334,9 @@ sparse_early_usemaps_alloc_pgdat_section(struct pglist_data *pgdat,
 	 * from the same section as the pgdat where possible to avoid
 	 * this problem.
 	 */
-	goal = pgdat_to_phys(pgdat) & (PAGE_SECTION_MASK << PAGE_SHIFT);
+	goal = pgdat_to_phys(pgdat) & (PAGE_SECTION_MASK << PG_SHIFT);
 	limit = goal + (1UL << PA_SECTION_SHIFT);
-	nid = early_pfn_to_nid(goal >> PAGE_SHIFT);
+	nid = early_pfn_to_nid(goal >> PG_SHIFT);
 again:
 	usage = memblock_alloc_try_nid(size, SMP_CACHE_BYTES, goal, limit, nid);
 	if (!usage && limit) {
@@ -361,8 +361,8 @@ static void __init check_usemap_section_nr(int nid,
 		old_pgdat_snr = NR_MEM_SECTIONS;
 	}
 
-	usemap_snr = pfn_to_section_nr(__pa(usage) >> PAGE_SHIFT);
-	pgdat_snr = pfn_to_section_nr(pgdat_to_phys(pgdat) >> PAGE_SHIFT);
+	usemap_snr = pfn_to_section_nr(__pa(usage) >> PG_SHIFT);
+	pgdat_snr = pfn_to_section_nr(pgdat_to_phys(pgdat) >> PG_SHIFT);
 	if (usemap_snr == pgdat_snr)
 		return;
 
@@ -428,7 +428,7 @@ struct page __init *__populate_section_memmap(unsigned long pfn,
 	map = memmap_alloc(size, size, addr, nid, false);
 	if (!map)
 		panic("%s: Failed to allocate %lu bytes align=0x%lx nid=%d from=%pa\n",
-		      __func__, size, PAGE_SIZE, nid, &addr);
+		      __func__, size, PG_SIZE, nid, &addr);
 
 	return map;
 }
@@ -565,7 +565,7 @@ static void __init sparse_init_nid(int nid, unsigned long pnum_begin,
 				goto failed;
 			}
 			memmap_boot_pages_add(DIV_ROUND_UP(PAGES_PER_SECTION * sizeof(struct page),
-							   PAGE_SIZE));
+							   PG_SIZE));
 			sparse_init_early_section(nid, map, pnum, 0);
 		}
 	}
@@ -759,7 +759,7 @@ static void free_map_bootmem(struct page *memmap)
 	struct page *page = virt_to_page(memmap);
 
 	nr_pages = PAGE_ALIGN(PAGES_PER_SECTION * sizeof(struct page))
-		>> PAGE_SHIFT;
+		>> PG_SHIFT;
 
 	for (i = 0; i < nr_pages; i++, page++) {
 		type = bootmem_type(page);
@@ -855,11 +855,11 @@ static void section_deactivate(unsigned long pfn, unsigned long nr_pages,
 	 * section_activate() and pfn_valid() .
 	 */
 	if (!section_is_early) {
-		memmap_pages_add(-1L * (DIV_ROUND_UP(nr_pages * sizeof(struct page), PAGE_SIZE)));
+		memmap_pages_add(-1L * (DIV_ROUND_UP(nr_pages * sizeof(struct page), PG_SIZE)));
 		depopulate_section_memmap(pfn, nr_pages, altmap);
 	} else if (memmap) {
 		memmap_boot_pages_add(-1L * (DIV_ROUND_UP(nr_pages * sizeof(struct page),
-							  PAGE_SIZE)));
+							  PG_SIZE)));
 		free_map_bootmem(memmap);
 	}
 
@@ -906,7 +906,7 @@ static struct page * __meminit section_activate(int nid, unsigned long pfn,
 		section_deactivate(pfn, nr_pages, altmap);
 		return ERR_PTR(-ENOMEM);
 	}
-	memmap_pages_add(DIV_ROUND_UP(nr_pages * sizeof(struct page), PAGE_SIZE));
+	memmap_pages_add(DIV_ROUND_UP(nr_pages * sizeof(struct page), PG_SIZE));
 
 	return memmap;
 }

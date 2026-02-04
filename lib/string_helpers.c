@@ -682,11 +682,11 @@ char *kstrdup_quotable_cmdline(struct task_struct *task, gfp_t gfp)
 	char *buffer, *quoted;
 	int i, res;
 
-	buffer = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	buffer = kmalloc(PG_SIZE, GFP_KERNEL);
 	if (!buffer)
 		return NULL;
 
-	res = get_cmdline(task, buffer, PAGE_SIZE - 1);
+	res = get_cmdline(task, buffer, PG_SIZE - 1);
 	buffer[res] = '\0';
 
 	/* Collapse trailing NULLs, leave res pointing to last non-NULL. */

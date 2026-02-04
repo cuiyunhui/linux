@@ -884,7 +884,7 @@ static int sched_copy_attr(struct sched_attr __user *uattr, struct sched_attr *a
 	/* ABI compatibility quirk: */
 	if (!size)
 		size = SCHED_ATTR_SIZE_VER0;
-	if (size < SCHED_ATTR_SIZE_VER0 || size > PAGE_SIZE)
+	if (size < SCHED_ATTR_SIZE_VER0 || size > PG_SIZE)
 		goto err_size;
 
 	ret = copy_struct_from_user(attr, sizeof(*attr), uattr, size);
@@ -1064,7 +1064,7 @@ SYSCALL_DEFINE4(sched_getattr, pid_t, pid, struct sched_attr __user *, uattr,
 	struct task_struct *p;
 	int retval;
 
-	if (unlikely(!uattr || pid < 0 || usize > PAGE_SIZE ||
+	if (unlikely(!uattr || pid < 0 || usize > PG_SIZE ||
 		      usize < SCHED_ATTR_SIZE_VER0 || flags))
 		return -EINVAL;
 

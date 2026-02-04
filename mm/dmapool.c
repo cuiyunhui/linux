@@ -244,7 +244,7 @@ struct dma_pool *dma_pool_create_node(const char *name, struct device *dev,
 		size = sizeof(struct dma_block);
 
 	size = ALIGN(size, align);
-	allocation = max_t(size_t, size, PAGE_SIZE);
+	allocation = max_t(size_t, size, PG_SIZE);
 
 	if (!boundary)
 		boundary = allocation;

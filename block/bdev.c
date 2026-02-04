@@ -133,8 +133,8 @@ invalidate:
 	 * The 'end' argument is inclusive so the rounding is safe.
 	 */
 	return invalidate_inode_pages2_range(bdev->bd_mapping,
-					     lstart >> PAGE_SHIFT,
-					     lend >> PAGE_SHIFT);
+					     lstart >> PG_SHIFT,
+					     lend >> PG_SHIFT);
 }
 
 static void set_init_blocksize(struct block_device *bdev)
@@ -142,7 +142,7 @@ static void set_init_blocksize(struct block_device *bdev)
 	unsigned int bsize = bdev_logical_block_size(bdev);
 	loff_t size = i_size_read(BD_INODE(bdev));
 
-	while (bsize < PAGE_SIZE) {
+	while (bsize < PG_SIZE) {
 		if (size & bsize)
 			break;
 		bsize <<= 1;
@@ -229,13 +229,13 @@ static int sb_validate_large_blocksize(struct super_block *sb, int size)
 		return 0;
 
 	pr_warn_ratelimited("%s: block size(%d) > page size(%lu) %s\n",
-				sb->s_type->name, size, PAGE_SIZE, err_str);
+				sb->s_type->name, size, PG_SIZE, err_str);
 	return -EINVAL;
 }
 
 int sb_set_blocksize(struct super_block *sb, int size)
 {
-	if (size > PAGE_SIZE && sb_validate_large_blocksize(sb, size))
+	if (size > PG_SIZE && sb_validate_large_blocksize(sb, size))
 		return 0;
 	if (set_blocksize(sb->s_bdev_file, size))
 		return 0;

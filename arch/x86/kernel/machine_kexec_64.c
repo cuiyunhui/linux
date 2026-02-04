@@ -85,7 +85,7 @@ static int map_mmio_serial(struct x86_mapping_info *info, pgd_t *level4p)
 		return 0;
 
 	mstart = kexec_debug_8250_mmio32 & PAGE_MASK;
-	mend = (kexec_debug_8250_mmio32 + PAGE_SIZE + 23) & PAGE_MASK;
+	mend = (kexec_debug_8250_mmio32 + PTE_SIZE + 23) & PAGE_MASK;
 	pr_info("Map PCI serial at %lx - %lx\n", mstart, mend);
 	return kernel_ident_mapping_init(info, level4p, mstart, mend);
 }
@@ -215,7 +215,7 @@ static int init_transition_pgtable(struct kimage *image, pgd_t *pgd,
 	if (cc_platform_has(CC_ATTR_GUEST_MEM_ENCRYPT))
 		prot = PAGE_KERNEL_EXEC;
 
-	set_pte(pte, pfn_pte(paddr >> PAGE_SHIFT, prot));
+	set_pte(pte, pfn_pte(paddr >> PTE_SHIFT, prot));
 	return 0;
 err:
 	return result;
@@ -261,8 +261,8 @@ static int init_pgtable(struct kimage *image, unsigned long control_page)
 		info.direct_gbpages = true;
 
 	for (i = 0; i < nr_pfn_mapped; i++) {
-		mstart = pfn_mapped[i].start << PAGE_SHIFT;
-		mend   = pfn_mapped[i].end << PAGE_SHIFT;
+		mstart = pfn_mapped[i].start << PTE_SHIFT;
+		mend   = pfn_mapped[i].end << PTE_SHIFT;
 
 		result = kernel_ident_mapping_init(&info, image->arch.pgd,
 						   mstart, mend);
@@ -371,7 +371,7 @@ int machine_kexec_prepare(struct kimage *image)
 	kexec_pa_table_page = (unsigned long)__pa(image->arch.pgd);
 
 	if (image->type == KEXEC_TYPE_DEFAULT)
-		kexec_pa_swap_page = page_to_pfn(image->swap_page) << PAGE_SHIFT;
+		kexec_pa_swap_page = page_to_pfn(image->swap_page) << PTE_SHIFT;
 
 	prepare_debug_idt((unsigned long)__pa(control_page),
 			  (unsigned long)kexec_debug_exc_vectors - reloc_start);
@@ -639,8 +639,8 @@ kexec_mark_range(unsigned long start, unsigned long end, bool protect)
 	if (!end || start > end)
 		return 0;
 
-	page = pfn_to_page(start >> PAGE_SHIFT);
-	nr_pages = (end >> PAGE_SHIFT) - (start >> PAGE_SHIFT) + 1;
+	page = pfn_to_page(start >> PTE_SHIFT);
+	nr_pages = (end >> PTE_SHIFT) - (start >> PTE_SHIFT) + 1;
 	if (protect)
 		return set_pages_ro(page, nr_pages);
 	else
@@ -656,7 +656,7 @@ static void kexec_mark_crashkres(bool protect)
 	/* Don't touch the control code page used in crash_kexec().*/
 	control = PFN_PHYS(page_to_pfn(kexec_crash_image->control_code_page));
 	kexec_mark_range(crashk_res.start, control - 1, protect);
-	control += KEXEC_CONTROL_PAGE_SIZE;
+	control += KEXEC_CONTROL_PTE_SIZE;
 	kexec_mark_range(control, crashk_res.end, protect);
 }
 
@@ -669,7 +669,7 @@ static void kexec_mark_dm_crypt_keys(bool protect)
 	if (kexec_crash_image->dm_crypt_keys_addr) {
 		start_paddr = kexec_crash_image->dm_crypt_keys_addr;
 		end_paddr = start_paddr + kexec_crash_image->dm_crypt_keys_sz - 1;
-		nr_pages = (PAGE_ALIGN(end_paddr) - PAGE_ALIGN_DOWN(start_paddr))/PAGE_SIZE;
+		nr_pages = (PAGE_ALIGN(end_paddr) - PAGE_ALIGN_DOWN(start_paddr))/PTE_SIZE;
 		if (protect)
 			set_memory_np((unsigned long)phys_to_virt(start_paddr), nr_pages);
 		else

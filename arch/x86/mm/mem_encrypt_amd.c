@@ -47,7 +47,7 @@ u64 sev_check_data __section(".data") = 0;
 EXPORT_SYMBOL(sme_me_mask);
 
 /* Buffer used for early in-place encryption by BSP, no locking needed */
-static char sme_early_buffer[PAGE_SIZE] __initdata __aligned(PAGE_SIZE);
+static char sme_early_buffer[PTE_SIZE] __initdata __aligned(PTE_SIZE);
 
 /*
  * SNP-specific routine which needs to additionally change the page state from
@@ -57,7 +57,7 @@ static char sme_early_buffer[PAGE_SIZE] __initdata __aligned(PAGE_SIZE);
 static inline void __init snp_memcpy(void *dst, void *src, size_t sz,
 				     unsigned long paddr, bool decrypt)
 {
-	unsigned long npages = PAGE_ALIGN(sz) >> PAGE_SHIFT;
+	unsigned long npages = PAGE_ALIGN(sz) >> PTE_SHIFT;
 
 	if (decrypt) {
 		/*
@@ -276,7 +276,7 @@ static void enc_dec_hypercall(unsigned long vaddr, unsigned long size, bool enc)
 		psize = page_level_size(level);
 		pmask = page_level_mask(level);
 
-		notify_page_enc_status_changed(pfn, psize >> PAGE_SHIFT, enc);
+		notify_page_enc_status_changed(pfn, psize >> PTE_SHIFT, enc);
 
 		vaddr = (vaddr & pmask) + psize;
 	}
@@ -306,7 +306,7 @@ static int amd_enc_status_change_finish(unsigned long vaddr, int npages, bool en
 		snp_set_memory_private(vaddr, npages);
 
 	if (!cc_platform_has(CC_ATTR_HOST_MEM_ENCRYPT))
-		enc_dec_hypercall(vaddr, npages << PAGE_SHIFT, enc);
+		enc_dec_hypercall(vaddr, npages << PTE_SHIFT, enc);
 
 	return 0;
 }
@@ -329,7 +329,7 @@ int prepare_pte_enc(struct pte_enc_desc *d)
 	if (pgprot_val(old_prot) == pgprot_val(d->new_pgprot))
 		return 1;
 
-	d->pa = d->pfn << PAGE_SHIFT;
+	d->pa = d->pfn << PTE_SHIFT;
 	d->size = page_level_size(d->pte_level);
 
 	/*
@@ -411,7 +411,7 @@ static int __init early_set_memory_enc_dec(unsigned long vaddr,
 
 		if (level == PG_LEVEL_4K) {
 			__set_clr_pte_enc(kpte, level, enc);
-			vaddr_next = (vaddr & PAGE_MASK) + PAGE_SIZE;
+			vaddr_next = (vaddr & PTE_MASK) + PTE_SIZE;
 			continue;
 		}
 
@@ -547,7 +547,7 @@ void __init mem_encrypt_free_decrypted_mem(void)
 
 	vaddr = (unsigned long)__start_bss_decrypted_unused;
 	vaddr_end = (unsigned long)__end_bss_decrypted;
-	npages = (vaddr_end - vaddr) >> PAGE_SHIFT;
+	npages = (vaddr_end - vaddr) >> PTE_SHIFT;
 
 	/*
 	 * If the unused memory range was mapped decrypted, change the encryption

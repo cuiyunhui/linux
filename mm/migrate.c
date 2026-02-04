@@ -359,7 +359,7 @@ static bool remove_migration_pte(struct folio *folio,
 
 		/* pgoff is invalid for ksm pages, but they are never large */
 		if (folio_test_large(folio) && !folio_test_hugetlb(folio))
-			idx = linear_page_index(vma, pvmw.address) - pvmw.pgoff;
+			idx = linear_pte_index(vma, pvmw.address) - pvmw.pteoff;
 		new = folio_page(folio, idx);
 
 #ifdef CONFIG_ARCH_ENABLE_THP_MIGRATION
@@ -430,7 +430,7 @@ static bool remove_migration_pte(struct folio *folio,
 		{
 			if (folio_test_anon(folio))
 				folio_add_anon_rmap_pte(folio, new, vma,
-							pvmw.address, rmap_flags);
+							rmap_flags);
 			else
 				folio_add_file_rmap_pte(folio, new, vma);
 			set_pte_at(vma->vm_mm, pvmw.address, pvmw.pte, pte);

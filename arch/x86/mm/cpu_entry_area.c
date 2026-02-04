@@ -36,7 +36,7 @@ static __init void init_cea_offsets(void)
 		return;
 	}
 
-	max_cea = (CPU_ENTRY_AREA_MAP_SIZE - PAGE_SIZE) / CPU_ENTRY_AREA_SIZE;
+	max_cea = (CPU_ENTRY_AREA_MAP_SIZE - PG_SIZE) / CPU_ENTRY_AREA_SIZE;
 
 	/* O(sodding terrible) */
 	for_each_possible_cpu(i) {
@@ -70,7 +70,7 @@ static inline void init_cea_offsets(void) { }
 noinstr struct cpu_entry_area *get_cpu_entry_area(int cpu)
 {
 	unsigned long va = CPU_ENTRY_AREA_PER_CPU + cea_offset(cpu) * CPU_ENTRY_AREA_SIZE;
-	BUILD_BUG_ON(sizeof(struct cpu_entry_area) % PAGE_SIZE != 0);
+	BUILD_BUG_ON(sizeof(struct cpu_entry_area) % PG_SIZE != 0);
 
 	return (struct cpu_entry_area *) va;
 }
@@ -79,7 +79,7 @@ EXPORT_SYMBOL(get_cpu_entry_area);
 void cea_set_pte(void *cea_vaddr, phys_addr_t pa, pgprot_t flags)
 {
 	unsigned long va = (unsigned long) cea_vaddr;
-	pte_t pte = pfn_pte(pa >> PAGE_SHIFT, flags);
+	pte_t pte = pfn_pte(pa >> PTE_SHIFT, flags);
 
 	/*
 	 * The cpu_entry_area is shared between the user and kernel
@@ -98,7 +98,7 @@ void cea_set_pte(void *cea_vaddr, phys_addr_t pa, pgprot_t flags)
 static void __init
 cea_map_percpu_pages(void *cea_vaddr, void *ptr, int pages, pgprot_t prot)
 {
-	for ( ; pages; pages--, cea_vaddr+= PAGE_SIZE, ptr += PAGE_SIZE)
+	for ( ; pages; pages--, cea_vaddr+= PTE_SIZE, ptr += PTE_SIZE)
 		cea_set_pte(cea_vaddr, per_cpu_ptr_to_phys(ptr), prot);
 }
 
@@ -112,8 +112,8 @@ static void __init percpu_setup_debug_store(unsigned int cpu)
 		return;
 
 	cea = &get_cpu_entry_area(cpu)->cpu_debug_store;
-	npages = sizeof(struct debug_store) / PAGE_SIZE;
-	BUILD_BUG_ON(sizeof(struct debug_store) % PAGE_SIZE != 0);
+	npages = sizeof(struct debug_store) / PG_SIZE;
+	BUILD_BUG_ON(sizeof(struct debug_store) % PG_SIZE != 0);
 	cea_map_percpu_pages(cea, &per_cpu(cpu_debug_store, cpu), npages,
 			     PAGE_KERNEL);
 
@@ -122,8 +122,8 @@ static void __init percpu_setup_debug_store(unsigned int cpu)
 	 * Force the population of PMDs for not yet allocated per cpu
 	 * memory like debug store buffers.
 	 */
-	npages = sizeof(struct debug_store_buffers) / PAGE_SIZE;
-	for (; npages; npages--, cea += PAGE_SIZE)
+	npages = sizeof(struct debug_store_buffers) / PTE_SIZE;
+	for (; npages; npages--, cea += PTE_SIZE)
 		cea_set_pte(cea, 0, PAGE_NONE);
 #endif
 }
@@ -131,7 +131,7 @@ static void __init percpu_setup_debug_store(unsigned int cpu)
 #ifdef CONFIG_X86_64
 
 #define cea_map_stack(name) do {					\
-	npages = sizeof(estacks->name## _stack) / PAGE_SIZE;		\
+	npages = sizeof(estacks->name## _stack) / PTE_SIZE;		\
 	cea_map_percpu_pages(cea->estacks.name## _stack,		\
 			estacks->name## _stack, npages, PAGE_KERNEL);	\
 	} while (0)
@@ -142,7 +142,7 @@ static void __init percpu_setup_exception_stacks(unsigned int cpu)
 	struct cpu_entry_area *cea = get_cpu_entry_area(cpu);
 	unsigned int npages;
 
-	BUILD_BUG_ON(sizeof(exception_stacks) % PAGE_SIZE != 0);
+	BUILD_BUG_ON(sizeof(exception_stacks) % PG_SIZE != 0);
 
 	per_cpu(cea_exception_stacks, cpu) = &cea->estacks;
 
@@ -220,8 +220,8 @@ static void __init setup_cpu_entry_area(unsigned int cpu)
 	 * boundary.  Assert that we're not doing that.
 	 */
 	BUILD_BUG_ON((offsetof(struct tss_struct, x86_tss) ^
-		      offsetofend(struct tss_struct, x86_tss)) & PAGE_MASK);
-	BUILD_BUG_ON(sizeof(struct tss_struct) % PAGE_SIZE != 0);
+		      offsetofend(struct tss_struct, x86_tss)) & PG_MASK);
+	BUILD_BUG_ON(sizeof(struct tss_struct) % PG_SIZE != 0);
 	/*
 	 * VMX changes the host TR limit to 0x67 after a VM exit. This is
 	 * okay, since 0x67 covers the size of struct x86_hw_tss. Make sure
@@ -231,7 +231,7 @@ static void __init setup_cpu_entry_area(unsigned int cpu)
 	BUILD_BUG_ON(sizeof(struct x86_hw_tss) != 0x68);
 
 	cea_map_percpu_pages(&cea->tss, &per_cpu(cpu_tss_rw, cpu),
-			     sizeof(struct tss_struct) / PAGE_SIZE, tss_prot);
+			     sizeof(struct tss_struct) / PG_SIZE, tss_prot);
 
 #ifdef CONFIG_X86_32
 	per_cpu(cpu_entry_area, cpu) = cea;
@@ -248,7 +248,7 @@ static __init void setup_cpu_entry_area_ptes(void)
 	unsigned long start, end;
 
 	/* The +1 is for the readonly IDT: */
-	BUILD_BUG_ON((CPU_ENTRY_AREA_PAGES+1)*PAGE_SIZE != CPU_ENTRY_AREA_MAP_SIZE);
+	BUILD_BUG_ON((CPU_ENTRY_AREA_PAGES+1)*PG_SIZE != CPU_ENTRY_AREA_MAP_SIZE);
 	BUG_ON(CPU_ENTRY_AREA_BASE & ~PMD_MASK);
 
 	start = CPU_ENTRY_AREA_BASE;

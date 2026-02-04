@@ -31,7 +31,7 @@ static inline bool emulate_vsyscall(unsigned long error_code,
  */
 static inline bool is_vsyscall_vaddr(unsigned long vaddr)
 {
-	return unlikely((vaddr & PAGE_MASK) == VSYSCALL_ADDR);
+	return unlikely((vaddr & PG_MASK) == VSYSCALL_ADDR);
 }
 
 #endif /* _ASM_X86_VSYSCALL_H */

@@ -52,7 +52,7 @@
  * Try to keep balance_dirty_pages() call intervals higher than this many pages
  * by raising pause time to max_pause when falls below it.
  */
-#define DIRTY_POLL_THRESH	(128 >> (PAGE_SHIFT - 10))
+#define DIRTY_POLL_THRESH	(128 >> (PG_SHIFT - 10))
 
 /*
  * Estimate write bandwidth or update dirty limit at 200ms intervals.
@@ -350,9 +350,9 @@ static void domain_dirty_limits(struct dirty_throttle_control *dtc)
 	struct dirty_throttle_control *gdtc = mdtc_gdtc(dtc);
 	unsigned long bytes = vm_dirty_bytes;
 	unsigned long bg_bytes = dirty_background_bytes;
-	/* convert ratios to per-PAGE_SIZE for higher precision */
-	unsigned long ratio = (vm_dirty_ratio * PAGE_SIZE) / 100;
-	unsigned long bg_ratio = (dirty_background_ratio * PAGE_SIZE) / 100;
+	/* convert ratios to per-PG_SIZE for higher precision */
+	unsigned long ratio = (vm_dirty_ratio * PG_SIZE) / 100;
+	unsigned long bg_ratio = (dirty_background_ratio * PG_SIZE) / 100;
 	unsigned long thresh;
 	unsigned long bg_thresh;
 	struct task_struct *tsk;
@@ -365,27 +365,27 @@ static void domain_dirty_limits(struct dirty_throttle_control *dtc)
 		 * The byte settings can't be applied directly to memcg
 		 * domains.  Convert them to ratios by scaling against
 		 * globally available memory.  As the ratios are in
-		 * per-PAGE_SIZE, they can be obtained by dividing bytes by
+		 * per-PG_SIZE, they can be obtained by dividing bytes by
 		 * number of pages.
 		 */
 		if (bytes)
 			ratio = min(DIV_ROUND_UP(bytes, global_avail),
-				    PAGE_SIZE);
+				    PG_SIZE);
 		if (bg_bytes)
 			bg_ratio = min(DIV_ROUND_UP(bg_bytes, global_avail),
-				       PAGE_SIZE);
+				       PG_SIZE);
 		bytes = bg_bytes = 0;
 	}
 
 	if (bytes)
-		thresh = DIV_ROUND_UP(bytes, PAGE_SIZE);
+		thresh = DIV_ROUND_UP(bytes, PG_SIZE);
 	else
-		thresh = (ratio * available_memory) / PAGE_SIZE;
+		thresh = (ratio * available_memory) / PG_SIZE;
 
 	if (bg_bytes)
-		bg_thresh = DIV_ROUND_UP(bg_bytes, PAGE_SIZE);
+		bg_thresh = DIV_ROUND_UP(bg_bytes, PG_SIZE);
 	else
-		bg_thresh = (bg_ratio * available_memory) / PAGE_SIZE;
+		bg_thresh = (bg_ratio * available_memory) / PG_SIZE;
 
 	tsk = current;
 	if (rt_or_dl_task(tsk)) {
@@ -442,7 +442,7 @@ static unsigned long node_dirty_limit(struct pglist_data *pgdat)
 	unsigned long dirty;
 
 	if (vm_dirty_bytes)
-		dirty = DIV_ROUND_UP(vm_dirty_bytes, PAGE_SIZE) *
+		dirty = DIV_ROUND_UP(vm_dirty_bytes, PG_SIZE) *
 			node_memory / global_dirtyable_memory();
 	else
 		dirty = vm_dirty_ratio * node_memory / 100;
@@ -495,7 +495,7 @@ static int dirty_background_bytes_handler(const struct ctl_table *table, int wri
 
 	ret = proc_doulongvec_minmax(table, write, buffer, lenp, ppos);
 	if (ret == 0 && write) {
-		if (DIV_ROUND_UP(dirty_background_bytes, PAGE_SIZE) >
+		if (DIV_ROUND_UP(dirty_background_bytes, PG_SIZE) >
 								UINT_MAX) {
 			dirty_background_bytes = old_bytes;
 			return -ERANGE;
@@ -527,7 +527,7 @@ static int dirty_bytes_handler(const struct ctl_table *table, int write,
 
 	ret = proc_doulongvec_minmax(table, write, buffer, lenp, ppos);
 	if (ret == 0 && write && vm_dirty_bytes != old_bytes) {
-		if (DIV_ROUND_UP(vm_dirty_bytes, PAGE_SIZE) > UINT_MAX) {
+		if (DIV_ROUND_UP(vm_dirty_bytes, PG_SIZE) > UINT_MAX) {
 			vm_dirty_bytes = old_bytes;
 			return -ERANGE;
 		}
@@ -676,7 +676,7 @@ static u64 bdi_get_bytes(unsigned int ratio)
 	u64 bytes;
 
 	global_dirty_limits(&background_thresh, &dirty_thresh);
-	bytes = (dirty_thresh * PAGE_SIZE * ratio) / BDI_RATIO_SCALE / 100;
+	bytes = (dirty_thresh * PG_SIZE * ratio) / BDI_RATIO_SCALE / 100;
 
 	return bytes;
 }
@@ -761,7 +761,7 @@ u64 bdi_get_min_bytes(struct backing_dev_info *bdi)
 int bdi_set_min_bytes(struct backing_dev_info *bdi, u64 min_bytes)
 {
 	int ret;
-	unsigned long pages = min_bytes >> PAGE_SHIFT;
+	unsigned long pages = min_bytes >> PG_SHIFT;
 	long min_ratio;
 
 	ret = bdi_check_pages_limit(pages);
@@ -782,7 +782,7 @@ u64 bdi_get_max_bytes(struct backing_dev_info *bdi)
 int bdi_set_max_bytes(struct backing_dev_info *bdi, u64 max_bytes)
 {
 	int ret;
-	unsigned long pages = max_bytes >> PAGE_SHIFT;
+	unsigned long pages = max_bytes >> PG_SHIFT;
 	long max_ratio;
 
 	ret = bdi_check_pages_limit(pages);
@@ -2062,7 +2062,7 @@ int balance_dirty_pages_ratelimited_flags(struct address_space *mapping,
 
 	ratelimit = current->nr_dirtied_pause;
 	if (wb->dirty_exceeded)
-		ratelimit = min(ratelimit, 32 >> (PAGE_SHIFT - 10));
+		ratelimit = min(ratelimit, 32 >> (PG_SHIFT - 10));
 
 	preempt_disable();
 	/*
@@ -2241,7 +2241,7 @@ static int laptop_mode_handler(const struct ctl_table *table, int write,
 }
 
 /* this is needed for the proc_doulongvec_minmax of vm_dirty_bytes */
-static const unsigned long dirty_bytes_min = 2 * PAGE_SIZE;
+static const unsigned long dirty_bytes_min = 2 * PG_SIZE;
 
 static const struct ctl_table vm_page_writeback_sysctls[] = {
 	{
@@ -2416,7 +2416,7 @@ static pgoff_t wbc_end(struct writeback_control *wbc)
 {
 	if (wbc->range_cyclic)
 		return -1;
-	return wbc->range_end >> PAGE_SHIFT;
+	return wbc->range_end >> PG_SHIFT;
 }
 
 static struct folio *writeback_get_folio(struct address_space *mapping,
@@ -2489,7 +2489,7 @@ struct folio *writeback_iter(struct address_space *mapping,
 		if (wbc->range_cyclic)
 			wbc->index = mapping->writeback_index;
 		else
-			wbc->index = wbc->range_start >> PAGE_SHIFT;
+			wbc->index = wbc->range_start >> PG_SHIFT;
 
 		/*
 		 * To avoid livelocks when other processes dirty new pages, we
@@ -2634,7 +2634,7 @@ static void folio_account_dirtied(struct folio *folio,
 		__node_stat_mod_folio(folio, NR_DIRTIED, nr);
 		wb_stat_mod(wb, WB_RECLAIMABLE, nr);
 		wb_stat_mod(wb, WB_DIRTIED, nr);
-		task_io_account_write(nr * PAGE_SIZE);
+		task_io_account_write(nr * PG_SIZE);
 		current->nr_dirtied += nr;
 		__this_cpu_add(bdp_ratelimits, nr);
 
@@ -2653,7 +2653,7 @@ void folio_account_cleaned(struct folio *folio, struct bdi_writeback *wb)
 	lruvec_stat_mod_folio(folio, NR_FILE_DIRTY, -nr);
 	zone_stat_mod_folio(folio, NR_ZONE_WRITE_PENDING, -nr);
 	wb_stat_mod(wb, WB_RECLAIMABLE, -nr);
-	task_io_account_cancelled_write(nr * PAGE_SIZE);
+	task_io_account_cancelled_write(nr * PG_SIZE);
 }
 
 /*

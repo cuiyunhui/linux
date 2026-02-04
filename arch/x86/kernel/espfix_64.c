@@ -39,10 +39,10 @@
  * it up to a cache line to avoid unnecessary sharing.
  */
 #define ESPFIX_STACK_SIZE	(8*8UL)
-#define ESPFIX_STACKS_PER_PAGE	(PAGE_SIZE/ESPFIX_STACK_SIZE)
+#define ESPFIX_STACKS_PER_PAGE	(PG_SIZE/ESPFIX_STACK_SIZE)
 
 /* There is address space for how many espfix pages? */
-#define ESPFIX_PAGE_SPACE	(1UL << (P4D_SHIFT-PAGE_SHIFT-16))
+#define ESPFIX_PAGE_SPACE	(1UL << (P4D_SHIFT-PG_SHIFT-16))
 
 #define ESPFIX_MAX_CPUS		(ESPFIX_STACKS_PER_PAGE * ESPFIX_PAGE_SPACE)
 #if CONFIG_NR_CPUS > ESPFIX_MAX_CPUS
@@ -63,7 +63,7 @@ static DEFINE_MUTEX(espfix_init_mutex);
 static void *espfix_pages[ESPFIX_MAX_PAGES];
 
 static __page_aligned_bss pud_t espfix_pud_page[PTRS_PER_PUD]
-	__aligned(PAGE_SIZE);
+	__aligned(PG_SIZE);
 
 static unsigned int page_random, slot_random;
 
@@ -79,13 +79,13 @@ static inline unsigned long espfix_base_addr(unsigned int cpu)
 
 	page = (cpu / ESPFIX_STACKS_PER_PAGE) ^ page_random;
 	slot = (cpu + slot_random) % ESPFIX_STACKS_PER_PAGE;
-	addr = (page << PAGE_SHIFT) + (slot * ESPFIX_STACK_SIZE);
+	addr = (page << PG_SHIFT) + (slot * ESPFIX_STACK_SIZE);
 	addr = (addr & 0xffffUL) | ((addr & ~0xffffUL) << 16);
 	addr += ESPFIX_BASE_ADDR;
 	return addr;
 }
 
-#define PTE_STRIDE        (65536/PAGE_SIZE)
+#define PTE_STRIDE        (65536/PG_SIZE)
 #define ESPFIX_PTE_CLONES (PTRS_PER_PTE/PTE_STRIDE)
 #define ESPFIX_PMD_CLONES PTRS_PER_PMD
 #define ESPFIX_PUD_CLONES (65536/(ESPFIX_PTE_CLONES*ESPFIX_PMD_CLONES))
@@ -166,7 +166,7 @@ void init_espfix_ap(int cpu)
 
 		pmd_p = (pmd_t *)page_address(page);
 		pud = __pud(__pa(pmd_p) | (PGTABLE_PROT & ptemask));
-		paravirt_alloc_pmd(&init_mm, __pa(pmd_p) >> PAGE_SHIFT);
+		paravirt_alloc_pmd(&init_mm, __pa(pmd_p) >> PTE_SHIFT);
 		for (n = 0; n < ESPFIX_PUD_CLONES; n++)
 			set_pud(&pud_p[n], pud);
 	}
@@ -178,7 +178,7 @@ void init_espfix_ap(int cpu)
 
 		pte_p = (pte_t *)page_address(page);
 		pmd = __pmd(__pa(pte_p) | (PGTABLE_PROT & ptemask));
-		paravirt_alloc_pte(&init_mm, __pa(pte_p) >> PAGE_SHIFT);
+		paravirt_alloc_pte(&init_mm, __pa(pte_p) >> PTE_SHIFT);
 		for (n = 0; n < ESPFIX_PMD_CLONES; n++)
 			set_pmd(&pmd_p[n], pmd);
 	}
@@ -201,5 +201,5 @@ unlock_done:
 done:
 	per_cpu(espfix_stack, cpu) = addr;
 	per_cpu(espfix_waddr, cpu) = (unsigned long)stack_page
-				      + (addr & ~PAGE_MASK);
+				      + (addr & ~PG_MASK);
 }

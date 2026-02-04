@@ -114,12 +114,12 @@ enum tva_type {
 #define HPAGE_PUD_SHIFT ({ BUILD_BUG(); 0; })
 #endif
 
-#define HPAGE_PMD_ORDER (HPAGE_PMD_SHIFT-PAGE_SHIFT)
+#define HPAGE_PMD_ORDER (HPAGE_PMD_SHIFT-PG_SHIFT)
 #define HPAGE_PMD_NR (1<<HPAGE_PMD_ORDER)
 #define HPAGE_PMD_MASK	(~(HPAGE_PMD_SIZE - 1))
 #define HPAGE_PMD_SIZE	((1UL) << HPAGE_PMD_SHIFT)
 
-#define HPAGE_PUD_ORDER (HPAGE_PUD_SHIFT-PAGE_SHIFT)
+#define HPAGE_PUD_ORDER (HPAGE_PUD_SHIFT-PG_SHIFT)
 #define HPAGE_PUD_NR (1<<HPAGE_PUD_ORDER)
 #define HPAGE_PUD_MASK	(~(HPAGE_PUD_SIZE - 1))
 #define HPAGE_PUD_SIZE	((1UL) << HPAGE_PUD_SHIFT)
@@ -220,13 +220,13 @@ static inline int next_order(unsigned long *orders, int prev)
 static inline bool thp_vma_suitable_order(struct vm_area_struct *vma,
 		unsigned long addr, int order)
 {
-	unsigned long hpage_size = PAGE_SIZE << order;
+	unsigned long hpage_size = PG_SIZE << order;
 	unsigned long haddr;
 
 	/* Don't have to check pgoff for anonymous vma */
 	if (!vma_is_anonymous(vma)) {
-		if (!IS_ALIGNED((vma->vm_start >> PAGE_SHIFT) - vma->vm_pgoff,
-				hpage_size >> PAGE_SHIFT))
+		if (!IS_ALIGNED((vma->vm_start >> PTE_SHIFT) - vma->vm_pteoff,
+				hpage_size >> PG_SHIFT))
 			return false;
 	}
 

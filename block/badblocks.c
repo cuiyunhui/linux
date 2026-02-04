@@ -1427,7 +1427,7 @@ retry:
 	len = 0;
 	i = 0;
 
-	while (len < PAGE_SIZE && i < bb->count) {
+	while (len < PG_SIZE && i < bb->count) {
 		sector_t s = BB_OFFSET(p[i]);
 		unsigned int length = BB_LEN(p[i]);
 		int ack = BB_ACK(p[i]);
@@ -1437,7 +1437,7 @@ retry:
 		if (unack && ack)
 			continue;
 
-		len += snprintf(page+len, PAGE_SIZE-len, "%llu %u\n",
+		len += snprintf(page+len, PG_SIZE-len, "%llu %u\n",
 				(unsigned long long)s << bb->shift,
 				length << bb->shift);
 	}
@@ -1498,9 +1498,9 @@ static int __badblocks_init(struct device *dev, struct badblocks *bb,
 	else
 		bb->shift = -1;
 	if (dev)
-		bb->page = devm_kzalloc(dev, PAGE_SIZE, GFP_KERNEL);
+		bb->page = devm_kzalloc(dev, PG_SIZE, GFP_KERNEL);
 	else
-		bb->page = kzalloc(PAGE_SIZE, GFP_KERNEL);
+		bb->page = kzalloc(PG_SIZE, GFP_KERNEL);
 	if (!bb->page) {
 		bb->shift = -1;
 		return -ENOMEM;

@@ -178,7 +178,7 @@ static ssize_t queue_ra_show(struct gendisk *disk, char *page)
 	ssize_t ret;
 
 	mutex_lock(&disk->queue->limits_lock);
-	ret = queue_var_show(disk->bdi->ra_pages << (PAGE_SHIFT - 10), page);
+	ret = queue_var_show(disk->bdi->ra_pages << (PG_SHIFT - 10), page);
 	mutex_unlock(&disk->queue->limits_lock);
 
 	return ret;
@@ -203,7 +203,7 @@ queue_ra_store(struct gendisk *disk, const char *page, size_t count)
 	 * Use WRITE_ONCE() to write bdi->ra_pages once.
 	 */
 	mutex_lock(&q->limits_lock);
-	WRITE_ONCE(disk->bdi->ra_pages, ra_kb >> (PAGE_SHIFT - 10));
+	WRITE_ONCE(disk->bdi->ra_pages, ra_kb >> (PG_SHIFT - 10));
 	mutex_unlock(&q->limits_lock);
 
 	return ret;

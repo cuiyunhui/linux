@@ -323,7 +323,7 @@ static void do_page_cache_ra(struct readahead_control *ractl,
 	if (isize == 0)
 		return;
 
-	end_index = (isize - 1) >> PAGE_SHIFT;
+	end_index = (isize - 1) >> PG_SHIFT;
 	if (index > end_index)
 		return;
 	/* Don't read past the page containing the last byte of the file */
@@ -357,7 +357,7 @@ void force_page_cache_ra(struct readahead_control *ractl,
 	max_pages = max_t(unsigned long, bdi->io_pages, ra->ra_pages);
 	nr_to_read = min_t(unsigned long, nr_to_read, max_pages);
 	while (nr_to_read) {
-		unsigned long this_chunk = (2 * 1024 * 1024) / PAGE_SIZE;
+		unsigned long this_chunk = (2 * 1024 * 1024) / PG_SIZE;
 
 		if (this_chunk > nr_to_read)
 			this_chunk = nr_to_read;
@@ -471,7 +471,7 @@ void page_cache_ra_order(struct readahead_control *ractl,
 	pgoff_t start = readahead_index(ractl);
 	pgoff_t index = start;
 	unsigned int min_order = mapping_min_folio_order(mapping);
-	pgoff_t limit = (i_size_read(mapping->host) - 1) >> PAGE_SHIFT;
+	pgoff_t limit = (i_size_read(mapping->host) - 1) >> PG_SHIFT;
 	pgoff_t mark = index + ra->size - ra->async_size;
 	unsigned int nofs;
 	int err = 0;
@@ -584,7 +584,7 @@ void page_cache_sync_ra(struct readahead_control *ractl,
 	}
 
 	max_pages = ractl_max_pages(ractl, req_count);
-	prev_index = (unsigned long long)ra->prev_pos >> PAGE_SHIFT;
+	prev_index = (unsigned long long)ra->prev_pos >> PG_SHIFT;
 	/*
 	 * A start of file, oversized read, or sequential cache miss:
 	 * trivial case: (index - prev_index) == 1
@@ -773,7 +773,7 @@ void readahead_expand(struct readahead_control *ractl,
 	unsigned long min_nrpages = mapping_min_folio_nrpages(mapping);
 	unsigned int min_order = mapping_min_folio_order(mapping);
 
-	new_index = new_start / PAGE_SIZE;
+	new_index = new_start / PG_SIZE;
 	/*
 	 * Readahead code should have aligned the ractl->_index to
 	 * min_nrpages before calling readahead aops.
@@ -807,7 +807,7 @@ void readahead_expand(struct readahead_control *ractl,
 	}
 
 	new_len += new_start - readahead_pos(ractl);
-	new_nr_pages = DIV_ROUND_UP(new_len, PAGE_SIZE);
+	new_nr_pages = DIV_ROUND_UP(new_len, PG_SIZE);
 
 	/* Expand the trailing edge upwards */
 	while (ractl->_nr_pages < new_nr_pages) {

@@ -2596,7 +2596,7 @@ static int __init eventpoll_init(void)
 	/*
 	 * Allows top 4% of lomem to be allocated for epoll watches (per user).
 	 */
-	max_user_watches = (((si.totalram - si.totalhigh) / 25) << PAGE_SHIFT) /
+	max_user_watches = (((si.totalram - si.totalhigh) / 25) << PG_SHIFT) /
 		EP_ITEM_COST;
 	BUG_ON(max_user_watches < 0);
 

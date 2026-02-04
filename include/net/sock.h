@@ -1561,7 +1561,7 @@ static inline long sk_prot_mem_limits(const struct sock *sk, int index)
 
 static inline int sk_mem_pages(int amt)
 {
-	return (amt + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	return (amt + PG_SIZE - 1) >> PG_SHIFT;
 }
 
 static inline bool sk_has_account(struct sock *sk)
@@ -1620,7 +1620,7 @@ static inline void sk_mem_reclaim(struct sock *sk)
 
 	reclaimable = sk->sk_forward_alloc - sk_unused_reserved_mem(sk);
 
-	if (reclaimable >= (int)PAGE_SIZE)
+	if (reclaimable >= (int)PG_SIZE)
 		__sk_mem_reclaim(sk, reclaimable);
 }
 

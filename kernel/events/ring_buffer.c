@@ -238,7 +238,7 @@ __perf_output_begin(struct perf_output_handle *handle,
 	if (unlikely(head - local_read(&rb->wakeup) > rb->watermark))
 		local_add(rb->watermark, &rb->wakeup);
 
-	page_shift = PAGE_SHIFT + page_order(rb);
+	page_shift = PG_SHIFT + page_order(rb);
 
 	handle->page = (offset >> page_shift) & (rb->nr_pages - 1);
 	offset &= (1UL << page_shift) - 1;
@@ -586,18 +586,18 @@ long perf_output_copy_aux(struct perf_output_handle *aux_handle,
 	unsigned long tocopy, remainder, len = 0;
 	void *addr;
 
-	from &= (rb->aux_nr_pages << PAGE_SHIFT) - 1;
-	to &= (rb->aux_nr_pages << PAGE_SHIFT) - 1;
+	from &= (rb->aux_nr_pages << PG_SHIFT) - 1;
+	to &= (rb->aux_nr_pages << PG_SHIFT) - 1;
 
 	do {
-		tocopy = PAGE_SIZE - offset_in_page(from);
+		tocopy = PG_SIZE - offset_in_pg(from);
 		if (to > from)
 			tocopy = min(tocopy, to - from);
 		if (!tocopy)
 			break;
 
-		addr = rb->aux_pages[from >> PAGE_SHIFT];
-		addr += offset_in_page(from);
+		addr = rb->aux_pages[from >> PG_SHIFT];
+		addr += offset_in_pg(from);
 
 		remainder = perf_output_copy(handle, addr, tocopy);
 		if (remainder)
@@ -605,7 +605,7 @@ long perf_output_copy_aux(struct perf_output_handle *aux_handle,
 
 		len += tocopy;
 		from += tocopy;
-		from &= (rb->aux_nr_pages << PAGE_SHIFT) - 1;
+		from &= (rb->aux_nr_pages << PG_SHIFT) - 1;
 	} while (to != from);
 
 	return len;
@@ -675,7 +675,7 @@ static void __rb_free_aux(struct perf_buffer *rb)
 }
 
 int rb_alloc_aux(struct perf_buffer *rb, struct perf_event *event,
-		 pgoff_t pgoff, int nr_pages, long watermark, int flags)
+		 unsigned long pteoff, int nr_pages, long watermark, int flags)
 {
 	bool overwrite = !(flags & RING_BUFFER_WRITABLE);
 	int node = (event->cpu == -1) ? -1 : cpu_to_node(event->cpu);
@@ -703,7 +703,7 @@ int rb_alloc_aux(struct perf_buffer *rb, struct perf_event *event,
 		if (!watermark)
 			watermark = min_t(unsigned long,
 					  U32_MAX,
-					  (unsigned long)nr_pages << (PAGE_SHIFT - 1));
+					  (unsigned long)nr_pages << (PG_SHIFT - 1));
 
 		/*
 		 * If using contiguous pages, use aux_watermark as the basis
@@ -724,7 +724,7 @@ int rb_alloc_aux(struct perf_buffer *rb, struct perf_event *event,
 
 	/*
 	 * kcalloc_node() is unable to allocate buffer if the size is larger
-	 * than: PAGE_SIZE << MAX_PAGE_ORDER; directly bail out in this case.
+	 * than: PG_SIZE << MAX_PAGE_ORDER; directly bail out in this case.
 	 */
 	if (get_order((unsigned long)nr_pages * sizeof(void *)) > MAX_PAGE_ORDER)
 		return -ENOMEM;
@@ -782,7 +782,7 @@ int rb_alloc_aux(struct perf_buffer *rb, struct perf_event *event,
 
 out:
 	if (!ret)
-		rb->aux_pgoff = pgoff;
+		rb->aux_pteoff = pteoff;
 	else
 		__rb_free_aux(rb);
 
@@ -802,15 +802,16 @@ void rb_free_aux(struct perf_buffer *rb)
  */
 
 static struct page *
-__perf_mmap_to_page(struct perf_buffer *rb, unsigned long pgoff)
+__perf_mmap_to_page(struct perf_buffer *rb, unsigned long pteoff)
 {
-	if (pgoff > rb->nr_pages)
+	if (pteoff > PTES_PER_PAGE * rb->nr_pages)
 		return NULL;
 
-	if (pgoff == 0)
+	if (pteoff == 0)
 		return virt_to_page(rb->user_page);
 
-	return virt_to_page(rb->data_pages[pgoff - 1]);
+	return virt_to_page(rb->data_pages[pteoff / PTES_PER_PAGE - 1]) +
+		(pteoff % PTES_PER_PAGE) * PTE_SIZE;
 }
 
 static void *perf_mmap_alloc_page(int cpu)
@@ -842,7 +843,7 @@ struct perf_buffer *rb_alloc(int nr_pages, long watermark, int cpu, int flags)
 	size = sizeof(struct perf_buffer);
 	size += nr_pages * sizeof(void *);
 
-	if (order_base_2(size) > PAGE_SHIFT+MAX_PAGE_ORDER)
+	if (order_base_2(size) > PG_SHIFT+MAX_PAGE_ORDER)
 		goto fail;
 
 	node = (cpu == -1) ? cpu : cpu_to_node(cpu);
@@ -897,7 +898,7 @@ __perf_mmap_to_page(struct perf_buffer *rb, unsigned long pgoff)
 	if (pgoff > data_page_nr(rb))
 		return NULL;
 
-	return vmalloc_to_page((void *)rb->user_page + pgoff * PAGE_SIZE);
+	return vmalloc_to_page((void *)rb->user_page + pgoff * PG_SIZE);
 }
 
 static void rb_free_work(struct work_struct *work)
@@ -932,12 +933,12 @@ struct perf_buffer *rb_alloc(int nr_pages, long watermark, int cpu, int flags)
 
 	INIT_WORK(&rb->work, rb_free_work);
 
-	all_buf = vmalloc_user((nr_pages + 1) * PAGE_SIZE);
+	all_buf = vmalloc_user((nr_pages + 1) * PG_SIZE);
 	if (!all_buf)
 		goto fail_all_buf;
 
 	rb->user_page = all_buf;
-	rb->data_pages[0] = all_buf + PAGE_SIZE;
+	rb->data_pages[0] = all_buf + PG_SIZE;
 	if (nr_pages) {
 		rb->nr_pages = 1;
 		rb->page_order = ilog2(nr_pages);
@@ -957,19 +958,20 @@ fail:
 #endif
 
 struct page *
-perf_mmap_to_page(struct perf_buffer *rb, unsigned long pgoff)
+perf_mmap_to_page(struct perf_buffer *rb, unsigned long pteoff)
 {
 	if (rb->aux_nr_pages) {
 		/* above AUX space */
-		if (pgoff > rb->aux_pgoff + rb->aux_nr_pages)
+		if (pteoff > rb->aux_pteoff + PTES_PER_PAGE * rb->aux_nr_pages)
 			return NULL;
 
 		/* AUX space */
-		if (pgoff >= rb->aux_pgoff) {
-			int aux_pgoff = array_index_nospec(pgoff - rb->aux_pgoff, rb->aux_nr_pages);
+		if (pteoff >= rb->aux_pteoff) {
+			int aux_pgoff = array_index_nospec((pteoff - rb->aux_pteoff) / PTES_PER_PAGE,
+							   rb->aux_nr_pages);
 			return virt_to_page(rb->aux_pages[aux_pgoff]);
 		}
 	}
 
-	return __perf_mmap_to_page(rb, pgoff);
+	return __perf_mmap_to_page(rb, pteoff);
 }

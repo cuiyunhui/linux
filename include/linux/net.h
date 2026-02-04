@@ -325,7 +325,7 @@ static inline bool sendpage_ok(struct page *page)
  */
 static inline bool sendpages_ok(struct page *page, size_t len, size_t offset)
 {
-	struct page *p = page + (offset >> PAGE_SHIFT);
+	struct page *p = page + (offset >> PG_SHIFT);
 	size_t count = 0;
 
 	while (count < len) {
@@ -333,7 +333,7 @@ static inline bool sendpages_ok(struct page *page, size_t len, size_t offset)
 			return false;
 
 		p++;
-		count += PAGE_SIZE;
+		count += PG_SIZE;
 	}
 
 	return true;

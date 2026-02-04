@@ -51,16 +51,16 @@ early_set_pages_state(unsigned long vaddr, unsigned long paddr,
 {
 	unsigned long paddr_end;
 
-	vaddr = vaddr & PAGE_MASK;
+	vaddr = vaddr & PTE_MASK;
 
-	paddr = paddr & PAGE_MASK;
-	paddr_end = paddr + (npages << PAGE_SHIFT);
+	paddr = paddr & PTE_MASK;
+	paddr_end = paddr + (npages << PTE_SHIFT);
 
 	while (paddr < paddr_end) {
 		__page_state_change(vaddr, paddr, desc);
 
-		vaddr += PAGE_SIZE;
-		paddr += PAGE_SIZE;
+		vaddr += PTE_SIZE;
+		paddr += PTE_SIZE;
 	}
 }
 
@@ -202,7 +202,7 @@ bool __init snp_init(struct boot_params *bp)
 	if (!cc_info)
 		return false;
 
-	if (cc_info->secrets_phys && cc_info->secrets_len == PAGE_SIZE)
+	if (cc_info->secrets_phys && cc_info->secrets_len == PTE_SIZE)
 		sev_secrets_pa = cc_info->secrets_phys;
 	else
 		return false;

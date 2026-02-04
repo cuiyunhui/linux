@@ -37,7 +37,7 @@ static int walk_pte_range_inner(pte_t *pte, unsigned long addr,
 		if (ops->install_pte && pte_none(ptep_get(pte))) {
 			pte_t new_pte;
 
-			err = ops->install_pte(addr, addr + PAGE_SIZE, &new_pte,
+			err = ops->install_pte(addr, addr + PTE_SIZE, &new_pte,
 					       walk);
 			if (err)
 				break;
@@ -47,13 +47,13 @@ static int walk_pte_range_inner(pte_t *pte, unsigned long addr,
 			if (!WARN_ON_ONCE(walk->no_vma))
 				update_mmu_cache(walk->vma, addr, pte);
 		} else {
-			err = ops->pte_entry(pte, addr, addr + PAGE_SIZE, walk);
+			err = ops->pte_entry(pte, addr, addr + PTE_SIZE, walk);
 			if (err)
 				break;
 		}
-		if (addr >= end - PAGE_SIZE)
+		if (addr >= end - PTE_SIZE)
 			break;
-		addr += PAGE_SIZE;
+		addr += PTE_SIZE;
 		pte++;
 	}
 	return err;
@@ -814,15 +814,15 @@ int walk_page_mapping(struct address_space *mapping, pgoff_t first_index,
 	vma_interval_tree_foreach(vma, &mapping->i_mmap, first_index,
 				  first_index + nr - 1) {
 		/* Clip to the vma */
-		vba = vma->vm_pgoff;
-		vea = vba + vma_pages(vma);
+		vba = vma->vm_pteoff;
+		vea = vba + vma_pages(vma) * PTES_PER_PAGE;
 		cba = first_index;
 		cba = max(cba, vba);
 		cea = first_index + nr;
 		cea = min(cea, vea);
 
-		start_addr = ((cba - vba) << PAGE_SHIFT) + vma->vm_start;
-		end_addr = ((cea - vba) << PAGE_SHIFT) + vma->vm_start;
+		start_addr = ((cba - vba) << PG_SHIFT) + vma->vm_start;
+		end_addr = ((cea - vba) << PG_SHIFT) + vma->vm_start;
 		if (start_addr >= end_addr)
 			continue;
 
@@ -1011,7 +1011,7 @@ pte_table:
 		goto not_found;
 	pte = ptep_get(ptep);
 
-	entry_size = PAGE_SIZE;
+	entry_size = PTE_SIZE;
 	fw->level = FW_LEVEL_PTE;
 	fw->ptep = ptep;
 	fw->pte = pte;
@@ -1042,7 +1042,7 @@ not_found:
 found:
 	if (expose_page)
 		/* Note: Offset from the mapped page, not the folio start. */
-		fw->page = page + ((addr & (entry_size - 1)) >> PAGE_SHIFT);
+		fw->page = page + ((addr & (entry_size - 1)) >> PG_SHIFT);
 	else
 		fw->page = NULL;
 	fw->ptl = ptl;

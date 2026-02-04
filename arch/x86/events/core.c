@@ -2700,7 +2700,7 @@ static ssize_t max_precise_show(struct device *cdev,
 {
 	struct pmu *pmu = dev_get_drvdata(cdev);
 
-	return snprintf(buf, PAGE_SIZE, "%d\n", x86_pmu_max_precise(pmu));
+	return snprintf(buf, PG_SIZE, "%d\n", x86_pmu_max_precise(pmu));
 }
 
 static DEVICE_ATTR_RO(max_precise);

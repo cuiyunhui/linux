@@ -46,7 +46,7 @@ struct iov_iter;		/* in uio.h */
  * Can be overridden by arch-specific value.
  */
 #ifndef IOREMAP_MAX_ORDER
-#define IOREMAP_MAX_ORDER	(7 + PAGE_SHIFT)	/* 128 pages */
+#define IOREMAP_MAX_ORDER	(7 + PG_SHIFT)	/* 128 pages */
 #endif
 
 struct vm_struct {
@@ -114,7 +114,7 @@ static inline bool arch_vmap_pmd_supported(pgprot_t prot)
 static inline unsigned long arch_vmap_pte_range_map_size(unsigned long addr, unsigned long end,
 							 u64 pfn, unsigned int max_page_shift)
 {
-	return PAGE_SIZE;
+	return PTE_SIZE;
 }
 #endif
 
@@ -122,14 +122,14 @@ static inline unsigned long arch_vmap_pte_range_map_size(unsigned long addr, uns
 static inline unsigned long arch_vmap_pte_range_unmap_size(unsigned long addr,
 							   pte_t *ptep)
 {
-	return PAGE_SIZE;
+	return PTE_SIZE;
 }
 #endif
 
 #ifndef arch_vmap_pte_supported_shift
 static inline int arch_vmap_pte_supported_shift(unsigned long size)
 {
-	return PAGE_SHIFT;
+	return PTE_SHIFT;
 }
 #endif
 
@@ -237,7 +237,7 @@ static inline size_t get_vm_area_size(const struct vm_struct *area)
 {
 	if (!(area->flags & VM_NO_GUARD))
 		/* return actual size without guard page */
-		return area->size - PAGE_SIZE;
+		return area->size - PG_SIZE;
 	else
 		return area->size;
 
@@ -258,7 +258,7 @@ struct vmap_area *find_vmap_area(unsigned long addr);
 static inline bool is_vm_area_hugepages(const void *addr)
 {
 	/*
-	 * This may not 100% tell if the area is mapped with > PAGE_SIZE
+	 * This may not 100% tell if the area is mapped with > PG_SIZE
 	 * page table entries, if for some reason the architecture indicates
 	 * larger sizes are available but decides not to use them, nothing
 	 * prevents that. This only indicates the size of the physical page

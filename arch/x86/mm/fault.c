@@ -302,7 +302,7 @@ static void dump_pagetable(unsigned long address)
 
 #ifdef CONFIG_X86_PAE
 	pr_info("*pdpt = %016Lx ", pgd_val(*pgd));
-	if (!low_pfn(pgd_val(*pgd) >> PAGE_SHIFT) || !pgd_present(*pgd))
+	if (!low_pfn(pgd_val(*pgd) >> PTE_SHIFT) || !pgd_present(*pgd))
 		goto out;
 #define pr_pde pr_cont
 #else
@@ -392,9 +392,9 @@ static void dump_pagetable(unsigned long address)
 	if (bad_address(pte))
 		goto bad;
 
-	pr_cont("PTE %lx", pte_val(*pte));
+	pr_cont("PTE %px %lx", pte, pte_val(*pte));
 out:
-	pr_cont("\n");
+	pr_cont(" - %#lx\n", address);
 	return;
 bad:
 	pr_info("BAD\n");
@@ -532,7 +532,7 @@ show_fault_oops(struct pt_regs *regs, unsigned long error_code, unsigned long ad
 				from_kuid(&init_user_ns, current_uid()));
 	}
 
-	if (address < PAGE_SIZE && !user_mode(regs))
+	if (address < PG_SIZE && !user_mode(regs))
 		pr_alert("BUG: kernel NULL pointer dereference, address: %px\n",
 			(void *)address);
 	else
@@ -887,10 +887,10 @@ bad_area_access_error(struct pt_regs *regs, unsigned long error_code,
 		 * handler.  It does *not* guarantee that the VMA we find here
 		 * was the one that we faulted on.
 		 *
-		 * 1. T1   : mprotect_key(foo, PAGE_SIZE, pkey=4);
+		 * 1. T1   : mprotect_key(foo, PG_SIZE, pkey=4);
 		 * 2. T1   : set PKRU to deny access to pkey=4, touches page
 		 * 3. T1   : faults...
-		 * 4.    T2: mprotect_key(foo, PAGE_SIZE, pkey=5);
+		 * 4.    T2: mprotect_key(foo, PG_SIZE, pkey=5);
 		 * 5. T1   : enters fault handler, takes mmap_lock, etc...
 		 * 6. T1   : reaches here, sees vma_pkey(vma)=5, when we really
 		 *	     faulted on a pte with its pkey=4.
@@ -936,7 +936,7 @@ do_sigbus(struct pt_regs *regs, unsigned long error_code, unsigned long address,
 		if (fault & VM_FAULT_HWPOISON_LARGE)
 			lsb = hstate_index_to_shift(VM_FAULT_GET_HINDEX(fault));
 		if (fault & VM_FAULT_HWPOISON)
-			lsb = PAGE_SHIFT;
+			lsb = PTE_SHIFT;
 		force_sig_mceerr(BUS_MCEERR_AR, (void __user *)address, lsb);
 		return;
 	}

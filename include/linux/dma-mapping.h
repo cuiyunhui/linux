@@ -514,7 +514,7 @@ static inline dma_addr_t dma_map_single_attrs(struct device *dev, void *ptr,
 			  "rejecting DMA map of vmalloc memory\n"))
 		return DMA_MAPPING_ERROR;
 	debug_dma_map_single(dev, ptr, size);
-	return dma_map_page_attrs(dev, virt_to_page(ptr), offset_in_page(ptr),
+	return dma_map_page_attrs(dev, virt_to_page(ptr), offset_in_pg(ptr),
 			size, dir, attrs);
 }
 

@@ -474,13 +474,13 @@ anon_pipe_write(struct kiocb *iocb, struct iov_iter *from)
 	 */
 	head = pipe->head;
 	was_empty = pipe_empty(head, pipe->tail);
-	chars = total_len & (PAGE_SIZE-1);
+	chars = total_len & (PG_SIZE-1);
 	if (chars && !was_empty) {
 		struct pipe_buffer *buf = pipe_buf(pipe, head - 1);
 		int offset = buf->offset + buf->len;
 
 		if ((buf->flags & PIPE_BUF_FLAG_CAN_MERGE) &&
-		    offset + chars <= PAGE_SIZE) {
+		    offset + chars <= PG_SIZE) {
 			ret = pipe_buf_confirm(pipe, buf);
 			if (ret)
 				goto out;
@@ -519,8 +519,8 @@ anon_pipe_write(struct kiocb *iocb, struct iov_iter *from)
 				break;
 			}
 
-			copied = copy_page_from_iter(page, 0, PAGE_SIZE, from);
-			if (unlikely(copied < PAGE_SIZE && iov_iter_count(from))) {
+			copied = copy_page_from_iter(page, 0, PG_SIZE, from);
+			if (unlikely(copied < PG_SIZE && iov_iter_count(from))) {
 				anon_pipe_put_page(pipe, page);
 				if (!ret)
 					ret = -EFAULT;
@@ -801,8 +801,8 @@ struct pipe_inode_info *alloc_pipe_info(void)
 	if (pipe == NULL)
 		goto out_free_uid;
 
-	if (pipe_bufs * PAGE_SIZE > max_size && !capable(CAP_SYS_RESOURCE))
-		pipe_bufs = max_size >> PAGE_SHIFT;
+	if (pipe_bufs * PG_SIZE > max_size && !capable(CAP_SYS_RESOURCE))
+		pipe_bufs = max_size >> PG_SHIFT;
 
 	user_bufs = account_pipe_buffers(user, 0, pipe_bufs);
 
@@ -1275,8 +1275,8 @@ unsigned int round_pipe_size(unsigned int size)
 		return 0;
 
 	/* Minimum pipe size, as required by POSIX */
-	if (size < PAGE_SIZE)
-		return PAGE_SIZE;
+	if (size < PG_SIZE)
+		return PG_SIZE;
 
 	return roundup_pow_of_two(size);
 }
@@ -1370,7 +1370,7 @@ static long pipe_set_size(struct pipe_inode_info *pipe, unsigned int arg)
 		return -EBUSY;
 
 	size = round_pipe_size(arg);
-	nr_slots = size >> PAGE_SHIFT;
+	nr_slots = size >> PG_SHIFT;
 
 	if (!nr_slots)
 		return -EINVAL;
@@ -1400,7 +1400,7 @@ static long pipe_set_size(struct pipe_inode_info *pipe, unsigned int arg)
 	if (ret < 0)
 		goto out_revert_acct;
 
-	return pipe->max_usage * PAGE_SIZE;
+	return pipe->max_usage * PG_SIZE;
 
 out_revert_acct:
 	(void) account_pipe_buffers(pipe->user, nr_slots, pipe->nr_accounted);
@@ -1440,7 +1440,7 @@ long pipe_fcntl(struct file *file, unsigned int cmd, unsigned int arg)
 		ret = pipe_set_size(pipe, arg);
 		break;
 	case F_GETPIPE_SZ:
-		ret = pipe->max_usage * PAGE_SIZE;
+		ret = pipe->max_usage * PG_SIZE;
 		break;
 	default:
 		ret = -EINVAL;

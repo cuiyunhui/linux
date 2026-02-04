@@ -116,7 +116,7 @@ extern struct pcpu_chunk *pcpu_reserved_chunk;
  */
 static inline int pcpu_chunk_nr_blocks(struct pcpu_chunk *chunk)
 {
-	return chunk->nr_pages * PAGE_SIZE / PCPU_BITMAP_BLOCK_SIZE;
+	return chunk->nr_pages * PG_SIZE / PCPU_BITMAP_BLOCK_SIZE;
 }
 
 /**
@@ -128,7 +128,7 @@ static inline int pcpu_chunk_nr_blocks(struct pcpu_chunk *chunk)
  */
 static inline int pcpu_nr_pages_to_map_bits(int pages)
 {
-	return pages * PAGE_SIZE / PCPU_MIN_ALLOC_SIZE;
+	return pages * PG_SIZE / PCPU_MIN_ALLOC_SIZE;
 }
 
 /**

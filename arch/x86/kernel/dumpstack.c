@@ -224,7 +224,7 @@ static void __show_trace_log_lvl(struct task_struct *task, struct pt_regs *regs,
 			 * See if the next page up is valid so that we can
 			 * generate some kind of backtrace if this happens.
 			 */
-			stack = (unsigned long *)PAGE_ALIGN((unsigned long)stack);
+			stack = (unsigned long *)PG_ALIGN((unsigned long)stack);
 			if (get_stack_info(stack, task, &stack_info, &visit_mask))
 				break;
 		}

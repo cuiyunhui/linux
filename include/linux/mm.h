@@ -80,8 +80,8 @@ extern void * high_memory;
  * PAGE_SHIFT is the shift for page size (e.g., 12 for 4KB pages)
  * So (20 - PAGE_SHIFT) converts between pages and MB
  */
-#define PAGES_TO_MB(pages) ((pages) >> (20 - PAGE_SHIFT))
-#define MB_TO_PAGES(mb)    ((mb) << (20 - PAGE_SHIFT))
+#define PAGES_TO_MB(pages) ((pages) >> (20 - PG_SHIFT))
+#define MB_TO_PAGES(mb)    ((mb) << (20 - PG_SHIFT))
 
 #ifdef CONFIG_SYSCTL
 extern int sysctl_legacy_va_layout;
@@ -776,7 +776,8 @@ struct vm_operations_struct {
 	vm_fault_t (*fault)(struct vm_fault *vmf);
 	vm_fault_t (*huge_fault)(struct vm_fault *vmf, unsigned int order);
 	vm_fault_t (*map_pages)(struct vm_fault *vmf,
-			pgoff_t start_pgoff, pgoff_t end_pgoff);
+				unsigned long start_pteoff,
+				unsigned long end_pteoff);
 	unsigned long (*pagesize)(struct vm_area_struct * area);
 
 	/* notification that a previously read-only page is about to become
@@ -1747,7 +1748,7 @@ vm_fault_t finish_fault(struct vm_fault *vmf);
  *
  * A folio may belong to an inode's memory mapping. In this case,
  * folio->mapping points to the inode, and folio->index is the file
- * offset of the folio, in units of PAGE_SIZE.
+ * offset of the folio, in units of PG_SIZE.
  *
  * If pagecache pages are not associated with an inode, they are said to be
  * anonymous pages. These may become associated with the swapcache, and in that
@@ -3521,7 +3522,7 @@ static inline spinlock_t *pte_lockptr(struct mm_struct *mm, pmd_t *pmd)
 static inline spinlock_t *ptep_lockptr(struct mm_struct *mm, pte_t *pte)
 {
 	BUILD_BUG_ON(IS_ENABLED(CONFIG_HIGHPTE));
-	BUILD_BUG_ON(MAX_PTRS_PER_PTE * sizeof(pte_t) > PAGE_SIZE);
+	BUILD_BUG_ON(MAX_PTRS_PER_PTE * sizeof(pte_t) > PTE_SIZE);
 	return ptlock_ptr(virt_to_ptdesc(pte));
 }
 
@@ -3720,7 +3721,7 @@ extern void __init pagecache_init(void);
 extern void free_initmem(void);
 
 /*
- * Free reserved pages within range [PAGE_ALIGN(start), end & PAGE_MASK)
+ * Free reserved pages within range [PAGE_ALIGN(start), end & PG_MASK)
  * into the buddy system. The freed pages will be poisoned with pattern
  * "poison" if it's within range [0, UCHAR_MAX].
  * Return pages freed into the buddy system.
@@ -4010,7 +4011,7 @@ static inline unsigned long stack_guard_start_gap(const struct vm_area_struct *v
 
 	/* See reasoning around the VM_SHADOW_STACK definition */
 	if (vma->vm_flags & VM_SHADOW_STACK)
-		return PAGE_SIZE;
+		return PG_SIZE;
 
 	return 0;
 }
@@ -4033,7 +4034,7 @@ static inline unsigned long vm_end_gap(const struct vm_area_struct *vma)
 	if (vma->vm_flags & VM_GROWSUP) {
 		vm_end += stack_guard_gap;
 		if (vm_end < vma->vm_end)
-			vm_end = -PAGE_SIZE;
+			vm_end = -PG_SIZE;
 	}
 	return vm_end;
 }
@@ -4043,7 +4044,7 @@ static inline unsigned long vma_pages(const struct vm_area_struct *vma)
 	return (vma->vm_end - vma->vm_start) >> PG_SHIFT;
 }
 
-static inline unsigned long vma_ptes(struct vm_area_struct *vma)
+static inline unsigned long vma_ptes(const struct vm_area_struct *vma)
 {
 	return (vma->vm_end - vma->vm_start) >> PTE_SHIFT;
 }
@@ -4051,11 +4052,6 @@ static inline unsigned long vma_ptes(struct vm_area_struct *vma)
 static inline unsigned long vma_desc_size(const struct vm_area_desc *desc)
 {
 	return desc->end - desc->start;
-}
-
-static inline unsigned long vma_desc_pages(const struct vm_area_desc *desc)
-{
-	return vma_desc_size(desc) >> PAGE_SHIFT;
 }
 
 /**
@@ -4607,7 +4603,7 @@ static inline bool __vmemmap_can_optimize(struct vmem_altmap *altmap,
 		return false;
 
 	nr_pages = pgmap_vmemmap_nr(pgmap);
-	nr_vmemmap_pages = ((nr_pages * sizeof(struct page)) >> PAGE_SHIFT);
+	nr_vmemmap_pages = ((nr_pages * sizeof(struct page)) >> PG_SHIFT);
 	/*
 	 * For vmemmap optimization with DAX we need minimum 2 vmemmap
 	 * pages. See layout diagram in Documentation/mm/vmemmap_dedup.rst
@@ -4822,7 +4818,7 @@ static inline void accept_memory(phys_addr_t start, unsigned long size)
 
 static inline bool pfn_is_unaccepted_memory(unsigned long pfn)
 {
-	return range_contains_unaccepted_memory(pfn << PAGE_SHIFT, PAGE_SIZE);
+	return range_contains_unaccepted_memory(pfn << PTE_SHIFT, PTE_SIZE);
 }
 
 void vma_pgtable_walk_begin(struct vm_area_struct *vma);

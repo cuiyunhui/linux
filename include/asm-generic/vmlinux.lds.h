@@ -13,7 +13,7 @@
  *	. = START;
  *	__init_begin = .;
  *	HEAD_TEXT_SECTION
- *	INIT_TEXT_SECTION(PAGE_SIZE)
+ *	INIT_TEXT_SECTION(PTE_SIZE)
  *	INIT_DATA_SECTION(...)
  *	PERCPU_SECTION(CACHELINE_SIZE)
  *	__init_end = .;
@@ -23,7 +23,7 @@
  *	_etext = .;
  *
  *      _sdata = .;
- *	RO_DATA(PAGE_SIZE)
+ *	RO_DATA(PTE_SIZE)
  *	RW_DATA(...)
  *	_edata = .;
  *
@@ -397,10 +397,10 @@
  * Data section helpers
  */
 #define NOSAVE_DATA							\
-	. = ALIGN(PAGE_SIZE);						\
+	. = ALIGN(PTE_SIZE);						\
 	__nosave_begin = .;						\
 	*(.data..nosave)						\
-	. = ALIGN(PAGE_SIZE);						\
+	. = ALIGN(PTE_SIZE);						\
 	__nosave_end = .;
 
 #define CACHE_HOT_DATA(align)						\
@@ -610,7 +610,7 @@
 		*(.text.unknown .text.unknown.*)			\
 		TEXT_SPLIT						\
 		TEXT_UNLIKELY						\
-		. = ALIGN(PAGE_SIZE);					\
+		. = ALIGN(PTE_SIZE);					\
 		TEXT_HOT						\
 		*(TEXT_MAIN .text.fixup)				\
 		NOINSTR_TEXT						\
@@ -684,11 +684,11 @@
  */
 #ifdef CONFIG_DEBUG_INFO_BTF
 #define BTF								\
-	. = ALIGN(PAGE_SIZE);						\
+	. = ALIGN(PTE_SIZE);						\
 	.BTF : AT(ADDR(.BTF) - LOAD_OFFSET) {				\
 		BOUNDED_SECTION_BY(.BTF, _BTF)				\
 	}								\
-	. = ALIGN(PAGE_SIZE);						\
+	. = ALIGN(PTE_SIZE);						\
 	.BTF_ids : AT(ADDR(.BTF_ids) - LOAD_OFFSET) {			\
 		*(.BTF_ids)						\
 	}
@@ -783,9 +783,9 @@
 	. = ALIGN(bss_align);						\
 	.bss : AT(ADDR(.bss) - LOAD_OFFSET) {				\
 		BSS_FIRST_SECTIONS					\
-		. = ALIGN(PAGE_SIZE);					\
+		. = ALIGN(PTE_SIZE);					\
 		*(.bss..page_aligned)					\
-		. = ALIGN(PAGE_SIZE);					\
+		. = ALIGN(PTE_SIZE);					\
 		*(.dynbss)						\
 		*(BSS_MAIN)						\
 		*(COMMON)						\
@@ -1009,9 +1009,9 @@
  */
 #ifdef CONFIG_AMD_MEM_ENCRYPT
 #define PERCPU_DECRYPTED_SECTION					\
-	. = ALIGN(PAGE_SIZE);						\
+	. = ALIGN(PTE_SIZE);						\
 	*(.data..percpu..decrypted)					\
-	. = ALIGN(PAGE_SIZE);
+	. = ALIGN(PTE_SIZE);
 #else
 #define PERCPU_DECRYPTED_SECTION
 #endif
@@ -1089,7 +1089,7 @@
  */
 #define PERCPU_INPUT(cacheline)						\
 	__per_cpu_start = .;						\
-	. = ALIGN(PAGE_SIZE);						\
+	. = ALIGN(PTE_SIZE);						\
 	*(.data..percpu..page_aligned)					\
 	. = ALIGN(cacheline);						\
 	__per_cpu_hot_start = .;					\
@@ -1113,7 +1113,7 @@
  * sharing between subsections for different purposes.
  */
 #define PERCPU_SECTION(cacheline)					\
-	. = ALIGN(PAGE_SIZE);						\
+	. = ALIGN(PTE_SIZE);						\
 	.data..percpu	: AT(ADDR(.data..percpu) - LOAD_OFFSET) {	\
 		PERCPU_INPUT(cacheline)					\
 	}
@@ -1130,15 +1130,15 @@
  * All sections are combined in a single .data section.
  * The sections following CONSTRUCTORS are arranged so their
  * typical alignment matches.
- * A cacheline is typical/always less than a PAGE_SIZE so
+ * A cacheline is typical/always less than a PTE_SIZE so
  * the sections that has this restriction (or similar)
- * is located before the ones requiring PAGE_SIZE alignment.
- * NOSAVE_DATA starts and ends with a PAGE_SIZE alignment which
+ * is located before the ones requiring PTE_SIZE alignment.
+ * NOSAVE_DATA starts and ends with a PTE_SIZE alignment which
  * matches the requirement of PAGE_ALIGNED_DATA.
  *
  * use 0 as page_align if page_aligned data is not used */
 #define RW_DATA(cacheline, pagealigned, inittask)			\
-	. = ALIGN(PAGE_SIZE);						\
+	. = ALIGN(PTE_SIZE);						\
 	.data : AT(ADDR(.data) - LOAD_OFFSET) {				\
 		INIT_TASK_DATA(inittask)				\
 		NOSAVE_DATA						\

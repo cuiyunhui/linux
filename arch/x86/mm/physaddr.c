@@ -51,7 +51,7 @@ bool __virt_addr_valid(unsigned long x)
 			return false;
 	}
 
-	return pfn_valid(x >> PAGE_SHIFT);
+	return pfn_valid(x >> PTE_SHIFT);
 }
 EXPORT_SYMBOL(__virt_addr_valid);
 
@@ -66,7 +66,7 @@ unsigned long __phys_addr(unsigned long x)
 	VIRTUAL_BUG_ON(__vmalloc_start_set && is_vmalloc_addr((void *) x));
 	/* max_low_pfn is set early, but not _that_ early */
 	if (max_low_pfn) {
-		VIRTUAL_BUG_ON((phys_addr >> PAGE_SHIFT) > max_low_pfn);
+		VIRTUAL_BUG_ON((phys_addr >> PTE_SHIFT) > max_low_pfn);
 		BUG_ON(slow_virt_to_phys((void *)x) != phys_addr);
 	}
 	return phys_addr;
@@ -82,7 +82,7 @@ bool __virt_addr_valid(unsigned long x)
 		return false;
 	if (x >= FIXADDR_START)
 		return false;
-	return pfn_valid((x - PAGE_OFFSET) >> PAGE_SHIFT);
+	return pfn_valid((x - PAGE_OFFSET) >> PTE_SHIFT);
 }
 EXPORT_SYMBOL(__virt_addr_valid);
 

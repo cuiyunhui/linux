@@ -285,7 +285,7 @@ static inline void bio_first_folio(struct folio_iter *fi, struct bio *bio,
 
 	fi->folio = page_folio(bvec->bv_page);
 	fi->offset = bvec->bv_offset +
-			PAGE_SIZE * folio_page_idx(fi->folio, bvec->bv_page);
+			PG_SIZE * folio_page_idx(fi->folio, bvec->bv_page);
 	fi->_seg_count = bvec->bv_len;
 	fi->length = min(folio_size(fi->folio) - fi->offset, fi->_seg_count);
 	fi->_next = folio_next(fi->folio);
@@ -455,7 +455,7 @@ void bio_add_virt_nofail(struct bio *bio, void *vaddr, unsigned len);
 static inline unsigned int bio_add_max_vecs(void *kaddr, unsigned int len)
 {
 	if (is_vmalloc_addr(kaddr))
-		return DIV_ROUND_UP(offset_in_page(kaddr) + len, PAGE_SIZE);
+		return DIV_ROUND_UP(offset_in_pg(kaddr) + len, PG_SIZE);
 	return 1;
 }
 

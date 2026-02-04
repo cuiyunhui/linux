@@ -21,7 +21,7 @@
  *   than or at LOCAL_DISTANCE.
  *
  * - It's best if the chunk size is power of two multiple of
- *   PAGE_SIZE.  Because each chunk is allocated as a contiguous
+ *   PG_SIZE.  Because each chunk is allocated as a contiguous
  *   kernel memory block using alloc_pages(), memory will be wasted if
  *   chunk size is not aligned.  percpu-km code will whine about it.
  */
@@ -52,7 +52,7 @@ static void pcpu_depopulate_chunk(struct pcpu_chunk *chunk,
 
 static struct pcpu_chunk *pcpu_create_chunk(gfp_t gfp)
 {
-	const int nr_pages = pcpu_group_sizes[0] >> PAGE_SHIFT;
+	const int nr_pages = pcpu_group_sizes[0] >> PG_SHIFT;
 	struct pcpu_chunk *chunk;
 	struct page *pages;
 	unsigned long flags;
@@ -86,7 +86,7 @@ static struct pcpu_chunk *pcpu_create_chunk(gfp_t gfp)
 
 static void pcpu_destroy_chunk(struct pcpu_chunk *chunk)
 {
-	const int nr_pages = pcpu_group_sizes[0] >> PAGE_SHIFT;
+	const int nr_pages = pcpu_group_sizes[0] >> PG_SHIFT;
 
 	if (!chunk)
 		return;
@@ -114,7 +114,7 @@ static int __init pcpu_verify_alloc_info(const struct pcpu_alloc_info *ai)
 		return -EINVAL;
 	}
 
-	nr_pages = (ai->groups[0].nr_units * ai->unit_size) >> PAGE_SHIFT;
+	nr_pages = (ai->groups[0].nr_units * ai->unit_size) >> PG_SHIFT;
 	alloc_pages = roundup_pow_of_two(nr_pages);
 
 	if (alloc_pages > nr_pages)

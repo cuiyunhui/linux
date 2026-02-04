@@ -205,7 +205,7 @@ struct snp_guest_msg_hdr {
 
 struct snp_guest_msg {
 	struct snp_guest_msg_hdr hdr;
-	u8 payload[PAGE_SIZE - sizeof(struct snp_guest_msg_hdr)];
+	u8 payload[PTE_SIZE - sizeof(struct snp_guest_msg_hdr)];
 } __packed;
 
 #define SNP_TSC_INFO_REQ_SZ	128
@@ -329,7 +329,7 @@ struct svsm_ca {
 	u8 mem_available;
 	u8 rsvd1[6];
 
-	u8 svsm_buffer[PAGE_SIZE - 8];
+	u8 svsm_buffer[PTE_SIZE - 8];
 };
 
 #define SVSM_SUCCESS				0

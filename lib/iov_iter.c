@@ -347,11 +347,11 @@ static inline bool page_copy_sane(struct page *page, size_t offset, size_t n)
 	 * avoid a possible cache line miss for requests that fit all
 	 * page orders.
 	 */
-	if (n <= v && v <= PAGE_SIZE)
+	if (n <= v && v <= PG_SIZE)
 		return true;
 
 	head = compound_head(page);
-	v += (page - head) << PAGE_SHIFT;
+	v += (page - head) << PG_SHIFT;
 
 	if (WARN_ON(n > v || v > page_size(head)))
 		return false;
@@ -366,11 +366,11 @@ size_t copy_page_to_iter(struct page *page, size_t offset, size_t bytes,
 		return 0;
 	if (WARN_ON_ONCE(i->data_source))
 		return 0;
-	page += offset / PAGE_SIZE; // first subpage
-	offset %= PAGE_SIZE;
+	page += offset / PG_SIZE; // first subpage
+	offset %= PG_SIZE;
 	while (1) {
 		void *kaddr = kmap_local_page(page);
-		size_t n = min(bytes, (size_t)PAGE_SIZE - offset);
+		size_t n = min(bytes, (size_t)PG_SIZE - offset);
 		n = _copy_to_iter(kaddr + offset, n, i);
 		kunmap_local(kaddr);
 		res += n;
@@ -378,7 +378,7 @@ size_t copy_page_to_iter(struct page *page, size_t offset, size_t bytes,
 		if (!bytes || !n)
 			break;
 		offset += n;
-		if (offset == PAGE_SIZE) {
+		if (offset == PG_SIZE) {
 			page++;
 			offset = 0;
 		}
@@ -396,11 +396,11 @@ size_t copy_page_to_iter_nofault(struct page *page, unsigned offset, size_t byte
 		return 0;
 	if (WARN_ON_ONCE(i->data_source))
 		return 0;
-	page += offset / PAGE_SIZE; // first subpage
-	offset %= PAGE_SIZE;
+	page += offset / PG_SIZE; // first subpage
+	offset %= PG_SIZE;
 	while (1) {
 		void *kaddr = kmap_local_page(page);
-		size_t n = min(bytes, (size_t)PAGE_SIZE - offset);
+		size_t n = min(bytes, (size_t)PG_SIZE - offset);
 
 		n = iterate_and_advance(i, n, kaddr + offset,
 					copy_to_user_iter_nofault,
@@ -411,7 +411,7 @@ size_t copy_page_to_iter_nofault(struct page *page, unsigned offset, size_t byte
 		if (!bytes || !n)
 			break;
 		offset += n;
-		if (offset == PAGE_SIZE) {
+		if (offset == PG_SIZE) {
 			page++;
 			offset = 0;
 		}
@@ -426,11 +426,11 @@ size_t copy_page_from_iter(struct page *page, size_t offset, size_t bytes,
 	size_t res = 0;
 	if (!page_copy_sane(page, offset, bytes))
 		return 0;
-	page += offset / PAGE_SIZE; // first subpage
-	offset %= PAGE_SIZE;
+	page += offset / PG_SIZE; // first subpage
+	offset %= PG_SIZE;
 	while (1) {
 		void *kaddr = kmap_local_page(page);
-		size_t n = min(bytes, (size_t)PAGE_SIZE - offset);
+		size_t n = min(bytes, (size_t)PG_SIZE - offset);
 		n = _copy_from_iter(kaddr + offset, n, i);
 		kunmap_local(kaddr);
 		res += n;
@@ -438,7 +438,7 @@ size_t copy_page_from_iter(struct page *page, size_t offset, size_t bytes,
 		if (!bytes || !n)
 			break;
 		offset += n;
-		if (offset == PAGE_SIZE) {
+		if (offset == PG_SIZE) {
 			page++;
 			offset = 0;
 		}
@@ -484,8 +484,8 @@ size_t copy_folio_from_iter_atomic(struct folio *folio, size_t offset,
 
 		n = bytes - copied;
 		if (folio_test_partial_kmap(folio) &&
-		    n > PAGE_SIZE - offset_in_page(offset))
-			n = PAGE_SIZE - offset_in_page(offset);
+		    n > PG_SIZE - offset_in_pg(offset))
+			n = PG_SIZE - offset_in_pg(offset);
 
 		pagefault_disable();
 		n = __copy_from_iter(to, n, i);
@@ -897,7 +897,7 @@ EXPORT_SYMBOL(iov_iter_gap_alignment);
 static int want_pages_array(struct page ***res, size_t size,
 			    size_t start, unsigned int maxpages)
 {
-	unsigned int count = DIV_ROUND_UP(size + start, PAGE_SIZE);
+	unsigned int count = DIV_ROUND_UP(size + start, PG_SIZE);
 
 	if (count > maxpages)
 		count = maxpages;
@@ -926,16 +926,16 @@ static ssize_t iter_folioq_get_pages(struct iov_iter *iter,
 			return -EIO;
 	}
 
-	maxpages = want_pages_array(ppages, maxsize, iov_offset & ~PAGE_MASK, maxpages);
+	maxpages = want_pages_array(ppages, maxsize, iov_offset & ~PG_MASK, maxpages);
 	if (!maxpages)
 		return -ENOMEM;
-	*_start_offset = iov_offset & ~PAGE_MASK;
+	*_start_offset = iov_offset & ~PG_MASK;
 	pages = *ppages;
 
 	for (;;) {
 		struct folio *folio = folioq_folio(folioq, slot);
 		size_t offset = iov_offset, fsize = folioq_folio_size(folioq, slot);
-		size_t part = PAGE_SIZE - offset % PAGE_SIZE;
+		size_t part = PG_SIZE - offset % PG_SIZE;
 
 		if (offset < fsize) {
 			part = umin(part, umin(maxsize - extracted, fsize - offset));
@@ -943,7 +943,7 @@ static ssize_t iter_folioq_get_pages(struct iov_iter *iter,
 			iov_offset += part;
 			extracted += part;
 
-			*pages = folio_page(folio, offset / PAGE_SIZE);
+			*pages = folio_page(folio, offset / PG_SIZE);
 			get_page(*pages);
 			pages++;
 			maxpages--;
@@ -1005,8 +1005,8 @@ static ssize_t iter_xarray_get_pages(struct iov_iter *i,
 	loff_t pos;
 
 	pos = i->xarray_start + i->iov_offset;
-	index = pos >> PAGE_SHIFT;
-	offset = pos & ~PAGE_MASK;
+	index = pos >> PG_SHIFT;
+	offset = pos & ~PG_MASK;
 	*_start_offset = offset;
 
 	count = want_pages_array(pages, maxsize, offset, maxpages);
@@ -1016,7 +1016,7 @@ static ssize_t iter_xarray_get_pages(struct iov_iter *i,
 	if (nr == 0)
 		return 0;
 
-	maxsize = min_t(size_t, nr * PAGE_SIZE - offset, maxsize);
+	maxsize = min_t(size_t, nr * PG_SIZE - offset, maxsize);
 	i->iov_offset += maxsize;
 	i->count -= maxsize;
 	return maxsize;
@@ -1055,8 +1055,8 @@ static struct page *first_bvec_segment(const struct iov_iter *i,
 	if (*size > len)
 		*size = len;
 	skip += i->bvec->bv_offset;
-	page = i->bvec->bv_page + skip / PAGE_SIZE;
-	*start = skip % PAGE_SIZE;
+	page = i->bvec->bv_page + skip / PG_SIZE;
+	*start = skip % PG_SIZE;
 	return page;
 }
 
@@ -1083,15 +1083,15 @@ static ssize_t __iov_iter_get_pages_alloc(struct iov_iter *i,
 			gup_flags |= FOLL_NOFAULT;
 
 		addr = first_iovec_segment(i, &maxsize);
-		*start = addr % PAGE_SIZE;
-		addr &= PAGE_MASK;
+		*start = addr % PG_SIZE;
+		addr &= PG_MASK;
 		n = want_pages_array(pages, maxsize, *start, maxpages);
 		if (!n)
 			return -ENOMEM;
 		res = get_user_pages_fast(addr, n, gup_flags, *pages);
 		if (unlikely(res <= 0))
 			return res;
-		maxsize = min_t(size_t, maxsize, res * PAGE_SIZE - *start);
+		maxsize = min_t(size_t, maxsize, res * PG_SIZE - *start);
 		iov_iter_advance(i, maxsize);
 		return maxsize;
 	}
@@ -1110,7 +1110,7 @@ static ssize_t __iov_iter_get_pages_alloc(struct iov_iter *i,
 			if (!folio_test_slab(folio))
 				folio_get(folio);
 		}
-		maxsize = min_t(size_t, maxsize, n * PAGE_SIZE - *start);
+		maxsize = min_t(size_t, maxsize, n * PG_SIZE - *start);
 		i->count -= maxsize;
 		i->iov_offset += maxsize;
 		if (i->iov_offset == i->bvec->bv_len) {
@@ -1161,12 +1161,12 @@ static int iov_npages(const struct iov_iter *i, int maxpages)
 	int npages = 0;
 
 	for (p = iter_iov(i); size; skip = 0, p++) {
-		unsigned offs = offset_in_page(p->iov_base + skip);
+		unsigned offs = offset_in_pg(p->iov_base + skip);
 		size_t len = min(p->iov_len - skip, size);
 
 		if (len) {
 			size -= len;
-			npages += DIV_ROUND_UP(offs + len, PAGE_SIZE);
+			npages += DIV_ROUND_UP(offs + len, PG_SIZE);
 			if (unlikely(npages > maxpages))
 				return maxpages;
 		}
@@ -1181,11 +1181,11 @@ static int bvec_npages(const struct iov_iter *i, int maxpages)
 	int npages = 0;
 
 	for (p = i->bvec; size; skip = 0, p++) {
-		unsigned offs = (p->bv_offset + skip) % PAGE_SIZE;
+		unsigned offs = (p->bv_offset + skip) % PG_SIZE;
 		size_t len = min(p->bv_len - skip, size);
 
 		size -= len;
-		npages += DIV_ROUND_UP(offs + len, PAGE_SIZE);
+		npages += DIV_ROUND_UP(offs + len, PG_SIZE);
 		if (unlikely(npages > maxpages))
 			return maxpages;
 	}
@@ -1197,8 +1197,8 @@ int iov_iter_npages(const struct iov_iter *i, int maxpages)
 	if (unlikely(!i->count))
 		return 0;
 	if (likely(iter_is_ubuf(i))) {
-		unsigned offs = offset_in_page(i->ubuf + i->iov_offset);
-		int npages = DIV_ROUND_UP(offs + i->count, PAGE_SIZE);
+		unsigned offs = offset_in_pg(i->ubuf + i->iov_offset);
+		int npages = DIV_ROUND_UP(offs + i->count, PG_SIZE);
 		return min(npages, maxpages);
 	}
 	/* iovec and kvec have identical layouts */
@@ -1207,13 +1207,13 @@ int iov_iter_npages(const struct iov_iter *i, int maxpages)
 	if (iov_iter_is_bvec(i))
 		return bvec_npages(i, maxpages);
 	if (iov_iter_is_folioq(i)) {
-		unsigned offset = i->iov_offset % PAGE_SIZE;
-		int npages = DIV_ROUND_UP(offset + i->count, PAGE_SIZE);
+		unsigned offset = i->iov_offset % PG_SIZE;
+		int npages = DIV_ROUND_UP(offset + i->count, PG_SIZE);
 		return min(npages, maxpages);
 	}
 	if (iov_iter_is_xarray(i)) {
-		unsigned offset = (i->xarray_start + i->iov_offset) % PAGE_SIZE;
-		int npages = DIV_ROUND_UP(offset + i->count, PAGE_SIZE);
+		unsigned offset = (i->xarray_start + i->iov_offset) % PG_SIZE;
+		int npages = DIV_ROUND_UP(offset + i->count, PG_SIZE);
 		return min(npages, maxpages);
 	}
 	return 0;
@@ -1514,7 +1514,7 @@ static ssize_t iov_iter_extract_folioq_pages(struct iov_iter *i,
 			return -EIO;
 	}
 
-	offset = i->iov_offset & ~PAGE_MASK;
+	offset = i->iov_offset & ~PG_MASK;
 	*offset0 = offset;
 
 	maxpages = want_pages_array(pages, maxsize, offset, maxpages);
@@ -1525,7 +1525,7 @@ static ssize_t iov_iter_extract_folioq_pages(struct iov_iter *i,
 	for (;;) {
 		struct folio *folio = folioq_folio(folioq, slot);
 		size_t offset = i->iov_offset, fsize = folioq_folio_size(folioq, slot);
-		size_t part = PAGE_SIZE - offset % PAGE_SIZE;
+		size_t part = PG_SIZE - offset % PG_SIZE;
 
 		if (offset < fsize) {
 			part = umin(part, umin(maxsize - extracted, fsize - offset));
@@ -1533,7 +1533,7 @@ static ssize_t iov_iter_extract_folioq_pages(struct iov_iter *i,
 			i->iov_offset += part;
 			extracted += part;
 
-			p[nr++] = folio_page(folio, offset / PAGE_SIZE);
+			p[nr++] = folio_page(folio, offset / PG_SIZE);
 		}
 
 		if (nr >= maxpages || extracted >= maxsize)
@@ -1568,9 +1568,9 @@ static ssize_t iov_iter_extract_xarray_pages(struct iov_iter *i,
 	struct folio *folio;
 	unsigned int nr = 0, offset;
 	loff_t pos = i->xarray_start + i->iov_offset;
-	XA_STATE(xas, i->xarray, pos >> PAGE_SHIFT);
+	XA_STATE(xas, i->xarray, pos >> PG_SHIFT);
 
-	offset = pos & ~PAGE_MASK;
+	offset = pos & ~PG_MASK;
 	*offset0 = offset;
 
 	maxpages = want_pages_array(pages, maxsize, offset, maxpages);
@@ -1595,7 +1595,7 @@ static ssize_t iov_iter_extract_xarray_pages(struct iov_iter *i,
 	}
 	rcu_read_unlock();
 
-	maxsize = min_t(size_t, nr * PAGE_SIZE - offset, maxsize);
+	maxsize = min_t(size_t, nr * PG_SIZE - offset, maxsize);
 	iov_iter_advance(i, maxsize);
 	return maxsize;
 }
@@ -1657,7 +1657,7 @@ static ssize_t iov_iter_extract_bvec_pages(struct iov_iter *i,
 		 * The caller will handle this with another call to
 		 * iov_iter_extract_pages.
 		 */
-		if (bv.bv_offset + bv.bv_len != PAGE_SIZE)
+		if (bv.bv_offset + bv.bv_len != PG_SIZE)
 			break;
 
 		bvec_iter_advance_single(i->bvec, &bi, bv.bv_len);
@@ -1695,7 +1695,7 @@ static ssize_t iov_iter_extract_kvec_pages(struct iov_iter *i,
 	}
 
 	kaddr = i->kvec->iov_base + skip;
-	offset = (unsigned long)kaddr & ~PAGE_MASK;
+	offset = (unsigned long)kaddr & ~PG_MASK;
 	*offset0 = offset;
 
 	maxpages = want_pages_array(pages, size, offset, maxpages);
@@ -1706,7 +1706,7 @@ static ssize_t iov_iter_extract_kvec_pages(struct iov_iter *i,
 	kaddr -= offset;
 	len = offset + size;
 	for (k = 0; k < maxpages; k++) {
-		size_t seg = min_t(size_t, len, PAGE_SIZE);
+		size_t seg = min_t(size_t, len, PG_SIZE);
 
 		if (is_vmalloc_or_module_addr(kaddr))
 			page = vmalloc_to_page(kaddr);
@@ -1715,10 +1715,10 @@ static ssize_t iov_iter_extract_kvec_pages(struct iov_iter *i,
 
 		p[k] = page;
 		len -= seg;
-		kaddr += PAGE_SIZE;
+		kaddr += PG_SIZE;
 	}
 
-	size = min_t(size_t, size, maxpages * PAGE_SIZE - offset);
+	size = min_t(size_t, size, maxpages * PG_SIZE - offset);
 	iov_iter_advance(i, size);
 	return size;
 }
@@ -1755,15 +1755,15 @@ static ssize_t iov_iter_extract_user_pages(struct iov_iter *i,
 		gup_flags |= FOLL_NOFAULT;
 
 	addr = first_iovec_segment(i, &maxsize);
-	*offset0 = offset = addr % PAGE_SIZE;
-	addr &= PAGE_MASK;
+	*offset0 = offset = addr % PG_SIZE;
+	addr &= PG_MASK;
 	maxpages = want_pages_array(pages, maxsize, offset, maxpages);
 	if (!maxpages)
 		return -ENOMEM;
 	res = pin_user_pages_fast(addr, maxpages, gup_flags, *pages);
 	if (unlikely(res <= 0))
 		return res;
-	maxsize = min_t(size_t, maxsize, res * PAGE_SIZE - offset);
+	maxsize = min_t(size_t, maxsize, res * PG_SIZE - offset);
 	iov_iter_advance(i, maxsize);
 	return maxsize;
 }
@@ -1850,11 +1850,11 @@ static unsigned int get_contig_folio_len(struct page **pages,
 		unsigned int *num_pages, size_t left, size_t offset)
 {
 	struct folio *folio = page_folio(pages[0]);
-	size_t contig_sz = min_t(size_t, PAGE_SIZE - offset, left);
+	size_t contig_sz = min_t(size_t, PG_SIZE - offset, left);
 	unsigned int max_pages, i;
 	size_t folio_offset, len;
 
-	folio_offset = PAGE_SIZE * folio_page_idx(folio, pages[0]) + offset;
+	folio_offset = PG_SIZE * folio_page_idx(folio, pages[0]) + offset;
 	len = min(folio_size(folio) - folio_offset, left);
 
 	/*
@@ -1862,9 +1862,9 @@ static unsigned int get_contig_folio_len(struct page **pages,
 	 * to check that all pages belong to the same folio.
 	 */
 	left -= contig_sz;
-	max_pages = DIV_ROUND_UP(offset + len, PAGE_SIZE);
+	max_pages = DIV_ROUND_UP(offset + len, PG_SIZE);
 	for (i = 1; i < max_pages; i++) {
-		size_t next = min_t(size_t, PAGE_SIZE, left);
+		size_t next = min_t(size_t, PG_SIZE, left);
 
 		if (page_folio(pages[i]) != folio ||
 		    pages[i] != pages[i - 1] + 1)
@@ -1919,7 +1919,7 @@ ssize_t iov_iter_extract_bvecs(struct iov_iter *iter, struct bio_vec *bv,
 	if (unlikely(size <= 0))
 		return size ? size : -EFAULT;
 
-	nr_pages = DIV_ROUND_UP(offset + size, PAGE_SIZE);
+	nr_pages = DIV_ROUND_UP(offset + size, PG_SIZE);
 	for (left = size; left > 0; left -= len) {
 		unsigned int nr_to_add;
 

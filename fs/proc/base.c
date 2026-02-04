@@ -258,7 +258,7 @@ static ssize_t get_mm_proctitle(struct mm_struct *mm, char __user *buf,
 	char *page;
 	int ret, got;
 
-	if (pos >= PAGE_SIZE)
+	if (pos >= PG_SIZE)
 		return 0;
 
 	page = (char *)__get_free_page(GFP_KERNEL);
@@ -266,7 +266,7 @@ static ssize_t get_mm_proctitle(struct mm_struct *mm, char __user *buf,
 		return -ENOMEM;
 
 	ret = 0;
-	got = access_remote_vm(mm, arg_start, page, PAGE_SIZE, FOLL_ANON);
+	got = access_remote_vm(mm, arg_start, page, PG_SIZE, FOLL_ANON);
 	if (got > 0) {
 		int len = strnlen(page, got);
 
@@ -354,7 +354,7 @@ static ssize_t get_mm_cmdline(struct mm_struct *mm, char __user *buf,
 	len = 0;
 	while (count) {
 		int got;
-		size_t size = min_t(size_t, PAGE_SIZE, count);
+		size_t size = min_t(size_t, PG_SIZE, count);
 
 		got = access_remote_vm(mm, pos, page, size, FOLL_ANON);
 		if (got <= 0)
@@ -921,7 +921,7 @@ static ssize_t mem_rw(struct file *file, char __user *buf,
 		flags |= FOLL_FORCE;
 
 	while (count > 0) {
-		size_t this_len = min_t(size_t, count, PAGE_SIZE);
+		size_t this_len = min_t(size_t, count, PG_SIZE);
 
 		if (write && copy_from_user(page, buf, this_len)) {
 			copied = -EFAULT;
@@ -1038,7 +1038,7 @@ static ssize_t environ_read(struct file *file, char __user *buf,
 
 		this_len = env_end - (env_start + src);
 
-		max_len = min_t(size_t, PAGE_SIZE, count);
+		max_len = min_t(size_t, PG_SIZE, count);
 		this_len = min(max_len, this_len);
 
 		retval = access_remote_vm(mm, (env_start + src), page, this_len, FOLL_ANON);
@@ -1643,7 +1643,7 @@ static ssize_t timens_offsets_write(struct file *file, const char __user *buf,
 	int ret, noffsets;
 
 	/* Only allow < page size writes at the beginning of the file */
-	if ((*ppos != 0) || (count >= PAGE_SIZE))
+	if ((*ppos != 0) || (count >= PG_SIZE))
 		return -EINVAL;
 
 	/* Slurp in the user data */
@@ -2823,8 +2823,8 @@ static ssize_t proc_pid_attr_write(struct file * file, const char __user * buf,
 	}
 	rcu_read_unlock();
 
-	if (count > PAGE_SIZE)
-		count = PAGE_SIZE;
+	if (count > PG_SIZE)
+		count = PG_SIZE;
 
 	/* No partial writes. */
 	if (*ppos != 0)

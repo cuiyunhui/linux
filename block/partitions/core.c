@@ -132,7 +132,7 @@ static struct parsed_partitions *check_partition(struct gendisk *hd)
 
 	state->disk = hd;
 	strscpy(state->name, hd->disk_name);
-	snprintf(state->pp_buf, PAGE_SIZE, " %s:", state->name);
+	snprintf(state->pp_buf, PG_SIZE, " %s:", state->name);
 	if (isdigit(state->name[strlen(state->name)-1]))
 		sprintf(state->name, "p");
 
@@ -165,7 +165,7 @@ static struct parsed_partitions *check_partition(struct gendisk *hd)
 		res = err;
 	if (res) {
 		strlcat(state->pp_buf,
-			" unable to read partition table\n", PAGE_SIZE);
+			" unable to read partition table\n", PG_SIZE);
 		printk(KERN_INFO "%s", state->pp_buf);
 	}
 

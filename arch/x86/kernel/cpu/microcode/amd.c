@@ -710,7 +710,7 @@ static bool __apply_microcode_amd(struct microcode_amd *mc, u32 *cur_rev,
 		 * Flush next page too if patch image is crossing a page
 		 * boundary.
 		 */
-		if (p_addr >> PAGE_SHIFT != p_addr_end >> PAGE_SHIFT)
+		if (p_addr >> PTE_SHIFT != p_addr_end >> PTE_SHIFT)
 			invlpg(p_addr_end);
 	}
 

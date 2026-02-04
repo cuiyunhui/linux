@@ -56,10 +56,10 @@ static inline void bvec_set_page(struct bio_vec *bv, struct page *page,
 static inline void bvec_set_folio(struct bio_vec *bv, struct folio *folio,
 		size_t len, size_t offset)
 {
-	unsigned long nr = offset / PAGE_SIZE;
+	unsigned long nr = offset / PG_SIZE;
 
 	WARN_ON_ONCE(len > UINT_MAX);
-	bvec_set_page(bv, folio_page(folio, nr), len, offset % PAGE_SIZE);
+	bvec_set_page(bv, folio_page(folio, nr), len, offset % PG_SIZE);
 }
 
 /**
@@ -71,7 +71,7 @@ static inline void bvec_set_folio(struct bio_vec *bv, struct folio *folio,
 static inline void bvec_set_virt(struct bio_vec *bv, void *vaddr,
 		unsigned int len)
 {
-	bvec_set_page(bv, virt_to_page(vaddr), len, offset_in_page(vaddr));
+	bvec_set_page(bv, virt_to_page(vaddr), len, offset_in_pg(vaddr));
 }
 
 struct bvec_iter {
@@ -122,7 +122,7 @@ struct bvec_iter_all {
 	(__bvec_iter_bvec((bvec), (iter))->bv_offset + (iter).bi_bvec_done)
 
 #define mp_bvec_iter_page_idx(bvec, iter)			\
-	(mp_bvec_iter_offset((bvec), (iter)) / PAGE_SIZE)
+	(mp_bvec_iter_offset((bvec), (iter)) / PG_SIZE)
 
 #define mp_bvec_iter_bvec(bvec, iter)				\
 ((struct bio_vec) {						\
@@ -133,11 +133,11 @@ struct bvec_iter_all {
 
 /* For building single-page bvec in flight */
  #define bvec_iter_offset(bvec, iter)				\
-	(mp_bvec_iter_offset((bvec), (iter)) % PAGE_SIZE)
+	(mp_bvec_iter_offset((bvec), (iter)) % PG_SIZE)
 
 #define bvec_iter_len(bvec, iter)				\
 	min_t(unsigned, mp_bvec_iter_len((bvec), (iter)),		\
-	      PAGE_SIZE - bvec_iter_offset((bvec), (iter)))
+	      PG_SIZE - bvec_iter_offset((bvec), (iter)))
 
 #define bvec_iter_page(bvec, iter)				\
 	(mp_bvec_iter_page((bvec), (iter)) +			\
@@ -229,10 +229,10 @@ static inline void bvec_advance(const struct bio_vec *bvec,
 		bv->bv_page++;
 		bv->bv_offset = 0;
 	} else {
-		bv->bv_page = bvec->bv_page + (bvec->bv_offset >> PAGE_SHIFT);
-		bv->bv_offset = bvec->bv_offset & ~PAGE_MASK;
+		bv->bv_page = bvec->bv_page + (bvec->bv_offset >> PG_SHIFT);
+		bv->bv_offset = bvec->bv_offset & ~PG_MASK;
 	}
-	bv->bv_len = min_t(unsigned int, PAGE_SIZE - bv->bv_offset,
+	bv->bv_len = min_t(unsigned int, PG_SIZE - bv->bv_offset,
 			   bvec->bv_len - iter_all->done);
 	iter_all->done += bv->bv_len;
 

@@ -118,14 +118,14 @@ static void * __meminit altmap_alloc_block_buf(unsigned long size,
 {
 	unsigned long pfn, nr_pfns, nr_align;
 
-	if (size & ~PAGE_MASK) {
-		pr_warn_once("%s: allocations must be multiple of PAGE_SIZE (%ld)\n",
+	if (size & ~PG_MASK) {
+		pr_warn_once("%s: allocations must be multiple of PG_SIZE (%ld)\n",
 				__func__, size);
 		return NULL;
 	}
 
 	pfn = vmem_altmap_next_pfn(altmap);
-	nr_pfns = size >> PAGE_SHIFT;
+	nr_pfns = size >> PTE_SHIFT;
 	nr_align = 1UL << find_first_bit(&nr_pfns, BITS_PER_LONG);
 	nr_align = ALIGN(pfn, nr_align) - pfn;
 	if (nr_pfns + nr_align > vmem_altmap_nr_free(altmap))
@@ -161,7 +161,7 @@ pte_t * __meminit vmemmap_pte_populate(pmd_t *pmd, unsigned long addr, int node,
 		void *p;
 
 		if (ptpfn == (unsigned long)-1) {
-			p = vmemmap_alloc_block_buf(PAGE_SIZE, node, altmap);
+			p = vmemmap_alloc_block_buf(PG_SIZE, node, altmap);
 			if (!p)
 				return NULL;
 			ptpfn = PHYS_PFN(__pa(p));
@@ -199,7 +199,7 @@ pmd_t * __meminit vmemmap_pmd_populate(pud_t *pud, unsigned long addr, int node)
 {
 	pmd_t *pmd = pmd_offset(pud, addr);
 	if (pmd_none(*pmd)) {
-		void *p = vmemmap_alloc_block_zero(PAGE_SIZE, node);
+		void *p = vmemmap_alloc_block_zero(PG_SIZE, node);
 		if (!p)
 			return NULL;
 		kernel_pte_init(p);
@@ -212,7 +212,7 @@ pud_t * __meminit vmemmap_pud_populate(p4d_t *p4d, unsigned long addr, int node)
 {
 	pud_t *pud = pud_offset(p4d, addr);
 	if (pud_none(*pud)) {
-		void *p = vmemmap_alloc_block_zero(PAGE_SIZE, node);
+		void *p = vmemmap_alloc_block_zero(PG_SIZE, node);
 		if (!p)
 			return NULL;
 		pmd_init(p);
@@ -225,7 +225,7 @@ p4d_t * __meminit vmemmap_p4d_populate(pgd_t *pgd, unsigned long addr, int node)
 {
 	p4d_t *p4d = p4d_offset(pgd, addr);
 	if (p4d_none(*p4d)) {
-		void *p = vmemmap_alloc_block_zero(PAGE_SIZE, node);
+		void *p = vmemmap_alloc_block_zero(PG_SIZE, node);
 		if (!p)
 			return NULL;
 		pud_init(p);
@@ -238,7 +238,7 @@ pgd_t * __meminit vmemmap_pgd_populate(unsigned long addr, int node)
 {
 	pgd_t *pgd = pgd_offset_k(addr);
 	if (pgd_none(*pgd)) {
-		void *p = vmemmap_alloc_block_zero(PAGE_SIZE, node);
+		void *p = vmemmap_alloc_block_zero(PG_SIZE, node);
 		if (!p)
 			return NULL;
 		pgd_populate_kernel(addr, pgd, p);
@@ -272,7 +272,7 @@ static pte_t * __meminit vmemmap_populate_address(unsigned long addr, int node,
 	pte = vmemmap_pte_populate(pmd, addr, node, altmap, ptpfn, flags);
 	if (!pte)
 		return NULL;
-	vmemmap_verify(pte, node, addr, addr + PAGE_SIZE);
+	vmemmap_verify(pte, node, addr, addr + PG_SIZE);
 
 	return pte;
 }
@@ -286,7 +286,7 @@ static int __meminit vmemmap_populate_range(unsigned long start,
 	unsigned long addr = start;
 	pte_t *pte;
 
-	for (; addr < end; addr += PAGE_SIZE) {
+	for (; addr < end; addr += PG_SIZE) {
 		pte = vmemmap_populate_address(addr, node, altmap,
 					       ptpfn, flags);
 		if (!pte)
@@ -311,7 +311,7 @@ int __meminit vmemmap_populate_basepages(unsigned long start, unsigned long end,
  * after zones have been initialized.
  *
  * We know that:
- * 1) The first @headsize / PAGE_SIZE vmemmap pages were individually
+ * 1) The first @headsize / PG_SIZE vmemmap pages were individually
  *    allocated through memblock, and mapped.
  *
  * 2) The rest of the vmemmap pages are mirrors of the last head page.
@@ -329,12 +329,12 @@ int __meminit vmemmap_undo_hvo(unsigned long addr, unsigned long end,
 	 */
 	WARN_ON(!early_boot_irqs_disabled);
 
-	headpages = headsize >> PAGE_SHIFT;
+	headpages = headsize >> PG_SHIFT;
 
 	/*
 	 * Clear mirrored mappings for tail page structs.
 	 */
-	for (maddr = addr + headsize; maddr < end; maddr += PAGE_SIZE) {
+	for (maddr = addr + headsize; maddr < end; maddr += PTE_SIZE) {
 		pte = virt_to_kpte(maddr);
 		pte_clear(&init_mm, maddr, pte);
 	}
@@ -343,11 +343,12 @@ int __meminit vmemmap_undo_hvo(unsigned long addr, unsigned long end,
 	 * Clear and free mappings for head page and first tail page
 	 * structs.
 	 */
-	for (maddr = addr; headpages-- > 0; maddr += PAGE_SIZE) {
+	for (maddr = addr; headpages-- > 0; maddr += PTE_SIZE) {
 		pte = virt_to_kpte(maddr);
 		pfn = pte_pfn(ptep_get(pte));
 		pte_clear(&init_mm, maddr, pte);
-		memblock_phys_free(PFN_PHYS(pfn), PAGE_SIZE);
+		/* XXX */
+		memblock_phys_free(PFN_PHYS(pfn), PG_SIZE);
 	}
 
 	flush_tlb_kernel_range(addr, end);
@@ -372,7 +373,7 @@ void vmemmap_wrprotect_hvo(unsigned long addr, unsigned long end,
 	unsigned long maddr;
 	pte_t *pte;
 
-	for (maddr = addr + headsize; maddr < end; maddr += PAGE_SIZE) {
+	for (maddr = addr + headsize; maddr < end; maddr += PTE_SIZE) {
 		pte = virt_to_kpte(maddr);
 		ptep_set_wrprotect(&init_mm, maddr, pte);
 	}
@@ -389,7 +390,7 @@ int __meminit vmemmap_populate_hvo(unsigned long addr, unsigned long end,
 	pte_t *pte;
 	unsigned long maddr;
 
-	for (maddr = addr; maddr < addr + headsize; maddr += PAGE_SIZE) {
+	for (maddr = addr; maddr < addr + headsize; maddr += PG_SIZE) {
 		pte = vmemmap_populate_address(maddr, node, NULL, -1, 0);
 		if (!pte)
 			return -ENOMEM;
@@ -490,7 +491,7 @@ static pte_t * __meminit compound_section_tail_page(unsigned long addr)
 {
 	pte_t *pte;
 
-	addr -= PAGE_SIZE;
+	addr -= PG_SIZE;
 
 	/*
 	 * Assuming sections are populated sequentially, the previous section's
@@ -536,7 +537,7 @@ static int __meminit vmemmap_populate_compound_pages(unsigned long start_pfn,
 			return -ENOMEM;
 
 		/* Populate the tail pages vmemmap page */
-		next = addr + PAGE_SIZE;
+		next = addr + PTE_SIZE;
 		pte = vmemmap_populate_address(next, node, NULL, -1, 0);
 		if (!pte)
 			return -ENOMEM;
@@ -545,7 +546,7 @@ static int __meminit vmemmap_populate_compound_pages(unsigned long start_pfn,
 		 * Reuse the previous page for the rest of tail pages
 		 * See layout diagram in Documentation/mm/vmemmap_dedup.rst
 		 */
-		next += PAGE_SIZE;
+		next += PTE_SIZE;
 		rc = vmemmap_populate_range(next, last, node, NULL,
 					    pte_pfn(ptep_get(pte)),
 					    VMEMMAP_POPULATE_PAGEREF);

@@ -21,8 +21,8 @@ SECTIONS
 	VDSO_VVAR_SYMS
 
 	vclock_pages = VDSO_VCLOCK_PAGES_START(vdso_u_data);
-	pvclock_page = vclock_pages + VDSO_PAGE_PVCLOCK_OFFSET * PAGE_SIZE;
-	hvclock_page = vclock_pages + VDSO_PAGE_HVCLOCK_OFFSET * PAGE_SIZE;
+	pvclock_page = vclock_pages + VDSO_PAGE_PVCLOCK_OFFSET * PG_SIZE;
+	hvclock_page = vclock_pages + VDSO_PAGE_HVCLOCK_OFFSET * PG_SIZE;
 
 	. = SIZEOF_HEADERS;
 

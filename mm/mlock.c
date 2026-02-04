@@ -307,7 +307,7 @@ void munlock_folio(struct folio *folio)
 static inline unsigned int folio_mlock_step(struct folio *folio,
 		pte_t *pte, unsigned long addr, unsigned long end)
 {
-	unsigned int count = (end - addr) >> PAGE_SHIFT;
+	unsigned int count = (end - addr) >> PG_SHIFT;
 	pte_t ptent = ptep_get(pte);
 
 	if (!folio_test_large(folio))
@@ -381,7 +381,7 @@ static int mlock_pte_range(pmd_t *pmd, unsigned long addr,
 		return 0;
 	}
 
-	for (pte = start_pte; addr != end; pte++, addr += PAGE_SIZE) {
+	for (pte = start_pte; addr != end; pte++, addr += PTE_SIZE) {
 		ptent = ptep_get(pte);
 		if (!pte_present(ptent))
 			continue;
@@ -400,7 +400,7 @@ static int mlock_pte_range(pmd_t *pmd, unsigned long addr,
 
 next_entry:
 		pte += step - 1;
-		addr += (step - 1) << PAGE_SHIFT;
+		addr += (step - 1) << PTE_SHIFT;
 	}
 	pte_unmap(start_pte);
 out:
@@ -487,7 +487,7 @@ static int mlock_fixup(struct vma_iterator *vmi, struct vm_area_struct *vma,
 	/*
 	 * Keep track of amount of locked VM.
 	 */
-	nr_pages = (end - start) >> PAGE_SHIFT;
+	nr_pages = (end - start) >> PG_SHIFT;
 	if (!(newflags & VM_LOCKED))
 		nr_pages = -nr_pages;
 	else if (oldflags & VM_LOCKED)
@@ -518,8 +518,8 @@ static int apply_vma_lock_flags(unsigned long start, size_t len,
 	struct vm_area_struct *vma, *prev;
 	VMA_ITERATOR(vmi, current->mm, start);
 
-	VM_BUG_ON(offset_in_page(start));
-	VM_BUG_ON(len != PAGE_ALIGN(len));
+	VM_BUG_ON(offset_in_pte(start));
+	VM_BUG_ON(len != PTE_ALIGN(len));
 	end = start + len;
 	if (end < start)
 		return -EINVAL;
@@ -594,7 +594,7 @@ static unsigned long count_mm_mlocked_page_nr(struct mm_struct *mm,
 		}
 	}
 
-	return count >> PAGE_SHIFT;
+	return count >> PG_SHIFT;
 }
 
 /*
@@ -620,12 +620,12 @@ static __must_check int do_mlock(unsigned long start, size_t len, vm_flags_t fla
 	if (!can_do_mlock())
 		return -EPERM;
 
-	len = PAGE_ALIGN(len + (offset_in_page(start)));
-	start &= PAGE_MASK;
+	len = PTE_ALIGN(len + offset_in_pte(start));
+	start &= PG_MASK;
 
 	lock_limit = rlimit(RLIMIT_MEMLOCK);
-	lock_limit >>= PAGE_SHIFT;
-	locked = len >> PAGE_SHIFT;
+	lock_limit >>= PG_SHIFT;
+	locked = len >> PG_SHIFT;
 
 	if (mmap_write_lock_killable(current->mm))
 		return -EINTR;
@@ -680,8 +680,8 @@ SYSCALL_DEFINE2(munlock, unsigned long, start, size_t, len)
 
 	start = untagged_addr(start);
 
-	len = PAGE_ALIGN(len + (offset_in_page(start)));
-	start &= PAGE_MASK;
+	len = PTE_ALIGN(len + offset_in_pte(start));
+	start &= PG_MASK;
 
 	if (mmap_write_lock_killable(current->mm))
 		return -EINTR;
@@ -755,7 +755,7 @@ SYSCALL_DEFINE1(mlockall, int, flags)
 		return -EPERM;
 
 	lock_limit = rlimit(RLIMIT_MEMLOCK);
-	lock_limit >>= PAGE_SHIFT;
+	lock_limit >>= PG_SHIFT;
 
 	if (mmap_write_lock_killable(current->mm))
 		return -EINTR;
@@ -794,10 +794,10 @@ int user_shm_lock(size_t size, struct ucounts *ucounts)
 	long memlock;
 	int allowed = 0;
 
-	locked = (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	locked = (size + PG_SIZE - 1) >> PG_SHIFT;
 	lock_limit = rlimit(RLIMIT_MEMLOCK);
 	if (lock_limit != RLIM_INFINITY)
-		lock_limit >>= PAGE_SHIFT;
+		lock_limit >>= PG_SHIFT;
 	spin_lock(&shmlock_user_lock);
 	memlock = inc_rlimit_ucounts(ucounts, UCOUNT_RLIMIT_MEMLOCK, locked);
 
@@ -819,7 +819,7 @@ out:
 void user_shm_unlock(size_t size, struct ucounts *ucounts)
 {
 	spin_lock(&shmlock_user_lock);
-	dec_rlimit_ucounts(ucounts, UCOUNT_RLIMIT_MEMLOCK, (size + PAGE_SIZE - 1) >> PAGE_SHIFT);
+	dec_rlimit_ucounts(ucounts, UCOUNT_RLIMIT_MEMLOCK, (size + PG_SIZE - 1) >> PG_SHIFT);
 	spin_unlock(&shmlock_user_lock);
 	put_ucounts(ucounts);
 }

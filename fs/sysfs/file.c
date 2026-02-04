@@ -54,27 +54,27 @@ static int sysfs_kf_seq_show(struct seq_file *sf, void *v)
 	if (WARN_ON_ONCE(!ops->show))
 		return -EINVAL;
 
-	/* acquire buffer and ensure that it's >= PAGE_SIZE and clear */
+	/* acquire buffer and ensure that it's >= PG_SIZE and clear */
 	count = seq_get_buf(sf, &buf);
-	if (count < PAGE_SIZE) {
+	if (count < PG_SIZE) {
 		seq_commit(sf, -1);
 		return 0;
 	}
-	memset(buf, 0, PAGE_SIZE);
+	memset(buf, 0, PG_SIZE);
 
 	count = ops->show(kobj, of->kn->priv, buf);
 	if (count < 0)
 		return count;
 
 	/*
-	 * The code works fine with PAGE_SIZE return but it's likely to
+	 * The code works fine with PG_SIZE return but it's likely to
 	 * indicate truncated result or overflow in normal use cases.
 	 */
-	if (count >= (ssize_t)PAGE_SIZE) {
+	if (count >= (ssize_t)PG_SIZE) {
 		printk("fill_read_buffer: %pS returned bad count\n",
 				ops->show);
 		/* Try to struggle along */
-		count = PAGE_SIZE - 1;
+		count = PG_SIZE - 1;
 	}
 	seq_commit(sf, count);
 	return 0;
@@ -311,7 +311,7 @@ int sysfs_add_file_mode_ns(struct kernfs_node *parent,
 #endif
 
 	kn = __kernfs_create_file(parent, attr->name, mode & 0777, uid, gid,
-				  PAGE_SIZE, ops, (void *)attr, ns, key);
+				  PG_SIZE, ops, (void *)attr, ns, key);
 	if (IS_ERR(kn)) {
 		if (PTR_ERR(kn) == -EEXIST)
 			sysfs_warn_dup(parent, attr->name);
@@ -737,8 +737,8 @@ int sysfs_change_owner(struct kobject *kobj, kuid_t kuid, kgid_t kgid)
 }
 
 /**
- *	sysfs_emit - scnprintf equivalent, aware of PAGE_SIZE buffer.
- *	@buf:	start of PAGE_SIZE buffer.
+ *	sysfs_emit - scnprintf equivalent, aware of PG_SIZE buffer.
+ *	@buf:	start of PG_SIZE buffer.
  *	@fmt:	format
  *	@...:	optional arguments to @format
  *
@@ -750,12 +750,12 @@ int sysfs_emit(char *buf, const char *fmt, ...)
 	va_list args;
 	int len;
 
-	if (WARN(!buf || offset_in_page(buf),
+	if (WARN(!buf || offset_in_pg(buf),
 		 "invalid sysfs_emit: buf:%p\n", buf))
 		return 0;
 
 	va_start(args, fmt);
-	len = vscnprintf(buf, PAGE_SIZE, fmt, args);
+	len = vscnprintf(buf, PG_SIZE, fmt, args);
 	va_end(args);
 
 	return len;
@@ -763,10 +763,10 @@ int sysfs_emit(char *buf, const char *fmt, ...)
 EXPORT_SYMBOL_GPL(sysfs_emit);
 
 /**
- *	sysfs_emit_at - scnprintf equivalent, aware of PAGE_SIZE buffer.
- *	@buf:	start of PAGE_SIZE buffer.
+ *	sysfs_emit_at - scnprintf equivalent, aware of PG_SIZE buffer.
+ *	@buf:	start of PG_SIZE buffer.
  *	@at:	offset in @buf to start write in bytes
- *		@at must be >= 0 && < PAGE_SIZE
+ *		@at must be >= 0 && < PG_SIZE
  *	@fmt:	format
  *	@...:	optional arguments to @fmt
  *
@@ -778,12 +778,12 @@ int sysfs_emit_at(char *buf, int at, const char *fmt, ...)
 	va_list args;
 	int len;
 
-	if (WARN(!buf || offset_in_page(buf) || at < 0 || at >= PAGE_SIZE,
+	if (WARN(!buf || offset_in_pg(buf) || at < 0 || at >= PG_SIZE,
 		 "invalid sysfs_emit_at: buf:%p at:%d\n", buf, at))
 		return 0;
 
 	va_start(args, fmt);
-	len = vscnprintf(buf + at, PAGE_SIZE - at, fmt, args);
+	len = vscnprintf(buf + at, PG_SIZE - at, fmt, args);
 	va_end(args);
 
 	return len;

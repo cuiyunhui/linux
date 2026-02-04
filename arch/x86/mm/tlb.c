@@ -1357,7 +1357,7 @@ STATIC_NOPV void native_flush_tlb_multi(const struct cpumask *cpumask,
 		trace_tlb_flush(TLB_REMOTE_SEND_IPI, TLB_FLUSH_ALL);
 	else
 		trace_tlb_flush(TLB_REMOTE_SEND_IPI,
-				(info->end - info->start) >> PAGE_SHIFT);
+				(info->end - info->start) >> PTE_SHIFT);
 
 	/*
 	 * If no page tables were freed, we can skip sending IPIs to
@@ -1506,8 +1506,8 @@ static void invlpgb_kernel_range_flush(struct flush_tlb_info *info)
 {
 	unsigned long addr, nr;
 
-	for (addr = info->start; addr < info->end; addr += nr << PAGE_SHIFT) {
-		nr = (info->end - addr) >> PAGE_SHIFT;
+	for (addr = info->start; addr < info->end; addr += nr << PTE_SHIFT) {
+		nr = (info->end - addr) >> PTE_SHIFT;
 
 		/*
 		 * INVLPGB has a limit on the size of ranges it can
@@ -1526,7 +1526,7 @@ static void do_kernel_range_flush(void *info)
 	unsigned long addr;
 
 	/* flush range by one by one 'invlpg' */
-	for (addr = f->start; addr < f->end; addr += PAGE_SIZE)
+	for (addr = f->start; addr < f->end; addr += PTE_SIZE)
 		flush_tlb_one_kernel(addr);
 }
 
@@ -1552,7 +1552,7 @@ void flush_tlb_kernel_range(unsigned long start, unsigned long end)
 
 	guard(preempt)();
 
-	info = get_flush_tlb_info(NULL, start, end, PAGE_SHIFT, false,
+	info = get_flush_tlb_info(NULL, start, end, PTE_SHIFT, false,
 				  TLB_GENERATION_INVALID);
 
 	if (info->end == TLB_FLUSH_ALL)

@@ -156,7 +156,7 @@ static int bio_copy_user_iov(struct request *rq, struct rq_map_data *map_data,
 	int i = 0, ret;
 	int nr_pages;
 	unsigned int len = iter->count;
-	unsigned int offset = map_data ? offset_in_page(map_data->offset) : 0;
+	unsigned int offset = map_data ? offset_in_pg(map_data->offset) : 0;
 
 	bmd = bio_alloc_map_data(iter, gfp_mask);
 	if (!bmd)
@@ -170,7 +170,7 @@ static int bio_copy_user_iov(struct request *rq, struct rq_map_data *map_data,
 	bmd->is_our_pages = !map_data;
 	bmd->is_null_mapped = (map_data && map_data->null_mapped);
 
-	nr_pages = bio_max_segs(DIV_ROUND_UP(offset + len, PAGE_SIZE));
+	nr_pages = bio_max_segs(DIV_ROUND_UP(offset + len, PG_SIZE));
 
 	ret = -ENOMEM;
 	bio = blk_rq_map_bio_alloc(rq, nr_pages, gfp_mask);
@@ -179,10 +179,10 @@ static int bio_copy_user_iov(struct request *rq, struct rq_map_data *map_data,
 
 	if (map_data) {
 		nr_pages = 1U << map_data->page_order;
-		i = map_data->offset / PAGE_SIZE;
+		i = map_data->offset / PG_SIZE;
 	}
 	while (len) {
-		unsigned int bytes = PAGE_SIZE;
+		unsigned int bytes = PG_SIZE;
 
 		bytes -= offset;
 
@@ -367,8 +367,8 @@ static struct bio *bio_copy_kern(struct request *rq, void *data, unsigned int le
 {
 	enum req_op op = req_op(rq);
 	unsigned long kaddr = (unsigned long)data;
-	unsigned long end = (kaddr + len + PAGE_SIZE - 1) >> PAGE_SHIFT;
-	unsigned long start = kaddr >> PAGE_SHIFT;
+	unsigned long end = (kaddr + len + PG_SIZE - 1) >> PG_SHIFT;
+	unsigned long start = kaddr >> PG_SHIFT;
 	struct bio *bio;
 	void *p = data;
 	int nr_pages = 0;
@@ -386,7 +386,7 @@ static struct bio *bio_copy_kern(struct request *rq, void *data, unsigned int le
 
 	while (len) {
 		struct page *page;
-		unsigned int bytes = PAGE_SIZE;
+		unsigned int bytes = PG_SIZE;
 
 		if (bytes > len)
 			bytes = len;

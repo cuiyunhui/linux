@@ -400,8 +400,8 @@ pagerange_is_ram_callback(unsigned long initial_pfn, unsigned long total_nr_page
 static int pat_pagerange_is_ram(resource_size_t start, resource_size_t end)
 {
 	int ret = 0;
-	unsigned long start_pfn = start >> PAGE_SHIFT;
-	unsigned long end_pfn = (end + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	unsigned long start_pfn = start >> PTE_SHIFT;
+	unsigned long end_pfn = (end + PTE_SIZE - 1) >> PTE_SHIFT;
 	struct pagerange_state state = {start_pfn, 0, 0};
 
 	/*
@@ -411,8 +411,8 @@ static int pat_pagerange_is_ram(resource_size_t start, resource_size_t end)
 	 * some of those portions are listed(or not even listed) with
 	 * different e820 types(RAM/reserved/..)
 	 */
-	if (start_pfn < ISA_END_ADDRESS >> PAGE_SHIFT)
-		start_pfn = ISA_END_ADDRESS >> PAGE_SHIFT;
+	if (start_pfn < ISA_END_ADDRESS >> PTE_SHIFT)
+		start_pfn = ISA_END_ADDRESS >> PTE_SHIFT;
 
 	if (start_pfn < end_pfn) {
 		ret = walk_system_ram_range(start_pfn, end_pfn - start_pfn,
@@ -452,7 +452,7 @@ static int reserve_ram_pages_type(u64 start, u64 end,
 		req_type = _PAGE_CACHE_MODE_UC_MINUS;
 	}
 
-	for (pfn = (start >> PAGE_SHIFT); pfn < (end >> PAGE_SHIFT); ++pfn) {
+	for (pfn = (start >> PTE_SHIFT); pfn < (end >> PTE_SHIFT); ++pfn) {
 		enum page_cache_mode type;
 
 		page = pfn_to_page(pfn);
@@ -470,7 +470,7 @@ static int reserve_ram_pages_type(u64 start, u64 end,
 	if (new_type)
 		*new_type = req_type;
 
-	for (pfn = (start >> PAGE_SHIFT); pfn < (end >> PAGE_SHIFT); ++pfn) {
+	for (pfn = (start >> PTE_SHIFT); pfn < (end >> PTE_SHIFT); ++pfn) {
 		page = pfn_to_page(pfn);
 		set_page_memtype(page, req_type);
 	}
@@ -482,7 +482,7 @@ static int free_ram_pages_type(u64 start, u64 end)
 	struct page *page;
 	u64 pfn;
 
-	for (pfn = (start >> PAGE_SHIFT); pfn < (end >> PAGE_SHIFT); ++pfn) {
+	for (pfn = (start >> PTE_SHIFT); pfn < (end >> PTE_SHIFT); ++pfn) {
 		page = pfn_to_page(pfn);
 		set_page_memtype(page, _PAGE_CACHE_MODE_WB);
 	}
@@ -657,13 +657,13 @@ static enum page_cache_mode lookup_memtype(u64 paddr)
 	enum page_cache_mode rettype = _PAGE_CACHE_MODE_WB;
 	struct memtype *entry;
 
-	if (x86_platform.is_untracked_pat_range(paddr, paddr + PAGE_SIZE))
+	if (x86_platform.is_untracked_pat_range(paddr, paddr + PTE_SIZE))
 		return rettype;
 
-	if (pat_pagerange_is_ram(paddr, paddr + PAGE_SIZE)) {
+	if (pat_pagerange_is_ram(paddr, paddr + PTE_SIZE)) {
 		struct page *page;
 
-		page = pfn_to_page(paddr >> PAGE_SHIFT);
+		page = pfn_to_page(paddr >> PTE_SHIFT);
 		return get_page_memtype(page);
 	}
 
@@ -769,7 +769,7 @@ EXPORT_SYMBOL(arch_io_free_memtype_wc);
 pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
 				unsigned long size, pgprot_t vma_prot)
 {
-	if (!phys_mem_access_encrypted(pfn << PAGE_SHIFT, size))
+	if (!phys_mem_access_encrypted(pfn << PTE_SHIFT, size))
 		vma_prot = pgprot_decrypted(vma_prot);
 
 	return vma_prot;
@@ -815,7 +815,7 @@ int memtype_kernel_map_sync(u64 base, unsigned long size,
 	 * Some areas in the middle of the kernel identity range
 	 * are not mapped, for example the PCI space.
 	 */
-	if (!page_is_ram(base >> PAGE_SHIFT))
+	if (!page_is_ram(base >> PTE_SHIFT))
 		return 0;
 
 	id_sz = (__pa(high_memory-1) <= base + size) ?
@@ -907,7 +907,7 @@ static void free_pfn_range(u64 paddr, unsigned long size)
 
 int pfnmap_setup_cachemode(unsigned long pfn, unsigned long size, pgprot_t *prot)
 {
-	resource_size_t paddr = (resource_size_t)pfn << PAGE_SHIFT;
+	resource_size_t paddr = (resource_size_t)pfn << PTE_SHIFT;
 	enum page_cache_mode pcm;
 
 	if (!pat_enabled())
@@ -916,9 +916,9 @@ int pfnmap_setup_cachemode(unsigned long pfn, unsigned long size, pgprot_t *prot
 	pcm = lookup_memtype(paddr);
 
 	/* Check memtype for the remaining pages */
-	while (size > PAGE_SIZE) {
-		size -= PAGE_SIZE;
-		paddr += PAGE_SIZE;
+	while (size > PTE_SIZE) {
+		size -= PTE_SIZE;
+		paddr += PTE_SIZE;
 		if (pcm != lookup_memtype(paddr))
 			return -EINVAL;
 	}
@@ -929,14 +929,14 @@ int pfnmap_setup_cachemode(unsigned long pfn, unsigned long size, pgprot_t *prot
 
 int pfnmap_track(unsigned long pfn, unsigned long size, pgprot_t *prot)
 {
-	const resource_size_t paddr = (resource_size_t)pfn << PAGE_SHIFT;
+	const resource_size_t paddr = (resource_size_t)pfn << PTE_SHIFT;
 
 	return reserve_pfn_range(paddr, size, prot);
 }
 
 void pfnmap_untrack(unsigned long pfn, unsigned long size)
 {
-	const resource_size_t paddr = (resource_size_t)pfn << PAGE_SHIFT;
+	const resource_size_t paddr = (resource_size_t)pfn << PTE_SHIFT;
 
 	free_pfn_range(paddr, size);
 }

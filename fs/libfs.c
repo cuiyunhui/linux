@@ -36,7 +36,7 @@ int simple_getattr(struct mnt_idmap *idmap, const struct path *path,
 {
 	struct inode *inode = d_inode(path->dentry);
 	generic_fillattr(&nop_mnt_idmap, request_mask, inode, stat);
-	stat->blocks = inode->i_mapping->nrpages << (PAGE_SHIFT - 9);
+	stat->blocks = inode->i_mapping->nrpages << (PG_SHIFT - 9);
 	return 0;
 }
 EXPORT_SYMBOL(simple_getattr);
@@ -47,7 +47,7 @@ int simple_statfs(struct dentry *dentry, struct kstatfs *buf)
 
 	buf->f_fsid = u64_to_fsid(id);
 	buf->f_type = dentry->d_sb->s_magic;
-	buf->f_bsize = PAGE_SIZE;
+	buf->f_bsize = PG_SIZE;
 	buf->f_namelen = NAME_MAX;
 	return 0;
 }
@@ -680,8 +680,8 @@ static int pseudo_fs_fill_super(struct super_block *s, struct fs_context *fc)
 	struct inode *root;
 
 	s->s_maxbytes = MAX_LFS_FILESIZE;
-	s->s_blocksize = PAGE_SIZE;
-	s->s_blocksize_bits = PAGE_SHIFT;
+	s->s_blocksize = PG_SIZE;
+	s->s_blocksize_bits = PG_SHIFT;
 	s->s_magic = ctx->magic;
 	s->s_op = ctx->ops ?: &simple_super_operations;
 	s->s_export_op = ctx->eops;
@@ -947,7 +947,7 @@ int simple_write_begin(const struct kiocb *iocb, struct address_space *mapping,
 {
 	struct folio *folio;
 
-	folio = __filemap_get_folio(mapping, pos / PAGE_SIZE, FGP_WRITEBEGIN,
+	folio = __filemap_get_folio(mapping, pos / PG_SIZE, FGP_WRITEBEGIN,
 			mapping_gfp_mask(mapping));
 	if (IS_ERR(folio))
 		return PTR_ERR(folio);
@@ -1041,8 +1041,8 @@ int simple_fill_super(struct super_block *s, unsigned long magic,
 	struct dentry *dentry;
 	int i;
 
-	s->s_blocksize = PAGE_SIZE;
-	s->s_blocksize_bits = PAGE_SHIFT;
+	s->s_blocksize = PG_SIZE;
+	s->s_blocksize_bits = PG_SHIFT;
 	s->s_magic = magic;
 	s->s_op = &simple_super_operations;
 	s->s_time_gran = 1;
@@ -1622,7 +1622,7 @@ int generic_check_addressable(unsigned blocksize_bits, u64 num_blocks)
 	if (check_shl_overflow(num_blocks, blocksize_bits, &max_bytes))
 		return -EFBIG;
 
-	last_fs_page = (max_bytes >> PAGE_SHIFT) - 1;
+	last_fs_page = (max_bytes >> PG_SHIFT) - 1;
 
 	if (unlikely(num_blocks == 0))
 		return 0;
@@ -1778,7 +1778,7 @@ void make_empty_dir_inode(struct inode *inode)
 	inode->i_gid = GLOBAL_ROOT_GID;
 	inode->i_rdev = 0;
 	inode->i_size = 0;
-	inode->i_blkbits = PAGE_SHIFT;
+	inode->i_blkbits = PG_SHIFT;
 	inode->i_blocks = 0;
 
 	inode->i_op = &empty_dir_inode_operations;
@@ -2116,7 +2116,7 @@ ssize_t direct_write_fallback(struct kiocb *iocb, struct iov_iter *iter,
 			return direct_written;
 		return err;
 	}
-	invalidate_mapping_pages(mapping, pos >> PAGE_SHIFT, end >> PAGE_SHIFT);
+	invalidate_mapping_pages(mapping, pos >> PG_SHIFT, end >> PG_SHIFT);
 	return direct_written + buffered_written;
 }
 EXPORT_SYMBOL_GPL(direct_write_fallback);

@@ -45,11 +45,11 @@ struct page **io_pin_pages(unsigned long uaddr, unsigned long len, int *npages)
 
 	if (check_add_overflow(uaddr, len, &end))
 		return ERR_PTR(-EOVERFLOW);
-	if (check_add_overflow(end, PAGE_SIZE - 1, &end))
+	if (check_add_overflow(end, PG_SIZE - 1, &end))
 		return ERR_PTR(-EOVERFLOW);
 
-	end = end >> PAGE_SHIFT;
-	start = uaddr >> PAGE_SHIFT;
+	end = end >> PG_SHIFT;
+	start = uaddr >> PG_SHIFT;
 	nr_pages = end - start;
 	if (WARN_ON_ONCE(!nr_pages))
 		return ERR_PTR(-EINVAL);
@@ -199,14 +199,14 @@ int io_create_region(struct io_ring_ctx *ctx, struct io_mapped_region *mr,
 		return -EFAULT;
 	if (!reg->size || reg->mmap_offset || reg->id)
 		return -EINVAL;
-	if ((reg->size >> PAGE_SHIFT) > INT_MAX)
+	if ((reg->size >> PG_SHIFT) > INT_MAX)
 		return -E2BIG;
-	if ((reg->user_addr | reg->size) & ~PAGE_MASK)
+	if ((reg->user_addr | reg->size) & ~PG_MASK)
 		return -EINVAL;
 	if (check_add_overflow(reg->user_addr, reg->size, &end))
 		return -EOVERFLOW;
 
-	nr_pages = reg->size >> PAGE_SHIFT;
+	nr_pages = reg->size >> PG_SHIFT;
 	if (ctx->user) {
 		ret = __io_account_mem(ctx->user, nr_pages);
 		if (ret)
@@ -231,9 +231,9 @@ out_free:
 }
 
 static struct io_mapped_region *io_mmap_get_region(struct io_ring_ctx *ctx,
-						   loff_t pgoff)
+						   loff_t pteoff)
 {
-	loff_t offset = pgoff << PAGE_SHIFT;
+	loff_t offset = pteoff << PTE_SHIFT;
 	unsigned int id;
 
 
@@ -268,12 +268,12 @@ static void *io_region_validate_mmap(struct io_ring_ctx *ctx,
 	return io_region_get_ptr(mr);
 }
 
-static void *io_uring_validate_mmap_request(struct file *file, loff_t pgoff)
+static void *io_uring_validate_mmap_request(struct file *file, loff_t pteoff)
 {
 	struct io_ring_ctx *ctx = file->private_data;
 	struct io_mapped_region *region;
 
-	region = io_mmap_get_region(ctx, pgoff);
+	region = io_mmap_get_region(ctx, pteoff);
 	if (!region)
 		return ERR_PTR(-EINVAL);
 	return io_region_validate_mmap(ctx, region);
@@ -296,30 +296,30 @@ __cold int io_uring_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	struct io_ring_ctx *ctx = file->private_data;
 	size_t sz = vma->vm_end - vma->vm_start;
-	long offset = vma->vm_pgoff << PAGE_SHIFT;
+	long offset = vma->vm_pteoff << PTE_SHIFT;
 	unsigned int page_limit = UINT_MAX;
 	struct io_mapped_region *region;
 	void *ptr;
 
 	guard(mutex)(&ctx->mmap_lock);
 
-	ptr = io_uring_validate_mmap_request(file, vma->vm_pgoff);
+	ptr = io_uring_validate_mmap_request(file, vma->vm_pteoff);
 	if (IS_ERR(ptr))
 		return PTR_ERR(ptr);
 
 	switch (offset & IORING_OFF_MMAP_MASK) {
 	case IORING_OFF_SQ_RING:
 	case IORING_OFF_CQ_RING:
-		page_limit = (sz + PAGE_SIZE - 1) >> PAGE_SHIFT;
+		page_limit = (sz + PG_SIZE - 1) >> PG_SHIFT;
 		break;
 	}
 
-	region = io_mmap_get_region(ctx, vma->vm_pgoff);
+	region = io_mmap_get_region(ctx, vma->vm_pteoff);
 	return io_region_mmap(ctx, region, vma, page_limit);
 }
 
 unsigned long io_uring_get_unmapped_area(struct file *filp, unsigned long addr,
-					 unsigned long len, unsigned long pgoff,
+					 unsigned long len, unsigned long pteoff,
 					 unsigned long flags)
 {
 	struct io_ring_ctx *ctx = filp->private_data;
@@ -335,7 +335,7 @@ unsigned long io_uring_get_unmapped_area(struct file *filp, unsigned long addr,
 
 	guard(mutex)(&ctx->mmap_lock);
 
-	ptr = io_uring_validate_mmap_request(filp, pgoff);
+	ptr = io_uring_validate_mmap_request(filp, pteoff);
 	if (IS_ERR(ptr))
 		return -ENOMEM;
 
@@ -347,21 +347,21 @@ unsigned long io_uring_get_unmapped_area(struct file *filp, unsigned long addr,
 	 * - use the kernel virtual address of the shared io_uring context
 	 *   (instead of the userspace-provided address, which has to be 0UL
 	 *   anyway).
-	 * - use the same pgoff which the get_unmapped_area() uses to
+	 * - use the same pteoff which the get_unmapped_area() uses to
 	 *   calculate the page colouring.
 	 * For architectures without such aliasing requirements, the
 	 * architecture will return any suitable mapping because addr is 0.
 	 */
 	filp = NULL;
 	flags |= MAP_SHARED;
-	pgoff = 0;	/* has been translated to ptr above */
+	pteoff = 0;	/* has been translated to ptr above */
 #ifdef SHM_COLOUR
 	addr = (uintptr_t) ptr;
-	pgoff = addr >> PAGE_SHIFT;
+	pteoff = addr >> PG_SHIFT;
 #else
 	addr = 0UL;
 #endif
-	return mm_get_unmapped_area(filp, addr, len, pgoff, flags);
+	return mm_get_unmapped_area(filp, addr, len, pteoff, flags);
 }
 
 #else /* !CONFIG_MMU */
@@ -377,7 +377,7 @@ unsigned int io_uring_nommu_mmap_capabilities(struct file *file)
 }
 
 unsigned long io_uring_get_unmapped_area(struct file *file, unsigned long addr,
-					 unsigned long len, unsigned long pgoff,
+					 unsigned long len, unsigned long pteoff,
 					 unsigned long flags)
 {
 	struct io_ring_ctx *ctx = file->private_data;
@@ -385,7 +385,7 @@ unsigned long io_uring_get_unmapped_area(struct file *file, unsigned long addr,
 
 	guard(mutex)(&ctx->mmap_lock);
 
-	ptr = io_uring_validate_mmap_request(file, pgoff);
+	ptr = io_uring_validate_mmap_request(file, pteoff);
 	if (IS_ERR(ptr))
 		return PTR_ERR(ptr);
 

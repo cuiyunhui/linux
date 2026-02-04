@@ -832,7 +832,7 @@ ssize_t proc_simple_write(struct file *f, const char __user *ubuf, size_t size,
 
 	if (!pde->write)
 		return -EACCES;
-	if (size == 0 || size > PAGE_SIZE - 1)
+	if (size == 0 || size > PG_SIZE - 1)
 		return -EINVAL;
 	buf = memdup_user_nul(ubuf, size);
 	if (IS_ERR(buf))

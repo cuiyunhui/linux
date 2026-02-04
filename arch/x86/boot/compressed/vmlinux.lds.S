@@ -70,14 +70,14 @@ SECTIONS
 		_ebss = .;
 	}
 #ifdef CONFIG_X86_64
-       . = ALIGN(PAGE_SIZE);
+       . = ALIGN(PTE_SIZE);
        .pgtable : {
 		_pgtable = . ;
 		*(.pgtable)
 		_epgtable = . ;
 	}
 #endif
-	. = ALIGN(PAGE_SIZE);	/* keep ZO size page aligned */
+	. = ALIGN(PTE_SIZE);	/* keep ZO size page aligned */
 	_end = .;
 
 	STABS_DEBUG

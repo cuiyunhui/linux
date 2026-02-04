@@ -266,7 +266,7 @@ static struct file *aio_private_file(struct kioctx *ctx, loff_t nr_pages)
 
 	inode->i_mapping->a_ops = &aio_ctx_aops;
 	inode->i_mapping->i_private_data = ctx;
-	inode->i_size = PAGE_SIZE * nr_pages;
+	inode->i_size = PG_SIZE * nr_pages;
 
 	file = alloc_file_pseudo(inode, aio_mnt, "[aio]",
 				O_RDWR, &aio_ring_fops);
@@ -505,7 +505,7 @@ static int aio_setup_ring(struct kioctx *ctx, unsigned int nr_events)
 	}
 
 	ctx->aio_ring_file = file;
-	nr_events = (PAGE_SIZE * nr_pages - sizeof(struct aio_ring))
+	nr_events = (PG_SIZE * nr_pages - sizeof(struct aio_ring))
 			/ sizeof(struct io_event);
 
 	ctx->ring_folios = ctx->internal_folios;
@@ -539,7 +539,7 @@ static int aio_setup_ring(struct kioctx *ctx, unsigned int nr_events)
 		return -ENOMEM;
 	}
 
-	ctx->mmap_size = nr_pages * PAGE_SIZE;
+	ctx->mmap_size = nr_pages * PG_SIZE;
 	pr_debug("attempting mmap of %lu bytes\n", ctx->mmap_size);
 
 	if (mmap_write_lock_killable(mm)) {
@@ -576,8 +576,8 @@ static int aio_setup_ring(struct kioctx *ctx, unsigned int nr_events)
 	return 0;
 }
 
-#define AIO_EVENTS_PER_PAGE	(PAGE_SIZE / sizeof(struct io_event))
-#define AIO_EVENTS_FIRST_PAGE	((PAGE_SIZE - sizeof(struct aio_ring)) / sizeof(struct io_event))
+#define AIO_EVENTS_PER_PAGE	(PG_SIZE / sizeof(struct io_event))
+#define AIO_EVENTS_FIRST_PAGE	((PG_SIZE - sizeof(struct aio_ring)) / sizeof(struct io_event))
 #define AIO_EVENTS_OFFSET	(AIO_EVENTS_PER_PAGE - AIO_EVENTS_FIRST_PAGE)
 
 void kiocb_set_cancel_fn(struct kiocb *iocb, kiocb_cancel_fn *cancel)

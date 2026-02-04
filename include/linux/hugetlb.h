@@ -774,7 +774,7 @@ static inline struct hstate *hstate_vma(struct vm_area_struct *vma)
 
 static inline unsigned long huge_page_size(const struct hstate *h)
 {
-	return (unsigned long)PAGE_SIZE << h->order;
+	return (unsigned long)PG_SIZE << h->order;
 }
 
 extern unsigned long vma_kernel_pagesize(struct vm_area_struct *vma);
@@ -793,7 +793,7 @@ static inline unsigned int huge_page_order(struct hstate *h)
 
 static inline unsigned huge_page_shift(struct hstate *h)
 {
-	return h->order + PAGE_SHIFT;
+	return h->order + PG_SHIFT;
 }
 
 static inline bool order_is_gigantic(unsigned int order)
@@ -865,7 +865,7 @@ static inline struct hstate *folio_hstate(struct folio *folio)
 
 static inline unsigned hstate_index_to_shift(unsigned index)
 {
-	return hstates[index].order + PAGE_SHIFT;
+	return hstates[index].order + PG_SHIFT;
 }
 
 static inline int hstate_index(struct hstate *h)
@@ -985,7 +985,7 @@ static inline spinlock_t *huge_pte_lockptr(struct hstate *h,
 {
 	const unsigned long size = huge_page_size(h);
 
-	VM_WARN_ON(size == PAGE_SIZE);
+	VM_WARN_ON(size == PG_SIZE);
 
 	/*
 	 * hugetlb must use the exact same PT locks as core-mm page table
@@ -1077,7 +1077,7 @@ bool is_raw_hwpoison_page_in_hugepage(struct page *page);
 
 static inline unsigned long huge_page_mask_align(struct file *file)
 {
-	return PAGE_MASK & ~huge_page_mask(hstate_file(file));
+	return PG_MASK & ~huge_page_mask(hstate_file(file));
 }
 
 #else	/* CONFIG_HUGETLB_PAGE */
@@ -1169,22 +1169,22 @@ static inline struct hstate *size_to_hstate(unsigned long size)
 
 static inline unsigned long huge_page_size(struct hstate *h)
 {
-	return PAGE_SIZE;
+	return PG_SIZE;
 }
 
 static inline unsigned long huge_page_mask(struct hstate *h)
 {
-	return PAGE_MASK;
+	return PG_MASK;
 }
 
 static inline unsigned long vma_kernel_pagesize(struct vm_area_struct *vma)
 {
-	return PAGE_SIZE;
+	return PG_SIZE;
 }
 
 static inline unsigned long vma_mmu_pagesize(struct vm_area_struct *vma)
 {
-	return PAGE_SIZE;
+	return PG_SIZE;
 }
 
 static inline unsigned int huge_page_order(struct hstate *h)
@@ -1194,7 +1194,7 @@ static inline unsigned int huge_page_order(struct hstate *h)
 
 static inline unsigned int huge_page_shift(struct hstate *h)
 {
-	return PAGE_SHIFT;
+	return PG_SHIFT;
 }
 
 static inline bool hstate_is_gigantic(struct hstate *h)

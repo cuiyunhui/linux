@@ -1374,11 +1374,11 @@ static ssize_t input_dev_show_modalias(struct device *dev,
 	struct input_dev *id = to_input_dev(dev);
 	ssize_t len;
 
-	len = input_print_modalias(buf, PAGE_SIZE, id);
-	if (len < PAGE_SIZE - 2)
-		len += snprintf(buf + len, PAGE_SIZE - len, "\n");
+	len = input_print_modalias(buf, PG_SIZE, id);
+	if (len < PG_SIZE - 2)
+		len += snprintf(buf + len, PG_SIZE - len, "\n");
 
-	return min_t(int, len, PAGE_SIZE);
+	return min_t(int, len, PG_SIZE);
 }
 static DEVICE_ATTR(modalias, S_IRUGO, input_dev_show_modalias, NULL);
 
@@ -1390,9 +1390,9 @@ static ssize_t input_dev_show_properties(struct device *dev,
 					 char *buf)
 {
 	struct input_dev *input_dev = to_input_dev(dev);
-	int len = input_print_bitmap(buf, PAGE_SIZE, input_dev->propbit,
+	int len = input_print_bitmap(buf, PG_SIZE, input_dev->propbit,
 				     INPUT_PROP_MAX, true);
-	return min_t(int, len, PAGE_SIZE);
+	return min_t(int, len, PG_SIZE);
 }
 static DEVICE_ATTR(properties, S_IRUGO, input_dev_show_properties, NULL);
 
@@ -1509,10 +1509,10 @@ static ssize_t input_dev_show_cap_##bm(struct device *dev,		\
 				       char *buf)			\
 {									\
 	struct input_dev *input_dev = to_input_dev(dev);		\
-	int len = input_print_bitmap(buf, PAGE_SIZE,			\
+	int len = input_print_bitmap(buf, PG_SIZE,			\
 				     input_dev->bm##bit, ev##_MAX,	\
 				     true);				\
-	return min_t(int, len, PAGE_SIZE);				\
+	return min_t(int, len, PG_SIZE);				\
 }									\
 static DEVICE_ATTR(bm, S_IRUGO, input_dev_show_cap_##bm, NULL)
 

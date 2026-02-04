@@ -100,7 +100,7 @@ static int traverse(struct seq_file *m, loff_t offset)
 		return 0;
 
 	if (!m->buf) {
-		m->buf = seq_buf_alloc(m->size = PAGE_SIZE);
+		m->buf = seq_buf_alloc(m->size = PG_SIZE);
 		if (!m->buf)
 			return -ENOMEM;
 	}
@@ -208,7 +208,7 @@ ssize_t seq_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 
 	/* grab buffer if we didn't have one */
 	if (!m->buf) {
-		m->buf = seq_buf_alloc(m->size = PAGE_SIZE);
+		m->buf = seq_buf_alloc(m->size = PG_SIZE);
 		if (!m->buf)
 			goto Enomem;
 	}

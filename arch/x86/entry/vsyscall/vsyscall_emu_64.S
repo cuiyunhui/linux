@@ -13,7 +13,7 @@
 
 __PAGE_ALIGNED_DATA
 	.globl __vsyscall_page
-	.balign PAGE_SIZE, 0xcc
+	.balign PG_SIZE, 0xcc
 	.type __vsyscall_page, @object
 __vsyscall_page:
 

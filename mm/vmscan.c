@@ -2298,7 +2298,7 @@ static bool inactive_is_low(struct lruvec *lruvec, enum lru_list inactive_lru)
 	inactive = lruvec_page_state(lruvec, NR_LRU_BASE + inactive_lru);
 	active = lruvec_page_state(lruvec, NR_LRU_BASE + active_lru);
 
-	gb = (inactive + active) >> (30 - PAGE_SHIFT);
+	gb = (inactive + active) >> (30 - PG_SHIFT);
 	if (gb)
 		inactive_ratio = int_sqrt(10 * gb);
 	else
@@ -3524,7 +3524,7 @@ static bool walk_pte_range(pmd_t *pmd, unsigned long start, unsigned long end,
 
 	lazy_mmu_mode_enable();
 restart:
-	for (i = pte_index(start), addr = start; addr != end; i++, addr += PAGE_SIZE) {
+	for (i = pte_index(start), addr = start; addr != end; i++, addr += PTE_SIZE) {
 		unsigned long pfn;
 		struct folio *folio;
 		pte_t ptent = ptep_get(pte + i);
@@ -3560,7 +3560,7 @@ restart:
 	walk_update_folio(walk, last, gen, dirty);
 	last = NULL;
 
-	if (i < PTRS_PER_PTE && get_next_vma(PMD_MASK, PAGE_SIZE, args, &start, &end))
+	if (i < PTRS_PER_PTE && get_next_vma(PMD_MASK, PG_SIZE, args, &start, &end))
 		goto restart;
 
 	lazy_mmu_mode_disable();
@@ -4237,25 +4237,25 @@ bool lru_gen_look_around(struct page_vma_mapped_walk *pvmw)
 	start = max(addr & PMD_MASK, vma->vm_start);
 	end = min(addr | ~PMD_MASK, vma->vm_end - 1) + 1;
 
-	if (end - start == PAGE_SIZE)
+	if (end - start == PG_SIZE)
 		return true;
 
-	if (end - start > MIN_LRU_BATCH * PAGE_SIZE) {
-		if (addr - start < MIN_LRU_BATCH * PAGE_SIZE / 2)
-			end = start + MIN_LRU_BATCH * PAGE_SIZE;
-		else if (end - addr < MIN_LRU_BATCH * PAGE_SIZE / 2)
-			start = end - MIN_LRU_BATCH * PAGE_SIZE;
+	if (end - start > MIN_LRU_BATCH * PG_SIZE) {
+		if (addr - start < MIN_LRU_BATCH * PG_SIZE / 2)
+			end = start + MIN_LRU_BATCH * PG_SIZE;
+		else if (end - addr < MIN_LRU_BATCH * PG_SIZE / 2)
+			start = end - MIN_LRU_BATCH * PG_SIZE;
 		else {
-			start = addr - MIN_LRU_BATCH * PAGE_SIZE / 2;
-			end = addr + MIN_LRU_BATCH * PAGE_SIZE / 2;
+			start = addr - MIN_LRU_BATCH * PG_SIZE / 2;
+			end = addr + MIN_LRU_BATCH * PG_SIZE / 2;
 		}
 	}
 
 	lazy_mmu_mode_enable();
 
-	pte -= (addr - start) / PAGE_SIZE;
+	pte -= (addr - start) / PG_SIZE;
 
-	for (i = 0, addr = start; addr != end; i++, addr += PAGE_SIZE) {
+	for (i = 0, addr = start; addr != end; i++, addr += PG_SIZE) {
 		unsigned long pfn;
 		pte_t ptent = ptep_get(pte + i);
 
@@ -7760,7 +7760,7 @@ int user_proactive_reclaim(char *buf,
 	buf = strstrip(buf);
 
 	old_buf = buf;
-	nr_to_reclaim = memparse(buf, &buf) / PAGE_SIZE;
+	nr_to_reclaim = memparse(buf, &buf) / PG_SIZE;
 	if (buf == old_buf)
 		return -EINVAL;
 

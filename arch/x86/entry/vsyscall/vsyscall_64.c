@@ -294,7 +294,7 @@ static const struct vm_operations_struct gate_vma_ops = {
 };
 static struct vm_area_struct gate_vma __ro_after_init = {
 	.vm_start	= VSYSCALL_ADDR,
-	.vm_end		= VSYSCALL_ADDR + PAGE_SIZE,
+	.vm_end		= VSYSCALL_ADDR + PG_SIZE,
 	.vm_page_prot	= PAGE_READONLY_EXEC,
 	.vm_flags	= VM_READ | VM_EXEC,
 	.vm_ops		= &gate_vma_ops,
@@ -328,7 +328,7 @@ int in_gate_area(struct mm_struct *mm, unsigned long addr)
  */
 int in_gate_area_no_mm(unsigned long addr)
 {
-	return vsyscall_mode != NONE && (addr & PAGE_MASK) == VSYSCALL_ADDR;
+	return vsyscall_mode != NONE && (addr & PG_MASK) == VSYSCALL_ADDR;
 }
 
 /*

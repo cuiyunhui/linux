@@ -48,7 +48,7 @@ static int freader_get_folio(struct freader *r, loff_t file_off)
 	freader_put_folio(r);
 
 	/* only use page cache lookup - fail if not already cached */
-	r->folio = filemap_get_folio(r->file->f_mapping, file_off >> PAGE_SHIFT);
+	r->folio = filemap_get_folio(r->file->f_mapping, file_off >> PG_SHIFT);
 
 	if (IS_ERR(r->folio) || !folio_test_uptodate(r->folio)) {
 		if (!IS_ERR(r->folio))

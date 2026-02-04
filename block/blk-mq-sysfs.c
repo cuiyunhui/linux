@@ -80,7 +80,7 @@ static ssize_t blk_mq_hw_sysfs_nr_reserved_tags_show(struct blk_mq_hw_ctx *hctx,
 
 static ssize_t blk_mq_hw_sysfs_cpus_show(struct blk_mq_hw_ctx *hctx, char *page)
 {
-	const size_t size = PAGE_SIZE - 1;
+	const size_t size = PG_SIZE - 1;
 	unsigned int i, first = 1;
 	int ret = 0, pos = 0;
 

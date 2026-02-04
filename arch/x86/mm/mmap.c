@@ -43,7 +43,7 @@ static unsigned long stack_maxrandom_size(unsigned long task_size)
 	unsigned long max = 0;
 	if (current->flags & PF_RANDOMIZE) {
 		max = (-1UL) & __STACK_RND_MASK(task_size == task_size_32bit());
-		max <<= PAGE_SHIFT;
+		max <<= PG_SHIFT;
 	}
 
 	return max;
@@ -71,7 +71,7 @@ static unsigned long arch_rnd(unsigned int rndbits)
 {
 	if (!(current->flags & PF_RANDOMIZE))
 		return 0;
-	return (get_random_long() & ((1UL << rndbits) - 1)) << PAGE_SHIFT;
+	return (get_random_long() & ((1UL << rndbits) - 1)) << PG_SHIFT;
 }
 
 unsigned long arch_mmap_rnd(void)
@@ -95,7 +95,7 @@ static unsigned long mmap_base(unsigned long rnd, unsigned long task_size,
 	 */
 	gap = clamp(gap, SIZE_128M, (task_size / 6) * 5);
 
-	return PAGE_ALIGN(task_size - gap - rnd);
+	return PG_ALIGN(task_size - gap - rnd);
 }
 
 static unsigned long mmap_legacy_base(unsigned long rnd,
@@ -211,7 +211,7 @@ int valid_phys_addr_range(phys_addr_t addr, size_t count)
 /* Can we access it through mmap? Must be a valid physical address: */
 int valid_mmap_phys_addr_range(unsigned long pfn, size_t count)
 {
-	phys_addr_t addr = (phys_addr_t)pfn << PAGE_SHIFT;
+	phys_addr_t addr = (phys_addr_t)pfn << PTE_SHIFT;
 
 	return phys_addr_valid(addr + count - 1);
 }

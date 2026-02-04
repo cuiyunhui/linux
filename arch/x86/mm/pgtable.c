@@ -27,7 +27,7 @@ void ___pte_free_tlb(struct mmu_gather *tlb, struct page *pte)
 #if CONFIG_PGTABLE_LEVELS > 2
 void ___pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmd)
 {
-	paravirt_release_pmd(__pa(pmd) >> PAGE_SHIFT);
+	paravirt_release_pmd(__pa(pmd) >> PTE_SHIFT);
 	/*
 	 * NOTE! For PAE, any changes to the top page-directory-pointer-table
 	 * entries need a full cr3 reload to flush.
@@ -41,14 +41,14 @@ void ___pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmd)
 #if CONFIG_PGTABLE_LEVELS > 3
 void ___pud_free_tlb(struct mmu_gather *tlb, pud_t *pud)
 {
-	paravirt_release_pud(__pa(pud) >> PAGE_SHIFT);
+	paravirt_release_pud(__pa(pud) >> PTE_SHIFT);
 	tlb_remove_ptdesc(tlb, virt_to_ptdesc(pud));
 }
 
 #if CONFIG_PGTABLE_LEVELS > 4
 void ___p4d_free_tlb(struct mmu_gather *tlb, p4d_t *p4d)
 {
-	paravirt_release_p4d(__pa(p4d) >> PAGE_SHIFT);
+	paravirt_release_p4d(__pa(p4d) >> PTE_SHIFT);
 	tlb_remove_ptdesc(tlb, virt_to_ptdesc(p4d));
 }
 #endif	/* CONFIG_PGTABLE_LEVELS > 4 */
@@ -136,7 +136,7 @@ static void pgd_dtor(pgd_t *pgd)
 
 void pud_populate(struct mm_struct *mm, pud_t *pudp, pmd_t *pmd)
 {
-	paravirt_alloc_pmd(mm, __pa(pmd) >> PAGE_SHIFT);
+	paravirt_alloc_pmd(mm, __pa(pmd) >> PTE_SHIFT);
 
 	/* Note: almost everything apart from _PAGE_PRESENT is
 	   reserved at the pmd (PDPT) level. */
@@ -225,7 +225,7 @@ static void mop_up_one_pmd(struct mm_struct *mm, pgd_t *pgdp)
 
 		pgd_clear(pgdp);
 
-		paravirt_release_pmd(pgd_val(pgd) >> PAGE_SHIFT);
+		paravirt_release_pmd(pgd_val(pgd) >> PTE_SHIFT);
 		pmd_free(mm, pmd);
 		mm_dec_nr_pmds(mm);
 	}
@@ -553,9 +553,9 @@ void __init reserve_top_address(unsigned long reserve)
 {
 #ifdef CONFIG_X86_32
 	BUG_ON(fixmaps_set > 0);
-	__FIXADDR_TOP = round_down(-reserve, 1 << PMD_SHIFT) - PAGE_SIZE;
+	__FIXADDR_TOP = round_down(-reserve, 1 << PMD_SHIFT) - PTE_SIZE;
 	printk(KERN_INFO "Reserving virtual address space above 0x%08lx (rounded to 0x%08lx)\n",
-	       -reserve, __FIXADDR_TOP + PAGE_SIZE);
+	       -reserve, __FIXADDR_TOP + PTE_SIZE);
 #endif
 }
 
@@ -588,7 +588,7 @@ void native_set_fixmap(unsigned /* enum fixed_addresses */ idx,
 	/* Sanitize 'prot' against any unsupported bits: */
 	pgprot_val(flags) &= __default_kernel_pte_mask;
 
-	__native_set_fixmap(idx, pfn_pte(phys >> PAGE_SHIFT, flags));
+	__native_set_fixmap(idx, pfn_pte(phys >> PTE_SHIFT, flags));
 }
 
 #ifdef CONFIG_HAVE_ARCH_HUGE_VMAP
@@ -645,7 +645,7 @@ int pud_set_huge(pud_t *pud, phys_addr_t addr, pgprot_t prot)
 		return 0;
 
 	set_pte((pte_t *)pud, pfn_pte(
-		(u64)addr >> PAGE_SHIFT,
+		(u64)addr >> PTE_SHIFT,
 		__pgprot(protval_4k_2_large(pgprot_val(prot)) | _PAGE_PSE)));
 
 	return 1;
@@ -677,7 +677,7 @@ int pmd_set_huge(pmd_t *pmd, phys_addr_t addr, pgprot_t prot)
 		return 0;
 
 	set_pte((pte_t *)pmd, pfn_pte(
-		(u64)addr >> PAGE_SHIFT,
+		(u64)addr >> PTE_SHIFT,
 		__pgprot(protval_4k_2_large(pgprot_val(prot)) | _PAGE_PSE)));
 
 	return 1;
@@ -746,7 +746,7 @@ int pud_free_pmd_page(pud_t *pud, unsigned long addr)
 	pud_clear(pud);
 
 	/* INVLPG to clear all paging-structure caches */
-	flush_tlb_kernel_range(addr, addr + PAGE_SIZE-1);
+	flush_tlb_kernel_range(addr, addr + PTE_SIZE-1);
 
 	for (i = 0; i < PTRS_PER_PMD; i++) {
 		if (!pmd_none(pmd_sv[i])) {
@@ -778,7 +778,7 @@ int pmd_free_pte_page(pmd_t *pmd, unsigned long addr)
 	pmd_clear(pmd);
 
 	/* INVLPG to clear all paging-structure caches */
-	flush_tlb_kernel_range(addr, addr + PAGE_SIZE-1);
+	flush_tlb_kernel_range(addr, addr + PTE_SIZE-1);
 
 	pagetable_dtor_free(pt);
 

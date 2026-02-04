@@ -2161,7 +2161,7 @@ static int unuse_pte(struct vm_area_struct *vma, pmd_t *pmd,
 			VM_WARN_ON_FOLIO(!folio_test_locked(folio), folio);
 			folio_add_new_anon_rmap(folio, vma, addr, rmap_flags);
 		} else {
-			folio_add_anon_rmap_pte(folio, page, vma, addr, rmap_flags);
+			folio_add_anon_rmap_pte(folio, page, vma, rmap_flags);
 		}
 	} else { /* ksm created a completely new copy */
 		folio_add_new_anon_rmap(folio, vma, addr, RMAP_EXCLUSIVE);

@@ -39,7 +39,7 @@ struct exception_stacks {
 
 /* The effective cpu entry area mapping with guard pages. */
 struct cea_exception_stacks {
-	ESTACKS_MEMBERS(PAGE_SIZE, EXCEPTION_STKSZ)
+	ESTACKS_MEMBERS(PG_SIZE, EXCEPTION_STKSZ)
 };
 
 /*
@@ -68,15 +68,15 @@ enum exception_stack_ordering {
 	offsetof(struct cea_exception_stacks, st## _stack)
 
 #define CEA_ESTACK_PAGES					\
-	(sizeof(struct cea_exception_stacks) / PAGE_SIZE)
+	(sizeof(struct cea_exception_stacks) / PG_SIZE)
 
 #endif
 
 #ifdef CONFIG_X86_32
 struct doublefault_stack {
-	unsigned long stack[(PAGE_SIZE - sizeof(struct x86_hw_tss)) / sizeof(unsigned long)];
+	unsigned long stack[(PG_SIZE - sizeof(struct x86_hw_tss)) / sizeof(unsigned long)];
 	struct x86_hw_tss tss;
-} __aligned(PAGE_SIZE);
+} __aligned(PG_SIZE);
 #endif
 
 /*
@@ -88,7 +88,7 @@ struct doublefault_stack {
  * There is no direct allocation of a struct cpu_entry_area.
  */
 struct cpu_entry_area {
-	char gdt[PAGE_SIZE];
+	char gdt[PTE_SIZE];
 
 	/*
 	 * The GDT is just below entry_stack and thus serves (on x86_64) as
@@ -96,12 +96,12 @@ struct cpu_entry_area {
 	 * it needs an extra guard page.
 	 */
 #ifdef CONFIG_X86_32
-	char guard_entry_stack[PAGE_SIZE];
+	char guard_entry_stack[PG_SIZE];
 #endif
 	struct entry_stack_page entry_stack_page;
 
 #ifdef CONFIG_X86_32
-	char guard_doublefault_stack[PAGE_SIZE];
+	char guard_doublefault_stack[PG_SIZE];
 	struct doublefault_stack doublefault_stack;
 #endif
 

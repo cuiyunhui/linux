@@ -391,11 +391,11 @@ int __device_set_driver_override(struct device *dev, const char *s, size_t len)
 
 	/*
 	 * The stored value will be used in sysfs show callback (sysfs_emit()),
-	 * which has a length limit of PAGE_SIZE and adds a trailing newline.
+	 * which has a length limit of PG_SIZE and adds a trailing newline.
 	 * Thus we can store one character less to avoid truncation during sysfs
 	 * show.
 	 */
-	if (len >= (PAGE_SIZE - 1))
+	if (len >= (PG_SIZE - 1))
 		return -EINVAL;
 
 	/*

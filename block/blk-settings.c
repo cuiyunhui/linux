@@ -80,7 +80,7 @@ void blk_apply_bdi_limits(struct backing_dev_info *bdi,
 		io_opt = (u64)lim->max_sectors << SECTOR_SHIFT;
 
 	bdi->ra_pages = max3(bdi->ra_pages,
-				io_opt * 2 >> PAGE_SHIFT,
+				io_opt * 2 >> PG_SHIFT,
 				VM_READAHEAD_PAGES);
 	bdi->io_pages = lim->max_sectors >> PAGE_SECTORS_SHIFT;
 }
@@ -226,7 +226,7 @@ static int blk_validate_integrity_limits(struct queue_limits *lim)
  * Returns max guaranteed bytes which we can fit in a bio.
  *
  * We request that an atomic_write is ITER_UBUF iov_iter (so a single vector),
- * so we assume that we can fit in at least PAGE_SIZE in a segment, apart from
+ * so we assume that we can fit in at least PG_SIZE in a segment, apart from
  * the first and last segments.
  */
 static unsigned int blk_queue_max_guaranteed_bio(struct queue_limits *lim)
@@ -236,7 +236,7 @@ static unsigned int blk_queue_max_guaranteed_bio(struct queue_limits *lim)
 
 	length = min(max_segments, 2) * lim->logical_block_size;
 	if (max_segments > 2)
-		length += (max_segments - 2) * PAGE_SIZE;
+		length += (max_segments - 2) * PG_SIZE;
 
 	return length;
 }
@@ -497,7 +497,7 @@ int blk_validate_limits(struct queue_limits *lim)
 		seg_size = lim->max_segment_size;
 	else
 		seg_size = lim->seg_boundary_mask + 1;
-	lim->max_fast_segment_size = min_t(unsigned int, seg_size, PAGE_SIZE);
+	lim->max_fast_segment_size = min_t(unsigned int, seg_size, PG_SIZE);
 
 	/*
 	 * We require drivers to at least do logical block aligned I/O, but
@@ -507,7 +507,7 @@ int blk_validate_limits(struct queue_limits *lim)
 	 */
 	if (!lim->dma_alignment)
 		lim->dma_alignment = SECTOR_SIZE - 1;
-	if (WARN_ON_ONCE(lim->dma_alignment > PAGE_SIZE))
+	if (WARN_ON_ONCE(lim->dma_alignment > PG_SIZE))
 		return -EINVAL;
 
 	if (lim->alignment_offset) {
@@ -661,8 +661,8 @@ static unsigned int queue_limit_discard_alignment(
 static unsigned int blk_round_down_sectors(unsigned int sectors, unsigned int lbs)
 {
 	sectors = round_down(sectors, lbs >> SECTOR_SHIFT);
-	if (sectors < PAGE_SIZE >> SECTOR_SHIFT)
-		sectors = PAGE_SIZE >> SECTOR_SHIFT;
+	if (sectors < PG_SIZE >> SECTOR_SHIFT)
+		sectors = PG_SIZE >> SECTOR_SHIFT;
 	return sectors;
 }
 

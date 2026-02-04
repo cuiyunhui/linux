@@ -165,7 +165,7 @@ static struct scatterlist *sg_kmalloc(unsigned int nents, gfp_t gfp_mask)
 		 * intermediate allocations.
 		 */
 		void *ptr = (void *) __get_free_page(gfp_mask);
-		kmemleak_alloc(ptr, PAGE_SIZE, 1, gfp_mask);
+		kmemleak_alloc(ptr, PG_SIZE, 1, gfp_mask);
 		return ptr;
 	} else
 		return kmalloc_objs(struct scatterlist, nents, gfp_mask);
@@ -465,11 +465,11 @@ int sg_alloc_append_table_from_pages(struct sg_append_table *sgt_append,
 	struct page *last_pg;
 
 	/*
-	 * The algorithm below requires max_segment to be aligned to PAGE_SIZE
+	 * The algorithm below requires max_segment to be aligned to PG_SIZE
 	 * otherwise it can overshoot.
 	 */
-	max_segment = ALIGN_DOWN(max_segment, PAGE_SIZE);
-	if (WARN_ON(max_segment < PAGE_SIZE))
+	max_segment = ALIGN_DOWN(max_segment, PG_SIZE);
+	if (WARN_ON(max_segment < PG_SIZE))
 		return -EINVAL;
 
 	if (IS_ENABLED(CONFIG_ARCH_NO_SG_CHAIN) && sgt_append->prv)
@@ -483,13 +483,13 @@ int sg_alloc_append_table_from_pages(struct sg_append_table *sgt_append,
 
 		/* Merge contiguous pages into the last SG */
 		prv_len = sgt_append->prv->length;
-		next_pfn = (sg_phys(sgt_append->prv) + prv_len) / PAGE_SIZE;
+		next_pfn = (sg_phys(sgt_append->prv) + prv_len) / PG_SIZE;
 		if (page_to_pfn(pages[0]) == next_pfn) {
 			last_pg = pfn_to_page(next_pfn - 1);
 			while (n_pages && pages_are_mergeable(pages[0], last_pg)) {
-				if (sgt_append->prv->length + PAGE_SIZE > max_segment)
+				if (sgt_append->prv->length + PG_SIZE > max_segment)
 					break;
-				sgt_append->prv->length += PAGE_SIZE;
+				sgt_append->prv->length += PG_SIZE;
 				last_pg = pages[0];
 				pages++;
 				n_pages--;
@@ -503,7 +503,7 @@ int sg_alloc_append_table_from_pages(struct sg_append_table *sgt_append,
 	chunks = 1;
 	seg_len = 0;
 	for (i = 1; i < n_pages; i++) {
-		seg_len += PAGE_SIZE;
+		seg_len += PG_SIZE;
 		if (seg_len >= max_segment ||
 		    !pages_are_mergeable(pages[i], pages[i - 1])) {
 			chunks++;
@@ -519,7 +519,7 @@ int sg_alloc_append_table_from_pages(struct sg_append_table *sgt_append,
 		/* look for the end of the current chunk */
 		seg_len = 0;
 		for (j = cur_page + 1; j < n_pages; j++) {
-			seg_len += PAGE_SIZE;
+			seg_len += PG_SIZE;
 			if (seg_len >= max_segment ||
 			    !pages_are_mergeable(pages[j], pages[j - 1]))
 				break;
@@ -537,7 +537,7 @@ int sg_alloc_append_table_from_pages(struct sg_append_table *sgt_append,
 				sgt_append->prv->length = prv_len;
 			return PTR_ERR(s);
 		}
-		chunk_size = ((j - cur_page) << PAGE_SHIFT) - offset;
+		chunk_size = ((j - cur_page) << PG_SHIFT) - offset;
 		sg_set_page(s, pages[cur_page],
 			    min_t(unsigned long, size, chunk_size), offset);
 		added_nents++;
@@ -620,9 +620,9 @@ struct scatterlist *sgl_alloc_order(unsigned long long length,
 	unsigned int nent, nalloc;
 	u32 elem_len;
 
-	nent = round_up(length, PAGE_SIZE << order) >> (PAGE_SHIFT + order);
+	nent = round_up(length, PG_SIZE << order) >> (PG_SHIFT + order);
 	/* Check for integer overflow */
-	if (length > (nent << (PAGE_SHIFT + order)))
+	if (length > (nent << (PG_SHIFT + order)))
 		return NULL;
 	nalloc = nent;
 	if (chainable) {
@@ -638,7 +638,7 @@ struct scatterlist *sgl_alloc_order(unsigned long long length,
 	sg_init_table(sgl, nalloc);
 	sg = sgl;
 	while (length) {
-		elem_len = min_t(u64, length, PAGE_SIZE << order);
+		elem_len = min_t(u64, length, PG_SIZE << order);
 		page = alloc_pages(gfp, order);
 		if (!page) {
 			sgl_free_order(sgl, order);
@@ -738,7 +738,7 @@ EXPORT_SYMBOL(__sg_page_iter_start);
 
 static int sg_page_count(struct scatterlist *sg)
 {
-	return PAGE_ALIGN(sg->offset + sg->length) >> PAGE_SHIFT;
+	return PG_ALIGN(sg->offset + sg->length) >> PG_SHIFT;
 }
 
 bool __sg_page_iter_next(struct sg_page_iter *piter)
@@ -762,7 +762,7 @@ EXPORT_SYMBOL(__sg_page_iter_next);
 
 static int sg_dma_page_count(struct scatterlist *sg)
 {
-	return PAGE_ALIGN(sg->offset + sg_dma_len(sg)) >> PAGE_SHIFT;
+	return PG_ALIGN(sg->offset + sg_dma_len(sg)) >> PG_SHIFT;
 }
 
 bool __sg_page_iter_dma_next(struct sg_dma_page_iter *dma_iter)
@@ -821,13 +821,13 @@ static bool sg_miter_get_next_page(struct sg_mapping_iter *miter)
 		sg = miter->piter.sg;
 
 		miter->__offset = miter->piter.sg_pgoffset ? 0 : sg->offset;
-		miter->piter.sg_pgoffset += miter->__offset >> PAGE_SHIFT;
-		miter->__offset &= PAGE_SIZE - 1;
+		miter->piter.sg_pgoffset += miter->__offset >> PG_SHIFT;
+		miter->__offset &= PG_SIZE - 1;
 		miter->__remaining = sg->offset + sg->length -
-				     (miter->piter.sg_pgoffset << PAGE_SHIFT) -
+				     (miter->piter.sg_pgoffset << PG_SHIFT) -
 				     miter->__offset;
 		miter->__remaining = min_t(unsigned long, miter->__remaining,
-					   PAGE_SIZE - miter->__offset);
+					   PG_SIZE - miter->__offset);
 	}
 
 	return true;
@@ -1136,12 +1136,12 @@ static ssize_t extract_user_to_sg(struct iov_iter *iter,
 		len = res;
 		maxsize -= len;
 		ret += len;
-		npages = DIV_ROUND_UP(off + len, PAGE_SIZE);
+		npages = DIV_ROUND_UP(off + len, PG_SIZE);
 		sg_max -= npages;
 
 		for (; npages > 0; npages--) {
 			struct page *page = *pages;
-			size_t seg = min_t(size_t, PAGE_SIZE - off, len);
+			size_t seg = min_t(size_t, PG_SIZE - off, len);
 
 			*pages++ = NULL;
 			sg_set_page(sg, page, seg, off);
@@ -1234,14 +1234,14 @@ static ssize_t extract_kvec_to_sg(struct iov_iter *iter,
 		}
 
 		kaddr = (unsigned long)kv[i].iov_base + start;
-		off = kaddr & ~PAGE_MASK;
+		off = kaddr & ~PG_MASK;
 		len = min_t(size_t, maxsize, len - start);
-		kaddr &= PAGE_MASK;
+		kaddr &= PG_MASK;
 
 		maxsize -= len;
 		ret += len;
 		do {
-			seg = min_t(size_t, len, PAGE_SIZE - off);
+			seg = min_t(size_t, len, PG_SIZE - off);
 			if (is_vmalloc_or_module_addr((void *)kaddr))
 				page = vmalloc_to_page((void *)kaddr);
 			else
@@ -1253,7 +1253,7 @@ static ssize_t extract_kvec_to_sg(struct iov_iter *iter,
 			sg_max--;
 
 			len -= seg;
-			kaddr += PAGE_SIZE;
+			kaddr += PG_SIZE;
 			off = 0;
 		} while (len > 0 && sg_max > 0);
 
@@ -1342,7 +1342,7 @@ static ssize_t extract_xarray_to_sg(struct iov_iter *iter,
 	struct xarray *xa = iter->xarray;
 	struct folio *folio;
 	loff_t start = iter->xarray_start + iter->iov_offset;
-	pgoff_t index = start / PAGE_SIZE;
+	pgoff_t index = start / PG_SIZE;
 	ssize_t ret = 0;
 	size_t offset, len;
 	XA_STATE(xas, xa, index);

@@ -79,10 +79,10 @@ static int elf_core_dump(struct coredump_params *cprm);
 #define elf_core_dump	NULL
 #endif
 
-#if ELF_EXEC_PAGESIZE > PAGE_SIZE
+#if ELF_EXEC_PAGESIZE > PG_SIZE
 #define ELF_MIN_ALIGN	ELF_EXEC_PAGESIZE
 #else
-#define ELF_MIN_ALIGN	PAGE_SIZE
+#define ELF_MIN_ALIGN	PTE_SIZE
 #endif
 
 #ifndef ELF_CORE_EFLAGS
@@ -1336,7 +1336,7 @@ out_free_interp:
 		 * leave a gap between .bss and brk.
 		 */
 		if (!brk_moved)
-			mm->brk = mm->start_brk = mm->brk + PAGE_SIZE;
+			mm->brk = mm->start_brk = mm->brk + PG_SIZE;
 
 		mm->brk = mm->start_brk = arch_randomize_brk(mm);
 		brk_moved = true;
@@ -1352,10 +1352,10 @@ out_free_interp:
 		   and some applications "depend" upon this behavior.
 		   Since we do not have the power to recompile these, we
 		   emulate the SVr4 behavior. Sigh. */
-		error = vm_mmap(NULL, 0, PAGE_SIZE, PROT_READ | PROT_EXEC,
+		error = vm_mmap(NULL, 0, PG_SIZE, PROT_READ | PROT_EXEC,
 				MAP_FIXED | MAP_PRIVATE, 0);
 
-		retval = do_mseal(0, PAGE_SIZE, 0);
+		retval = do_mseal(0, PG_SIZE, 0);
 		if (retval)
 			pr_warn_ratelimited("pid=%d, couldn't seal address 0, ret=%d.\n",
 					    task_pid_nr(current), retval);
@@ -1613,7 +1613,7 @@ static int fill_files_note(struct memelfnote *note, struct coredump_params *cprm
 			      size);
 		return -EINVAL;
 	}
-	size = round_up(size, PAGE_SIZE);
+	size = round_up(size, PG_SIZE);
 	/*
 	 * "size" can be 0 here legitimately.
 	 * Let it ENOMEM and omit NT_FILE section which will be empty anyway.
@@ -1653,13 +1653,13 @@ static int fill_files_note(struct memelfnote *note, struct coredump_params *cprm
 
 		*start_end_ofs++ = m->start;
 		*start_end_ofs++ = m->end;
-		*start_end_ofs++ = m->pgoff;
+		*start_end_ofs++ = m->pteoff;
 		count++;
 	}
 
 	/* Now we know exact count of files, can store it */
 	data[0] = count;
-	data[1] = PAGE_SIZE;
+	data[1] = PG_SIZE;
 	/*
 	 * Count usually is less than mm->map_count,
 	 * we need to move filenames down.

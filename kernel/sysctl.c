@@ -598,8 +598,8 @@ static int do_proc_dointvec(const struct ctl_table *table, int dir,
 		if (proc_first_pos_non_zero_ignore(ppos, table))
 			goto out;
 
-		if (left > PAGE_SIZE - 1)
-			left = PAGE_SIZE - 1;
+		if (left > PG_SIZE - 1)
+			left = PG_SIZE - 1;
 		p = buffer;
 	}
 
@@ -661,8 +661,8 @@ static int do_proc_douintvec_w(const struct ctl_table *table, void *buffer,
 	if (proc_first_pos_non_zero_ignore(ppos, table))
 		goto bail_early;
 
-	if (left > PAGE_SIZE - 1)
-		left = PAGE_SIZE - 1;
+	if (left > PG_SIZE - 1)
+		left = PG_SIZE - 1;
 
 	proc_skip_spaces(&p, &left);
 	if (!left) {
@@ -990,8 +990,8 @@ static int do_proc_doulongvec_minmax(const struct ctl_table *table, int dir,
 		if (proc_first_pos_non_zero_ignore(ppos, table))
 			goto out;
 
-		if (left > PAGE_SIZE - 1)
-			left = PAGE_SIZE - 1;
+		if (left > PG_SIZE - 1)
+			left = PG_SIZE - 1;
 		p = buffer;
 	}
 
@@ -1129,8 +1129,8 @@ int proc_do_large_bitmap(const struct ctl_table *table, int dir,
 		char *p = buffer;
 		size_t skipped = 0;
 
-		if (left > PAGE_SIZE - 1) {
-			left = PAGE_SIZE - 1;
+		if (left > PG_SIZE - 1) {
+			left = PG_SIZE - 1;
 			/* How much of the buffer we'll skip this pass */
 			skipped = *lenp - left;
 		}

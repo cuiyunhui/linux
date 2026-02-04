@@ -111,7 +111,7 @@ bool vdso_get_timestamp(const struct vdso_time_data *vd, const struct vdso_clock
 static __always_inline
 const struct vdso_time_data *__arch_get_vdso_u_timens_data(const struct vdso_time_data *vd)
 {
-	return (void *)vd + PAGE_SIZE;
+	return (void *)vd + PTE_SIZE;
 }
 
 static __always_inline

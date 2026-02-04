@@ -722,7 +722,7 @@ struct folio *iomap_get_folio(struct iomap_iter *iter, loff_t pos, size_t len)
 		fgp |= FGP_DONTCACHE;
 	fgp |= fgf_set_order(len);
 
-	return __filemap_get_folio(iter->inode->i_mapping, pos >> PAGE_SHIFT,
+	return __filemap_get_folio(iter->inode->i_mapping, pos >> PG_SHIFT,
 			fgp, mapping_gfp_mask(iter->inode->i_mapping));
 }
 EXPORT_SYMBOL_GPL(iomap_get_folio);
@@ -866,7 +866,7 @@ static struct folio *__iomap_get_folio(struct iomap_iter *iter,
 	loff_t pos = iter->pos;
 
 	if (!mapping_large_folio_support(iter->inode->i_mapping))
-		len = min_t(size_t, len, PAGE_SIZE - offset_in_page(pos));
+		len = min_t(size_t, len, PG_SIZE - offset_in_pg(pos));
 
 	if (iter->iomap.flags & IOMAP_F_FOLIO_BATCH) {
 		struct folio *folio = folio_batch_next(iter->fbatch);
@@ -1187,7 +1187,7 @@ retry:
 			iomap_write_failed(iter->inode, pos, bytes);
 			iov_iter_revert(i, copied);
 
-			if (chunk > PAGE_SIZE)
+			if (chunk > PG_SIZE)
 				chunk /= 2;
 			if (copied) {
 				bytes = copied;
@@ -1312,10 +1312,10 @@ static void iomap_write_delalloc_scan(struct inode *inode,
 
 		/* grab locked page */
 		folio = filemap_lock_folio(inode->i_mapping,
-				start_byte >> PAGE_SHIFT);
+				start_byte >> PG_SHIFT);
 		if (IS_ERR(folio)) {
-			start_byte = ALIGN_DOWN(start_byte, PAGE_SIZE) +
-					PAGE_SIZE;
+			start_byte = ALIGN_DOWN(start_byte, PG_SIZE) +
+					PG_SIZE;
 			continue;
 		}
 
@@ -1601,8 +1601,8 @@ iomap_fill_dirty_folios(
 	unsigned int		*iomap_flags)
 {
 	struct address_space	*mapping = iter->inode->i_mapping;
-	pgoff_t			pstart = *start >> PAGE_SHIFT;
-	pgoff_t			pend = (end - 1) >> PAGE_SHIFT;
+	pgoff_t			pstart = *start >> PG_SHIFT;
+	pgoff_t			pend = (end - 1) >> PG_SHIFT;
 	unsigned int		count;
 
 	if (!iter->fbatch) {
@@ -1611,7 +1611,7 @@ iomap_fill_dirty_folios(
 	}
 
 	count = filemap_get_folios_dirty(mapping, &pstart, pend, iter->fbatch);
-	*start = (pstart << PAGE_SHIFT);
+	*start = (pstart << PG_SHIFT);
 	*iomap_flags |= IOMAP_F_FOLIO_BATCH;
 	return count;
 }
@@ -1810,7 +1810,7 @@ static bool iomap_writeback_handle_eof(struct folio *folio, struct inode *inode,
 
 	if (*end_pos > isize) {
 		size_t poff = offset_in_folio(folio, isize);
-		pgoff_t end_index = isize >> PAGE_SHIFT;
+		pgoff_t end_index = isize >> PG_SHIFT;
 
 		/*
 		 * If the folio is entirely ouside of i_size, skip it.

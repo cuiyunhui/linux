@@ -526,7 +526,7 @@ phys_addr_t memblock_get_current_limit(void);
  */
 static inline unsigned long memblock_region_memory_base_pfn(const struct memblock_region *reg)
 {
-	return PFN_UP(reg->base);
+	return PHYS_PFN(PG_ALIGN(reg->base));
 }
 
 /**
@@ -537,7 +537,7 @@ static inline unsigned long memblock_region_memory_base_pfn(const struct membloc
  */
 static inline unsigned long memblock_region_memory_end_pfn(const struct memblock_region *reg)
 {
-	return PFN_DOWN(reg->base + reg->size);
+	return PHYS_PFN(PG_ALIGN_DOWN(reg->base + reg->size));
 }
 
 /**

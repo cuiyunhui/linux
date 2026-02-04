@@ -2815,7 +2815,7 @@ static void __init l1tf_apply_mitigation(void)
 	return;
 #endif
 
-	half_pa = (u64)l1tf_pfn_limit() << PAGE_SHIFT;
+	half_pa = (u64)l1tf_pfn_limit() << PTE_SHIFT;
 	if (l1tf_mitigation != L1TF_MITIGATION_OFF &&
 			e820__mapped_any(half_pa, ULLONG_MAX - half_pa, E820_TYPE_RAM)) {
 		pr_warn("System has more than MAX_PA/2 memory. L1TF mitigation not effective.\n");

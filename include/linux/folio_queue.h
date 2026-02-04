@@ -257,11 +257,11 @@ static inline unsigned int folioq_folio_order(const struct folio_queue *folioq, 
  *
  * Retrieve the size of the folio in the specified slot from a folio queue
  * segment.  Note that no bounds check is made and if the slot hasn't been
- * added into yet, the size returned will be PAGE_SIZE.
+ * added into yet, the size returned will be PG_SIZE.
  */
 static inline size_t folioq_folio_size(const struct folio_queue *folioq, unsigned int slot)
 {
-	return PAGE_SIZE << folioq_folio_order(folioq, slot);
+	return PG_SIZE << folioq_folio_order(folioq, slot);
 }
 
 /**

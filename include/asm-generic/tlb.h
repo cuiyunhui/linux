@@ -85,7 +85,7 @@
  *    tlb_flush_mmu() when required and has no return value.
  *
  *    __tlb_remove_folio_pages() is similar to __tlb_remove_page_size(),
- *    however, instead of removing a single page, assume PAGE_SIZE and remove
+ *    however, instead of removing a single page, assume PG_SIZE and remove
  *    the given number of consecutive pages that are all part of the
  *    same (large) folio.
  *
@@ -211,7 +211,7 @@ struct mmu_table_batch {
 };
 
 #define MAX_TABLE_BATCH		\
-	((PAGE_SIZE - sizeof(struct mmu_table_batch)) / sizeof(void *))
+	((PG_SIZE - sizeof(struct mmu_table_batch)) / sizeof(void *))
 
 #ifndef CONFIG_HAVE_ARCH_TLB_REMOVE_TABLE
 static inline void __tlb_remove_table(void *table)
@@ -277,7 +277,7 @@ struct mmu_gather_batch {
 };
 
 #define MAX_GATHER_BATCH	\
-	((PAGE_SIZE - sizeof(struct mmu_gather_batch)) / sizeof(void *))
+	((PG_SIZE - sizeof(struct mmu_gather_batch)) / sizeof(void *))
 
 /*
  * Limit the maximum number of mmu_gather batches to reduce a risk of soft
@@ -515,7 +515,7 @@ static inline void tlb_remove_page_size(struct mmu_gather *tlb,
 
 static inline void tlb_remove_page(struct mmu_gather *tlb, struct page *page)
 {
-	return tlb_remove_page_size(tlb, page, PAGE_SIZE);
+	return tlb_remove_page_size(tlb, page, PG_SIZE);
 }
 
 static inline void tlb_remove_ptdesc(struct mmu_gather *tlb, struct ptdesc *pt)
@@ -539,7 +539,7 @@ static inline void tlb_change_page_size(struct mmu_gather *tlb,
 static inline unsigned long tlb_get_unmap_shift(struct mmu_gather *tlb)
 {
 	if (tlb->cleared_ptes)
-		return PAGE_SHIFT;
+		return PTE_SHIFT;
 	if (tlb->cleared_pmds)
 		return PMD_SHIFT;
 	if (tlb->cleared_puds)
@@ -547,7 +547,7 @@ static inline unsigned long tlb_get_unmap_shift(struct mmu_gather *tlb)
 	if (tlb->cleared_p4ds)
 		return P4D_SHIFT;
 
-	return PAGE_SHIFT;
+	return PTE_SHIFT;
 }
 
 static inline unsigned long tlb_get_unmap_size(struct mmu_gather *tlb)
@@ -654,7 +654,7 @@ static inline void __tlb_remove_tlb_entry(struct mmu_gather *tlb, pte_t *ptep, u
  */
 #define tlb_remove_tlb_entry(tlb, ptep, address)		\
 	do {							\
-		tlb_flush_pte_range(tlb, address, PAGE_SIZE);	\
+		tlb_flush_pte_range(tlb, address, PTE_SIZE);	\
 		__tlb_remove_tlb_entry(tlb, ptep, address);	\
 	} while (0)
 
@@ -668,13 +668,13 @@ static inline void __tlb_remove_tlb_entry(struct mmu_gather *tlb, pte_t *ptep, u
 static inline void tlb_remove_tlb_entries(struct mmu_gather *tlb,
 		pte_t *ptep, unsigned int nr, unsigned long address)
 {
-	tlb_flush_pte_range(tlb, address, PAGE_SIZE * nr);
+	tlb_flush_pte_range(tlb, address, PTE_SIZE * nr);
 	for (;;) {
 		__tlb_remove_tlb_entry(tlb, ptep, address);
 		if (--nr == 0)
 			break;
 		ptep++;
-		address += PAGE_SIZE;
+		address += PTE_SIZE;
 	}
 }
 
@@ -735,13 +735,13 @@ static inline void tlb_remove_tlb_entries(struct mmu_gather *tlb,
  * architecture to do its own odd thing, not cause pain for others
  * http://lkml.kernel.org/r/CA+55aFzBggoXtNXQeng5d_mRoDnaMBE5Y+URs+PHR67nUpMtaw@mail.gmail.com
  *
- * For now w.r.t page table cache, mark the range_size as PAGE_SIZE
+ * For now w.r.t page table cache, mark the range_size as PG_SIZE
  */
 
 #ifndef pte_free_tlb
 #define pte_free_tlb(tlb, ptep, address)			\
 	do {							\
-		tlb_flush_pmd_range(tlb, address, PAGE_SIZE);	\
+		tlb_flush_pmd_range(tlb, address, PG_SIZE);	\
 		tlb->freed_tables = 1;				\
 		__pte_free_tlb(tlb, ptep, address);		\
 	} while (0)
@@ -750,7 +750,7 @@ static inline void tlb_remove_tlb_entries(struct mmu_gather *tlb,
 #ifndef pmd_free_tlb
 #define pmd_free_tlb(tlb, pmdp, address)			\
 	do {							\
-		tlb_flush_pud_range(tlb, address, PAGE_SIZE);	\
+		tlb_flush_pud_range(tlb, address, PG_SIZE);	\
 		tlb->freed_tables = 1;				\
 		__pmd_free_tlb(tlb, pmdp, address);		\
 	} while (0)
@@ -759,7 +759,7 @@ static inline void tlb_remove_tlb_entries(struct mmu_gather *tlb,
 #ifndef pud_free_tlb
 #define pud_free_tlb(tlb, pudp, address)			\
 	do {							\
-		tlb_flush_p4d_range(tlb, address, PAGE_SIZE);	\
+		tlb_flush_p4d_range(tlb, address, PG_SIZE);	\
 		tlb->freed_tables = 1;				\
 		__pud_free_tlb(tlb, pudp, address);		\
 	} while (0)
@@ -768,7 +768,7 @@ static inline void tlb_remove_tlb_entries(struct mmu_gather *tlb,
 #ifndef p4d_free_tlb
 #define p4d_free_tlb(tlb, pudp, address)			\
 	do {							\
-		__tlb_adjust_range(tlb, address, PAGE_SIZE);	\
+		__tlb_adjust_range(tlb, address, PG_SIZE);	\
 		tlb->freed_tables = 1;				\
 		__p4d_free_tlb(tlb, pudp, address);		\
 	} while (0)

@@ -79,15 +79,15 @@ x86_get_mtrr_mem_range(struct range *range, int nr_range,
 		if (!size)
 			continue;
 		base = range_state[i].base_pfn;
-		if (base < (1<<(20-PAGE_SHIFT)) && mtrr_state.have_fixed &&
+		if (base < (1<<(20-PTE_SHIFT)) && mtrr_state.have_fixed &&
 		    (mtrr_state.enabled & MTRR_STATE_MTRR_ENABLED) &&
 		    (mtrr_state.enabled & MTRR_STATE_MTRR_FIXED_ENABLED)) {
 			/* Var MTRR contains UC entry below 1M? Skip it: */
 			pr_warn(BIOS_BUG_MSG, i);
-			if (base + size <= (1<<(20-PAGE_SHIFT)))
+			if (base + size <= (1<<(20-PTE_SHIFT)))
 				continue;
-			size -= (1<<(20-PAGE_SHIFT)) - base;
-			base = 1<<(20-PAGE_SHIFT);
+			size -= (1<<(20-PTE_SHIFT)) - base;
+			base = 1<<(20-PTE_SHIFT);
 		}
 		subtract_range(range, RANGE_NUM, base, base + size);
 	}
@@ -178,8 +178,8 @@ static void __init
 save_var_mtrr(unsigned int reg, unsigned long basek, unsigned long sizek,
 	      unsigned char type)
 {
-	range_state[reg].base_pfn = basek >> (PAGE_SHIFT - 10);
-	range_state[reg].size_pfn = sizek >> (PAGE_SHIFT - 10);
+	range_state[reg].base_pfn = basek >> (PTE_SHIFT - 10);
+	range_state[reg].size_pfn = sizek >> (PTE_SHIFT - 10);
 	range_state[reg].type = type;
 }
 
@@ -190,8 +190,8 @@ static void __init set_var_mtrr_all(void)
 	unsigned int reg;
 
 	for (reg = 0; reg < num_var_ranges; reg++) {
-		basek = range_state[reg].base_pfn << (PAGE_SHIFT - 10);
-		sizek = range_state[reg].size_pfn << (PAGE_SHIFT - 10);
+		basek = range_state[reg].base_pfn << (PTE_SHIFT - 10);
+		sizek = range_state[reg].size_pfn << (PTE_SHIFT - 10);
 		type = range_state[reg].type;
 
 		set_var_mtrr(reg, basek, sizek, type);
@@ -389,8 +389,8 @@ set_var_mtrr_range(struct var_mtrr_state *state, unsigned long base_pfn,
 	if (state->reg >= num_var_ranges)
 		return;
 
-	basek = base_pfn << (PAGE_SHIFT - 10);
-	sizek = size_pfn << (PAGE_SHIFT - 10);
+	basek = base_pfn << (PTE_SHIFT - 10);
+	sizek = size_pfn << (PTE_SHIFT - 10);
 
 	/* See if I can merge with the last range: */
 	if ((basek <= 1024) ||
@@ -493,7 +493,7 @@ struct mtrr_cleanup_result {
  * so we need (1+16)*8
  */
 #define NUM_RESULT	136
-#define PSHIFT		(PAGE_SHIFT - 10)
+#define PSHIFT		(PTE_SHIFT - 10)
 
 static struct mtrr_cleanup_result __initdata result[NUM_RESULT];
 static unsigned long __initdata min_loss_pfn[RANGE_NUM];
@@ -507,12 +507,12 @@ static void __init print_out_mtrr_range_state(void)
 
 	for (i = 0; i < num_var_ranges; i++) {
 
-		size_base = range_state[i].size_pfn << (PAGE_SHIFT - 10);
+		size_base = range_state[i].size_pfn << (PTE_SHIFT - 10);
 		if (!size_base)
 			continue;
 
 		size_base = to_size_factor(size_base, &size_factor);
-		start_base = range_state[i].base_pfn << (PAGE_SHIFT - 10);
+		start_base = range_state[i].base_pfn << (PTE_SHIFT - 10);
 		start_base = to_size_factor(start_base, &start_factor);
 		type = range_state[i].type;
 
@@ -693,23 +693,23 @@ int __init mtrr_cleanup(void)
 
 	memset(range, 0, sizeof(range));
 	x_remove_size = 0;
-	x_remove_base = 1 << (32 - PAGE_SHIFT);
+	x_remove_base = 1 << (32 - PTE_SHIFT);
 	if (mtrr_tom2)
-		x_remove_size = (mtrr_tom2 >> PAGE_SHIFT) - x_remove_base;
+		x_remove_size = (mtrr_tom2 >> PTE_SHIFT) - x_remove_base;
 
 	/*
 	 * [0, 1M) should always be covered by var mtrr with WB
 	 * and fixed mtrrs should take effect before var mtrr for it:
 	 */
 	nr_range = add_range_with_merge(range, RANGE_NUM, 0, 0,
-					1ULL<<(20 - PAGE_SHIFT));
+					1ULL<<(20 - PTE_SHIFT));
 	/* add from var mtrr at last */
 	nr_range = x86_get_mtrr_mem_range(range, nr_range,
 					  x_remove_base, x_remove_size);
 
 	range_sums = sum_ranges(range, nr_range);
 	pr_info("total RAM covered: %ldM\n",
-	       range_sums >> (20 - PAGE_SHIFT));
+	       range_sums >> (20 - PTE_SHIFT));
 
 	if (mtrr_chunk_size && mtrr_gran_size) {
 		i = 0;
@@ -831,10 +831,10 @@ real_trim_memory(unsigned long start_pfn, unsigned long limit_pfn)
 	u64 trim_start, trim_size;
 
 	trim_start = start_pfn;
-	trim_start <<= PAGE_SHIFT;
+	trim_start <<= PTE_SHIFT;
 
 	trim_size = limit_pfn;
-	trim_size <<= PAGE_SHIFT;
+	trim_size <<= PTE_SHIFT;
 	trim_size -= trim_start;
 
 	return e820__range_update(trim_start, trim_size, E820_TYPE_RAM, E820_TYPE_RESERVED);
@@ -924,8 +924,8 @@ int __init mtrr_trim_uncached_memory(unsigned long end_pfn)
 	memset(range, 0, sizeof(range));
 	nr_range = 0;
 	if (mtrr_tom2) {
-		range[nr_range].start = (1ULL<<(32 - PAGE_SHIFT));
-		range[nr_range].end = mtrr_tom2 >> PAGE_SHIFT;
+		range[nr_range].start = (1ULL<<(32 - PTE_SHIFT));
+		range[nr_range].end = mtrr_tom2 >> PTE_SHIFT;
 		if (highest_pfn < range[nr_range].end)
 			highest_pfn = range[nr_range].end;
 		nr_range++;

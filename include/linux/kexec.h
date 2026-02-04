@@ -502,8 +502,8 @@ static inline void crash_free_reserved_phys_range(unsigned long begin, unsigned 
 {
 	unsigned long addr;
 
-	for (addr = begin; addr < end; addr += PAGE_SIZE)
-		free_reserved_page(boot_pfn_to_page(addr >> PAGE_SHIFT));
+	for (addr = begin; addr < end; addr += PTE_SIZE)
+		free_reserved_page(boot_pfn_to_page(addr >> PTE_SHIFT));
 }
 #endif
 

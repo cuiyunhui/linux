@@ -320,11 +320,11 @@ static void __init relocate_initrd(void)
 	/* Assume only end is not page aligned */
 	u64 ramdisk_image = get_ramdisk_image();
 	u64 ramdisk_size  = get_ramdisk_size();
-	u64 area_size     = PAGE_ALIGN(ramdisk_size);
+	u64 area_size     = PG_ALIGN(ramdisk_size);
 	int ret = 0;
 
 	/* We need to move the initrd down into directly mapped mem */
-	u64 relocated_ramdisk = memblock_phys_alloc_range(area_size, PAGE_SIZE, 0,
+	u64 relocated_ramdisk = memblock_phys_alloc_range(area_size, PTE_SIZE, 0,
 						      PFN_PHYS(max_pfn_mapped));
 	if (!relocated_ramdisk)
 		panic("Cannot find place for new RAMDISK of size %lld\n",
@@ -350,7 +350,7 @@ static void __init early_reserve_initrd(void)
 	/* Assume only end is not page aligned */
 	u64 ramdisk_image = get_ramdisk_image();
 	u64 ramdisk_size  = get_ramdisk_size();
-	u64 ramdisk_end   = PAGE_ALIGN(ramdisk_image + ramdisk_size);
+	u64 ramdisk_end   = PG_ALIGN(ramdisk_image + ramdisk_size);
 
 	if (!boot_params.hdr.type_of_loader ||
 	    !ramdisk_image || !ramdisk_size)
@@ -364,7 +364,7 @@ static void __init reserve_initrd(void)
 	/* Assume only end is not page aligned */
 	u64 ramdisk_image = get_ramdisk_image();
 	u64 ramdisk_size  = get_ramdisk_size();
-	u64 ramdisk_end   = PAGE_ALIGN(ramdisk_image + ramdisk_size);
+	u64 ramdisk_end   = PG_ALIGN(ramdisk_image + ramdisk_size);
 
 	if (!boot_params.hdr.type_of_loader ||
 	    !ramdisk_image || !ramdisk_size)
@@ -743,7 +743,7 @@ static void __init trim_snb_memory(void)
 	 */
 
 	for (i = 0; i < ARRAY_SIZE(bad_pages); i++) {
-		if (memblock_reserve(bad_pages[i], PAGE_SIZE))
+		if (memblock_reserve(bad_pages[i], PTE_SIZE))
 			printk(KERN_WARNING "failed to reserve 0x%08lx\n",
 			       bad_pages[i]);
 	}
@@ -760,7 +760,7 @@ static void __init trim_bios_range(void)
 	 * since some BIOSes are known to corrupt low memory.  See the
 	 * Kconfig help text for X86_RESERVE_LOW.
 	 */
-	e820__range_update(0, PAGE_SIZE, E820_TYPE_RAM, E820_TYPE_RESERVED);
+	e820__range_update(0, PTE_SIZE, E820_TYPE_RAM, E820_TYPE_RESERVED);
 
 	/*
 	 * special case: Some BIOSes report the PC BIOS
@@ -1054,7 +1054,7 @@ void __init setup_arch(char **cmdline_p)
 
 	/* How many end-of-memory variables you have, grandma! */
 	/* need this before calling reserve_initrd */
-	if (max_pfn > (1UL<<(32 - PAGE_SHIFT)))
+	if (max_pfn > (1UL<<(32 - PTE_SHIFT)))
 		max_low_pfn = e820__end_of_low_ram_pfn();
 	else
 		max_low_pfn = max_pfn;
@@ -1102,7 +1102,7 @@ void __init setup_arch(char **cmdline_p)
 
 #ifdef CONFIG_X86_32
 	printk(KERN_DEBUG "initial memory mapped: [mem 0x00000000-%#010lx]\n",
-			(max_pfn_mapped<<PAGE_SHIFT) - 1);
+			(max_pfn_mapped<<PTE_SHIFT) - 1);
 #endif
 
 	/*
@@ -1189,7 +1189,7 @@ void __init setup_arch(char **cmdline_p)
 	x86_flattree_get_config();
 
 	initmem_init();
-	dma_contiguous_reserve(max_pfn_mapped << PAGE_SHIFT);
+	dma_contiguous_reserve(max_pfn_mapped << PTE_SHIFT);
 
 	/*
 	 * Reserve memory for crash kernel after SRAT is parsed so that it

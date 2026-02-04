@@ -615,7 +615,7 @@ void __init files_maxfiles_init(void)
 	unsigned long memreserve = (nr_pages - nr_free_pages()) * 3/2;
 
 	memreserve = min(memreserve, nr_pages - 1);
-	n = ((nr_pages - memreserve) * (PAGE_SIZE / 1024)) / 10;
+	n = ((nr_pages - memreserve) * (PG_SIZE / 1024)) / 10;
 
 	files_stat.max_files = max_t(unsigned long, n, NR_FILE);
 }

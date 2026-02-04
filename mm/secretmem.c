@@ -51,14 +51,14 @@ static vm_fault_t secretmem_fault(struct vm_fault *vmf)
 {
 	struct address_space *mapping = vmf->vma->vm_file->f_mapping;
 	struct inode *inode = file_inode(vmf->vma->vm_file);
-	pgoff_t offset = vmf->pgoff;
+	unsigned long offset = vmf->pteoff;
 	gfp_t gfp = vmf->gfp_mask;
 	unsigned long addr;
 	struct folio *folio;
 	vm_fault_t ret;
 	int err;
 
-	if (((loff_t)vmf->pgoff << PAGE_SHIFT) >= i_size_read(inode))
+	if (((loff_t)vmf->pteoff << PTE_SHIFT) >= i_size_read(inode))
 		return vmf_error(-EINVAL);
 
 	filemap_invalidate_lock_shared(mapping);
@@ -97,10 +97,10 @@ retry:
 		}
 
 		addr = (unsigned long)folio_address(folio);
-		flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
+		flush_tlb_kernel_range(addr, addr + PG_SIZE);
 	}
 
-	vmf->page = folio_file_page(folio, vmf->pgoff);
+	vmf->page = folio_file_page(folio, vmf->pteoff);
 	ret = VM_FAULT_LOCKED;
 
 out:

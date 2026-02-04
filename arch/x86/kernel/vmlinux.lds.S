@@ -71,7 +71,7 @@ const_cpu_current_top_of_stack = cpu_current_top_of_stack;
 
 #define X86_ALIGN_RODATA_BEGIN
 #define X86_ALIGN_RODATA_END					\
-		. = ALIGN(PAGE_SIZE);				\
+		. = ALIGN(PTE_SIZE);				\
 		__end_rodata_aligned = .;
 
 #define ALIGN_ENTRY_TEXT_BEGIN
@@ -92,7 +92,7 @@ const_cpu_current_top_of_stack = cpu_current_top_of_stack;
 	__start_bss_decrypted = .;				\
 	__pi___start_bss_decrypted = .;				\
 	*(.bss..decrypted);					\
-	. = ALIGN(PAGE_SIZE);					\
+	. = ALIGN(PTE_SIZE);					\
 	__start_bss_decrypted_unused = .;			\
 	. = ALIGN(PMD_SIZE);					\
 	__end_bss_decrypted = .;				\
@@ -165,10 +165,10 @@ SECTIONS
 
 	/* End of text section, which should occupy whole number of pages */
 	_etext = .;
-	. = ALIGN(PAGE_SIZE);
+	. = ALIGN(PTE_SIZE);
 
 	X86_ALIGN_RODATA_BEGIN
-	RO_DATA(PAGE_SIZE)
+	RO_DATA(PTE_SIZE)
 	X86_ALIGN_RODATA_END
 
 	/* Data */
@@ -187,7 +187,7 @@ SECTIONS
 		NOSAVE_DATA
 #endif
 
-		PAGE_ALIGNED_DATA(PAGE_SIZE)
+		PAGE_ALIGNED_DATA(PTE_SIZE)
 
 		CACHE_HOT_DATA(L1_CACHE_BYTES)
 
@@ -209,12 +209,12 @@ SECTIONS
 	ORC_UNWIND_TABLE
 
 	/* Init code and data - will be freed after init */
-	. = ALIGN(PAGE_SIZE);
+	. = ALIGN(PTE_SIZE);
 	.init.begin : AT(ADDR(.init.begin) - LOAD_OFFSET) {
 		__init_begin = .; /* paired with __init_end */
 	}
 
-	INIT_TEXT_SECTION(PAGE_SIZE)
+	INIT_TEXT_SECTION(PTE_SIZE)
 
 	/*
 	 * Section for code used exclusively before alternatives are run. All
@@ -225,7 +225,7 @@ SECTIONS
 	 */
 	.altinstr_aux : AT(ADDR(.altinstr_aux) - LOAD_OFFSET) {
 		*(.altinstr_aux)
-		. = ALIGN(PAGE_SIZE);
+		. = ALIGN(PTE_SIZE);
 		__inittext_end = .;
 	}
 
@@ -339,7 +339,7 @@ SECTIONS
 	RUNTIME_CONST_VARIABLES
 	RUNTIME_CONST(ptr, USER_PTR_MAX)
 
-	. = ALIGN(PAGE_SIZE);
+	. = ALIGN(PTE_SIZE);
 
 	/* freed after init ends here */
 	.init.end : AT(ADDR(.init.end) - LOAD_OFFSET) {
@@ -350,11 +350,11 @@ SECTIONS
 	 * smp_locks might be freed after init
 	 * start/end must be page aligned
 	 */
-	. = ALIGN(PAGE_SIZE);
+	. = ALIGN(PTE_SIZE);
 	.smp_locks : AT(ADDR(.smp_locks) - LOAD_OFFSET) {
 		__smp_locks = .;
 		*(.smp_locks)
-		. = ALIGN(PAGE_SIZE);
+		. = ALIGN(PTE_SIZE);
 		__smp_locks_end = .;
 	}
 
@@ -365,14 +365,14 @@ SECTIONS
 #endif
 
 	/* BSS */
-	. = ALIGN(PAGE_SIZE);
+	. = ALIGN(PTE_SIZE);
 	.bss : AT(ADDR(.bss) - LOAD_OFFSET) {
 		__bss_start = .;
 		*(.bss..page_aligned)
-		. = ALIGN(PAGE_SIZE);
+		. = ALIGN(PTE_SIZE);
 		*(BSS_MAIN)
 		BSS_DECRYPTED
-		. = ALIGN(PAGE_SIZE);
+		. = ALIGN(PTE_SIZE);
 		__bss_stop = .;
 	}
 
@@ -384,7 +384,7 @@ SECTIONS
 	 */
 	__end_of_kernel_reserve = .;
 
-	. = ALIGN(PAGE_SIZE);
+	. = ALIGN(PTE_SIZE);
 	.brk : AT(ADDR(.brk) - LOAD_OFFSET) {
 		__brk_base = .;
 		. += 64 * 1024;		/* 64k alignment slop space */
@@ -392,7 +392,7 @@ SECTIONS
 		__brk_limit = .;
 	}
 
-	. = ALIGN(PAGE_SIZE);		/* keep VO_INIT_SIZE page aligned */
+	. = ALIGN(PTE_SIZE);		/* keep VO_INIT_SIZE page aligned */
 	_end = .;
 	__pi__end = .;
 

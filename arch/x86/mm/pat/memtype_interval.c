@@ -118,7 +118,7 @@ struct memtype *memtype_erase(u64 start, u64 end)
 
 struct memtype *memtype_lookup(u64 addr)
 {
-	return interval_iter_first(&memtype_rbroot, addr, addr + PAGE_SIZE-1);
+	return interval_iter_first(&memtype_rbroot, addr, addr + PTE_SIZE-1);
 }
 
 /*

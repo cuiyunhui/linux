@@ -13,8 +13,8 @@ static int nullfs_fs_fill_super(struct super_block *s, struct fs_context *fc)
 	struct inode *inode;
 
 	s->s_maxbytes		= MAX_LFS_FILESIZE;
-	s->s_blocksize		= PAGE_SIZE;
-	s->s_blocksize_bits	= PAGE_SHIFT;
+	s->s_blocksize		= PG_SIZE;
+	s->s_blocksize_bits	= PG_SHIFT;
 	s->s_magic		= NULL_FS_MAGIC;
 	s->s_op			= &nullfs_super_operations;
 	s->s_export_op		= NULL;

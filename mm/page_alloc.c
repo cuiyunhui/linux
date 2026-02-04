@@ -377,7 +377,7 @@ static inline int pfn_to_bitidx(const struct page *page, unsigned long pfn)
 #else
 	pfn = pfn - pageblock_start_pfn(page_zone(page)->zone_start_pfn);
 #endif /* CONFIG_SPARSEMEM */
-	return (pfn >> pageblock_order) * NR_PAGEBLOCK_BITS;
+	return (pfn >> pageblock_order) / PTES_PER_PAGE * NR_PAGEBLOCK_BITS;
 }
 
 static __always_inline bool is_standalone_pb_bit(enum pageblock_bits pb_bit)
@@ -728,9 +728,9 @@ static inline bool pcp_allowed_order(unsigned int order)
 /*
  * Higher-order pages are called "compound pages".  They are structured thusly:
  *
- * The first PAGE_SIZE page is called the "head page" and have PG_head set.
+ * The first PG_SIZE page is called the "head page" and have PG_head set.
  *
- * The remaining PAGE_SIZE pages are called "tail pages". PageTail() is encoded
+ * The remaining PG_SIZE pages are called "tail pages". PageTail() is encoded
  * in bit 0 of page->compound_head. The rest of bits is pointer to head page.
  *
  * The first tail page's ->compound_order holds the order of allocation.
@@ -1290,7 +1290,7 @@ void __pgalloc_tag_add(struct page *page, struct task_struct *task,
 	union codetag_ref ref;
 
 	if (get_page_tag_ref(page, &ref, &handle)) {
-		alloc_tag_add(&ref, task->alloc_tag, PAGE_SIZE * nr);
+		alloc_tag_add(&ref, task->alloc_tag, PG_SIZE * nr);
 		update_page_tag_ref(handle, &ref);
 		put_page_tag_ref(handle);
 	}
@@ -1311,7 +1311,7 @@ void __pgalloc_tag_sub(struct page *page, unsigned int nr)
 	union codetag_ref ref;
 
 	if (get_page_tag_ref(page, &ref, &handle)) {
-		alloc_tag_sub(&ref, PAGE_SIZE * nr);
+		alloc_tag_sub(&ref, PG_SIZE * nr);
 		update_page_tag_ref(handle, &ref);
 		put_page_tag_ref(handle);
 	}
@@ -1327,7 +1327,7 @@ static inline void pgalloc_tag_sub(struct page *page, unsigned int nr)
 static inline void pgalloc_tag_sub_pages(struct alloc_tag *tag, unsigned int nr)
 {
 	if (tag)
-		this_cpu_sub(tag->counters->bytes, PAGE_SIZE * nr);
+		this_cpu_sub(tag->counters->bytes, PG_SIZE * nr);
 }
 
 #else /* CONFIG_MEM_ALLOC_PROFILING */
@@ -1436,9 +1436,9 @@ __always_inline bool __free_pages_prepare(struct page *page,
 
 	if (!PageHighMem(page) && !(fpi_flags & FPI_TRYLOCK)) {
 		debug_check_no_locks_freed(page_address(page),
-					   PAGE_SIZE << order);
+					   PG_SIZE << order);
 		debug_check_no_obj_freed(page_address(page),
-					   PAGE_SIZE << order);
+					   PG_SIZE << order);
 	}
 
 	kernel_poison_pages(page, 1 << order);
@@ -1540,9 +1540,9 @@ static void free_pcppages_bulk(struct zone *zone, int count,
 static void split_large_buddy(struct zone *zone, struct page *page,
 			      unsigned long pfn, int order, fpi_t fpi)
 {
-	unsigned long end = pfn + (1 << order);
+	unsigned long end = pfn + ((1 << order) * PTES_PER_PAGE);
 
-	VM_WARN_ON_ONCE(!IS_ALIGNED(pfn, 1 << order));
+	VM_WARN_ON_ONCE(!IS_ALIGNED(pfn, (1 << order) * PTES_PER_PAGE));
 	/* Caller removed page from freelist, buddy info cleared! */
 	VM_WARN_ON_ONCE(PageBuddy(page));
 
@@ -1553,7 +1553,7 @@ static void split_large_buddy(struct zone *zone, struct page *page,
 		int mt = get_pfnblock_migratetype(page, pfn);
 
 		__free_one_page(page, pfn, zone, order, mt, fpi);
-		pfn += 1 << order;
+		pfn += (1 << order) * PTES_PER_PAGE;
 		if (pfn == end)
 			break;
 		page = pfn_to_page(pfn);
@@ -1653,7 +1653,7 @@ void __meminit __free_pages_core(struct page *page, unsigned int order,
 		if (order == MAX_PAGE_ORDER && __free_unaccepted(page))
 			return;
 
-		accept_memory(page_to_phys(page), PAGE_SIZE << order);
+		accept_memory(page_to_phys(page), PG_SIZE << order);
 	}
 
 	/*
@@ -5402,7 +5402,7 @@ static void *make_alloc_exact(unsigned long addr, unsigned int order,
 		size_t size)
 {
 	if (addr) {
-		unsigned long nr = DIV_ROUND_UP(size, PAGE_SIZE);
+		unsigned long nr = DIV_ROUND_UP(size, PG_SIZE);
 		struct page *page = virt_to_page((void *)addr);
 		struct page *last = page + nr;
 
@@ -5481,11 +5481,11 @@ void * __meminit alloc_pages_exact_nid_noprof(int nid, size_t size, gfp_t gfp_ma
 void free_pages_exact(void *virt, size_t size)
 {
 	unsigned long addr = (unsigned long)virt;
-	unsigned long end = addr + PAGE_ALIGN(size);
+	unsigned long end = addr + PG_ALIGN(size);
 
 	while (addr < end) {
 		free_page(addr);
-		addr += PAGE_SIZE;
+		addr += PG_SIZE;
 	}
 }
 EXPORT_SYMBOL(free_pages_exact);
@@ -5930,7 +5930,7 @@ static int zone_batchsize(struct zone *zone)
 	 * size is striking a balance between allocation latency
 	 * and zone lock contention.
 	 */
-	batch = min(zone_managed_pages(zone) >> 12, SZ_256K / PAGE_SIZE);
+	batch = min(zone_managed_pages(zone) >> 12, SZ_256K / PG_SIZE);
 	if (batch <= 1)
 		return 1;
 
@@ -6159,7 +6159,7 @@ static void zone_pcp_update_cacheinfo(struct zone *zone, unsigned int cpu)
 	 * cache-hot pages sharing.
 	 */
 	pcp_spin_lock_maybe_irqsave(pcp, UP_flags);
-	if ((cci->per_cpu_data_slice_size >> PAGE_SHIFT) > 3 * pcp->batch)
+	if ((cci->per_cpu_data_slice_size >> PG_SHIFT) > 3 * pcp->batch)
 		pcp->flags |= PCPF_FREE_HIGH_BATCH;
 	else
 		pcp->flags &= ~PCPF_FREE_HIGH_BATCH;
@@ -6239,9 +6239,9 @@ unsigned long free_reserved_area(void *start, void *end, int poison, const char 
 	void *pos;
 	unsigned long pages = 0;
 
-	start = (void *)PAGE_ALIGN((unsigned long)start);
-	end = (void *)((unsigned long)end & PAGE_MASK);
-	for (pos = start; pos < end; pos += PAGE_SIZE, pages++) {
+	start = (void *)PG_ALIGN((unsigned long)start);
+	end = (void *)((unsigned long)end & PG_MASK);
+	for (pos = start; pos < end; pos += PG_SIZE, pages++) {
 		struct page *page = virt_to_page(pos);
 		void *direct_map_addr;
 
@@ -6259,7 +6259,7 @@ unsigned long free_reserved_area(void *start, void *end, int poison, const char 
 		 */
 		direct_map_addr = kasan_reset_tag(direct_map_addr);
 		if ((unsigned int)poison <= 0xFF)
-			memset(direct_map_addr, poison, PAGE_SIZE);
+			memset(direct_map_addr, poison, PG_SIZE);
 
 		free_reserved_page(page);
 	}
@@ -6432,7 +6432,7 @@ static void setup_per_zone_lowmem_reserve(void)
 
 static void __setup_per_zone_wmarks(void)
 {
-	unsigned long pages_min = min_free_kbytes >> (PAGE_SHIFT - 10);
+	unsigned long pages_min = min_free_kbytes >> (PG_SHIFT - 10);
 	unsigned long lowmem_pages = 0;
 	struct zone *zone;
 	unsigned long flags;
@@ -6547,7 +6547,7 @@ void calculate_min_free_kbytes(void)
 	unsigned long lowmem_kbytes;
 	int new_min_free_kbytes;
 
-	lowmem_kbytes = nr_free_buffer_pages() * (PAGE_SIZE >> 10);
+	lowmem_kbytes = nr_free_buffer_pages() * (PG_SIZE >> 10);
 	new_min_free_kbytes = int_sqrt(lowmem_kbytes * 16);
 
 	if (new_min_free_kbytes > user_min_free_kbytes)
@@ -7482,7 +7482,7 @@ bool is_free_buddy_page(const struct page *page)
 	unsigned int order;
 
 	for (order = 0; order < NR_PAGE_ORDERS; order++) {
-		const struct page *head = page - (pfn & ((1 << order) - 1));
+		const struct page *head = page - ((pfn & ((1 << order) - 1)) * PTES_PER_PAGE);
 
 		if (PageBuddy(head) &&
 		    buddy_order_unsafe(head) >= order)
@@ -7627,7 +7627,7 @@ static bool page_contains_unaccepted(struct page *page, unsigned int order)
 {
 	phys_addr_t start = page_to_phys(page);
 
-	return range_contains_unaccepted_memory(start, PAGE_SIZE << order);
+	return range_contains_unaccepted_memory(start, PG_SIZE << order);
 }
 
 static void __accept_page(struct zone *zone, unsigned long *flags,
@@ -7639,7 +7639,7 @@ static void __accept_page(struct zone *zone, unsigned long *flags,
 	__ClearPageUnaccepted(page);
 	spin_unlock_irqrestore(&zone->lock, *flags);
 
-	accept_memory(page_to_phys(page), PAGE_SIZE << MAX_PAGE_ORDER);
+	accept_memory(page_to_phys(page), PG_SIZE << MAX_PAGE_ORDER);
 
 	__free_pages_ok(page, MAX_PAGE_ORDER, FPI_TO_TAIL);
 }

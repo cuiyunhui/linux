@@ -644,7 +644,7 @@ bool kmem_dump_obj(void *object)
 	struct kmem_obj_info kp = { };
 
 	/* Some arches consider ZERO_SIZE_PTR to be a valid address. */
-	if (object < (void *)PAGE_SIZE || !virt_addr_valid(object))
+	if (object < (void *)PG_SIZE || !virt_addr_valid(object))
 		return false;
 	slab = virt_to_slab(object);
 	if (!slab)
@@ -792,7 +792,7 @@ size_t kmalloc_size_roundup(size_t size)
 
 	/* Above the smaller buckets, size is a multiple of page size. */
 	if (size && size <= KMALLOC_MAX_SIZE)
-		return PAGE_SIZE << get_order(size);
+		return PG_SIZE << get_order(size);
 
 	/*
 	 * Return 'size' for 0 - kmalloc() returns ZERO_SIZE_PTR
@@ -1333,7 +1333,7 @@ struct kvfree_rcu_bulk_data {
  * kvfree_rcu_bulk_data structure becomes exactly one page.
  */
 #define KVFREE_BULK_MAX_ENTR \
-	((PAGE_SIZE - sizeof(struct kvfree_rcu_bulk_data)) / sizeof(void *))
+	((PG_SIZE - sizeof(struct kvfree_rcu_bulk_data)) / sizeof(void *))
 
 /**
  * struct kfree_rcu_cpu_work - single batch of kfree_rcu() requests

@@ -621,9 +621,9 @@ void __init reserve_initrd_mem(void)
 	 * are in use, but more importantly, reserves the entire set of pages
 	 * as we don't want these pages allocated for other purposes.
 	 */
-	start = round_down(phys_initrd_start, PAGE_SIZE);
+	start = round_down(phys_initrd_start, PG_SIZE);
 	size = phys_initrd_size + (phys_initrd_start - start);
-	size = round_up(size, PAGE_SIZE);
+	size = round_up(size, PG_SIZE);
 
 	if (!memblock_is_region_memory(start, size)) {
 		pr_err("INITRD: 0x%08llx+0x%08lx is not a memory region",
@@ -653,8 +653,8 @@ disable:
 void __weak __init free_initrd_mem(unsigned long start, unsigned long end)
 {
 #ifdef CONFIG_ARCH_KEEP_MEMBLOCK
-	unsigned long aligned_start = ALIGN_DOWN(start, PAGE_SIZE);
-	unsigned long aligned_end = ALIGN(end, PAGE_SIZE);
+	unsigned long aligned_start = ALIGN_DOWN(start, PG_SIZE);
+	unsigned long aligned_end = ALIGN(end, PG_SIZE);
 
 	memblock_free((void *)aligned_start, aligned_end - aligned_start);
 #endif

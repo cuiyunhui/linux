@@ -112,7 +112,7 @@ static void init_amd_k6(struct cpuinfo_x86 *c)
 {
 #ifdef CONFIG_X86_32
 	u32 l, h;
-	int mbytes = get_num_physpages() >> (20-PAGE_SHIFT);
+	int mbytes = get_num_physpages() >> (20-PG_SHIFT);
 
 	if (c->x86_model < 6) {
 		/* Based on AMD doc 20734R - June 2000 */
@@ -440,7 +440,7 @@ static void bsp_init_amd(struct cpuinfo_x86 *c)
 		assoc	 = cpuid >> 16 & 0xff;
 		upperbit = ((cpuid >> 24) << 10) / assoc;
 
-		va_align.mask	  = (upperbit - 1) & PAGE_MASK;
+		va_align.mask	  = (upperbit - 1) & PG_MASK;
 		va_align.flags    = ALIGN_VA_32 | ALIGN_VA_64;
 
 		/* A random value per boot for bit slice [12:upper_bit) */

@@ -228,7 +228,7 @@ static __init void early_mmio_serial_init(char *s)
 	if (!strncmp(s, "0x", 2)) {
 		/* NB: only 32-bit addresses are supported. */
 		membase = simple_strtoul(s, &e, 16);
-		early_serial_base = (unsigned long)early_ioremap(membase, PAGE_SIZE);
+		early_serial_base = (unsigned long)early_ioremap(membase, PG_SIZE);
 
 		static_call_update(serial_in, mem32_serial_in);
 		static_call_update(serial_out, mem32_serial_out);

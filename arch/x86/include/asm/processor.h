@@ -223,7 +223,7 @@ extern void cpu_detect(struct cpuinfo_x86 *c);
 
 static inline unsigned long long l1tf_pfn_limit(void)
 {
-	return BIT_ULL(boot_cpu_data.x86_cache_bits - 1 - PAGE_SHIFT);
+	return BIT_ULL(boot_cpu_data.x86_cache_bits - 1 - PTE_SHIFT);
 }
 
 void init_cpu_devs(void);
@@ -359,12 +359,12 @@ struct x86_hw_tss {
 #define IO_BITMAP_OFFSET_INVALID	(__KERNEL_TSS_LIMIT + 1)
 
 struct entry_stack {
-	char	stack[PAGE_SIZE];
+	char	stack[PTE_SIZE];
 };
 
 struct entry_stack_page {
 	struct entry_stack stack;
-} __aligned(PAGE_SIZE);
+} __aligned(PTE_SIZE);
 
 /*
  * All IO bitmap related data stored in the TSS:
@@ -406,7 +406,7 @@ struct tss_struct {
 	struct x86_hw_tss	x86_tss;
 
 	struct x86_io_bitmap	io_bitmap;
-} __aligned(PAGE_SIZE);
+} __aligned(PG_SIZE);
 
 DECLARE_PER_CPU_PAGE_ALIGNED(struct tss_struct, cpu_tss_rw);
 
@@ -674,7 +674,7 @@ extern void start_thread(struct pt_regs *regs, unsigned long new_ip,
  * This decides where the kernel will search for a free chunk of vm
  * space during mmap's.
  */
-#define __TASK_UNMAPPED_BASE(task_size)	(PAGE_ALIGN(task_size / 3))
+#define __TASK_UNMAPPED_BASE(task_size)	(PG_ALIGN(task_size / 3))
 #define TASK_UNMAPPED_BASE		__TASK_UNMAPPED_BASE(TASK_SIZE_LOW)
 
 #define KSTK_EIP(task)		(task_pt_regs(task)->ip)

@@ -134,7 +134,7 @@ static const char *kernfs_iop_get_link(struct dentry *dentry,
 
 	if (!dentry)
 		return ERR_PTR(-ECHILD);
-	body = kzalloc(PAGE_SIZE, GFP_KERNEL);
+	body = kzalloc(PG_SIZE, GFP_KERNEL);
 	if (!body)
 		return ERR_PTR(-ENOMEM);
 	error = kernfs_getlink(inode, body);

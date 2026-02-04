@@ -48,7 +48,7 @@ static int mincore_hugetlb(pte_t *pte, unsigned long hmask, unsigned long addr,
 			present = 1;
 	}
 
-	for (; addr != end; vec++, addr += PAGE_SIZE)
+	for (; addr != end; vec++, addr += PTE_SIZE)
 		*vec = present;
 	walk->private = vec;
 	spin_unlock(ptl);
@@ -105,7 +105,7 @@ static unsigned char mincore_swap(swp_entry_t entry, bool shmem)
  * and is up to date; i.e. that no page-in operation would be required
  * at this time if an application were to map and access this page.
  */
-static unsigned char mincore_page(struct address_space *mapping, pgoff_t index)
+static unsigned char mincore_page(struct address_space *mapping, unsigned long pteoff)
 {
 	unsigned char present = 0;
 	struct folio *folio;
@@ -116,7 +116,7 @@ static unsigned char mincore_page(struct address_space *mapping, pgoff_t index)
 	 * any other file mapping (ie. marked !present and faulted in with
 	 * tmpfs's .fault). So swapped out tmpfs mappings are tested here.
 	 */
-	folio = filemap_get_entry(mapping, index);
+	folio = filemap_get_entry(mapping, pteoff / PTES_PER_PAGE);
 	if (folio) {
 		if (xa_is_value(folio)) {
 			if (shmem_mapping(mapping))
@@ -135,15 +135,15 @@ static unsigned char mincore_page(struct address_space *mapping, pgoff_t index)
 static int __mincore_unmapped_range(unsigned long addr, unsigned long end,
 				struct vm_area_struct *vma, unsigned char *vec)
 {
-	unsigned long nr = (end - addr) >> PAGE_SHIFT;
+	unsigned long nr = (end - addr) >> PTE_SHIFT;
 	int i;
 
 	if (vma->vm_file) {
-		pgoff_t pgoff;
+		unsigned long pteoff;
 
-		pgoff = linear_page_index(vma, addr);
-		for (i = 0; i < nr; i++, pgoff++)
-			vec[i] = mincore_page(vma->vm_file->f_mapping, pgoff);
+		pteoff = linear_pte_index(vma, addr);
+		for (i = 0; i < nr; i++, pteoff++)
+			vec[i] = mincore_page(vma->vm_file->f_mapping, pteoff);
 	} else {
 		for (i = 0; i < nr; i++)
 			vec[i] = 0;
@@ -167,7 +167,7 @@ static int mincore_pte_range(pmd_t *pmd, unsigned long addr, unsigned long end,
 	struct vm_area_struct *vma = walk->vma;
 	pte_t *ptep;
 	unsigned char *vec = walk->private;
-	int nr = (end - addr) >> PAGE_SHIFT;
+	int nr = (end - addr) >> PG_SHIFT;
 	int step, i;
 
 	ptl = pmd_trans_huge_lock(pmd, vma);
@@ -182,19 +182,19 @@ static int mincore_pte_range(pmd_t *pmd, unsigned long addr, unsigned long end,
 		walk->action = ACTION_AGAIN;
 		return 0;
 	}
-	for (; addr != end; ptep += step, addr += step * PAGE_SIZE) {
+	for (; addr != end; ptep += step, addr += step * PTE_SIZE) {
 		pte_t pte = ptep_get(ptep);
 
 		step = 1;
 		/* We need to do cache lookup too for markers */
 		if (pte_none(pte) || pte_is_marker(pte))
-			__mincore_unmapped_range(addr, addr + PAGE_SIZE,
+			__mincore_unmapped_range(addr, addr + PTE_SIZE,
 						 vma, vec);
 		else if (pte_present(pte)) {
 			unsigned int batch = pte_batch_hint(ptep, pte);
 
 			if (batch > 1) {
-				unsigned int max_nr = (end - addr) >> PAGE_SHIFT;
+				unsigned int max_nr = (end - addr) >> PTE_SHIFT;
 
 				step = min_t(unsigned int, batch, max_nr);
 			}
@@ -253,16 +253,16 @@ static long do_mincore(unsigned long addr, unsigned long pages, unsigned char *v
 	vma = vma_lookup(current->mm, addr);
 	if (!vma)
 		return -ENOMEM;
-	end = min(vma->vm_end, addr + (pages << PAGE_SHIFT));
+	end = min(vma->vm_end, addr + (pages << PG_SHIFT));
 	if (!can_do_mincore(vma)) {
-		unsigned long pages = DIV_ROUND_UP(end - addr, PAGE_SIZE);
+		unsigned long pages = DIV_ROUND_UP(end - addr, PG_SIZE);
 		memset(vec, 1, pages);
 		return pages;
 	}
 	err = walk_page_range(vma->vm_mm, addr, end, &mincore_walk_ops, vec);
 	if (err < 0)
 		return err;
-	return (end - addr) >> PAGE_SHIFT;
+	return (end - addr) >> PG_SHIFT;
 }
 
 /*
@@ -282,7 +282,7 @@ static long do_mincore(unsigned long addr, unsigned long pages, unsigned char *v
  * return values:
  *  zero    - success
  *  -EFAULT - vec points to an illegal address
- *  -EINVAL - addr is not a multiple of PAGE_SIZE
+ *  -EINVAL - addr is not a multiple of PG_SIZE
  *  -ENOMEM - Addresses in the range [addr, addr + len] are
  *		invalid for the address space of this process, or
  *		specify one or more pages which are not currently
@@ -299,7 +299,7 @@ SYSCALL_DEFINE3(mincore, unsigned long, start, size_t, len,
 	start = untagged_addr(start);
 
 	/* Check the start address: needs to be page-aligned.. */
-	if (unlikely(start & ~PAGE_MASK))
+	if (unlikely(start & ~PTE_MASK))
 		return -EINVAL;
 
 	/* ..and we need to be passed a valid user-space range */
@@ -307,8 +307,8 @@ SYSCALL_DEFINE3(mincore, unsigned long, start, size_t, len,
 		return -ENOMEM;
 
 	/* This also avoids any overflows on PAGE_ALIGN */
-	pages = len >> PAGE_SHIFT;
-	pages += (offset_in_page(len)) != 0;
+	pages = len >> PTE_SHIFT;
+	pages += (offset_in_pte(len)) != 0;
 
 	if (!access_ok(vec, pages))
 		return -EFAULT;
@@ -320,11 +320,11 @@ SYSCALL_DEFINE3(mincore, unsigned long, start, size_t, len,
 	retval = 0;
 	while (pages) {
 		/*
-		 * Do at most PAGE_SIZE entries per iteration, due to
+		 * Do at most PG_SIZE entries per iteration, due to
 		 * the temporary buffer size.
 		 */
 		mmap_read_lock(current->mm);
-		retval = do_mincore(start, min(pages, PAGE_SIZE), tmp);
+		retval = do_mincore(start, min(pages, PG_SIZE), tmp);
 		mmap_read_unlock(current->mm);
 
 		if (retval <= 0)
@@ -335,7 +335,7 @@ SYSCALL_DEFINE3(mincore, unsigned long, start, size_t, len,
 		}
 		pages -= retval;
 		vec += retval;
-		start += retval << PAGE_SHIFT;
+		start += retval << PTE_SHIFT;
 		retval = 0;
 	}
 	free_page((unsigned long) tmp);

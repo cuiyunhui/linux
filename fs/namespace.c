@@ -3296,7 +3296,7 @@ static void mnt_warn_timestamp_expiry(const struct path *mountpoint,
 
 		buf = (char *)__get_free_page(GFP_KERNEL);
 		if (buf)
-			mntpath = d_path(mountpoint, buf, PAGE_SIZE);
+			mntpath = d_path(mountpoint, buf, PG_SIZE);
 		else
 			mntpath = ERR_PTR(-ENOMEM);
 		if (IS_ERR(mntpath))
@@ -4034,17 +4034,17 @@ static void *copy_mount_options(const void __user * data)
 	if (!data)
 		return NULL;
 
-	copy = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	copy = kmalloc(PG_SIZE, GFP_KERNEL);
 	if (!copy)
 		return ERR_PTR(-ENOMEM);
 
-	left = copy_from_user(copy, data, PAGE_SIZE);
+	left = copy_from_user(copy, data, PG_SIZE);
 
 	/*
 	 * Not all architectures have an exact copy_from_user(). Resort to
 	 * byte at a time.
 	 */
-	offset = PAGE_SIZE - left;
+	offset = PG_SIZE - left;
 	while (left) {
 		char c;
 		if (get_user(c, (const char __user *)data + offset))
@@ -4054,7 +4054,7 @@ static void *copy_mount_options(const void __user * data)
 		offset++;
 	}
 
-	if (left == PAGE_SIZE) {
+	if (left == PG_SIZE) {
 		kfree(copy);
 		return ERR_PTR(-EFAULT);
 	}
@@ -4072,7 +4072,7 @@ static char *copy_mount_string(const void __user *data)
  * be given to the mount() call (ie: read-only, no-dev, no-suid etc).
  *
  * data is a (void *) that can point to any structure up to
- * PAGE_SIZE-1 bytes, which can contain arbitrary fs-dependent
+ * PG_SIZE-1 bytes, which can contain arbitrary fs-dependent
  * information (or be NULL).
  *
  * Pre-0.97 versions of mount() didn't have a flags word.
@@ -4093,7 +4093,7 @@ int path_mount(const char *dev_name, const struct path *path,
 
 	/* Basic sanity checks */
 	if (data_page)
-		((char *)data_page)[PAGE_SIZE - 1] = 0;
+		((char *)data_page)[PG_SIZE - 1] = 0;
 
 	if (flags & MS_NOUSER)
 		return -EINVAL;
@@ -5076,7 +5076,7 @@ static int wants_mount_setattr(struct mount_attr __user *uattr, size_t usize,
 
 	BUILD_BUG_ON(sizeof(struct mount_attr) != MOUNT_ATTR_SIZE_VER0);
 
-	if (unlikely(usize > PAGE_SIZE))
+	if (unlikely(usize > PG_SIZE))
 		return -E2BIG;
 	if (unlikely(usize < MOUNT_ATTR_SIZE_VER0))
 		return -EINVAL;
@@ -5858,7 +5858,7 @@ static int copy_mnt_id_req(const struct mnt_id_req __user *req,
 	ret = get_user(usize, &req->size);
 	if (ret)
 		return -EFAULT;
-	if (unlikely(usize > PAGE_SIZE))
+	if (unlikely(usize > PG_SIZE))
 		return -E2BIG;
 	if (unlikely(usize < MNT_ID_REQ_SIZE_VER0))
 		return -EINVAL;

@@ -46,7 +46,7 @@ static inline void io_region_publish(struct io_ring_ctx *ctx,
 
 static inline size_t io_region_size(struct io_mapped_region *mr)
 {
-	return (size_t) mr->nr_pages << PAGE_SHIFT;
+	return (size_t) mr->nr_pages << PG_SHIFT;
 }
 
 #endif

@@ -289,7 +289,7 @@ static __always_inline bool vmstat_item_in_bytes(int idx)
 {
 	/*
 	 * Global and per-node slab counters track slab pages.
-	 * It's expected that changes are multiples of PAGE_SIZE.
+	 * It's expected that changes are multiples of PG_SIZE.
 	 * Internally values are stored in pages.
 	 *
 	 * Per-memcg and per-lruvec counters track memory, consumed
@@ -919,7 +919,7 @@ struct zone {
 	unsigned long		*pageblock_flags;
 #endif /* CONFIG_SPARSEMEM */
 
-	/* zone_start_pfn == zone_start_paddr >> PAGE_SHIFT */
+	/* zone_start_pfn == zone_start_paddr >> PTE_SHIFT */
 	unsigned long		zone_start_pfn;
 
 	/*
@@ -1116,7 +1116,7 @@ static inline unsigned long zone_cma_pages(struct zone *zone)
 
 static inline unsigned long zone_end_pfn(const struct zone *zone)
 {
-	return zone->zone_start_pfn + zone->spanned_pages;
+	return zone->zone_start_pfn + zone->spanned_pages * PTES_PER_PAGE;
 }
 
 static inline bool zone_spans_pfn(const struct zone *zone, unsigned long pfn)
@@ -1361,7 +1361,7 @@ struct memory_failure_stats {
 	 * Recovery results of poisoned raw pages handled by memory_failure,
 	 * in sync with mf_result.
 	 * total = ignored + failed + delayed + recovered.
-	 * total * PAGE_SIZE * #nodes = /proc/meminfo/HardwareCorrupted.
+	 * total * PG_SIZE * #nodes = /proc/meminfo/HardwareCorrupted.
 	 */
 	unsigned long ignored;
 	unsigned long failed;
@@ -1859,7 +1859,7 @@ static inline bool movable_only_nodes(nodemask_t *nodes)
  * PFN_SECTION_SHIFT		pfn to/from section number
  */
 #define PA_SECTION_SHIFT	(SECTION_SIZE_BITS)
-#define PFN_SECTION_SHIFT	(SECTION_SIZE_BITS - PAGE_SHIFT)
+#define PFN_SECTION_SHIFT	(SECTION_SIZE_BITS - PTE_SHIFT)
 
 #define NR_MEM_SECTIONS		(1UL << SECTIONS_SHIFT)
 
@@ -1869,7 +1869,7 @@ static inline bool movable_only_nodes(nodemask_t *nodes)
 #define SECTION_BLOCKFLAGS_BITS \
 	((1UL << (PFN_SECTION_SHIFT - pageblock_order)) * NR_PAGEBLOCK_BITS)
 
-#if (MAX_PAGE_ORDER + PAGE_SHIFT) > SECTION_SIZE_BITS
+#if (MAX_PAGE_ORDER + PG_SHIFT) > SECTION_SIZE_BITS
 #error Allocator MAX_PAGE_ORDER exceeds SECTION_SIZE
 #endif
 
@@ -1888,7 +1888,7 @@ static inline unsigned long section_nr_to_pfn(unsigned long sec)
 #define SUBSECTION_SHIFT 21
 #define SUBSECTION_SIZE (1UL << SUBSECTION_SHIFT)
 
-#define PFN_SUBSECTION_SHIFT (SUBSECTION_SHIFT - PAGE_SHIFT)
+#define PFN_SUBSECTION_SHIFT (SUBSECTION_SHIFT - PTE_SHIFT)
 #define PAGES_PER_SUBSECTION (1UL << PFN_SUBSECTION_SHIFT)
 #define PAGE_SUBSECTION_MASK (~(PAGES_PER_SUBSECTION-1))
 
@@ -1945,7 +1945,7 @@ struct mem_section {
 };
 
 #ifdef CONFIG_SPARSEMEM_EXTREME
-#define SECTIONS_PER_ROOT       (PAGE_SIZE / sizeof (struct mem_section))
+#define SECTIONS_PER_ROOT       (PG_SIZE / sizeof (struct mem_section))
 #else
 #define SECTIONS_PER_ROOT	1
 #endif
@@ -1988,7 +1988,7 @@ extern size_t mem_section_usage_size(void);
  *   1. All mem_map arrays are page-aligned.
  *   2. section_nr_to_pfn() always clears PFN_SECTION_SHIFT
  *      lowest bits.  PFN_SECTION_SHIFT is arch-specific
- *      (equal SECTION_SIZE_BITS - PAGE_SHIFT), and the
+ *      (equal SECTION_SIZE_BITS - PTE_SHIFT), and the
  *      worst combination is powerpc with 256k pages,
  *      which results in PFN_SECTION_SHIFT equal 6.
  * To sum it up, at least 6 bits are available on all architectures.
@@ -2183,7 +2183,7 @@ static inline int pfn_valid(unsigned long pfn)
 	int ret;
 
 	/*
-	 * Ensure the upper PAGE_SHIFT bits are clear in the
+	 * Ensure the upper PTE_SHIFT bits are clear in the
 	 * pfn. Else it might lead to false positives when
 	 * some of the upper bits are set, but the lower bits
 	 * match a valid pfn.

@@ -80,7 +80,7 @@ void si_meminfo(struct sysinfo *val)
 	val->bufferram = nr_blockdev_pages();
 	val->totalhigh = totalhigh_pages();
 	val->freehigh = nr_free_highpages();
-	val->mem_unit = PAGE_SIZE;
+	val->mem_unit = PG_SIZE;
 }
 
 EXPORT_SYMBOL(si_meminfo);
@@ -108,7 +108,7 @@ void si_meminfo_node(struct sysinfo *val, int nid)
 	val->freeram = sum_zone_node_page_state(nid, NR_FREE_PAGES);
 	val->totalhigh = managed_highpages;
 	val->freehigh = free_highpages;
-	val->mem_unit = PAGE_SIZE;
+	val->mem_unit = PG_SIZE;
 }
 #endif
 

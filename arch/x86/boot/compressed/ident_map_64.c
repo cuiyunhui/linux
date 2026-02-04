@@ -68,7 +68,7 @@ static void *alloc_pgt_page(void *context)
 	}
 
 	entry = pages->pgt_buf + pages->pgt_buf_offset;
-	pages->pgt_buf_offset += PAGE_SIZE;
+	pages->pgt_buf_offset += PTE_SIZE;
 
 	return entry;
 }
@@ -209,7 +209,7 @@ static pte_t *split_large_pmd(struct x86_mapping_info *info,
 	/* Populate the PTEs */
 	for (i = 0; i < PTRS_PER_PMD; i++) {
 		set_pte(&pte[i], __pte(address | page_flags));
-		address += PAGE_SIZE;
+		address += PTE_SIZE;
 	}
 
 	/*
@@ -239,8 +239,8 @@ static void clflush_page(unsigned long address)
 	 * cause another #VC exception and the GHCB is not ready to use yet.
 	 */
 	flush_size = 64;
-	start      = (char *)(address & PAGE_MASK);
-	end        = start + PAGE_SIZE;
+	start      = (char *)(address & PTE_MASK);
+	end        = start + PTE_SIZE;
 
 	/*
 	 * First make sure there are no pending writes on the cache-lines to
@@ -304,7 +304,7 @@ static int set_clr_page_flags(struct x86_mapping_info *info,
 		 * to shared in the RMP table.
 		 */
 		if (clr)
-			snp_set_page_shared(__pa(address & PAGE_MASK));
+			snp_set_page_shared(__pa(address & PTE_MASK));
 	}
 
 	/* Update PTE */
@@ -319,7 +319,7 @@ static int set_clr_page_flags(struct x86_mapping_info *info,
 	 * is updated.
 	 */
 	if (set & _PAGE_ENC)
-		snp_set_page_private(__pa(address & PAGE_MASK));
+		snp_set_page_private(__pa(address & PTE_MASK));
 
 	/* Flush TLB after changing encryption attribute */
 	write_cr3(top_level_pgt);

@@ -44,7 +44,7 @@ struct perf_buffer {
 	long				aux_head;
 	unsigned int			aux_nest;
 	long				aux_wakeup;	/* last aux_watermark boundary crossed by aux_head */
-	unsigned long			aux_pgoff;
+	unsigned long			aux_pteoff;
 	int				aux_nr_pages;
 	int				aux_overwrite;
 	refcount_t			aux_mmap_count;
@@ -125,12 +125,12 @@ static inline int data_page_nr(struct perf_buffer *rb)
 
 static inline unsigned long perf_data_size(struct perf_buffer *rb)
 {
-	return rb->nr_pages << (PAGE_SHIFT + page_order(rb));
+	return rb->nr_pages << (PG_SHIFT + page_order(rb));
 }
 
 static inline unsigned long perf_aux_size(struct perf_buffer *rb)
 {
-	return (unsigned long)rb->aux_nr_pages << PAGE_SHIFT;
+	return (unsigned long)rb->aux_nr_pages << PG_SHIFT;
 }
 
 #define __DEFINE_OUTPUT_COPY_BODY(advance_buf, memcpy_func, ...)	\
@@ -153,7 +153,7 @@ static inline unsigned long perf_aux_size(struct perf_buffer *rb)
 			handle->page++;					\
 			handle->page &= rb->nr_pages - 1;		\
 			handle->addr = rb->data_pages[handle->page];	\
-			handle->size = PAGE_SIZE << page_order(rb);	\
+			handle->size = PG_SIZE << page_order(rb);	\
 		}							\
 	} while (len && written == size);				\
 									\

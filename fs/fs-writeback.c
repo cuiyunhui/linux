@@ -902,7 +902,7 @@ void wbc_detach_inode(struct writeback_control *wbc)
 	 * deciding whether to switch or not.  This is to prevent one-off
 	 * small dirtiers from skewing the verdict.
 	 */
-	max_time = DIV_ROUND_UP((max_bytes >> PAGE_SHIFT) << WB_FRN_TIME_SHIFT,
+	max_time = DIV_ROUND_UP((max_bytes >> PG_SHIFT) << WB_FRN_TIME_SHIFT,
 				wb->avg_write_bandwidth);
 	if (avg_time)
 		avg_time += (max_time >> WB_FRN_TIME_AVG_SHIFT) -

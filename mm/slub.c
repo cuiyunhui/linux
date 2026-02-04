@@ -574,7 +574,7 @@ static inline unsigned int get_info_end(struct kmem_cache *s)
 
 static inline unsigned int order_objects(unsigned int order, unsigned int size)
 {
-	return ((unsigned int)PAGE_SIZE << order) / size;
+	return ((unsigned int)PG_SIZE << order) / size;
 }
 
 static inline struct kmem_cache_order_objects oo_make(unsigned int order,
@@ -1174,7 +1174,7 @@ static void print_trailer(struct kmem_cache *s, struct slab *slab, u8 *p)
 		print_section(KERN_ERR, "Bytes b4 ", p - 16, 16);
 
 	print_section(KERN_ERR,         "Object   ", p,
-		      min_t(unsigned int, s->object_size, PAGE_SIZE));
+		      min_t(unsigned int, s->object_size, PG_SIZE));
 	if (s->flags & SLAB_RED_ZONE)
 		print_section(KERN_ERR, "Redzone  ", p + s->object_size,
 			s->inuse - s->object_size);
@@ -3435,7 +3435,7 @@ static __always_inline void account_slab(struct slab *slab, int order,
 		alloc_slab_obj_exts(slab, s, gfp, true);
 
 	mod_node_page_state(slab_pgdat(slab), cache_vmstat_idx(s),
-			    PAGE_SIZE << order);
+			    PG_SIZE << order);
 }
 
 static __always_inline void unaccount_slab(struct slab *slab, int order,
@@ -3449,7 +3449,7 @@ static __always_inline void unaccount_slab(struct slab *slab, int order,
 	free_slab_obj_exts(slab, allow_spin);
 
 	mod_node_page_state(slab_pgdat(slab), cache_vmstat_idx(s),
-			    -(PAGE_SIZE << order));
+			    -(PG_SIZE << order));
 }
 
 static struct slab *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
@@ -5205,7 +5205,7 @@ static void *___kmalloc_large_node(size_t size, gfp_t flags, int node)
 	if (page) {
 		ptr = page_address(page);
 		mod_lruvec_page_state(page, NR_SLAB_UNRECLAIMABLE_B,
-				      PAGE_SIZE << order);
+				      PG_SIZE << order);
 		__SetPageLargeKmalloc(page);
 	}
 
@@ -5221,7 +5221,7 @@ void *__kmalloc_large_noprof(size_t size, gfp_t flags)
 {
 	void *ret = ___kmalloc_large_node(size, flags, NUMA_NO_NODE);
 
-	trace_kmalloc(_RET_IP_, ret, size, PAGE_SIZE << get_order(size),
+	trace_kmalloc(_RET_IP_, ret, size, PG_SIZE << get_order(size),
 		      flags, NUMA_NO_NODE);
 	return ret;
 }
@@ -5231,7 +5231,7 @@ void *__kmalloc_large_node_noprof(size_t size, gfp_t flags, int node)
 {
 	void *ret = ___kmalloc_large_node(size, flags, node);
 
-	trace_kmalloc(_RET_IP_, ret, size, PAGE_SIZE << get_order(size),
+	trace_kmalloc(_RET_IP_, ret, size, PG_SIZE << get_order(size),
 		      flags, node);
 	return ret;
 }
@@ -5247,7 +5247,7 @@ void *__do_kmalloc_node(size_t size, kmem_buckets *b, gfp_t flags, int node,
 	if (unlikely(size > KMALLOC_MAX_CACHE_SIZE)) {
 		ret = __kmalloc_large_node_noprof(size, flags, node);
 		trace_kmalloc(caller, ret, size,
-			      PAGE_SIZE << get_order(size), flags, node);
+			      PG_SIZE << get_order(size), flags, node);
 		return ret;
 	}
 
@@ -6403,7 +6403,7 @@ static void free_large_kmalloc(struct page *page, void *object)
 	kmsan_kfree_large(object);
 
 	mod_lruvec_page_state(page, NR_SLAB_UNRECLAIMABLE_B,
-			      -(PAGE_SIZE << order));
+			      -(PG_SIZE << order));
 	__ClearPageLargeKmalloc(page);
 	free_frozen_pages(page, order);
 }
@@ -6421,7 +6421,7 @@ void kvfree_rcu_cb(struct rcu_head *head)
 	void *slab_addr;
 
 	if (is_vmalloc_addr(obj)) {
-		obj = (void *) PAGE_ALIGN_DOWN((unsigned long)obj);
+		obj = (void *) PG_ALIGN_DOWN((unsigned long)obj);
 		vfree(obj);
 		return;
 	}
@@ -6433,7 +6433,7 @@ void kvfree_rcu_cb(struct rcu_head *head)
 		 * rcu_head offset can be only less than page size so no need to
 		 * consider allocation order
 		 */
-		obj = (void *) PAGE_ALIGN_DOWN((unsigned long)obj);
+		obj = (void *) PG_ALIGN_DOWN((unsigned long)obj);
 		free_large_kmalloc(page, obj);
 		return;
 	}
@@ -6705,7 +6705,7 @@ static gfp_t kmalloc_gfp_adjust(gfp_t flags, size_t size)
 	 * (__GFP_RETRY_MAYFAIL mode). We still kick in kswapd/kcompactd to
 	 * start working in the background
 	 */
-	if (size > PAGE_SIZE) {
+	if (size > PG_SIZE) {
 		flags |= __GFP_NOWARN;
 
 		if (!(flags & __GFP_RETRY_MAYFAIL))
@@ -6752,7 +6752,7 @@ void *__kvmalloc_node_noprof(DECL_BUCKET_PARAMS(size, b), unsigned long align,
 	ret = __do_kmalloc_node(size, PASS_BUCKET_PARAM(b),
 				kmalloc_gfp_adjust(flags, size),
 				node, _RET_IP_);
-	if (ret || size <= PAGE_SIZE)
+	if (ret || size <= PG_SIZE)
 		return ret;
 
 	/* Don't even allow crazy sizes */
@@ -7351,7 +7351,7 @@ static inline unsigned int calc_slab_order(unsigned int size,
 
 	for (order = min_order; order <= max_order; order++) {
 
-		unsigned int slab_size = (unsigned int)PAGE_SIZE << order;
+		unsigned int slab_size = (unsigned int)PG_SIZE << order;
 		unsigned int rem;
 
 		rem = slab_size % size;
@@ -7632,7 +7632,7 @@ static unsigned int calculate_sheaf_capacity(struct kmem_cache *s,
 	 * two percpu sheaves) as what was used for percpu partial slabs, which
 	 * should result in similar lock contention (barn or list_lock)
 	 */
-	if (s->size >= PAGE_SIZE)
+	if (s->size >= PG_SIZE)
 		capacity = 4;
 	else if (s->size >= 1024)
 		capacity = 12;
@@ -9730,7 +9730,7 @@ static int slab_debug_trace_open(struct inode *inode, struct file *filep)
 
 	alloc = debugfs_get_aux_num(filep);
 
-	if (!alloc_loc_track(t, PAGE_SIZE / sizeof(struct location), GFP_KERNEL)) {
+	if (!alloc_loc_track(t, PG_SIZE / sizeof(struct location), GFP_KERNEL)) {
 		bitmap_free(obj_map);
 		seq_release_private(inode, filep);
 		return -ENOMEM;

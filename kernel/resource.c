@@ -566,8 +566,8 @@ int walk_system_ram_range(unsigned long start_pfn, unsigned long nr_pages,
 	unsigned long pfn, end_pfn;
 	int ret = -EINVAL;
 
-	start = (u64) start_pfn << PAGE_SHIFT;
-	end = ((u64)(start_pfn + nr_pages) << PAGE_SHIFT) - 1;
+	start = (u64) start_pfn << PTE_SHIFT;
+	end = ((u64)(start_pfn + nr_pages) << PTE_SHIFT) - 1;
 	flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
 	while (start < end &&
 	       !find_next_iomem_res(start, end, flags, IORES_DESC_NONE, &res)) {
@@ -1929,8 +1929,8 @@ bool resource_is_exclusive(struct resource *root, u64 addr, resource_size_t size
 
 bool iomem_is_exclusive(u64 addr)
 {
-	return resource_is_exclusive(&iomem_resource, addr & PAGE_MASK,
-				     PAGE_SIZE);
+	return resource_is_exclusive(&iomem_resource, addr & PG_MASK,
+				     PG_SIZE);
 }
 
 struct resource_entry *resource_list_create_entry(struct resource *res,
@@ -1963,7 +1963,7 @@ EXPORT_SYMBOL(resource_list_free);
 #ifdef PA_SECTION_SHIFT
 #define GFR_DEFAULT_ALIGN	(1UL << PA_SECTION_SHIFT)
 #else
-#define GFR_DEFAULT_ALIGN	PAGE_SIZE
+#define GFR_DEFAULT_ALIGN	PG_SIZE
 #endif
 
 static resource_size_t gfr_start(struct resource *base, resource_size_t size,

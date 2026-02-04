@@ -115,12 +115,12 @@ size_t iterate_bvec(struct iov_iter *iter, size_t len, void *priv, void *priv2,
 	do {
 		size_t remain, consumed;
 		size_t offset = p->bv_offset + skip, part;
-		void *kaddr = kmap_local_page(p->bv_page + offset / PAGE_SIZE);
+		void *kaddr = kmap_local_page(p->bv_page + offset / PG_SIZE);
 
 		part = min3(len,
 			   (size_t)(p->bv_len - skip),
-			   (size_t)(PAGE_SIZE - offset % PAGE_SIZE));
-		remain = step(kaddr + offset % PAGE_SIZE, progress, part, priv, priv2);
+			   (size_t)(PG_SIZE - offset % PG_SIZE));
+		remain = step(kaddr + offset % PG_SIZE, progress, part, priv, priv2);
 		kunmap_local(kaddr);
 		consumed = part - remain;
 		len -= consumed;
@@ -170,7 +170,7 @@ size_t iterate_folioq(struct iov_iter *iter, size_t len, void *priv, void *priv2
 		fsize = folioq_folio_size(folioq, slot);
 		if (skip < fsize) {
 			base = kmap_local_folio(folio, skip);
-			part = umin(len, PAGE_SIZE - skip % PAGE_SIZE);
+			part = umin(len, PG_SIZE - skip % PG_SIZE);
 			remain = step(base, progress, part, priv, priv2);
 			kunmap_local(base);
 			consumed = part - remain;
@@ -207,7 +207,7 @@ size_t iterate_xarray(struct iov_iter *iter, size_t len, void *priv, void *priv2
 	struct folio *folio;
 	size_t progress = 0;
 	loff_t start = iter->xarray_start + iter->iov_offset;
-	pgoff_t index = start / PAGE_SIZE;
+	pgoff_t index = start / PG_SIZE;
 	XA_STATE(xas, iter->xarray, index);
 
 	rcu_read_lock();
@@ -228,7 +228,7 @@ size_t iterate_xarray(struct iov_iter *iter, size_t len, void *priv, void *priv2
 			void *base = kmap_local_folio(folio, offset);
 
 			part = min_t(size_t, flen,
-				     PAGE_SIZE - offset_in_page(offset));
+				     PG_SIZE - offset_in_pg(offset));
 			remain = step(base, progress, part, priv, priv2);
 			kunmap_local(base);
 

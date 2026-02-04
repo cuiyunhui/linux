@@ -417,7 +417,7 @@ static void init_stage(struct staging_state *ss)
 static bool can_send_next_chunk(struct staging_state *ss, int *err)
 {
 	/* A page size or remaining bytes if this is the final chunk */
-	ss->chunk_size = min(PAGE_SIZE, ss->ucode_len - ss->offset);
+	ss->chunk_size = min(PTE_SIZE, ss->ucode_len - ss->offset);
 
 	/*
 	 * Each microcode image is divided into chunks, each at most

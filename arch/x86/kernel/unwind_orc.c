@@ -747,7 +747,7 @@ void __unwind_start(struct unwind_state *state, struct task_struct *task,
 		 * See if the next page up is valid so that we can
 		 * generate some kind of backtrace if this happens.
 		 */
-		void *next_page = (void *)PAGE_ALIGN((unsigned long)state->sp);
+		void *next_page = (void *)PG_ALIGN((unsigned long)state->sp);
 		state->error = true;
 		if (get_stack_info(next_page, state->task, &state->stack_info,
 				   &state->stack_mask))

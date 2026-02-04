@@ -110,7 +110,7 @@ void __init kernel_randomize_memory(void)
 	 * add padding if needed (especially for memory hotplug support).
 	 */
 	BUG_ON(kaslr_regions[0].base != &page_offset_base);
-	memory_tb = DIV_ROUND_UP(max_pfn << PAGE_SHIFT, 1UL << TB_SHIFT) +
+	memory_tb = DIV_ROUND_UP(max_pfn << PTE_SHIFT, 1UL << TB_SHIFT) +
 		CONFIG_RANDOMIZE_MEMORY_PHYSICAL_PADDING;
 
 	/*
@@ -127,7 +127,7 @@ void __init kernel_randomize_memory(void)
 	 * Calculate the vmemmap region size in TBs, aligned to a TB
 	 * boundary.
 	 */
-	vmemmap_size = (kaslr_regions[0].size_tb << (TB_SHIFT - PAGE_SHIFT)) *
+	vmemmap_size = (kaslr_regions[0].size_tb << (TB_SHIFT - PTE_SHIFT)) *
 			sizeof(struct page);
 	kaslr_regions[2].size_tb = DIV_ROUND_UP(vmemmap_size, 1UL << TB_SHIFT);
 

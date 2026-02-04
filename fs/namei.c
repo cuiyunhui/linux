@@ -6324,7 +6324,7 @@ const char *page_get_link(struct dentry *dentry, struct inode *inode,
 	char *kaddr = __page_get_link(dentry, inode, callback);
 
 	if (!IS_ERR(kaddr))
-		nd_terminate_link(kaddr, inode->i_size, PAGE_SIZE - 1);
+		nd_terminate_link(kaddr, inode->i_size, PG_SIZE - 1);
 	return kaddr;
 }
 EXPORT_SYMBOL(page_get_link);

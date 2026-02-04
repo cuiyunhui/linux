@@ -395,8 +395,8 @@ static inline void mapping_set_gfp_mask(struct address_space *m, gfp_t mask)
 static inline size_t mapping_max_folio_size_supported(void)
 {
 	if (IS_ENABLED(CONFIG_TRANSPARENT_HUGEPAGE))
-		return 1U << (PAGE_SHIFT + MAX_PAGECACHE_ORDER);
-	return PAGE_SIZE;
+		return 1U << (PG_SHIFT + MAX_PAGECACHE_ORDER);
+	return PG_SIZE;
 }
 
 /*
@@ -482,7 +482,7 @@ mapping_min_folio_nrpages(const struct address_space *mapping)
 static inline unsigned long
 mapping_min_folio_nrbytes(const struct address_space *mapping)
 {
-	return mapping_min_folio_nrpages(mapping) << PAGE_SHIFT;
+	return mapping_min_folio_nrpages(mapping) << PG_SHIFT;
 }
 
 /**
@@ -516,7 +516,7 @@ static inline bool mapping_large_folio_support(const struct address_space *mappi
 /* Return the maximum folio size for this pagecache mapping, in bytes. */
 static inline size_t mapping_max_folio_size(const struct address_space *mapping)
 {
-	return PAGE_SIZE << mapping_max_folio_order(mapping);
+	return PG_SIZE << mapping_max_folio_order(mapping);
 }
 
 static inline int filemap_nr_thps(const struct address_space *mapping)
@@ -725,10 +725,10 @@ static inline unsigned int filemap_get_order(size_t size)
 {
 	unsigned int shift = ilog2(size);
 
-	if (shift <= PAGE_SHIFT)
+	if (shift <= PG_SHIFT)
 		return 0;
 
-	return shift - PAGE_SHIFT;
+	return shift - PG_SHIFT;
 }
 
 /**
@@ -954,7 +954,7 @@ static inline pgoff_t folio_next_index(const struct folio *folio)
  */
 static inline loff_t folio_next_pos(const struct folio *folio)
 {
-	return (loff_t)folio_next_index(folio) << PAGE_SHIFT;
+	return (loff_t)folio_next_index(folio) << PG_SHIFT;
 }
 
 /**
@@ -1023,14 +1023,14 @@ static inline struct folio *read_mapping_folio(struct address_space *mapping,
  * @page: The page which we need the offset of.
  *
  * For file pages, this is the offset from the beginning of the file
- * in units of PAGE_SIZE.  For anonymous pages, this is the offset from
- * the beginning of the anon_vma in units of PAGE_SIZE.  This will
+ * in units of PG_SIZE.  For anonymous pages, this is the offset from
+ * the beginning of the anon_vma in units of PG_SIZE.  This will
  * return nonsense for KSM pages.
  *
  * Context: Caller must have a reference on the folio or otherwise
  * prevent it from being split or freed.
  *
- * Return: The offset in units of PAGE_SIZE.
+ * Return: The offset in units of PG_SIZE.
  */
 static inline pgoff_t page_pgoff(const struct folio *folio,
 		const struct page *page)
@@ -1044,7 +1044,7 @@ static inline pgoff_t page_pgoff(const struct folio *folio,
  */
 static inline loff_t folio_pos(const struct folio *folio)
 {
-	return ((loff_t)folio->index) * PAGE_SIZE;
+	return ((loff_t)folio->index) * PG_SIZE;
 }
 
 /*
@@ -1054,25 +1054,35 @@ static inline loff_t page_offset(struct page *page)
 {
 	struct folio *folio = page_folio(page);
 
-	return folio_pos(folio) + folio_page_idx(folio, page) * PAGE_SIZE;
+	return folio_pos(folio) + folio_page_idx(folio, page) * PG_SIZE;
 }
 
 /*
- * Get the offset in PAGE_SIZE (even for hugetlb folios).
+ * Get the offset in PG_SIZE (even for hugetlb folios).
  */
 static inline pgoff_t folio_pgoff(const struct folio *folio)
 {
 	return folio->index;
 }
 
-static inline pgoff_t linear_page_index(const struct vm_area_struct *vma,
-					const unsigned long address)
+static inline pgoff_t folio_pteoff(struct folio *folio)
 {
-	pgoff_t pgoff;
-	pgoff = (address - vma->vm_start) >> PAGE_SHIFT;
-	pgoff += vma->vm_pgoff;
-	return pgoff;
+	return folio->index * PTES_PER_PAGE;
 }
+
+static inline unsigned long linear_pte_index(const struct vm_area_struct *vma,
+					     const unsigned long address)
+{
+	unsigned long pteoff;
+	pteoff = (address - vma->vm_start) >> PTE_SHIFT;
+	pteoff += vma->vm_pteoff;
+	return pteoff;
+}
+
+#if PTE_SIZE == PG_SIZE
+/* To be removed after conversion is done */
+#define linear_page_index linear_pte_index
+#endif
 
 struct wait_page_key {
 	struct folio *folio;
@@ -1365,7 +1375,7 @@ struct readahead_control {
 		._index = i,						\
 	}
 
-#define VM_READAHEAD_PAGES	(SZ_128K / PAGE_SIZE)
+#define VM_READAHEAD_PAGES	(SZ_128K / PG_SIZE)
 
 void page_cache_ra_unbounded(struct readahead_control *,
 		unsigned long nr_to_read, unsigned long lookahead_count);
@@ -1490,7 +1500,7 @@ static inline unsigned int __readahead_batch(struct readahead_control *rac,
  */
 static inline loff_t readahead_pos(const struct readahead_control *rac)
 {
-	return (loff_t)rac->_index * PAGE_SIZE;
+	return (loff_t)rac->_index * PG_SIZE;
 }
 
 /**
@@ -1499,7 +1509,7 @@ static inline loff_t readahead_pos(const struct readahead_control *rac)
  */
 static inline size_t readahead_length(const struct readahead_control *rac)
 {
-	return rac->_nr_pages * PAGE_SIZE;
+	return rac->_nr_pages * PG_SIZE;
 }
 
 /**
@@ -1526,13 +1536,13 @@ static inline unsigned int readahead_count(const struct readahead_control *rac)
  */
 static inline size_t readahead_batch_length(const struct readahead_control *rac)
 {
-	return rac->_batch_count * PAGE_SIZE;
+	return rac->_batch_count * PG_SIZE;
 }
 
 static inline unsigned long dir_pages(const struct inode *inode)
 {
-	return (unsigned long)(inode->i_size + PAGE_SIZE - 1) >>
-			       PAGE_SHIFT;
+	return (unsigned long)(inode->i_size + PG_SIZE - 1) >>
+			       PG_SHIFT;
 }
 
 /**
@@ -1547,7 +1557,7 @@ static inline ssize_t folio_mkwrite_check_truncate(const struct folio *folio,
 						   const struct inode *inode)
 {
 	loff_t size = i_size_read(inode);
-	pgoff_t index = size >> PAGE_SHIFT;
+	pgoff_t index = size >> PG_SHIFT;
 	size_t offset = offset_in_folio(folio, size);
 
 	if (!folio->mapping)

@@ -369,7 +369,7 @@ static ssize_t print_cpu_modalias(struct device *dev,
 
 	for (i = 0; i < MAX_CPU_FEATURES; i++)
 		if (cpu_have_feature(i)) {
-			if (len + sizeof(",XXXX\n") >= PAGE_SIZE) {
+			if (len + sizeof(",XXXX\n") >= PG_SIZE) {
 				WARN(1, "CPU features overflow page\n");
 				break;
 			}
@@ -381,7 +381,7 @@ static ssize_t print_cpu_modalias(struct device *dev,
 
 static int cpu_uevent(const struct device *dev, struct kobj_uevent_env *env)
 {
-	char *buf = kzalloc(PAGE_SIZE, GFP_KERNEL);
+	char *buf = kzalloc(PG_SIZE, GFP_KERNEL);
 	if (buf) {
 		print_cpu_modalias(NULL, NULL, buf);
 		add_uevent_var(env, "MODALIAS=%s", buf);

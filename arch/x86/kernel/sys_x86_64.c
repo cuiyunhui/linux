@@ -83,10 +83,10 @@ SYSCALL_DEFINE6(mmap, unsigned long, addr, unsigned long, len,
 		unsigned long, prot, unsigned long, flags,
 		unsigned long, fd, unsigned long, off)
 {
-	if (off & ~PAGE_MASK)
+	if (off & ~PTE_MASK)
 		return -EINVAL;
 
-	return ksys_mmap_pgoff(addr, len, prot, flags, fd, off >> PAGE_SHIFT);
+	return ksys_mmap_pgoff(addr, len, prot, flags, fd, off >> PTE_SHIFT);
 }
 
 static void find_start_end(unsigned long addr, unsigned long flags,
@@ -118,7 +118,7 @@ static void find_start_end(unsigned long addr, unsigned long flags,
 static inline unsigned long stack_guard_placement(vm_flags_t vm_flags)
 {
 	if (vm_flags & VM_SHADOW_STACK)
-		return PAGE_SIZE;
+		return PG_SIZE;
 
 	return 0;
 }
@@ -141,7 +141,7 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr, unsigned long len,
 		return -ENOMEM;
 
 	if (addr) {
-		addr = PAGE_ALIGN(addr);
+		addr = PTE_ALIGN(addr);
 		vma = find_vma(mm, addr);
 		if (end - len >= addr &&
 		    (!vma || addr + len <= vm_start_gap(vma)))
@@ -152,7 +152,7 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr, unsigned long len,
 	info.low_limit = begin;
 	info.high_limit = end;
 	if (!(filp && is_file_hugepages(filp))) {
-		info.align_offset = pgoff << PAGE_SHIFT;
+		info.align_offset = pgoff << PTE_SHIFT;
 		info.start_gap = stack_guard_placement(vm_flags);
 	}
 	if (filp) {
@@ -187,7 +187,7 @@ arch_get_unmapped_area_topdown(struct file *filp, unsigned long addr0,
 
 	/* requesting a specific address */
 	if (addr) {
-		addr &= PAGE_MASK;
+		addr &= PG_MASK;
 		if (!mmap_address_hint_valid(addr, len))
 			goto get_unmapped_area;
 
@@ -202,12 +202,12 @@ get_unmapped_area:
 	if (!in_32bit_syscall() && (flags & MAP_ABOVE4G))
 		info.low_limit = SZ_4G;
 	else
-		info.low_limit = PAGE_SIZE;
+		info.low_limit = PG_SIZE;
 
 	info.high_limit = get_mmap_base(0);
 	if (!(filp && is_file_hugepages(filp))) {
 		info.start_gap = stack_guard_placement(vm_flags);
-		info.align_offset = pgoff << PAGE_SHIFT;
+		info.align_offset = pgoff << PTE_SHIFT;
 	}
 
 	/*
@@ -225,7 +225,7 @@ get_unmapped_area:
 		info.align_offset += get_align_bits();
 	}
 	addr = vm_unmapped_area(&info);
-	if (!(addr & ~PAGE_MASK))
+	if (!(addr & ~PTE_MASK))
 		return addr;
 	VM_BUG_ON(addr != -ENOMEM);
 

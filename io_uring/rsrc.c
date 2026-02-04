@@ -44,7 +44,7 @@ int __io_account_mem(struct user_struct *user, unsigned long nr_pages)
 		return 0;
 
 	/* Don't allow more pages than we can safely lock */
-	page_limit = rlimit(RLIMIT_MEMLOCK) >> PAGE_SHIFT;
+	page_limit = rlimit(RLIMIT_MEMLOCK) >> PG_SHIFT;
 
 	cur_pages = atomic_long_read(&user->locked_vm);
 	do {
@@ -86,7 +86,7 @@ int io_account_mem(struct user_struct *user, struct mm_struct *mm_account,
 int io_validate_user_buf_range(u64 uaddr, u64 ulen)
 {
 	unsigned long tmp, base = (unsigned long)uaddr;
-	unsigned long acct_len = (unsigned long)PAGE_ALIGN(ulen);
+	unsigned long acct_len = (unsigned long)PTE_ALIGN(ulen);
 
 	/* arbitrary limit, but we need something */
 	if (ulen > SZ_1G || !ulen)
@@ -661,7 +661,7 @@ static int io_buffer_account_pin(struct io_ring_ctx *ctx, struct page **pages,
 			*last_hpage = hpage;
 			if (headpage_already_acct(ctx, pages, i, hpage))
 				continue;
-			imu->acct_pages += page_size(hpage) >> PAGE_SHIFT;
+			imu->acct_pages += page_size(hpage) >> PG_SHIFT;
 		}
 	}
 
@@ -816,7 +816,7 @@ static struct io_rsrc_node *io_sqe_buffer_register(struct io_ring_ctx *ctx,
 	/* store original address for later verification */
 	imu->ubuf = (unsigned long) iov->iov_base;
 	imu->len = iov->iov_len;
-	imu->folio_shift = PAGE_SHIFT;
+	imu->folio_shift = PG_SHIFT;
 	imu->release = io_release_ubuf;
 	imu->priv = imu;
 	imu->flags = 0;
@@ -825,9 +825,9 @@ static struct io_rsrc_node *io_sqe_buffer_register(struct io_ring_ctx *ctx,
 		imu->folio_shift = data.folio_shift;
 	refcount_set(&imu->refs, 1);
 
-	off = (unsigned long)iov->iov_base & ~PAGE_MASK;
+	off = (unsigned long)iov->iov_base & ~PG_MASK;
 	if (coalesced)
-		off += data.first_folio_page_idx << PAGE_SHIFT;
+		off += data.first_folio_page_idx << PG_SHIFT;
 
 	node->buf = imu;
 	ret = 0;
@@ -969,7 +969,7 @@ int io_buffer_register_bvec(struct io_uring_cmd *cmd, struct request *rq,
 	imu->ubuf = 0;
 	imu->len = blk_rq_bytes(rq);
 	imu->acct_pages = 0;
-	imu->folio_shift = PAGE_SHIFT;
+	imu->folio_shift = PG_SHIFT;
 	refcount_set(&imu->refs, 1);
 	imu->release = release;
 	imu->priv = rq;

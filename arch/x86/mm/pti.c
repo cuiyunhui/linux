@@ -393,7 +393,7 @@ pti_clone_pgtable(unsigned long start, unsigned long end,
 			/* Walk the page-table down to the pte level */
 			pte = pte_offset_kernel(pmd, addr);
 			if (pte_none(*pte)) {
-				addr = round_up(addr + 1, PAGE_SIZE);
+				addr = round_up(addr + 1, PTE_SIZE);
 				continue;
 			}
 
@@ -413,7 +413,7 @@ pti_clone_pgtable(unsigned long start, unsigned long end,
 			/* Clone the PTE */
 			*target_pte = *pte;
 
-			addr = round_up(addr + 1, PAGE_SIZE);
+			addr = round_up(addr + 1, PTE_SIZE);
 
 		} else {
 			BUG();
@@ -468,7 +468,7 @@ static void __init pti_clone_user_shared(void)
 		if (WARN_ON(!target_pte))
 			return;
 
-		*target_pte = pfn_pte(pa >> PAGE_SHIFT, PAGE_KERNEL);
+		*target_pte = pfn_pte(pa >> PTE_SHIFT, PAGE_KERNEL);
 	}
 }
 
@@ -485,7 +485,7 @@ static void __init pti_clone_user_shared(void)
 	unsigned long start, end;
 
 	start = CPU_ENTRY_AREA_BASE;
-	end   = start + (PAGE_SIZE * CPU_ENTRY_AREA_PAGES);
+	end   = start + (PTE_SIZE * CPU_ENTRY_AREA_PAGES);
 
 	pti_clone_pgtable(start, end, PTI_CLONE_PMD, false);
 }
@@ -592,7 +592,7 @@ static void pti_clone_kernel_text(void)
 	 */
 
 	/* Set the global bit for normal non-__init kernel text: */
-	set_memory_global(start, (end_global - start) >> PAGE_SHIFT);
+	set_memory_global(start, (end_global - start) >> PTE_SHIFT);
 }
 
 static void pti_set_kernel_image_nonglobal(void)
@@ -611,7 +611,7 @@ static void pti_set_kernel_image_nonglobal(void)
 	 * pti_clone_kernel_text() map put _PAGE_GLOBAL back for
 	 * areas that are mapped to userspace.
 	 */
-	set_memory_nonglobal(start, (end - start) >> PAGE_SHIFT);
+	set_memory_nonglobal(start, (end - start) >> PTE_SHIFT);
 }
 
 /*

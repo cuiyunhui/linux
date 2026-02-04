@@ -2661,7 +2661,7 @@ static int __init lapic_insert_resource(void)
 
 	/* Put local APIC into the resource map. */
 	lapic_resource.start = apic_mmio_base;
-	lapic_resource.end = lapic_resource.start + PAGE_SIZE - 1;
+	lapic_resource.end = lapic_resource.start + PTE_SIZE - 1;
 	insert_resource(&iomem_resource, &lapic_resource);
 
 	return 0;

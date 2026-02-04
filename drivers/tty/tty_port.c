@@ -230,7 +230,7 @@ int tty_port_alloc_xmit_buf(struct tty_port *port)
 	if (port->xmit_buf == NULL)
 		return -ENOMEM;
 
-	kfifo_init(&port->xmit_fifo, port->xmit_buf, PAGE_SIZE);
+	kfifo_init(&port->xmit_fifo, port->xmit_buf, PG_SIZE);
 
 	return 0;
 }

@@ -3439,7 +3439,7 @@ EXPORT_SYMBOL_GPL(blk_steal_bios);
 
 static size_t order_to_size(unsigned int order)
 {
-	return (size_t)PAGE_SIZE << order;
+	return (size_t)PG_SIZE << order;
 }
 
 /* called before freeing request pool in @tags */

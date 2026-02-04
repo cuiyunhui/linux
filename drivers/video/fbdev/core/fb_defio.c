@@ -272,7 +272,7 @@ static void fb_deferred_io_work(struct work_struct *work)
 		pgoff_t pgoff = pageref->offset >> PAGE_SHIFT;
 
 		mapping_wrprotect_range(fbdefio->mapping, pgoff,
-					page_to_pfn(page), 1);
+					page_to_pfn(page), PTES_PER_PAGE);
 	}
 #endif
 

@@ -324,8 +324,8 @@ static inline void __mod_node_page_state(struct pglist_data *pgdat,
 		 * multiples of whole pages. Store them as pages
 		 * internally to keep the per-cpu counters compact.
 		 */
-		VM_WARN_ON_ONCE(delta & (PAGE_SIZE - 1));
-		delta >>= PAGE_SHIFT;
+		VM_WARN_ON_ONCE(delta & (PG_SIZE - 1));
+		delta >>= PG_SHIFT;
 	}
 
 	node_page_state_add(delta, pgdat, item);

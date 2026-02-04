@@ -706,7 +706,7 @@ static struct page *__dma_alloc_pages(struct device *dev, size_t size,
 	if (WARN_ON_ONCE(gfp & __GFP_COMP))
 		return NULL;
 
-	size = PAGE_ALIGN(size);
+	size = PG_ALIGN(size);
 	if (dma_alloc_direct(dev, ops))
 		return dma_direct_alloc_pages(dev, size, dma_handle, dir, gfp);
 	if (use_dma_iommu(dev))
@@ -737,7 +737,7 @@ static void __dma_free_pages(struct device *dev, size_t size, struct page *page,
 {
 	const struct dma_map_ops *ops = get_dma_ops(dev);
 
-	size = PAGE_ALIGN(size);
+	size = PG_ALIGN(size);
 	if (dma_alloc_direct(dev, ops))
 		dma_direct_free_pages(dev, size, page, dma_handle, dir);
 	else if (use_dma_iommu(dev))
@@ -758,13 +758,14 @@ EXPORT_SYMBOL_GPL(dma_free_pages);
 int dma_mmap_pages(struct device *dev, struct vm_area_struct *vma,
 		size_t size, struct page *page)
 {
-	unsigned long count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+	unsigned long count = PG_ALIGN(size) >> PTE_SHIFT;
 
-	if (vma->vm_pgoff >= count || vma_pages(vma) > count - vma->vm_pgoff)
+	if (vma->vm_pteoff >= count ||
+	    vma_pages(vma) * PTES_PER_PAGE > count - vma->vm_pteoff)
 		return -ENXIO;
 	return remap_pfn_range(vma, vma->vm_start,
-			       page_to_pfn(page) + vma->vm_pgoff,
-			       vma_pages(vma) << PAGE_SHIFT, vma->vm_page_prot);
+			       page_to_pfn(page) + vma->vm_pteoff,
+			       vma_pages(vma) << PTE_SHIFT, vma->vm_page_prot);
 }
 EXPORT_SYMBOL_GPL(dma_mmap_pages);
 
@@ -782,7 +783,7 @@ static struct sg_table *alloc_single_sgt(struct device *dev, size_t size,
 	page = __dma_alloc_pages(dev, size, &sgt->sgl->dma_address, dir, gfp);
 	if (!page)
 		goto out_free_table;
-	sg_set_page(sgt->sgl, page, PAGE_ALIGN(size), 0);
+	sg_set_page(sgt->sgl, page, PG_ALIGN(size), 0);
 	sg_dma_len(sgt->sgl) = sgt->sgl->length;
 	return sgt;
 out_free_table:

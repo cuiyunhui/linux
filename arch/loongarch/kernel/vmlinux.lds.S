@@ -5,6 +5,7 @@
 #include <asm/orc_lookup.h>
 
 #define PAGE_SIZE _PAGE_SIZE
+#define PTE_SIZE _PAGE_SIZE
 #define RO_EXCEPTION_TABLE_ALIGN	4
 #define PHYSADDR_MASK			0xffffffffffff /* 48-bit */
 

@@ -44,7 +44,7 @@ static inline int io_notif_account_mem(struct io_kiocb *notif, unsigned len)
 {
 	struct io_ring_ctx *ctx = notif->ctx;
 	struct io_notif_data *nd = io_notif_to_data(notif);
-	unsigned nr_pages = (len >> PAGE_SHIFT) + 2;
+	unsigned nr_pages = (len >> PG_SHIFT) + 2;
 	int ret;
 
 	if (ctx->user) {

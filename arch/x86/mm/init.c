@@ -131,7 +131,7 @@ __ref void *alloc_low_pages(unsigned int num)
 	if (after_bootmem) {
 		unsigned int order;
 
-		order = get_order((unsigned long)num << PAGE_SHIFT);
+		order = get_order((unsigned long)num << PTE_SHIFT);
 		return (void *)__get_free_pages(GFP_ATOMIC | __GFP_ZERO, order);
 	}
 
@@ -140,17 +140,17 @@ __ref void *alloc_low_pages(unsigned int num)
 
 		if (min_pfn_mapped < max_pfn_mapped) {
 			ret = memblock_phys_alloc_range(
-					PAGE_SIZE * num, PAGE_SIZE,
-					min_pfn_mapped << PAGE_SHIFT,
-					max_pfn_mapped << PAGE_SHIFT);
+					PTE_SIZE * num, PTE_SIZE,
+					min_pfn_mapped << PTE_SHIFT,
+					max_pfn_mapped << PTE_SHIFT);
 		}
 		if (!ret && can_use_brk_pgt)
-			ret = __pa(extend_brk(PAGE_SIZE * num, PAGE_SIZE));
+			ret = __pa(extend_brk(PTE_SIZE * num, PTE_SIZE));
 
 		if (!ret)
 			panic("alloc_low_pages: can not alloc memory");
 
-		pfn = ret >> PAGE_SHIFT;
+		pfn = ret >> PTE_SHIFT;
 	} else {
 		pfn = pgt_buf_end;
 		pgt_buf_end += num;
@@ -159,11 +159,12 @@ __ref void *alloc_low_pages(unsigned int num)
 	for (i = 0; i < num; i++) {
 		void *adr;
 
-		adr = __va((pfn + i) << PAGE_SHIFT);
-		clear_page(adr);
+		adr = __va((pfn + i) << PTE_SHIFT);
+		//clear_page(adr);
+		memset(adr, 0, PTE_SIZE);
 	}
 
-	return __va(pfn << PAGE_SHIFT);
+	return __va(pfn << PTE_SHIFT);
 }
 
 /*
@@ -182,18 +183,18 @@ __ref void *alloc_low_pages(unsigned int num)
 #define INIT_PGD_PAGE_COUNT      (4 * INIT_PGD_PAGE_TABLES)
 #endif
 
-#define INIT_PGT_BUF_SIZE	(INIT_PGD_PAGE_COUNT * PAGE_SIZE)
+#define INIT_PGT_BUF_SIZE	(INIT_PGD_PAGE_COUNT * PTE_SIZE)
 RESERVE_BRK(early_pgt_alloc, INIT_PGT_BUF_SIZE);
 void  __init early_alloc_pgt_buf(void)
 {
 	unsigned long tables = INIT_PGT_BUF_SIZE;
 	phys_addr_t base;
 
-	base = __pa(extend_brk(tables, PAGE_SIZE));
+	base = __pa(extend_brk(tables, PTE_SIZE));
 
-	pgt_buf_start = base >> PAGE_SHIFT;
+	pgt_buf_start = base >> PTE_SHIFT;
 	pgt_buf_end = pgt_buf_start;
-	pgt_buf_top = pgt_buf_start + (tables >> PAGE_SHIFT);
+	pgt_buf_top = pgt_buf_start + (tables >> PTE_SHIFT);
 }
 
 int after_bootmem;
@@ -330,8 +331,8 @@ static int __meminit save_mr(struct map_range *mr, int nr_range,
 	if (start_pfn < end_pfn) {
 		if (nr_range >= NR_RANGE_MR)
 			panic("run out of range for init_memory_mapping\n");
-		mr[nr_range].start = start_pfn<<PAGE_SHIFT;
-		mr[nr_range].end   = end_pfn<<PAGE_SHIFT;
+		mr[nr_range].start = start_pfn<<PTE_SHIFT;
+		mr[nr_range].end   = end_pfn<<PTE_SHIFT;
 		mr[nr_range].page_size_mask = page_size_mask;
 		nr_range++;
 	}
@@ -355,7 +356,7 @@ static void __ref adjust_range_page_size_mask(struct map_range *mr,
 			unsigned long end = round_up(mr[i].end, PMD_SIZE);
 
 #ifdef CONFIG_X86_32
-			if ((end >> PAGE_SHIFT) > max_low_pfn)
+			if ((end >> PTE_SHIFT) > max_low_pfn)
 				continue;
 #endif
 
@@ -509,9 +510,9 @@ static void add_pfn_range_mapped(unsigned long start_pfn, unsigned long end_pfn)
 
 	max_pfn_mapped = max(max_pfn_mapped, end_pfn);
 
-	if (start_pfn < (1UL<<(32-PAGE_SHIFT)))
+	if (start_pfn < (1UL<<(32-PTE_SHIFT)))
 		max_low_pfn_mapped = max(max_low_pfn_mapped,
-					 min(end_pfn, 1UL<<(32-PAGE_SHIFT)));
+					 min(end_pfn, 1UL<<(32-PTE_SHIFT)));
 }
 
 bool pfn_range_is_mapped(unsigned long start_pfn, unsigned long end_pfn)
@@ -549,9 +550,9 @@ unsigned long __ref init_memory_mapping(unsigned long start,
 						   mr[i].page_size_mask,
 						   prot);
 
-	add_pfn_range_mapped(start >> PAGE_SHIFT, ret >> PAGE_SHIFT);
+	add_pfn_range_mapped(start >> PTE_SHIFT, ret >> PTE_SHIFT);
 
-	return ret >> PAGE_SHIFT;
+	return ret >> PTE_SHIFT;
 }
 
 /*
@@ -585,8 +586,8 @@ static unsigned long __init init_range_memory_mapping(
 		 * if it is overlapping with brk pgt, we need to
 		 * alloc pgt buf from memblock instead.
 		 */
-		can_use_brk_pgt = max(start, (u64)pgt_buf_end<<PAGE_SHIFT) >=
-				    min(end, (u64)pgt_buf_top<<PAGE_SHIFT);
+		can_use_brk_pgt = max(start, (u64)pgt_buf_end<<PTE_SHIFT) >=
+				    min(end, (u64)pgt_buf_top<<PTE_SHIFT);
 		init_memory_mapping(start, end, PAGE_KERNEL);
 		mapped_ram_size += end - start;
 		can_use_brk_pgt = true;
@@ -611,7 +612,7 @@ static unsigned long __init get_new_step_size(unsigned long step_size)
 	 * In the bottom-up case, round_up(x, 0) returns 0 though too, which
 	 * needs to be taken into consideration by the code below.
 	 */
-	return step_size << (PMD_SHIFT - PAGE_SHIFT - 1);
+	return step_size << (PMD_SHIFT - PTE_SHIFT - 1);
 }
 
 /**
@@ -653,7 +654,7 @@ static void __init memory_map_top_down(unsigned long map_start,
 	/* step_size need to be small so pgt_buf from BRK could cover it */
 	step_size = PMD_SIZE;
 	max_pfn_mapped = 0; /* will get exact value next */
-	min_pfn_mapped = real_end >> PAGE_SHIFT;
+	min_pfn_mapped = real_end >> PTE_SHIFT;
 	last_start = real_end;
 
 	/*
@@ -674,7 +675,7 @@ static void __init memory_map_top_down(unsigned long map_start,
 		mapped_ram_size += init_range_memory_mapping(start,
 							last_start);
 		last_start = start;
-		min_pfn_mapped = last_start >> PAGE_SHIFT;
+		min_pfn_mapped = last_start >> PTE_SHIFT;
 		if (mapped_ram_size >= step_size)
 			step_size = get_new_step_size(step_size);
 	}
@@ -703,7 +704,7 @@ static void __init memory_map_bottom_up(unsigned long map_start,
 	unsigned long step_size = PMD_SIZE;
 
 	start = map_start;
-	min_pfn_mapped = start >> PAGE_SHIFT;
+	min_pfn_mapped = start >> PTE_SHIFT;
 
 	/*
 	 * We start from the bottom (@map_start) and go to the top (@map_end).
@@ -764,9 +765,9 @@ void __init init_mem_mapping(void)
 	setup_pcid();
 
 #ifdef CONFIG_X86_64
-	end = max_pfn << PAGE_SHIFT;
+	end = max_pfn << PTE_SHIFT;
 #else
-	end = max_low_pfn << PAGE_SHIFT;
+	end = max_low_pfn << PTE_SHIFT;
 #endif
 
 	/* the ISA range is always mapped regardless of memory holes */
@@ -809,7 +810,7 @@ void __init init_mem_mapping(void)
 
 	x86_init.hyper.init_mem_mapping();
 
-	early_memtest(0, max_pfn_mapped << PAGE_SHIFT);
+	early_memtest(0, max_pfn_mapped << PTE_SHIFT);
 }
 
 /*
@@ -836,11 +837,11 @@ void __init poking_init(void)
 	 */
 	text_poke_mm_addr = TASK_UNMAPPED_BASE;
 	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
-		text_poke_mm_addr += (kaslr_get_random_long("Poking") & PAGE_MASK) %
-			(TASK_SIZE - TASK_UNMAPPED_BASE - 3 * PAGE_SIZE);
+		text_poke_mm_addr += (kaslr_get_random_long("Poking") & PTE_MASK) %
+			(TASK_SIZE - TASK_UNMAPPED_BASE - 3 * PG_SIZE);
 
-	if (((text_poke_mm_addr + PAGE_SIZE) & ~PMD_MASK) == 0)
-		text_poke_mm_addr += PAGE_SIZE;
+	if (((text_poke_mm_addr + PG_SIZE) & ~PMD_MASK) == 0)
+		text_poke_mm_addr += PG_SIZE;
 
 	/*
 	 * We need to trigger the allocation of the page-tables that will be
@@ -866,7 +867,7 @@ void __init poking_init(void)
  */
 int devmem_is_allowed(unsigned long pagenr)
 {
-	if (region_intersects(PFN_PHYS(pagenr), PAGE_SIZE,
+	if (region_intersects(PFN_PHYS(pagenr), PG_SIZE,
 				IORESOURCE_SYSTEM_RAM, IORES_DESC_NONE)
 			!= REGION_DISJOINT) {
 		/*
@@ -883,7 +884,7 @@ int devmem_is_allowed(unsigned long pagenr)
 	 * This must follow RAM test, since System RAM is considered a
 	 * restricted resource under CONFIG_STRICT_DEVMEM.
 	 */
-	if (iomem_is_exclusive(pagenr << PAGE_SHIFT)) {
+	if (iomem_is_exclusive(pagenr << PTE_SHIFT)) {
 		/* Low 1MB bypasses iomem restrictions. */
 		if (pagenr < 256)
 			return 1;
@@ -899,10 +900,10 @@ void free_init_pages(const char *what, unsigned long begin, unsigned long end)
 	unsigned long begin_aligned, end_aligned;
 
 	/* Make sure boundaries are page aligned */
-	begin_aligned = PAGE_ALIGN(begin);
-	end_aligned   = end & PAGE_MASK;
+	begin_aligned = PFN_ALIGN(begin);
+	end_aligned   = end & PTE_MASK;
 
-	if (WARN_ON(begin_aligned != begin || end_aligned != end)) {
+	if (/*WARN_ON*/(begin_aligned != begin || end_aligned != end)) {
 		begin = begin_aligned;
 		end   = end_aligned;
 	}
@@ -923,15 +924,15 @@ void free_init_pages(const char *what, unsigned long begin, unsigned long end)
 		 * corresponding pages will be unmapped.
 		 */
 		kmemleak_free_part((void *)begin, end - begin);
-		set_memory_np(begin, (end - begin) >> PAGE_SHIFT);
+		set_memory_np(begin, (end - begin) >> PTE_SHIFT);
 	} else {
 		/*
 		 * We just marked the kernel text read only above, now that
 		 * we are going to free part of that, we need to make that
 		 * writeable and non-executable first.
 		 */
-		set_memory_nx(begin, (end - begin) >> PAGE_SHIFT);
-		set_memory_rw(begin, (end - begin) >> PAGE_SHIFT);
+		set_memory_nx(begin, (end - begin) >> PTE_SHIFT);
+		set_memory_rw(begin, (end - begin) >> PTE_SHIFT);
 
 		free_reserved_area((void *)begin, (void *)end,
 				   POISON_FREE_INITMEM, what);
@@ -947,7 +948,7 @@ void free_kernel_image_pages(const char *what, void *begin, void *end)
 {
 	unsigned long begin_ul = (unsigned long)begin;
 	unsigned long end_ul = (unsigned long)end;
-	unsigned long len_pages = (end_ul - begin_ul) >> PAGE_SHIFT;
+	unsigned long len_pages = (end_ul - begin_ul) >> PTE_SHIFT;
 
 	free_init_pages(what, begin_ul, end_ul);
 
@@ -990,9 +991,9 @@ void __init free_initrd_mem(unsigned long start, unsigned long end)
 	 *   - i386_start_kernel()
 	 *   - x86_64_start_kernel()
 	 *   - relocate_initrd()
-	 * So here We can do PAGE_ALIGN() safely to get partial page to be freed
+	 * So here We can do PFN_ALIGN() safely to get partial page to be freed
 	 */
-	free_init_pages("initrd", start, PAGE_ALIGN(end));
+	free_init_pages("initrd", start, PFN_ALIGN(end));
 }
 #endif
 
@@ -1045,7 +1046,7 @@ unsigned long arch_max_swapfile_size(void)
 		 * which makes the usable limit higher.
 		 */
 #if CONFIG_PGTABLE_LEVELS > 2
-		l1tf_limit <<= PAGE_SHIFT - SWP_OFFSET_FIRST_BIT;
+		l1tf_limit <<= PTE_SHIFT - SWP_OFFSET_FIRST_BIT;
 #endif
 		pages = min_t(unsigned long long, l1tf_limit, pages);
 	}
@@ -1070,7 +1071,7 @@ struct execmem_info __init *execmem_arch_setup(void)
 	pgprot_t pgprot;
 
 	if (kaslr_enabled())
-		offset = get_random_u32_inclusive(1, 1024) * PAGE_SIZE;
+		offset = get_random_u32_inclusive(1, 1024) * PG_SIZE;
 
 	start = MODULES_VADDR + offset;
 

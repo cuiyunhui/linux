@@ -84,7 +84,7 @@ KCFI_REFERENCE(__clear_pages_unrolled);
  */
 static inline void clear_pages(void *addr, unsigned int npages)
 {
-	u64 len = npages * PAGE_SIZE;
+	u64 len = npages * PG_SIZE;
 	/*
 	 * Clean up KMSAN metadata for the pages being cleared. The assembly call
 	 * below clobbers @addr, so perform unpoisoning before it.
@@ -142,8 +142,8 @@ static __always_inline unsigned long task_size_max(void)
 	alternative_io("movq %[small],%0","movq %[large],%0",
 			X86_FEATURE_LA57,
 			"=r" (ret),
-			[small] "i" ((1ul << 47)-PAGE_SIZE),
-			[large] "i" ((1ul << 56)-PAGE_SIZE));
+			[small] "i" ((1ul << 47)-PG_SIZE),
+			[large] "i" ((1ul << 56)-PG_SIZE));
 
 	return ret;
 }

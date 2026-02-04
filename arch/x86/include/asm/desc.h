@@ -43,7 +43,7 @@ static inline void fill_ldt(struct desc_struct *desc, const struct user_desc *in
 
 struct gdt_page {
 	struct desc_struct gdt[GDT_ENTRIES];
-} __attribute__((aligned(PAGE_SIZE)));
+} __attribute__((aligned(PTE_SIZE)));
 
 DECLARE_PER_CPU_PAGE_ALIGNED(struct gdt_page, gdt_page);
 

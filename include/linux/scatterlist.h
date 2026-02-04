@@ -158,7 +158,7 @@ static inline void sg_assign_page(struct scatterlist *sg, struct page *page)
 static inline void sg_set_page(struct scatterlist *sg, struct page *page,
 			       unsigned int len, unsigned int offset)
 {
-	VM_WARN_ON_ONCE(!page_range_contiguous(page, ALIGN(len + offset, PAGE_SIZE) / PAGE_SIZE));
+	VM_WARN_ON_ONCE(!page_range_contiguous(page, ALIGN(len + offset, PG_SIZE) / PG_SIZE));
 	sg_assign_page(sg, page);
 	sg->offset = offset;
 	sg->length = len;
@@ -209,7 +209,7 @@ static inline void sg_set_buf(struct scatterlist *sg, const void *buf,
 #ifdef CONFIG_DEBUG_SG
 	BUG_ON(!virt_addr_valid(buf));
 #endif
-	sg_set_page(sg, virt_to_page(buf), buflen, offset_in_page(buf));
+	sg_set_page(sg, virt_to_page(buf), buflen, offset_in_pg(buf));
 }
 
 /*
@@ -532,7 +532,7 @@ size_t sg_zero_buffer(struct scatterlist *sgl, unsigned int nents,
  * Maximum number of entries that will be allocated in one piece, if
  * a list larger than this is required then chaining will be utilized.
  */
-#define SG_MAX_SINGLE_ALLOC		(PAGE_SIZE / sizeof(struct scatterlist))
+#define SG_MAX_SINGLE_ALLOC		(PG_SIZE / sizeof(struct scatterlist))
 
 /*
  * The maximum number of SG segments that we will put inside a
@@ -615,7 +615,7 @@ static inline dma_addr_t
 sg_page_iter_dma_address(struct sg_dma_page_iter *dma_iter)
 {
 	return sg_dma_address(dma_iter->base.sg) +
-	       (dma_iter->base.sg_pgoffset << PAGE_SHIFT);
+	       (dma_iter->base.sg_pgoffset << PG_SHIFT);
 }
 
 /**
@@ -626,7 +626,7 @@ sg_page_iter_dma_address(struct sg_dma_page_iter *dma_iter)
  * @pgoffset:	starting page offset (in pages)
  *
  * Callers may use sg_page_iter_page() to get each page pointer.
- * In each loop it operates on PAGE_SIZE unit.
+ * In each loop it operates on PG_SIZE unit.
  */
 #define for_each_sg_page(sglist, piter, nents, pgoffset)		   \
 	for (__sg_page_iter_start((piter), (sglist), (nents), (pgoffset)); \
@@ -641,7 +641,7 @@ sg_page_iter_dma_address(struct sg_dma_page_iter *dma_iter)
  * @pgoffset:	starting page offset (in pages)
  *
  * Callers may use sg_page_iter_dma_address() to get each page's DMA address.
- * In each loop it operates on PAGE_SIZE unit.
+ * In each loop it operates on PG_SIZE unit.
  */
 #define for_each_sg_dma_page(sglist, dma_iter, dma_nents, pgoffset)            \
 	for (__sg_page_iter_start(&(dma_iter)->base, sglist, dma_nents,        \
@@ -656,7 +656,7 @@ sg_page_iter_dma_address(struct sg_dma_page_iter *dma_iter)
  *
  * Iterates over the all memory pages in the buffer described by
  * a scatterlist stored in the given sg_table object.
- * See also for_each_sg_page(). In each loop it operates on PAGE_SIZE unit.
+ * See also for_each_sg_page(). In each loop it operates on PG_SIZE unit.
  */
 #define for_each_sgtable_page(sgt, piter, pgoffset)	\
 	for_each_sg_page((sgt)->sgl, piter, (sgt)->orig_nents, pgoffset)
@@ -669,7 +669,7 @@ sg_page_iter_dma_address(struct sg_dma_page_iter *dma_iter)
  *
  * Iterates over the all DMA mapped pages in the buffer described by
  * a scatterlist stored in the given sg_table object.
- * See also for_each_sg_dma_page(). In each loop it operates on PAGE_SIZE
+ * See also for_each_sg_dma_page(). In each loop it operates on PG_SIZE
  * unit.
  */
 #define for_each_sgtable_dma_page(sgt, dma_iter, pgoffset)	\

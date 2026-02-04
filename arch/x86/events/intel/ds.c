@@ -21,7 +21,7 @@ DEFINE_PER_CPU_PAGE_ALIGNED(struct debug_store, cpu_debug_store);
 /* The size of a BTS record in bytes: */
 #define BTS_RECORD_SIZE		24
 
-#define PEBS_FIXUP_SIZE		PAGE_SIZE
+#define PEBS_FIXUP_SIZE		PG_SIZE
 
 /*
  * pebs_record_32 for p4 and core not supported
@@ -804,7 +804,7 @@ static void ds_update_cea(void *cea, void *addr, size_t size, pgprot_t prot)
 	pa = virt_to_phys(addr);
 
 	preempt_disable();
-	for (; msz < size; msz += PAGE_SIZE, pa += PAGE_SIZE, cea += PAGE_SIZE)
+	for (; msz < size; msz += PG_SIZE, pa += PG_SIZE, cea += PG_SIZE)
 		cea_set_pte(cea, pa, prot);
 
 	/*
@@ -821,7 +821,7 @@ static void ds_clear_cea(void *cea, size_t size)
 	size_t msz = 0;
 
 	preempt_disable();
-	for (; msz < size; msz += PAGE_SIZE, cea += PAGE_SIZE)
+	for (; msz < size; msz += PG_SIZE, cea += PG_SIZE)
 		cea_set_pte(cea, 0, PAGE_NONE);
 
 	flush_tlb_kernel_range(start, start + size);
@@ -3352,13 +3352,13 @@ static void __init intel_ds_pebs_init(void)
 			pr_cont("PEBS fmt0%c, ", pebs_type);
 			x86_pmu.pebs_record_size = sizeof(struct pebs_record_core);
 			/*
-			 * Using >PAGE_SIZE buffers makes the WRMSR to
+			 * Using >PG_SIZE buffers makes the WRMSR to
 			 * PERF_GLOBAL_CTRL in intel_pmu_enable_all()
 			 * mysteriously hang on Core2.
 			 *
 			 * As a workaround, we don't do this.
 			 */
-			x86_pmu.pebs_buffer_size = PAGE_SIZE;
+			x86_pmu.pebs_buffer_size = PG_SIZE;
 			x86_pmu.drain_pebs = intel_pmu_drain_pebs_core;
 			break;
 

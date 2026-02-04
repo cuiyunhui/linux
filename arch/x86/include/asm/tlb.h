@@ -87,7 +87,7 @@ static inline void __invlpgb(unsigned long asid, unsigned long pcid,
 	u32 edx = (pcid << 16) | asid;
 
 	/* The low bits in rax are for flags. Verify addr is clean. */
-	VM_WARN_ON_ONCE(addr & ~PAGE_MASK);
+	VM_WARN_ON_ONCE(addr & ~PTE_MASK);
 
 	/* INVLPGB; supported in binutils >= 2.36. */
 	asm volatile(".byte 0x0f, 0x01, 0xfe" :: "a" (rax), "c" (ecx), "d" (edx));

@@ -1322,7 +1322,7 @@ struct file *get_file_active(struct file **f);
 /* Page cache limit. The filesystems should put that into their s_maxbytes 
    limits, otherwise bad things can happen in VM. */ 
 #if BITS_PER_LONG==32
-#define MAX_LFS_FILESIZE	((loff_t)ULONG_MAX << PAGE_SHIFT)
+#define MAX_LFS_FILESIZE	((loff_t)ULONG_MAX << PG_SHIFT)
 #elif BITS_PER_LONG==64
 #define MAX_LFS_FILESIZE 	((loff_t)LLONG_MAX)
 #endif
@@ -2414,7 +2414,7 @@ int generic_update_time(struct inode *inode, enum fs_update_time type,
 /* /sys/fs */
 extern struct kobject *fs_kobj;
 
-#define MAX_RW_COUNT (INT_MAX & PAGE_MASK)
+#define MAX_RW_COUNT (INT_MAX & PG_MASK)
 
 /* fs/open.c */
 struct audit_names;
@@ -3461,7 +3461,7 @@ struct simple_transaction_argresp {
 	char data[];
 };
 
-#define SIMPLE_TRANSACTION_LIMIT (PAGE_SIZE - sizeof(struct simple_transaction_argresp))
+#define SIMPLE_TRANSACTION_LIMIT (PG_SIZE - sizeof(struct simple_transaction_argresp))
 
 char *simple_transaction_get(struct file *file, const char __user *buf,
 				size_t size);

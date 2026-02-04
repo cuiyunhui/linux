@@ -39,7 +39,7 @@ static inline unsigned long size_inside_page(unsigned long start,
 {
 	unsigned long sz;
 
-	sz = PAGE_SIZE - (start & (PAGE_SIZE - 1));
+	sz = PG_SIZE - (start & (PG_SIZE - 1));
 
 	return min(sz, size);
 }
@@ -96,7 +96,7 @@ static ssize_t read_mem(struct file *file, char __user *buf,
 	read = 0;
 #ifdef __ARCH_HAS_NO_PAGE_ZERO_MAPPED
 	/* we don't have page 0 mapped on sparc and m68k.. */
-	if (p < PAGE_SIZE) {
+	if (p < PG_SIZE) {
 		sz = size_inside_page(p, count);
 		if (sz > 0) {
 			if (clear_user(buf, sz))
@@ -109,7 +109,7 @@ static ssize_t read_mem(struct file *file, char __user *buf,
 	}
 #endif
 
-	bounce = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	bounce = kmalloc(PG_SIZE, GFP_KERNEL);
 	if (!bounce)
 		return -ENOMEM;
 
@@ -120,7 +120,7 @@ static ssize_t read_mem(struct file *file, char __user *buf,
 		sz = size_inside_page(p, count);
 
 		err = -EPERM;
-		allowed = page_is_allowed(p >> PAGE_SHIFT);
+		allowed = page_is_allowed(p >> PG_SHIFT);
 		if (!allowed)
 			goto failed;
 
@@ -184,7 +184,7 @@ static ssize_t write_mem(struct file *file, const char __user *buf,
 
 #ifdef __ARCH_HAS_NO_PAGE_ZERO_MAPPED
 	/* we don't have page 0 mapped on sparc and m68k.. */
-	if (p < PAGE_SIZE) {
+	if (p < PG_SIZE) {
 		sz = size_inside_page(p, count);
 		/* Hmm. Do something? */
 		buf += sz;
@@ -199,7 +199,7 @@ static ssize_t write_mem(struct file *file, const char __user *buf,
 
 		sz = size_inside_page(p, count);
 
-		allowed = page_is_allowed(p >> PAGE_SHIFT);
+		allowed = page_is_allowed(p >> PG_SHIFT);
 		if (!allowed)
 			return -EPERM;
 
@@ -270,7 +270,7 @@ static pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
 				     unsigned long size, pgprot_t vma_prot)
 {
 #ifdef pgprot_noncached
-	phys_addr_t offset = pfn << PAGE_SHIFT;
+	phys_addr_t offset = pfn << PG_SHIFT;
 
 	if (uncached_access(file, offset))
 		return pgprot_noncached(vma_prot);
@@ -283,12 +283,12 @@ static pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
 static unsigned long get_unmapped_area_mem(struct file *file,
 					   unsigned long addr,
 					   unsigned long len,
-					   unsigned long pgoff,
+					   unsigned long pteoff,
 					   unsigned long flags)
 {
-	if (!valid_mmap_phys_addr_range(pgoff, len))
+	if (!valid_mmap_phys_addr_range(pteoff, len))
 		return (unsigned long) -EINVAL;
-	return pgoff << PAGE_SHIFT;
+	return pteoff << PTE_SHIFT;
 }
 
 /* permit direct mmap, for read, write or exec */
@@ -331,37 +331,37 @@ static int mmap_mem_prepare(struct vm_area_desc *desc)
 {
 	struct file *file = desc->file;
 	const size_t size = vma_desc_size(desc);
-	const phys_addr_t offset = (phys_addr_t)desc->pgoff << PAGE_SHIFT;
+	const phys_addr_t offset = (phys_addr_t)desc->pteoff << PTE_SHIFT;
 
 	/* Does it even fit in phys_addr_t? */
-	if (offset >> PAGE_SHIFT != desc->pgoff)
+	if (offset >> PTE_SHIFT != desc->pteoff)
 		return -EINVAL;
 
 	/* It's illegal to wrap around the end of the physical address space. */
 	if (offset + (phys_addr_t)size - 1 < offset)
 		return -EINVAL;
 
-	if (!valid_mmap_phys_addr_range(desc->pgoff, size))
+	if (!valid_mmap_phys_addr_range(desc->pteoff, size))
 		return -EINVAL;
 
 	if (!private_mapping_ok(desc))
 		return -ENOSYS;
 
-	if (!range_is_allowed(desc->pgoff, size))
+	if (!range_is_allowed(desc->pteoff, size))
 		return -EPERM;
 
-	if (!phys_mem_access_prot_allowed(file, desc->pgoff, size,
+	if (!phys_mem_access_prot_allowed(file, desc->pteoff, size,
 					  &desc->page_prot))
 		return -EINVAL;
 
-	desc->page_prot = phys_mem_access_prot(file, desc->pgoff,
+	desc->page_prot = phys_mem_access_prot(file, desc->pteoff,
 					       size,
 					       desc->page_prot);
 
 	desc->vm_ops = &mmap_mem_ops;
 
 	/* Remap-pfn-range will mark the range with the I/O flag. */
-	mmap_action_remap_full(desc, desc->pgoff);
+	mmap_action_remap_full(desc, desc->pteoff);
 	/* We filter remap errors to -EAGAIN. */
 	desc->action.error_hook = mmap_filter_error;
 
@@ -460,8 +460,8 @@ static ssize_t read_iter_zero(struct kiocb *iocb, struct iov_iter *iter)
 	while (iov_iter_count(iter)) {
 		size_t chunk = iov_iter_count(iter), n;
 
-		if (chunk > PAGE_SIZE)
-			chunk = PAGE_SIZE;	/* Just for latency reasons */
+		if (chunk > PG_SIZE)
+			chunk = PG_SIZE;	/* Just for latency reasons */
 		n = iov_iter_zero(chunk, iter);
 		if (!n && iov_iter_count(iter))
 			return written ? written : -EFAULT;
@@ -483,7 +483,7 @@ static ssize_t read_zero(struct file *file, char __user *buf,
 	size_t cleared = 0;
 
 	while (count) {
-		size_t chunk = min_t(size_t, count, PAGE_SIZE);
+		size_t chunk = min_t(size_t, count, PG_SIZE);
 		size_t left;
 
 		left = clear_user(buf + cleared, chunk);
@@ -537,7 +537,7 @@ static unsigned long get_unmapped_area_zero(struct file *file,
 #else
 static unsigned long get_unmapped_area_zero(struct file *file,
 				unsigned long addr, unsigned long len,
-				unsigned long pgoff, unsigned long flags)
+				unsigned long pteoff, unsigned long flags)
 {
 	if (flags & MAP_SHARED) {
 		/*
@@ -547,7 +547,7 @@ static unsigned long get_unmapped_area_zero(struct file *file,
 		 * get_unmapped_area(), so as not to confuse shmem with our
 		 * handle on "/dev/zero".
 		 */
-		return shmem_get_unmapped_area(NULL, addr, len, pgoff, flags);
+		return shmem_get_unmapped_area(NULL, addr, len, pteoff, flags);
 	}
 
 	/*
@@ -556,9 +556,9 @@ static unsigned long get_unmapped_area_zero(struct file *file,
 	 * fall back to system page size mappings.
 	 */
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
-	return thp_get_unmapped_area(file, addr, len, pgoff, flags);
+	return thp_get_unmapped_area(file, addr, len, pteoff, flags);
 #else
-	return mm_get_unmapped_area(file, addr, len, pgoff, flags);
+	return mm_get_unmapped_area(file, addr, len, pteoff, flags);
 #endif
 }
 #endif /* CONFIG_MMU */

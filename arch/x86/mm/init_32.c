@@ -176,7 +176,7 @@ static pte_t *__init page_table_kmap_check(pte_t *pte, pmd_t *pmd,
 		newpte = *adr;
 		for (i = 0; i < PTRS_PER_PTE; i++)
 			set_pte(newpte + i, pte[i]);
-		*adr = (void *)(((unsigned long)(*adr)) + PAGE_SIZE);
+		*adr = (void *)(((unsigned long)(*adr)) + PTE_SIZE);
 
 		set_pmd(pmd, __pmd(__pa(newpte)|_PAGE_TABLE));
 		BUG_ON(newpte != pte_offset_kernel(pmd, 0));
@@ -263,8 +263,8 @@ kernel_physical_mapping_init(unsigned long start,
 	unsigned pages_2m, pages_4k;
 	int mapping_iter;
 
-	start_pfn = start >> PAGE_SHIFT;
-	end_pfn = end >> PAGE_SHIFT;
+	start_pfn = start >> PTE_SHIFT;
+	end_pfn = end >> PTE_SHIFT;
 
 	/*
 	 * First iteration will setup identity mapping using large/small pages
@@ -288,7 +288,7 @@ kernel_physical_mapping_init(unsigned long start,
 repeat:
 	pages_2m = pages_4k = 0;
 	pfn = start_pfn;
-	pgd_idx = pgd_index((pfn<<PAGE_SHIFT) + PAGE_OFFSET);
+	pgd_idx = pgd_index((pfn<<PTE_SHIFT) + PAGE_OFFSET);
 	pgd = pgd_base + pgd_idx;
 	for (; pgd_idx < PTRS_PER_PGD; pgd++, pgd_idx++) {
 		pmd = one_md_table_init(pgd);
@@ -296,14 +296,14 @@ repeat:
 		if (pfn >= end_pfn)
 			continue;
 #ifdef CONFIG_X86_PAE
-		pmd_idx = pmd_index((pfn<<PAGE_SHIFT) + PAGE_OFFSET);
+		pmd_idx = pmd_index((pfn<<PTE_SHIFT) + PAGE_OFFSET);
 		pmd += pmd_idx;
 #else
 		pmd_idx = 0;
 #endif
 		for (; pmd_idx < PTRS_PER_PMD && pfn < end_pfn;
 		     pmd++, pmd_idx++) {
-			unsigned int addr = pfn * PAGE_SIZE + PAGE_OFFSET;
+			unsigned int addr = pfn * PTE_SIZE + PAGE_OFFSET;
 
 			/*
 			 * Map with big pages if possible, otherwise
@@ -320,9 +320,9 @@ repeat:
 					__pgprot(PTE_IDENT_ATTR |
 						 _PAGE_PSE);
 
-				pfn &= PMD_MASK >> PAGE_SHIFT;
-				addr2 = (pfn + PTRS_PER_PTE-1) * PAGE_SIZE +
-					PAGE_OFFSET + PAGE_SIZE-1;
+				pfn &= PMD_MASK >> PTE_SHIFT;
+				addr2 = (pfn + PTRS_PER_PTE-1) * PTE_SIZE +
+					PAGE_OFFSET + PTE_SIZE-1;
 
 				if (is_x86_32_kernel_text(addr) ||
 				    is_x86_32_kernel_text(addr2))
@@ -339,10 +339,10 @@ repeat:
 			}
 			pte = one_page_table_init(pmd);
 
-			pte_ofs = pte_index((pfn<<PAGE_SHIFT) + PAGE_OFFSET);
+			pte_ofs = pte_index((pfn<<PTE_SHIFT) + PAGE_OFFSET);
 			pte += pte_ofs;
 			for (; pte_ofs < PTRS_PER_PTE && pfn < end_pfn;
-			     pte++, pfn++, pte_ofs++, addr += PAGE_SIZE) {
+			     pte++, pfn++, pte_ofs++, addr += PTE_SIZE) {
 				pgprot_t prot = PAGE_KERNEL;
 				/*
 				 * first pass will use the same initial
@@ -356,7 +356,7 @@ repeat:
 				pages_4k++;
 				if (mapping_iter == 1) {
 					set_pte(pte, pfn_pte(pfn, init_prot));
-					last_map_addr = (pfn << PAGE_SHIFT) + PAGE_SIZE;
+					last_map_addr = (pfn << PTE_SHIFT) + PTE_SIZE;
 				} else
 					set_pte(pte, pfn_pte(pfn, prot));
 			}
@@ -390,7 +390,7 @@ static void __init permanent_kmaps_init(pgd_t *pgd_base)
 {
 	unsigned long vaddr = PKMAP_BASE;
 
-	page_table_range_init(vaddr, vaddr + PAGE_SIZE*LAST_PKMAP, pgd_base);
+	page_table_range_init(vaddr, vaddr + PTE_SIZE*LAST_PKMAP, pgd_base);
 
 	pkmap_page_table = virt_to_kpte(vaddr);
 }
@@ -433,8 +433,8 @@ void __init native_pagetable_init(void)
 	 * address. If initial memory mapping is doing right job, we
 	 * should have pte used near max_low_pfn or one pmd is not present.
 	 */
-	for (pfn = max_low_pfn; pfn < 1<<(32-PAGE_SHIFT); pfn++) {
-		va = PAGE_OFFSET + (pfn<<PAGE_SHIFT);
+	for (pfn = max_low_pfn; pfn < 1<<(32-PTE_SHIFT); pfn++) {
+		va = PAGE_OFFSET + (pfn<<PTE_SHIFT);
 		pgd = base + pgd_index(va);
 		if (!pgd_present(*pgd))
 			break;
@@ -519,7 +519,7 @@ static int __init parse_highmem(char *arg)
 	if (!arg)
 		return -EINVAL;
 
-	highmem_pages = memparse(arg, &arg) >> PAGE_SHIFT;
+	highmem_pages = memparse(arg, &arg) >> PTE_SHIFT;
 	return 0;
 }
 early_param("highmem", parse_highmem);
@@ -548,7 +548,7 @@ static void __init lowmem_pfn_init(void)
 		highmem_pages = 0;
 	}
 	if (highmem_pages) {
-		if (max_low_pfn - highmem_pages < 64*1024*1024/PAGE_SIZE) {
+		if (max_low_pfn - highmem_pages < 64*1024*1024/PTE_SIZE) {
 			printk(KERN_ERR MSG_LOWMEM_TOO_SMALL,
 				pages_to_mb(highmem_pages));
 			highmem_pages = 0;
@@ -620,9 +620,9 @@ void __init initmem_init(void)
 		highstart_pfn = max_low_pfn;
 	printk(KERN_NOTICE "%ldMB HIGHMEM available.\n",
 		pages_to_mb(highend_pfn - highstart_pfn));
-	high_memory = (void *) __va(highstart_pfn * PAGE_SIZE - 1) + 1;
+	high_memory = (void *) __va(highstart_pfn * PTE_SIZE - 1) + 1;
 #else
-	high_memory = (void *) __va(max_low_pfn * PAGE_SIZE - 1) + 1;
+	high_memory = (void *) __va(max_low_pfn * PTE_SIZE - 1) + 1;
 #endif
 
 	memblock_set_node(0, PHYS_ADDR_MAX, &memblock.memory, 0);
@@ -633,8 +633,8 @@ void __init initmem_init(void)
 			pages_to_mb(max_low_pfn));
 
 	printk(KERN_INFO "  mapped low ram: 0 - %08lx\n",
-		 max_pfn_mapped<<PAGE_SHIFT);
-	printk(KERN_INFO "  low ram: 0 - %08lx\n", max_low_pfn<<PAGE_SHIFT);
+		 max_pfn_mapped<<PTE_SHIFT);
+	printk(KERN_INFO "  low ram: 0 - %08lx\n", max_low_pfn<<PTE_SHIFT);
 }
 
 /*
@@ -698,9 +698,9 @@ void __init mem_init(void)
 	 * Check boundaries twice: Some fundamental inconsistencies can
 	 * be detected at build time already.
 	 */
-#define __FIXADDR_TOP (-PAGE_SIZE)
+#define __FIXADDR_TOP (-PTE_SIZE)
 #ifdef CONFIG_HIGHMEM
-	BUILD_BUG_ON(PKMAP_BASE + LAST_PKMAP*PAGE_SIZE	> FIXADDR_START);
+	BUILD_BUG_ON(PKMAP_BASE + LAST_PKMAP*PTE_SIZE	> FIXADDR_START);
 	BUILD_BUG_ON(VMALLOC_END			> PKMAP_BASE);
 #endif
 #define high_memory (-128UL << 20)
@@ -709,7 +709,7 @@ void __init mem_init(void)
 #undef __FIXADDR_TOP
 
 #ifdef CONFIG_HIGHMEM
-	BUG_ON(PKMAP_BASE + LAST_PKMAP*PAGE_SIZE	> FIXADDR_START);
+	BUG_ON(PKMAP_BASE + LAST_PKMAP*PTE_SIZE	> FIXADDR_START);
 	BUG_ON(VMALLOC_END				> PKMAP_BASE);
 #endif
 	BUG_ON(VMALLOC_START				>= VMALLOC_END);
@@ -730,11 +730,12 @@ static void mark_nxdata_nx(void)
 	/*
 	 * This comes from is_x86_32_kernel_text upper limit. Also HPAGE where used:
 	 */
-	unsigned long size = (((unsigned long)__init_end + HPAGE_SIZE) & HPAGE_MASK) - start;
+	unsigned long size = (((unsigned long)__init_end + HPTE_SIZE) & HPAGE_MASK) - start;
 
-	if (__supported_pte_mask & _PAGE_NX)
+	if (__supported_pte_mask & _PAGE_NX) {
 		printk(KERN_INFO "NX-protecting the kernel data: %luk\n", size >> 10);
-	set_memory_nx(start, size >> PAGE_SHIFT);
+		set_memory_nx(start, size >> PTE_SHIFT);
+	}
 }
 
 void mark_rodata_ro(void)
@@ -742,7 +743,7 @@ void mark_rodata_ro(void)
 	unsigned long start = PFN_ALIGN(_text);
 	unsigned long size = (unsigned long)__end_rodata - start;
 
-	set_pages_ro(virt_to_page(start), size >> PAGE_SHIFT);
+	set_pages_ro(virt_to_page(start), size >> PTE_SHIFT);
 	pr_info("Write protecting kernel text and read-only data: %luk\n",
 		size >> 10);
 
@@ -750,10 +751,10 @@ void mark_rodata_ro(void)
 
 #ifdef CONFIG_CPA_DEBUG
 	pr_info("Testing CPA: Reverting %lx-%lx\n", start, start + size);
-	set_pages_rw(virt_to_page(start), size >> PAGE_SHIFT);
+	set_pages_rw(virt_to_page(start), size >> PTE_SHIFT);
 
 	pr_info("Testing CPA: write protecting again\n");
-	set_pages_ro(virt_to_page(start), size >> PAGE_SHIFT);
+	set_pages_ro(virt_to_page(start), size >> PTE_SHIFT);
 #endif
 	mark_nxdata_nx();
 }

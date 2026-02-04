@@ -239,7 +239,7 @@ static const struct seq_operations kernfs_seq_ops = {
 static ssize_t kernfs_file_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 {
 	struct kernfs_open_file *of = kernfs_of(iocb->ki_filp);
-	ssize_t len = min_t(size_t, iov_iter_count(iter), PAGE_SIZE);
+	ssize_t len = min_t(size_t, iov_iter_count(iter), PG_SIZE);
 	const struct kernfs_ops *ops;
 	char *buf;
 
@@ -319,7 +319,7 @@ static ssize_t kernfs_fop_write_iter(struct kiocb *iocb, struct iov_iter *iter)
 		if (len > of->atomic_write_len)
 			return -E2BIG;
 	} else {
-		len = min_t(size_t, len, PAGE_SIZE);
+		len = min_t(size_t, len, PG_SIZE);
 	}
 
 	buf = of->prealloc_buf;
@@ -687,7 +687,7 @@ static int kernfs_fop_open(struct inode *inode, struct file *file)
 	if (ops->prealloc && ops->seq_show)
 		goto err_free;
 	if (ops->prealloc) {
-		int len = of->atomic_write_len ?: PAGE_SIZE;
+		int len = of->atomic_write_len ?: PG_SIZE;
 		of->prealloc_buf = kmalloc(len + 1, GFP_KERNEL);
 		error = -ENOMEM;
 		if (!of->prealloc_buf)

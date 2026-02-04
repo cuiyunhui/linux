@@ -71,17 +71,17 @@
 #define MAX_DMA_CHANNELS	8
 
 /* 16MB ISA DMA zone */
-#define MAX_DMA_PFN   ((16UL * 1024 * 1024) >> PAGE_SHIFT)
+#define MAX_DMA_PFN   ((16UL * 1024 * 1024) >> PTE_SHIFT)
 
 /* 4GB broken PCI/AGP hardware bus master zone */
-#define MAX_DMA32_PFN (1UL << (32 - PAGE_SHIFT))
+#define MAX_DMA32_PFN (1UL << (32 - PTE_SHIFT))
 
 #ifdef CONFIG_X86_32
 /* The maximum address that we can perform a DMA transfer to on this platform */
 #define MAX_DMA_ADDRESS      (PAGE_OFFSET + 0x1000000)
 #else
 /* Compat define for old dma zone */
-#define MAX_DMA_ADDRESS ((unsigned long)__va(MAX_DMA_PFN << PAGE_SHIFT))
+#define MAX_DMA_ADDRESS ((unsigned long)__va(MAX_DMA_PFN << PTE_SHIFT))
 #endif
 
 /* 8237 DMA controllers */
