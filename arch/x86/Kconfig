@@ -431,6 +431,27 @@ config PGTABLE_LEVELS
 	default 3 if X86_PAE
 	default 2
 
+choice
+	prompt "Page size" if EXPERT
+	default X86_PG_SIZE_4KB
+	depends on X86_64
+	help
+	  Select the desired size of order-0 buddy allocation.
+
+	  If you are not absolutely sure what you are doing, leave this
+	  option alone!
+
+	config X86_PG_SIZE_4KB
+		bool "4K page size"
+		select PG_SIZE_4KB
+	config X86_PG_SIZE_16KB
+		select PG_SIZE_16KB
+		bool "16K page size"
+	config X86_PG_SIZE_64KB
+		select PG_SIZE_64KB
+		bool "64K page size"
+endchoice
+
 menu "Processor type and features"
 
 config SMP
