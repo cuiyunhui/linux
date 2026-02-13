@@ -692,10 +692,10 @@ static void __init srmmu_early_allocate_ptable_skeleton(unsigned long start,
 		}
 		pmdp = pmd_offset(__nocache_fix(pudp), start);
 		if (srmmu_pmd_none(*__nocache_fix(pmdp))) {
-			ptep = __srmmu_get_nocache(PTE_SIZE, PTE_SIZE);
+			ptep = __srmmu_get_nocache(SRMMU_PTE_TABLE_SIZE, SRMMU_PTE_TABLE_SIZE);
 			if (ptep == NULL)
 				early_pgtable_allocfail("pte");
-			memset(__nocache_fix(ptep), 0, PTE_SIZE);
+			memset(__nocache_fix(ptep), 0, SRMMU_PTE_TABLE_SIZE);
 			pmd_set(__nocache_fix(pmdp), ptep);
 		}
 		if (start > (0xffffffffUL - PMD_SIZE))
@@ -726,11 +726,11 @@ static void __init srmmu_allocate_ptable_skeleton(unsigned long start,
 		}
 		pmdp = pmd_offset(pudp, start);
 		if (srmmu_pmd_none(*pmdp)) {
-			ptep = __srmmu_get_nocache(PTE_SIZE,
-							     PTE_SIZE);
+			ptep = __srmmu_get_nocache(SRMMU_PTE_TABLE_SIZE,
+							     SRMMU_PTE_TABLE_SIZE);
 			if (ptep == NULL)
 				early_pgtable_allocfail("pte");
-			memset(ptep, 0, PTE_SIZE);
+			memset(ptep, 0, SRMMU_PTE_TABLE_SIZE);
 			pmd_set(pmdp, ptep);
 		}
 		if (start > (0xffffffffUL - PMD_SIZE))
@@ -822,10 +822,10 @@ static void __init srmmu_inherit_prom_mappings(unsigned long start,
 			continue;
 		}
 		if (srmmu_pmd_none(*__nocache_fix(pmdp))) {
-			ptep = __srmmu_get_nocache(PTE_SIZE, PTE_SIZE);
+			ptep = __srmmu_get_nocache(SRMMU_PTE_TABLE_SIZE, SRMMU_PTE_TABLE_SIZE);
 			if (ptep == NULL)
 				early_pgtable_allocfail("pte");
-			memset(__nocache_fix(ptep), 0, PTE_SIZE);
+			memset(__nocache_fix(ptep), 0, SRMMU_PTE_TABLE_SIZE);
 			pmd_set(__nocache_fix(pmdp), ptep);
 		}
 		ptep = pte_offset_kernel(__nocache_fix(pmdp), start);
