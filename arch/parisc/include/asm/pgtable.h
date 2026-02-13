@@ -99,9 +99,7 @@ extern void __update_cache(pte_t pte);
 #define PGD_TABLE_ORDER	1
 #endif
 
-/* Definitions for 3rd level (we use PLD here for Page Lower directory
- * because PTE_SHIFT is used lower down to mean shift that has to be
- * done to get usable bits out of the PTE) */
+/* Definitions for 3rd level (we use PLD here for Page Lower directory) */
 #define PLD_SHIFT	PAGE_SHIFT
 #define PLD_SIZE	PAGE_SIZE
 #define BITS_PER_PTE	(PAGE_SHIFT - BITS_PER_PTE_ENTRY)
@@ -178,11 +176,6 @@ extern void __update_cache(pte_t pte);
 /*      following macro is ok for both 32 and 64 bit.                */
 
 #define xlate_pabit(x) (31 - x)
-
-/* this defines the shift to the usable bits in the PTE it is set so
- * that the valid bits _PAGE_PRESENT_BIT and _PAGE_USER_BIT are set
- * to zero */
-#define PTE_SHIFT	   	xlate_pabit(_PAGE_USER_BIT)
 
 /* PFN_PTE_SHIFT defines the shift of a PTE value to access the PFN field */
 #define PFN_PTE_SHIFT		12
