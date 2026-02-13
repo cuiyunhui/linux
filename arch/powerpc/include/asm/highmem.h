@@ -42,7 +42,7 @@ extern pte_t *pkmap_page_table;
  * in case of 16K/64K/256K page sizes.
  */
 #ifdef CONFIG_PPC_4K_PAGES
-#define PKMAP_ORDER	PTE_SHIFT
+#define PKMAP_ORDER	PTE_INDEX_SIZE
 #else
 #define PKMAP_ORDER	9
 #endif

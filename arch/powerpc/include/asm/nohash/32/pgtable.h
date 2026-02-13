@@ -11,7 +11,6 @@
 
 #endif /* __ASSEMBLER__ */
 
-#define PTE_INDEX_SIZE	PTE_SHIFT
 #define PMD_INDEX_SIZE	0
 #define PUD_INDEX_SIZE	0
 #define PGD_INDEX_SIZE	(32 - PGDIR_SHIFT)

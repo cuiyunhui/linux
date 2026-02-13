@@ -14,9 +14,9 @@
 
 #if defined(CONFIG_PPC_256K_PAGES) || \
     (defined(CONFIG_PPC_8xx) && defined(CONFIG_PPC_16K_PAGES))
-#define PTE_SHIFT	(PAGE_SHIFT - PTE_T_LOG2 - 2)	/* 1/4 of a page */
+#define PTE_INDEX_SIZE	(PAGE_SHIFT - PTE_T_LOG2 - 2)	/* 1/4 of a page */
 #else
-#define PTE_SHIFT	(PAGE_SHIFT - PTE_T_LOG2)	/* full page */
+#define PTE_INDEX_SIZE	(PAGE_SHIFT - PTE_T_LOG2)	/* full page */
 #endif
 
 #ifndef __ASSEMBLER__
