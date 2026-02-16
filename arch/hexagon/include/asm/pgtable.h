@@ -337,7 +337,7 @@ static inline int pte_exec(pte_t pte)
 
 #define PFN_PTE_SHIFT	PAGE_SHIFT
 /* pfn_pte - convert page number and protection value to page table entry */
-#define pfn_pte(pfn, pgprot) __pte((pfn << PAGE_SHIFT) | pgprot_val(pgprot))
+#define pfn_pte(pfn, pgprot) __pte(((pfn) << PAGE_SHIFT) | pgprot_val(pgprot))
 
 /* pte_pfn - convert pte to page frame number */
 #define pte_pfn(pte) (pte_val(pte) >> PAGE_SHIFT)
