@@ -223,14 +223,19 @@ static inline bool page_range_contiguous(const struct page *page,
 }
 #endif
 
-/* to align the pointer to the (next) page boundary */
-#define PAGE_ALIGN(addr) ALIGN(addr, PAGE_SIZE)
+#define PTE_ALIGN(addr)		ALIGN(addr, PTE_SIZE)
+#define PTE_ALIGN_DOWN(addr)	ALIGN(addr, PTE_SIZE)
+#define PTE_ALIGNED(addr)	IS_ALIGNED((unsigned long)(addr), PTE_SIZE)
 
-/* to align the pointer to the (prev) page boundary */
-#define PAGE_ALIGN_DOWN(addr) ALIGN_DOWN(addr, PAGE_SIZE)
+#define PG_ALIGN(addr)		ALIGN(addr, PG_SIZE)
+#define PG_ALIGN_DOWN(addr)	ALIGN_DOWN(addr, PG_SIZE)
+#define PG_ALIGNED(addr)	IS_ALIGNED((unsigned long)(addr), PG_SIZE)
 
-/* test whether an address (unsigned long or pointer) is aligned to PAGE_SIZE */
-#define PAGE_ALIGNED(addr)	IS_ALIGNED((unsigned long)(addr), PAGE_SIZE)
+#if PTE_SIZE == PG_SIZE
+#define PAGE_ALIGN		PG_ALIGN
+#define PAGE_ALIGN_DOWN		PG_ALIGN_DOWN
+#define PAGE_ALIGNED		PG_ALIGNED
+#endif
 
 /**
  * folio_page_idx - Return the number of a page in a folio.
