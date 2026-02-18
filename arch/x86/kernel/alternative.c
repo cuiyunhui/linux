@@ -2533,8 +2533,8 @@ typedef void text_poke_f(void *dst, const void *src, size_t len);
 
 static void *__text_poke(text_poke_f func, void *addr, const void *src, size_t len)
 {
-	bool cross_page_boundary = offset_in_page(addr) + len > PAGE_SIZE;
-	struct page *pages[2] = {NULL};
+	bool cross_pte_boundary = offset_in_pte(addr) + len > PTE_SIZE;
+	unsigned long pfns[2] = {};
 	struct mm_struct *prev_mm;
 	unsigned long flags;
 	pte_t pte, *ptep;
@@ -2548,20 +2548,20 @@ static void *__text_poke(text_poke_f func, void *addr, const void *src, size_t l
 	BUG_ON(!after_bootmem);
 
 	if (!core_kernel_text((unsigned long)addr)) {
-		pages[0] = vmalloc_to_page(addr);
-		if (cross_page_boundary)
-			pages[1] = vmalloc_to_page(addr + PAGE_SIZE);
+		pfns[0] = vmalloc_to_pfn(addr);
+		if (cross_pte_boundary)
+			pfns[1] = vmalloc_to_pfn(addr + PTE_SIZE);
 	} else {
-		pages[0] = virt_to_page(addr);
-		WARN_ON(!PageReserved(pages[0]));
-		if (cross_page_boundary)
-			pages[1] = virt_to_page(addr + PAGE_SIZE);
+		pfns[0] = virt_to_phys(addr) >> PTE_SHIFT;
+		WARN_ON(!PageReserved(pfn_to_page(pfns[0])));
+		if (cross_pte_boundary)
+			pfns[1] = virt_to_phys(addr + PTE_SIZE) >> PTE_SHIFT;
 	}
 	/*
 	 * If something went wrong, crash and burn since recovery paths are not
 	 * implemented.
 	 */
-	BUG_ON(!pages[0] || (cross_page_boundary && !pages[1]));
+	BUG_ON(!pfns[0] || (cross_pte_boundary && !pfns[1]));
 
 	/*
 	 * Map the page without the global bit, as TLB flushing is done with
@@ -2581,12 +2581,12 @@ static void *__text_poke(text_poke_f func, void *addr, const void *src, size_t l
 
 	local_irq_save(flags);
 
-	pte = mk_pte(pages[0], pgprot);
+	pte = pfn_pte(pfns[0], pgprot);
 	set_pte_at(text_poke_mm, text_poke_mm_addr, ptep, pte);
 
-	if (cross_page_boundary) {
-		pte = mk_pte(pages[1], pgprot);
-		set_pte_at(text_poke_mm, text_poke_mm_addr + PAGE_SIZE, ptep + 1, pte);
+	if (cross_pte_boundary) {
+		pte = pfn_pte(pfns[1], pgprot);
+		set_pte_at(text_poke_mm, text_poke_mm_addr + PTE_SIZE, ptep + 1, pte);
 	}
 
 	/*
@@ -2596,7 +2596,7 @@ static void *__text_poke(text_poke_f func, void *addr, const void *src, size_t l
 	prev_mm = use_temporary_mm(text_poke_mm);
 
 	kasan_disable_current();
-	func((u8 *)text_poke_mm_addr + offset_in_page(addr), src, len);
+	func((u8 *)text_poke_mm_addr + offset_in_pte(addr), src, len);
 	kasan_enable_current();
 
 	/*
@@ -2606,8 +2606,8 @@ static void *__text_poke(text_poke_f func, void *addr, const void *src, size_t l
 	barrier();
 
 	pte_clear(text_poke_mm, text_poke_mm_addr, ptep);
-	if (cross_page_boundary)
-		pte_clear(text_poke_mm, text_poke_mm_addr + PAGE_SIZE, ptep + 1);
+	if (cross_pte_boundary)
+		pte_clear(text_poke_mm, text_poke_mm_addr + PTE_SIZE, ptep + 1);
 
 	/*
 	 * Loading the previous page-table hierarchy requires a serializing
@@ -2621,8 +2621,8 @@ static void *__text_poke(text_poke_f func, void *addr, const void *src, size_t l
 	 * IRQs, but not if the mm is not used, as it is in this point.
 	 */
 	flush_tlb_mm_range(text_poke_mm, text_poke_mm_addr, text_poke_mm_addr +
-			   (cross_page_boundary ? 2 : 1) * PAGE_SIZE,
-			   PAGE_SHIFT, false);
+			   (cross_pte_boundary ? 2 : 1) * PTE_SIZE,
+			   PTE_SHIFT, false);
 
 	if (func == text_poke_memcpy) {
 		/*
@@ -2692,7 +2692,7 @@ void *text_poke_copy_locked(void *addr, const void *opcode, size_t len,
 		unsigned long ptr = start + patched;
 		size_t s;
 
-		s = min_t(size_t, PAGE_SIZE * 2 - offset_in_page(ptr), len - patched);
+		s = min_t(size_t, PTE_SIZE * 2 - offset_in_pte(ptr), len - patched);
 
 		__text_poke(text_poke_memcpy, (void *)ptr, opcode + patched, s);
 		patched += s;
@@ -2742,7 +2742,7 @@ void *text_poke_set(void *addr, int c, size_t len)
 		unsigned long ptr = start + patched;
 		size_t s;
 
-		s = min_t(size_t, PAGE_SIZE * 2 - offset_in_page(ptr), len - patched);
+		s = min_t(size_t, PTE_SIZE * 2 - offset_in_pte(ptr), len - patched);
 
 		__text_poke(text_poke_memset, (void *)ptr, (void *)&c, s);
 		patched += s;
