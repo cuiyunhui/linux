@@ -2282,14 +2282,18 @@ static inline struct folio *pfn_folio(unsigned long pfn)
 #define offset_in_folio(folio, p) ((unsigned long)(p) & (folio_size(folio) - 1))
 
 #ifdef CONFIG_MMU
-static inline pte_t mk_pte(const struct page *page, pgprot_t pgprot)
+static inline pte_t mkpte(const struct page *page, unsigned long pteoff,
+		pgprot_t pgprot)
 {
-	return pfn_pte(page_to_pfn(page), pgprot);
+	unsigned long off = pteoff & ((1UL << (PG_SHIFT - PTE_SHIFT)) - 1);
+
+	return pfn_pte(page_to_pfn(page) + off, pgprot);
 }
 
 /**
- * folio_mk_pte - Create a PTE for this folio
+ * folio_mkpte - Create a PTE for this folio
  * @folio: The folio to create a PTE for
+ * @pteoff: PTE offset of the mapping
  * @pgprot: The page protection bits to use
  *
  * Create a page table entry for the first page of this folio.
@@ -2297,10 +2301,25 @@ static inline pte_t mk_pte(const struct page *page, pgprot_t pgprot)
  *
  * Return: A page table entry suitable for mapping this folio.
  */
+static inline pte_t folio_mkpte(const struct folio *folio, unsigned long pteoff,
+				 pgprot_t pgprot)
+{
+	unsigned long off = pteoff & ((1UL << (PG_SHIFT - PTE_SHIFT)) - 1);
+
+	return pfn_pte(folio_pfn(folio) + off, pgprot);
+}
+
+#if PTE_SIZE == PG_SIZE
+static inline pte_t mk_pte(const struct page *page, pgprot_t pgprot)
+{
+	return mkpte(page, 0, pgprot);
+}
+
 static inline pte_t folio_mk_pte(const struct folio *folio, pgprot_t pgprot)
 {
-	return pfn_pte(folio_pfn(folio), pgprot);
+	return folio_mkpte(folio, 0, pgprot);
 }
+#endif
 
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 /**
