@@ -5562,7 +5562,7 @@ vm_fault_t finish_fault(struct vm_fault *vmf)
 	vm_fault_t ret;
 	bool is_cow = (vmf->flags & FAULT_FLAG_WRITE) &&
 		      !(vma->vm_flags & VM_SHARED);
-	int type, nr_pages;
+	int type, nr_ptes;
 	unsigned long addr;
 	bool needs_fallback = false;
 
@@ -5616,30 +5616,34 @@ fallback:
 			return VM_FAULT_OOM;
 	}
 
-	nr_pages = folio_nr_pages(folio);
+	nr_ptes = folio_nr_ptes(folio);
 
-	/* Using per-page fault to maintain the uffd semantics */
+	/*
+	 * Using per-page fault to maintain the uffd semantics, and same
+	 * approach also applies to non shmem/tmpfs faults to avoid
+	 * inflating the RSS of the process.
+	 */
 	if (unlikely(userfaultfd_armed(vma)) || unlikely(needs_fallback)) {
-		nr_pages = 1;
-	} else if (nr_pages > 1) {
-		pgoff_t idx = folio_page_idx(folio, page);
+		nr_ptes = 1;
+	} else if (nr_ptes > 1) {
+		unsigned long idx = folio_page_idx(folio, page) * PTES_PER_PAGE + (vmf->pteoff % PTES_PER_PAGE);
 		/* The page offset of vmf->address within the VMA. */
-		pgoff_t vma_off = vmf->pgoff - vmf->vma->vm_pgoff;
+		unsigned long vma_off = vmf->pteoff - vmf->vma->vm_pteoff;
 		/* The index of the entry in the pagetable for fault page. */
-		pgoff_t pte_off = pte_index(vmf->address);
+		unsigned long pte_off = pte_index(vmf->address);
 
 		/*
 		 * Fallback to per-page fault in case the folio size in page
 		 * cache beyond the VMA limits and PMD pagetable limits.
 		 */
 		if (unlikely(vma_off < idx ||
-			    vma_off + (nr_pages - idx) > vma_pages(vma) ||
+			    vma_off + (nr_ptes - idx) > vma_ptes(vma) ||
 			    pte_off < idx ||
-			    pte_off + (nr_pages - idx)  > PTRS_PER_PTE)) {
-			nr_pages = 1;
+			    pte_off + (nr_ptes - idx) > PTRS_PER_PTE)) {
+			nr_ptes = 1;
 		} else {
 			/* Now we can set mappings for the whole large folio. */
-			addr = vmf->address - idx * PAGE_SIZE;
+			addr = vmf->address - idx * PTE_SIZE;
 			page = &folio->page;
 		}
 	}
@@ -5650,20 +5654,20 @@ fallback:
 		return VM_FAULT_NOPAGE;
 
 	/* Re-check under ptl */
-	if (nr_pages == 1 && unlikely(vmf_pte_changed(vmf))) {
+	if (nr_ptes == 1 && unlikely(vmf_pte_changed(vmf))) {
 		update_mmu_tlb(vma, addr, vmf->pte);
 		ret = VM_FAULT_NOPAGE;
 		goto unlock;
-	} else if (nr_pages > 1 && !pte_range_none(vmf->pte, nr_pages)) {
+	} else if (nr_ptes > 1 && !pte_range_none(vmf->pte, nr_ptes)) {
 		needs_fallback = true;
 		pte_unmap_unlock(vmf->pte, vmf->ptl);
 		goto fallback;
 	}
 
-	folio_ref_add(folio, nr_pages - 1);
-	set_pte_range(vmf, folio, page, nr_pages, addr);
+	folio_ref_add(folio, nr_ptes - 1);
+	set_pte_range(vmf, folio, page, nr_ptes, addr);
 	type = is_cow ? MM_ANONPAGES : mm_counter_file(folio);
-	add_mm_counter(vma->vm_mm, type, nr_pages);
+	add_mm_counter(vma->vm_mm, type, nr_ptes);
 	ret = 0;
 
 unlock:

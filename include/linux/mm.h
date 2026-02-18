@@ -2515,6 +2515,17 @@ static inline unsigned long folio_nr_pages(const struct folio *folio)
 	return folio_large_nr_pages(folio);
 }
 
+/**
+ * folio_nr_ptes - The number of ptes in the folio.
+ * @folio: The folio.
+ *
+ * Return: A positive power of two.
+ */
+static inline long folio_nr_ptes(const struct folio *folio)
+{
+	return PAGES_TO_PTES(folio_nr_pages(folio));
+}
+
 #if !defined(CONFIG_HAVE_GIGANTIC_FOLIOS)
 /*
  * We don't expect any folios that exceed buddy sizes (and consequently
