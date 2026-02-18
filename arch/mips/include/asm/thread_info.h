@@ -76,22 +76,22 @@ register unsigned long current_stack_pointer __asm__("sp");
 #endif /* !__ASSEMBLER__ */
 
 /* thread information allocation */
-#if defined(CONFIG_PAGE_SIZE_4KB) && defined(CONFIG_32BIT)
+#if defined(CONFIG_PTE_SIZE_4KB) && defined(CONFIG_32BIT)
 #define THREAD_SIZE_ORDER (1)
 #endif
-#if defined(CONFIG_PAGE_SIZE_4KB) && defined(CONFIG_64BIT)
+#if defined(CONFIG_PTE_SIZE_4KB) && defined(CONFIG_64BIT)
 #define THREAD_SIZE_ORDER (2)
 #endif
-#ifdef CONFIG_PAGE_SIZE_8KB
+#ifdef CONFIG_PTE_SIZE_8KB
 #define THREAD_SIZE_ORDER (1)
 #endif
-#ifdef CONFIG_PAGE_SIZE_16KB
+#ifdef CONFIG_PTE_SIZE_16KB
 #define THREAD_SIZE_ORDER (0)
 #endif
-#ifdef CONFIG_PAGE_SIZE_32KB
+#ifdef CONFIG_PTE_SIZE_32KB
 #define THREAD_SIZE_ORDER (0)
 #endif
-#ifdef CONFIG_PAGE_SIZE_64KB
+#ifdef CONFIG_PTE_SIZE_64KB
 #define THREAD_SIZE_ORDER (0)
 #endif
 

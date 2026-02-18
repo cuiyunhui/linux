@@ -329,7 +329,7 @@ choice
 
 config 4KB_3LEVEL
 	bool "4KB with 3 levels"
-	select HAVE_PAGE_SIZE_4KB
+	select HAVE_PTE_SIZE_4KB
 	select PGTABLE_3LEVEL
 	help
 	  This option selects 4KB page size with 3 level page tables, which
@@ -337,7 +337,7 @@ config 4KB_3LEVEL
 
 config 4KB_4LEVEL
 	bool "4KB with 4 levels"
-	select HAVE_PAGE_SIZE_4KB
+	select HAVE_PTE_SIZE_4KB
 	select PGTABLE_4LEVEL
 	help
 	  This option selects 4KB page size with 4 level page tables, which
@@ -345,7 +345,7 @@ config 4KB_4LEVEL
 
 config 16KB_2LEVEL
 	bool "16KB with 2 levels"
-	select HAVE_PAGE_SIZE_16KB
+	select HAVE_PTE_SIZE_16KB
 	select PGTABLE_2LEVEL
 	help
 	  This option selects 16KB page size with 2 level page tables, which
@@ -353,7 +353,7 @@ config 16KB_2LEVEL
 
 config 16KB_3LEVEL
 	bool "16KB with 3 levels"
-	select HAVE_PAGE_SIZE_16KB
+	select HAVE_PTE_SIZE_16KB
 	select PGTABLE_3LEVEL
 	help
 	  This option selects 16KB page size with 3 level page tables, which
@@ -361,7 +361,7 @@ config 16KB_3LEVEL
 
 config 64KB_2LEVEL
 	bool "64KB with 2 levels"
-	select HAVE_PAGE_SIZE_64KB
+	select HAVE_PTE_SIZE_64KB
 	select PGTABLE_2LEVEL
 	help
 	  This option selects 64KB page size with 2 level page tables, which
@@ -369,7 +369,7 @@ config 64KB_2LEVEL
 
 config 64KB_3LEVEL
 	bool "64KB with 3 levels"
-	select HAVE_PAGE_SIZE_64KB
+	select HAVE_PTE_SIZE_64KB
 	select PGTABLE_3LEVEL
 	help
 	  This option selects 64KB page size with 3 level page tables, which
@@ -517,8 +517,8 @@ config NODES_SHIFT
 
 config ARCH_FORCE_MAX_ORDER
 	int "Maximum zone order"
-	default "13" if PAGE_SIZE_64KB
-	default "11" if PAGE_SIZE_16KB
+	default "13" if PTE_SIZE_64KB
+	default "11" if PTE_SIZE_16KB
 	default "10"
 	help
 	  The kernel memory allocator divides physically contiguous memory

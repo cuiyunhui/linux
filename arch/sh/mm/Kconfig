@@ -4,9 +4,9 @@ menu "Memory management options"
 config MMU
         bool "Support for memory management hardware"
 	depends on !CPU_SH2
-	select HAVE_PAGE_SIZE_4KB
-	select HAVE_PAGE_SIZE_8KB if X2TLB
-	select HAVE_PAGE_SIZE_64KB if CPU_SH4
+	select HAVE_PTE_SIZE_4KB
+	select HAVE_PTE_SIZE_8KB if X2TLB
+	select HAVE_PTE_SIZE_64KB if CPU_SH4
 	default y
 	help
 	  Some SH processors (such as SH-2/SH-2A) lack an MMU. In order to
@@ -18,10 +18,10 @@ config MMU
 
 config NOMMU
 	def_bool !MMU
-	select HAVE_PAGE_SIZE_4KB
-	select HAVE_PAGE_SIZE_8KB
-	select HAVE_PAGE_SIZE_16KB
-	select HAVE_PAGE_SIZE_64KB
+	select HAVE_PTE_SIZE_4KB
+	select HAVE_PTE_SIZE_8KB
+	select HAVE_PTE_SIZE_16KB
+	select HAVE_PTE_SIZE_64KB
 	help
 	  On MMU-less systems, any of these page sizes can be selected
 
@@ -32,8 +32,8 @@ config PAGE_OFFSET
 
 config ARCH_FORCE_MAX_ORDER
 	int "Order of maximal physically contiguous allocations"
-	default "8" if PAGE_SIZE_16KB
-	default "6" if PAGE_SIZE_64KB
+	default "8" if PTE_SIZE_16KB
+	default "6" if PTE_SIZE_64KB
 	default "13" if !MMU
 	default "10"
 	help
@@ -158,12 +158,12 @@ config HAVE_SRAM_POOL
 choice
 	prompt "HugeTLB page size"
 	depends on HUGETLB_PAGE
-	default HUGETLB_PAGE_SIZE_1MB if PAGE_SIZE_64KB
+	default HUGETLB_PAGE_SIZE_1MB if PTE_SIZE_64KB
 	default HUGETLB_PAGE_SIZE_64K
 
 config HUGETLB_PAGE_SIZE_64K
 	bool "64kB"
-	depends on !PAGE_SIZE_64KB
+	depends on !PTE_SIZE_64KB
 
 config HUGETLB_PAGE_SIZE_256K
 	bool "256kB"

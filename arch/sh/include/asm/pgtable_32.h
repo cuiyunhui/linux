@@ -118,17 +118,17 @@ static inline unsigned long copy_ptea_attributes(unsigned long x)
 #if !defined(CONFIG_MMU)
 # define _PAGE_FLAGS_HARD	0ULL
 #elif defined(CONFIG_X2TLB)
-# if defined(CONFIG_PAGE_SIZE_4KB)
+# if defined(CONFIG_PTE_SIZE_4KB)
 #  define _PAGE_FLAGS_HARD	_PAGE_EXT(_PAGE_EXT_ESZ0)
-# elif defined(CONFIG_PAGE_SIZE_8KB)
+# elif defined(CONFIG_PTE_SIZE_8KB)
 #  define _PAGE_FLAGS_HARD	_PAGE_EXT(_PAGE_EXT_ESZ1)
-# elif defined(CONFIG_PAGE_SIZE_64KB)
+# elif defined(CONFIG_PTE_SIZE_64KB)
 #  define _PAGE_FLAGS_HARD	_PAGE_EXT(_PAGE_EXT_ESZ2)
 # endif
 #else
-# if defined(CONFIG_PAGE_SIZE_4KB)
+# if defined(CONFIG_PTE_SIZE_4KB)
 #  define _PAGE_FLAGS_HARD	_PAGE_SZ0
-# elif defined(CONFIG_PAGE_SIZE_64KB)
+# elif defined(CONFIG_PTE_SIZE_64KB)
 #  define _PAGE_FLAGS_HARD	_PAGE_SZ1
 # endif
 #endif

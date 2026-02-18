@@ -1477,22 +1477,22 @@ __BUILD_CSR_OP(tlbidx)
 #define PS_1G		0x0000001e
 
 /* Default page size for a given kernel configuration */
-#ifdef CONFIG_PAGE_SIZE_4KB
+#ifdef CONFIG_PTE_SIZE_4KB
 #define PS_DEFAULT_SIZE PS_4K
-#elif defined(CONFIG_PAGE_SIZE_16KB)
+#elif defined(CONFIG_PTE_SIZE_16KB)
 #define PS_DEFAULT_SIZE PS_16K
-#elif defined(CONFIG_PAGE_SIZE_64KB)
+#elif defined(CONFIG_PTE_SIZE_64KB)
 #define PS_DEFAULT_SIZE PS_64K
 #else
 #error Bad page size configuration!
 #endif
 
 /* Default huge tlb size for a given kernel configuration */
-#ifdef CONFIG_PAGE_SIZE_4KB
+#ifdef CONFIG_PTE_SIZE_4KB
 #define PS_HUGE_SIZE   PS_1M
-#elif defined(CONFIG_PAGE_SIZE_16KB)
+#elif defined(CONFIG_PTE_SIZE_16KB)
 #define PS_HUGE_SIZE   PS_16M
-#elif defined(CONFIG_PAGE_SIZE_64KB)
+#elif defined(CONFIG_PTE_SIZE_64KB)
 #define PS_HUGE_SIZE   PS_256M
 #else
 #error Bad page size configuration for hugetlbfs!

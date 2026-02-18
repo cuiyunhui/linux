@@ -85,9 +85,9 @@ config MIPS
 	select HAVE_LD_DEAD_CODE_DATA_ELIMINATION
 	select HAVE_MOD_ARCH_SPECIFIC
 	select HAVE_NMI
-	select HAVE_PAGE_SIZE_4KB if !CPU_LOONGSON2EF && !CPU_LOONGSON64
-	select HAVE_PAGE_SIZE_16KB if !CPU_R3000
-	select HAVE_PAGE_SIZE_64KB if !CPU_R3000
+	select HAVE_PTE_SIZE_4KB if !CPU_LOONGSON2EF && !CPU_LOONGSON64
+	select HAVE_PTE_SIZE_16KB if !CPU_R3000
+	select HAVE_PTE_SIZE_64KB if !CPU_R3000
 	select HAVE_PERF_EVENTS
 	select HAVE_PERF_REGS
 	select HAVE_PERF_USER_STACK_DUMP
@@ -1674,8 +1674,8 @@ config CPU_CAVIUM_OCTEON
 	depends on SYS_HAS_CPU_CAVIUM_OCTEON
 	select CPU_HAS_PREFETCH
 	select CPU_SUPPORTS_64BIT_KERNEL
-	select HAVE_PAGE_SIZE_8KB if !MIPS_VA_BITS_48
-	select HAVE_PAGE_SIZE_32KB if !MIPS_VA_BITS_48
+	select HAVE_PTE_SIZE_8KB if !MIPS_VA_BITS_48
+	select HAVE_PTE_SIZE_32KB if !MIPS_VA_BITS_48
 	select WEAK_ORDERING
 	select CPU_SUPPORTS_HIGHMEM
 	select CPU_SUPPORTS_HUGEPAGES
@@ -1784,7 +1784,7 @@ config CPU_MIPS32_R5_XPA
 	bool "Extended Physical Addressing (XPA)"
 	depends on CPU_MIPS32_R5_FEATURES
 	depends on !EVA
-	depends on !PAGE_SIZE_4KB
+	depends on !PTE_SIZE_4KB
 	depends on SYS_SUPPORTS_HIGHMEM
 	select XPA
 	select HIGHMEM
@@ -2127,9 +2127,9 @@ config ZBOOT_LOAD_ADDRESS
 
 config ARCH_FORCE_MAX_ORDER
 	int "Maximum zone order"
-	default "13" if MIPS_HUGE_TLB_SUPPORT && PAGE_SIZE_64KB
-	default "12" if MIPS_HUGE_TLB_SUPPORT && PAGE_SIZE_32KB
-	default "11" if MIPS_HUGE_TLB_SUPPORT && PAGE_SIZE_16KB
+	default "13" if MIPS_HUGE_TLB_SUPPORT && PTE_SIZE_64KB
+	default "12" if MIPS_HUGE_TLB_SUPPORT && PTE_SIZE_32KB
+	default "11" if MIPS_HUGE_TLB_SUPPORT && PTE_SIZE_16KB
 	default "10"
 	help
 	  The kernel memory allocator divides physically contiguous memory
@@ -3019,8 +3019,8 @@ config STACKTRACE_SUPPORT
 
 config PGTABLE_LEVELS
 	int
-	default 4 if PAGE_SIZE_4KB && MIPS_VA_BITS_48
-	default 3 if 64BIT && (!PAGE_SIZE_64KB || MIPS_VA_BITS_48)
+	default 4 if PTE_SIZE_4KB && MIPS_VA_BITS_48
+	default 3 if 64BIT && (!PTE_SIZE_64KB || MIPS_VA_BITS_48)
 	default 2
 
 config MIPS_AUTO_PFN_OFFSET

@@ -89,15 +89,15 @@ config MMU
 
 config MMU_MOTOROLA
 	def_bool MMU && M68KCLASSIC
-	select HAVE_PAGE_SIZE_4KB
+	select HAVE_PTE_SIZE_4KB
 
 config MMU_COLDFIRE
 	def_bool MMU && COLDFIRE
-	select HAVE_PAGE_SIZE_8KB
+	select HAVE_PTE_SIZE_8KB
 
 config MMU_SUN3
 	def_bool MMU && SUN3
-	select HAVE_PAGE_SIZE_8KB
+	select HAVE_PTE_SIZE_8KB
 
 config ARCH_SUPPORTS_KEXEC
 	def_bool (M68KCLASSIC || SUN3) && MMU

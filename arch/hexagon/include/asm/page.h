@@ -12,23 +12,23 @@
 
 /*  This is probably not the most graceful way to handle this.  */
 
-#ifdef CONFIG_PAGE_SIZE_4KB
+#ifdef CONFIG_PTE_SIZE_4KB
 #define HEXAGON_L1_PTE_SIZE __HVM_PDE_S_4KB
 #endif
 
-#ifdef CONFIG_PAGE_SIZE_16KB
+#ifdef CONFIG_PTE_SIZE_16KB
 #define HEXAGON_L1_PTE_SIZE __HVM_PDE_S_16KB
 #endif
 
-#ifdef CONFIG_PAGE_SIZE_64KB
+#ifdef CONFIG_PTE_SIZE_64KB
 #define HEXAGON_L1_PTE_SIZE __HVM_PDE_S_64KB
 #endif
 
-#ifdef CONFIG_PAGE_SIZE_256KB
+#ifdef CONFIG_PTE_SIZE_256KB
 #define HEXAGON_L1_PTE_SIZE __HVM_PDE_S_256KB
 #endif
 
-#ifdef CONFIG_PAGE_SIZE_1MB
+#ifdef CONFIG_PTE_SIZE_1MB
 #define HEXAGON_L1_PTE_SIZE __HVM_PDE_S_1MB
 #endif
 

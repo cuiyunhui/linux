@@ -679,7 +679,7 @@ static int bridge_probe(struct platform_device *pdev)
 	 */
 	bridge_clr(bc, b_wid_control,
 		   BRIDGE_CTRL_IO_SWAP | BRIDGE_CTRL_MEM_SWAP);
-#ifdef CONFIG_PAGE_SIZE_4KB
+#ifdef CONFIG_PTE_SIZE_4KB
 	bridge_clr(bc, b_wid_control, BRIDGE_CTRL_PAGE_SIZE);
 #else /* 16kB or larger */
 	bridge_set(bc, b_wid_control, BRIDGE_CTRL_PAGE_SIZE);

@@ -83,7 +83,7 @@
  * For 64kB page size we use a 2 level page table tree for a total of 42 bits
  * of virtual address space.
  */
-#ifdef CONFIG_PAGE_SIZE_4KB
+#ifdef CONFIG_PTE_SIZE_4KB
 # ifdef CONFIG_MIPS_VA_BITS_48
 #  define PGD_TABLE_ORDER	0
 #  define PUD_TABLE_ORDER	0
@@ -93,12 +93,12 @@
 # endif
 #define PMD_TABLE_ORDER		0
 #endif
-#ifdef CONFIG_PAGE_SIZE_8KB
+#ifdef CONFIG_PTE_SIZE_8KB
 #define PGD_TABLE_ORDER		0
 #define PUD_TABLE_ORDER		aieeee_attempt_to_allocate_pud
 #define PMD_TABLE_ORDER		0
 #endif
-#ifdef CONFIG_PAGE_SIZE_16KB
+#ifdef CONFIG_PTE_SIZE_16KB
 #ifdef CONFIG_MIPS_VA_BITS_48
 #define PGD_TABLE_ORDER		1
 #else
@@ -107,12 +107,12 @@
 #define PUD_TABLE_ORDER		aieeee_attempt_to_allocate_pud
 #define PMD_TABLE_ORDER		0
 #endif
-#ifdef CONFIG_PAGE_SIZE_32KB
+#ifdef CONFIG_PTE_SIZE_32KB
 #define PGD_TABLE_ORDER		0
 #define PUD_TABLE_ORDER		aieeee_attempt_to_allocate_pud
 #define PMD_TABLE_ORDER		0
 #endif
-#ifdef CONFIG_PAGE_SIZE_64KB
+#ifdef CONFIG_PTE_SIZE_64KB
 #define PGD_TABLE_ORDER		0
 #define PUD_TABLE_ORDER		aieeee_attempt_to_allocate_pud
 #ifdef CONFIG_MIPS_VA_BITS_48

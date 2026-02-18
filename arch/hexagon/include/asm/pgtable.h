@@ -76,23 +76,23 @@ extern unsigned long empty_zero_page;
 #define PGDIR_SIZE (1UL << PGDIR_SHIFT)
 #define PGDIR_MASK (~(PGDIR_SIZE-1))
 
-#ifdef CONFIG_PAGE_SIZE_4KB
+#ifdef CONFIG_PTE_SIZE_4KB
 #define PTRS_PER_PTE 1024
 #endif
 
-#ifdef CONFIG_PAGE_SIZE_16KB
+#ifdef CONFIG_PTE_SIZE_16KB
 #define PTRS_PER_PTE 256
 #endif
 
-#ifdef CONFIG_PAGE_SIZE_64KB
+#ifdef CONFIG_PTE_SIZE_64KB
 #define PTRS_PER_PTE 64
 #endif
 
-#ifdef CONFIG_PAGE_SIZE_256KB
+#ifdef CONFIG_PTE_SIZE_256KB
 #define PTRS_PER_PTE 16
 #endif
 
-#ifdef CONFIG_PAGE_SIZE_1MB
+#ifdef CONFIG_PTE_SIZE_1MB
 #define PTRS_PER_PTE 4
 #endif
 

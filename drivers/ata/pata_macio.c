@@ -208,7 +208,7 @@ static const char* macio_ata_names[] = {
 /* Don't let a DMA segment go all the way to 64K */
 #define MAX_DBDMA_SEG		0xff00
 
-#ifdef CONFIG_PAGE_SIZE_64KB
+#ifdef CONFIG_PTE_SIZE_64KB
 /*
  * The SCSI core requires the segment size to cover at least a page, so
  * for 64K page size kernels it must be at least 64K. However the

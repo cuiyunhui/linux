@@ -17,7 +17,7 @@
 
 #undef PAGE_SIZE
 #undef PAGE_MASK
-#define PAGE_SIZE (1UL << CONFIG_PAGE_SHIFT)
+#define PAGE_SIZE (1UL << CONFIG_PTE_SHIFT)
 #define PAGE_MASK (~(PAGE_SIZE - 1))
 
 #define MEMCPY_AND_ZERO_SRC(type, dst, src, len) do {				\

@@ -324,15 +324,15 @@
 /*
  * Default page size for a given kernel configuration
  */
-#ifdef CONFIG_PAGE_SIZE_4KB
+#ifdef CONFIG_PTE_SIZE_4KB
 #define PM_DEFAULT_MASK PM_4K
-#elif defined(CONFIG_PAGE_SIZE_8KB)
+#elif defined(CONFIG_PTE_SIZE_8KB)
 #define PM_DEFAULT_MASK PM_8K
-#elif defined(CONFIG_PAGE_SIZE_16KB)
+#elif defined(CONFIG_PTE_SIZE_16KB)
 #define PM_DEFAULT_MASK PM_16K
-#elif defined(CONFIG_PAGE_SIZE_32KB)
+#elif defined(CONFIG_PTE_SIZE_32KB)
 #define PM_DEFAULT_MASK PM_32K
-#elif defined(CONFIG_PAGE_SIZE_64KB)
+#elif defined(CONFIG_PTE_SIZE_64KB)
 #define PM_DEFAULT_MASK PM_64K
 #else
 #error Bad page size configuration!
@@ -341,15 +341,15 @@
 /*
  * Default huge tlb size for a given kernel configuration
  */
-#ifdef CONFIG_PAGE_SIZE_4KB
+#ifdef CONFIG_PTE_SIZE_4KB
 #define PM_HUGE_MASK	PM_1M
-#elif defined(CONFIG_PAGE_SIZE_8KB)
+#elif defined(CONFIG_PTE_SIZE_8KB)
 #define PM_HUGE_MASK	PM_4M
-#elif defined(CONFIG_PAGE_SIZE_16KB)
+#elif defined(CONFIG_PTE_SIZE_16KB)
 #define PM_HUGE_MASK	PM_16M
-#elif defined(CONFIG_PAGE_SIZE_32KB)
+#elif defined(CONFIG_PTE_SIZE_32KB)
 #define PM_HUGE_MASK	PM_64M
-#elif defined(CONFIG_PAGE_SIZE_64KB)
+#elif defined(CONFIG_PTE_SIZE_64KB)
 #define PM_HUGE_MASK	PM_256M
 #elif defined(CONFIG_MIPS_HUGE_TLB_SUPPORT)
 #error Bad page size configuration for hugetlbfs!

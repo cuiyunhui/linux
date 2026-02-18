@@ -83,7 +83,7 @@ static __always_inline u64 __arch_get_hw_counter(s32 clock_mode,
 	return __arch_counter_get_cntvct();
 }
 
-#if IS_ENABLED(CONFIG_CC_IS_GCC) && IS_ENABLED(CONFIG_PAGE_SIZE_64KB)
+#if IS_ENABLED(CONFIG_CC_IS_GCC) && IS_ENABLED(CONFIG_PTE_SIZE_64KB)
 static __always_inline const struct vdso_time_data *__arch_get_vdso_u_time_data(void)
 {
 	const struct vdso_time_data *ret = &vdso_u_time_data;
@@ -94,7 +94,7 @@ static __always_inline const struct vdso_time_data *__arch_get_vdso_u_time_data(
 	return ret;
 }
 #define __arch_get_vdso_u_time_data __arch_get_vdso_u_time_data
-#endif /* IS_ENABLED(CONFIG_CC_IS_GCC) && IS_ENABLED(CONFIG_PAGE_SIZE_64KB) */
+#endif /* IS_ENABLED(CONFIG_CC_IS_GCC) && IS_ENABLED(CONFIG_PTE_SIZE_64KB) */
 
 #endif /* !__ASSEMBLER__ */
 

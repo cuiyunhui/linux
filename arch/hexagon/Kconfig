@@ -9,10 +9,10 @@ config HEXAGON
 	select ARCH_NO_PREEMPT
 	select ARCH_WANT_FRAME_POINTERS
 	select DMA_GLOBAL_POOL
-	select HAVE_PAGE_SIZE_4KB
-	select HAVE_PAGE_SIZE_16KB
-	select HAVE_PAGE_SIZE_64KB
-	select HAVE_PAGE_SIZE_256KB
+	select HAVE_PTE_SIZE_4KB
+	select HAVE_PTE_SIZE_16KB
+	select HAVE_PTE_SIZE_64KB
+	select HAVE_PTE_SIZE_256KB
 	select FRAME_POINTER
 	# Other pending projects/to-do items.
 	# select HAVE_REGS_AND_STACK_ACCESS_API

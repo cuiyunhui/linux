@@ -843,23 +843,23 @@ choice
 config PPC_4K_PAGES
 	bool "4k page size"
 	select HAVE_ARCH_SOFT_DIRTY if PPC_BOOK3S_64
-	select HAVE_PAGE_SIZE_4KB
+	select HAVE_PTE_SIZE_4KB
 
 config PPC_16K_PAGES
 	bool "16k page size"
 	depends on 44x || PPC_8xx
-	select HAVE_PAGE_SIZE_16KB
+	select HAVE_PTE_SIZE_16KB
 
 config PPC_64K_PAGES
 	bool "64k page size"
 	depends on 44x || PPC_BOOK3S_64
 	select HAVE_ARCH_SOFT_DIRTY if PPC_BOOK3S_64
-	select HAVE_PAGE_SIZE_64KB
+	select HAVE_PTE_SIZE_64KB
 
 config PPC_256K_PAGES
 	bool "256k page size (Requires non-standard binutils settings)"
 	depends on 44x && !PPC_47x
-	select HAVE_PAGE_SIZE_256KB
+	select HAVE_PTE_SIZE_256KB
 	help
 	  Make the page size 256k.
 

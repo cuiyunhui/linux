@@ -670,10 +670,10 @@ config BUILTIN_DTB_NAME
 
 config ZERO_PAGE_OFFSET
 	hex
-	default "0x00010000" if PAGE_SIZE_64KB || SH_RTS7751R2D || \
+	default "0x00010000" if PTE_SIZE_64KB || SH_RTS7751R2D || \
 				SH_7751_SOLUTION_ENGINE
-	default "0x00004000" if PAGE_SIZE_16KB || SH_SH03
-	default "0x00002000" if PAGE_SIZE_8KB
+	default "0x00004000" if PTE_SIZE_16KB || SH_SH03
+	default "0x00002000" if PTE_SIZE_8KB
 	default "0x00001000"
 	help
 	  This sets the default offset of zero page.
@@ -693,10 +693,10 @@ config BOOT_LINK_OFFSET
 
 config ENTRY_OFFSET
 	hex
-	default "0x00001000" if PAGE_SIZE_4KB
-	default "0x00002000" if PAGE_SIZE_8KB
-	default "0x00004000" if PAGE_SIZE_16KB
-	default "0x00010000" if PAGE_SIZE_64KB
+	default "0x00001000" if PTE_SIZE_4KB
+	default "0x00002000" if PTE_SIZE_8KB
+	default "0x00004000" if PTE_SIZE_16KB
+	default "0x00010000" if PTE_SIZE_64KB
 	default "0x00000000"
 
 config ROMIMAGE_MMCIF
