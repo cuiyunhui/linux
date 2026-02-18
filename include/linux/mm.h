@@ -1660,13 +1660,13 @@ unsigned long nr_free_buffer_pages(void);
 /* Returns the number of bytes in this potentially compound page. */
 static inline unsigned long page_size(const struct page *page)
 {
-	return PAGE_SIZE << compound_order(page);
+	return PG_SIZE << compound_order(page);
 }
 
 /* Returns the number of bits needed for the number of bytes in a page */
 static inline unsigned int page_shift(struct page *page)
 {
-	return PAGE_SHIFT + compound_order(page);
+	return PG_SHIFT + compound_order(page);
 }
 
 /**
@@ -1687,7 +1687,7 @@ static inline unsigned int thp_order(struct page *page)
  */
 static inline unsigned long thp_size(struct page *page)
 {
-	return PAGE_SIZE << thp_order(page);
+	return PG_SIZE << thp_order(page);
 }
 
 #ifdef CONFIG_MMU
@@ -2592,7 +2592,7 @@ static inline struct folio *folio_next(struct folio *folio)
  */
 static inline unsigned int folio_shift(const struct folio *folio)
 {
-	return PAGE_SHIFT + folio_order(folio);
+	return PG_SHIFT + folio_order(folio);
 }
 
 /**
@@ -2605,7 +2605,7 @@ static inline unsigned int folio_shift(const struct folio *folio)
  */
 static inline size_t folio_size(const struct folio *folio)
 {
-	return PAGE_SIZE << folio_order(folio);
+	return PG_SIZE << folio_order(folio);
 }
 
 /**
