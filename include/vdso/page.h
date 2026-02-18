@@ -28,7 +28,30 @@
 #define PTE_MASK	(~(PTE_SIZE - 1))
 #endif
 
-#define PAGE_SHIFT	PTE_SHIFT
-#define PAGE_SIZE	PTE_SIZE
-#define PAGE_MASK	PTE_MASK
+/* PG_SHIFT determines the size of order-0 buddy allocation */
+#define PG_SHIFT	CONFIG_PG_SHIFT
+
+#define PG_SIZE		(_AC(1,UL) << CONFIG_PG_SHIFT)
+
+#if !defined(CONFIG_64BIT)
+/* See comment for PTE_MASK */
+#define PG_MASK		(~((1 << CONFIG_PG_SHIFT) - 1))
+#else
+#define PG_MASK		(~(PG_SIZE - 1))
+#endif
+
+/*
+ * PAGE_SHIFT/SIZE/MASK have double meaning. They can be used for both
+ * MMU page size and for order-0 buddy allocations.
+ *
+ * Only define them if sizes are the same.
+ *
+ * To be removed once transition is complete.
+ */
+#if PTE_SHIFT == PG_SHIFT
+#define PAGE_SHIFT	PG_SHIFT
+#define PAGE_SIZE	PG_SIZE
+#define PAGE_MASK	PG_MASK
+#endif
+
 #endif	/* __VDSO_PAGE_H */

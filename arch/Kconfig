@@ -1363,6 +1363,38 @@ config PTE_SHIFT
 	default	16 if PTE_SIZE_64KB
 	default	18 if PTE_SIZE_256KB
 
+config PG_SIZE_4KB
+	bool
+
+config PG_SIZE_8KB
+	bool
+
+config PG_SIZE_16KB
+	bool
+
+config PG_SIZE_32KB
+	bool
+
+config PG_SIZE_64KB
+	bool
+
+config PG_SIZE_128KB
+	bool
+
+config PG_SIZE_256KB
+	bool
+
+config PG_SHIFT
+	int
+	default 12 if PG_SIZE_4KB
+	default 13 if PG_SIZE_8KB
+	default 14 if PG_SIZE_16KB
+	default 15 if PG_SIZE_32KB
+	default 16 if PG_SIZE_64KB
+	default 17 if PG_SIZE_128KB
+	default 18 if PG_SIZE_256KB
+	default PTE_SHIFT
+
 # This allows to use a set of generic functions to determine mmap base
 # address by giving priority to top-down scheme only if the process
 # is not in legacy mode (compat task, unlimited stack size or
