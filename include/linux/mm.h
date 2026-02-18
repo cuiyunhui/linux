@@ -2269,6 +2269,13 @@ static inline struct folio *pfn_folio(unsigned long pfn)
 	return page_folio(pfn_to_page(pfn));
 }
 
+#define offset_in_pte(p)	((unsigned long)(p) & ~PTE_MASK)
+#define offset_in_pg(p)		((unsigned long)(p) & ~PG_MASK)
+#if PTE_SIZE == PG_SIZE
+#define offset_in_page(p)	((unsigned long)(p) & ~PAGE_MASK)
+#endif
+#define offset_in_folio(folio, p) ((unsigned long)(p) & (folio_size(folio) - 1))
+
 #ifdef CONFIG_MMU
 static inline pte_t mk_pte(const struct page *page, pgprot_t pgprot)
 {
@@ -2794,9 +2801,6 @@ static inline void clear_page_pfmemalloc(struct page *page)
  * Can be called by the pagefault handler when it gets a VM_FAULT_OOM.
  */
 extern void pagefault_out_of_memory(void);
-
-#define offset_in_page(p)	((unsigned long)(p) & ~PAGE_MASK)
-#define offset_in_folio(folio, p) ((unsigned long)(p) & (folio_size(folio) - 1))
 
 /*
  * Parameter block passed down to zap_pte_range in exceptional cases.
