@@ -14,11 +14,11 @@
  * Determine the allocation order of a particular sized block of memory.  This
  * is on a logarithmic scale, where:
  *
- *	0 -> 2^0 * PAGE_SIZE and below
- *	1 -> 2^1 * PAGE_SIZE to 2^0 * PAGE_SIZE + 1
- *	2 -> 2^2 * PAGE_SIZE to 2^1 * PAGE_SIZE + 1
- *	3 -> 2^3 * PAGE_SIZE to 2^2 * PAGE_SIZE + 1
- *	4 -> 2^4 * PAGE_SIZE to 2^3 * PAGE_SIZE + 1
+ *	0 -> 2^0 * PG_SIZE and below
+ *	1 -> 2^1 * PG_SIZE to 2^0 * PG_SIZE + 1
+ *	2 -> 2^2 * PG_SIZE to 2^1 * PG_SIZE + 1
+ *	3 -> 2^3 * PG_SIZE to 2^2 * PG_SIZE + 1
+ *	4 -> 2^4 * PG_SIZE to 2^3 * PG_SIZE + 1
  *	...
  *
  * The order returned is used to find the smallest allocation granule required
@@ -30,16 +30,16 @@ static __always_inline __attribute_const__ int get_order(unsigned long size)
 {
 	if (__builtin_constant_p(size)) {
 		if (!size)
-			return BITS_PER_LONG - PAGE_SHIFT;
+			return BITS_PER_LONG - PG_SHIFT;
 
-		if (size < (1UL << PAGE_SHIFT))
+		if (size < (1UL << PG_SHIFT))
 			return 0;
 
-		return ilog2((size) - 1) - PAGE_SHIFT + 1;
+		return ilog2((size) - 1) - PG_SHIFT + 1;
 	}
 
 	size--;
-	size >>= PAGE_SHIFT;
+	size >>= PG_SHIFT;
 #if BITS_PER_LONG == 32
 	return fls(size);
 #else
