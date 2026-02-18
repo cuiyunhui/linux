@@ -707,7 +707,12 @@ struct vm_region {
 	unsigned long	vm_start;	/* start address of region */
 	unsigned long	vm_end;		/* region initialised to here */
 	unsigned long	vm_top;		/* region allocated to here */
-	unsigned long	vm_pgoff;	/* the offset in vm_file corresponding to vm_start */
+	union {
+		unsigned long vm_pteoff; /* the offset in vm_file corresponding to vm_start */
+#if PTE_SIZE == PG_SIZE
+		unsigned long vm_pgoff;  /* to be removed after conversion is done */
+#endif
+	};
 	struct file	*vm_file;	/* the backing file or NULL */
 
 	int		vm_usage;	/* region usage count (access under nommu_region_sem) */
@@ -885,7 +890,12 @@ struct vm_area_desc {
 	unsigned long end;
 
 	/* Mutable fields. Populated with initial state. */
-	pgoff_t pgoff;
+	union {
+		unsigned long pteoff;
+#if PTE_SIZE == PG_SIZE
+		unsigned long pgoff;  /* to be removed after conversion is done */
+#endif
+	};
 	struct file *vm_file;
 	vma_flags_t vma_flags;
 	pgprot_t page_prot;
@@ -971,8 +981,13 @@ struct vm_area_struct {
 	const struct vm_operations_struct *vm_ops;
 
 	/* Information about our backing store: */
-	unsigned long vm_pgoff;		/* Offset (within vm_file) in PAGE_SIZE
-					   units */
+	union {
+		unsigned long vm_pteoff; /* Offset (within vm_file) in PTE_SIZE
+					    units */
+#if PTE_SIZE == PG_SIZE
+		unsigned long vm_pgoff;  /* to be removed after conversion is done */
+#endif
+	};
 	struct file * vm_file;		/* File we map to (can be NULL). */
 	void * vm_private_data;		/* was vm_pte (shared mem) */
 

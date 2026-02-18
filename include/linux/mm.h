@@ -699,7 +699,12 @@ struct vm_fault {
 	const struct {
 		struct vm_area_struct *vma;	/* Target VMA */
 		gfp_t gfp_mask;			/* gfp mask to be used for allocations */
-		pgoff_t pgoff;			/* Logical page offset based on vma */
+		union {
+			unsigned long pteoff;	/* Logical PTE offset based on vma */
+#if PTE_SIZE == PG_SIZE
+			pgoff_t pgoff;		/* to be removed after conversion is done */
+#endif
+		};
 		unsigned long address;		/* Faulting virtual address - masked */
 		unsigned long real_address;	/* Faulting virtual address - unmasked */
 	};
