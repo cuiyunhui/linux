@@ -96,7 +96,7 @@ struct vma_merge_struct {
 	 */
 	unsigned long start;
 	unsigned long end;
-	pgoff_t pgoff;
+	unsigned long pteoff;
 
 	vm_flags_t vm_flags;
 	struct file *file;
@@ -227,20 +227,20 @@ static inline bool vmg_nomem(struct vma_merge_struct *vmg)
 }
 
 /* Assumes addr >= vma->vm_start. */
-static inline pgoff_t vma_pgoff_offset(struct vm_area_struct *vma,
+static inline unsigned long vma_pte_offset(struct vm_area_struct *vma,
 				       unsigned long addr)
 {
-	return vma->vm_pgoff + PHYS_PFN(addr - vma->vm_start);
+	return vma->vm_pteoff + ((addr - vma->vm_start) >> PTE_SHIFT);
 }
 
-#define VMG_STATE(name, mm_, vmi_, start_, end_, vm_flags_, pgoff_)	\
+#define VMG_STATE(name, mm_, vmi_, start_, end_, vm_flags_, pteoff_)	\
 	struct vma_merge_struct name = {				\
 		.mm = mm_,						\
 		.vmi = vmi_,						\
 		.start = start_,					\
 		.end = end_,						\
 		.vm_flags = vm_flags_,					\
-		.pgoff = pgoff_,					\
+		.pteoff = pteoff_,					\
 		.state = VMA_MERGE_START,				\
 	}
 
@@ -254,7 +254,7 @@ static inline pgoff_t vma_pgoff_offset(struct vm_area_struct *vma,
 		.start = start_,				\
 		.end = end_,					\
 		.vm_flags = vma_->vm_flags,			\
-		.pgoff = vma_pgoff_offset(vma_, start_),	\
+		.pteoff = vma_pte_offset(vma_, start_),	\
 		.file = vma_->vm_file,				\
 		.anon_vma = vma_->anon_vma,			\
 		.policy = vma_policy(vma_),			\
@@ -306,7 +306,7 @@ static inline void set_vma_from_desc(struct vm_area_struct *vma,
 	 */
 
 	/* Mutable fields. Populated with initial state. */
-	vma->vm_pgoff = desc->pgoff;
+	vma->vm_pteoff = desc->pteoff;
 	if (desc->vm_file != vma->vm_file)
 		vma_set_file(vma, desc->vm_file);
 	vma->flags = desc->vma_flags;

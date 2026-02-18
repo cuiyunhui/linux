@@ -241,7 +241,7 @@ void dump_vmg(const struct vma_merge_struct *vmg, const char *reason)
 		return;
 	}
 
-	pr_warn("vmg %px state: mm %px pgoff %lx\n"
+	pr_warn("vmg %px state: mm %px pteoff %lx\n"
 		"vmi %px [%lx,%lx)\n"
 		"prev %px middle %px next %px target %px\n"
 		"start %lx end %lx flags %lx\n"
@@ -252,7 +252,7 @@ void dump_vmg(const struct vma_merge_struct *vmg, const char *reason)
 		"just_expand %d\n"
 		"__adjust_middle_start %d __adjust_next_start %d\n"
 		"__remove_middle %d __remove_next %d\n",
-		vmg, vmg->mm, vmg->pgoff,
+		vmg, vmg->mm, vmg->pteoff,
 		vmg->vmi, vmg->vmi ? vma_iter_addr(vmg->vmi) : 0,
 		vmg->vmi ? vma_iter_end(vmg->vmi) : 0,
 		vmg->prev, vmg->middle, vmg->next, vmg->target,

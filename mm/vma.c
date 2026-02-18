@@ -13,8 +13,8 @@ struct mmap_state {
 
 	unsigned long addr;
 	unsigned long end;
-	pgoff_t pgoff;
-	unsigned long pglen;
+	unsigned long pteoff;
+	unsigned long ptelen;
 	union {
 		vm_flags_t vm_flags;
 		vma_flags_t vma_flags;
@@ -44,14 +44,14 @@ struct mmap_state {
 	bool file_doesnt_need_get :1;
 };
 
-#define MMAP_STATE(name, mm_, vmi_, addr_, len_, pgoff_, vm_flags_, file_) \
+#define MMAP_STATE(name, mm_, vmi_, addr_, len_, pteoff_, vm_flags_, file_) \
 	struct mmap_state name = {					\
 		.mm = mm_,						\
 		.vmi = vmi_,						\
 		.addr = addr_,						\
 		.end = (addr_) + (len_),				\
-		.pgoff = pgoff_,					\
-		.pglen = PHYS_PFN(len_),				\
+		.pteoff = pteoff_,					\
+		.ptelen = PHYS_PFN(len_),				\
 		.vm_flags = vm_flags_,					\
 		.file = file_,						\
 		.page_prot = vm_get_page_prot(vm_flags_),		\
@@ -64,7 +64,7 @@ struct mmap_state {
 		.start = (map_)->addr,					\
 		.end = (map_)->end,					\
 		.vm_flags = (map_)->vm_flags,				\
-		.pgoff = (map_)->pgoff,					\
+		.pteoff = (map_)->pteoff,				\
 		.file = (map_)->file,					\
 		.prev = (map_)->prev,					\
 		.middle = vma_,						\
@@ -194,11 +194,11 @@ static void init_multi_vma_prep(struct vma_prepare *vp,
  */
 static bool can_vma_merge_before(struct vma_merge_struct *vmg)
 {
-	pgoff_t pglen = PHYS_PFN(vmg->end - vmg->start);
+	unsigned long ptelen = PHYS_PFN(vmg->end - vmg->start);
 
 	if (is_mergeable_vma(vmg, /* merge_next = */ true) &&
 	    is_mergeable_anon_vma(vmg, /* merge_next = */ true)) {
-		if (vmg->next->vm_pgoff == vmg->pgoff + pglen)
+		if (vmg->next->vm_pteoff == vmg->pteoff + ptelen)
 			return true;
 	}
 
@@ -218,7 +218,7 @@ static bool can_vma_merge_after(struct vma_merge_struct *vmg)
 {
 	if (is_mergeable_vma(vmg, /* merge_next = */ false) &&
 	    is_mergeable_anon_vma(vmg, /* merge_next = */ false)) {
-		if (vmg->prev->vm_pgoff + vma_pages(vmg->prev) == vmg->pgoff)
+		if (vmg->prev->vm_pteoff + vma_pages(vmg->prev) == vmg->pteoff)
 			return true;
 	}
 	return false;
@@ -758,7 +758,7 @@ static int commit_merge(struct vma_merge_struct *vmg)
 	 */
 	vma_adjust_trans_huge(vma, vmg->start, vmg->end,
 			      vmg->__adjust_middle_start ? vmg->middle : NULL);
-	vma_set_range(vma, vmg->start, vmg->end, vmg->pgoff);
+	vma_set_range(vma, vmg->start, vmg->end, vmg->pteoff);
 	vmg_adjust_set_range(vmg);
 	vma_iter_store_overwrite(vmg->vmi, vmg->target);
 
@@ -919,7 +919,7 @@ static __must_check struct vm_area_struct *vma_merge_existing_range(
 
 		vmg->start = prev->vm_start;
 		vmg->end = next->vm_end;
-		vmg->pgoff = prev->vm_pgoff;
+		vmg->pteoff = prev->vm_pteoff;
 
 		/*
 		 * We already ensured anon_vma compatibility above, so now it's
@@ -938,7 +938,7 @@ static __must_check struct vm_area_struct *vma_merge_existing_range(
 		 */
 
 		vmg->start = prev->vm_start;
-		vmg->pgoff = prev->vm_pgoff;
+		vmg->pteoff = prev->vm_pteoff;
 
 		if (!vmg->__remove_middle)
 			vmg->__adjust_middle_start = true;
@@ -953,7 +953,7 @@ static __must_check struct vm_area_struct *vma_merge_existing_range(
 		 * shrink/delete extend
 		 */
 
-		pgoff_t pglen = PHYS_PFN(vmg->end - vmg->start);
+		unsigned long ptelen = PHYS_PFN(vmg->end - vmg->start);
 
 		VM_WARN_ON_VMG(!merge_right, vmg);
 		/* If we are offset into a VMA, then prev must be middle. */
@@ -961,13 +961,13 @@ static __must_check struct vm_area_struct *vma_merge_existing_range(
 
 		if (vmg->__remove_middle) {
 			vmg->end = next->vm_end;
-			vmg->pgoff = next->vm_pgoff - pglen;
+			vmg->pteoff = next->vm_pteoff - ptelen;
 		} else {
 			/* We shrink middle and expand next. */
 			vmg->__adjust_next_start = true;
 			vmg->start = middle->vm_start;
 			vmg->end = start;
-			vmg->pgoff = middle->vm_pgoff;
+			vmg->pteoff = middle->vm_pteoff;
 		}
 
 		err = dup_anon_vma(next, middle, &anon_dup);
@@ -1075,7 +1075,7 @@ struct vm_area_struct *vma_merge_new_range(struct vma_merge_struct *vmg)
 	if (can_merge_left) {
 		vmg->start = prev->vm_start;
 		vmg->target = prev;
-		vmg->pgoff = prev->vm_pgoff;
+		vmg->pteoff = prev->vm_pteoff;
 
 		/*
 		 * If this merge would result in removal of the next VMA but we
@@ -1874,7 +1874,7 @@ struct vm_area_struct *copy_vma(struct vm_area_struct **vmap,
 	if (new_vma && new_vma->vm_start < addr + len)
 		return NULL;	/* should never get here */
 
-	vmg.pgoff = pgoff;
+	vmg.pteoff = pgoff;
 	vmg.next = vma_iter_next_rewind(&vmi, NULL);
 	new_vma = vma_merge_copied_range(&vmg);
 
@@ -2370,7 +2370,7 @@ static void set_desc_from_map(struct vm_area_desc *desc,
 	desc->start = map->addr;
 	desc->end = map->end;
 
-	desc->pgoff = map->pgoff;
+	desc->pteoff = map->pteoff;
 	desc->vm_file = map->file;
 	desc->vma_flags = map->vma_flags;
 	desc->page_prot = map->page_prot;
@@ -2422,12 +2422,12 @@ static int __mmap_setup(struct mmap_state *map, struct vm_area_desc *desc,
 	}
 
 	/* Check against address space limit. */
-	if (!may_expand_vm(map->mm, map->vm_flags, map->pglen - vms->nr_pages))
+	if (!may_expand_vm(map->mm, map->vm_flags, map->ptelen - vms->nr_pages))
 		return -ENOMEM;
 
 	/* Private writable mapping: check memory availability. */
 	if (accountable_mapping(map->file, map->vm_flags)) {
-		map->charged = map->pglen;
+		map->charged = map->ptelen;
 		map->charged -= vms->nr_accounted;
 		if (map->charged) {
 			error = security_vm_enough_memory_mm(map->mm, map->charged);
@@ -2519,7 +2519,7 @@ static int __mmap_new_vma(struct mmap_state *map, struct vm_area_struct **vmap)
 		return -ENOMEM;
 
 	vma_iter_config(vmi, map->addr, map->end);
-	vma_set_range(vma, map->addr, map->end, map->pgoff);
+	vma_set_range(vma, map->addr, map->end, map->pteoff);
 	vm_flags_init(vma, map->vm_flags);
 	vma->vm_page_prot = map->page_prot;
 
@@ -2587,14 +2587,14 @@ static void __mmap_complete(struct mmap_state *map, struct vm_area_struct *vma)
 	/* Unmap any existing mapping in the area. */
 	vms_complete_munmap_vmas(&map->vms, &map->mas_detach);
 
-	vm_stat_account(mm, vma->vm_flags, map->pglen);
+	vm_stat_account(mm, vma->vm_flags, map->ptelen);
 	if (vm_flags & VM_LOCKED) {
 		if ((vm_flags & VM_SPECIAL) || vma_is_dax(vma) ||
 					is_vm_hugetlb_page(vma) ||
 					vma == get_gate_vma(mm))
 			vm_flags_clear(vma, VM_LOCKED_MASK);
 		else
-			mm->locked_vm += map->pglen;
+			mm->locked_vm += map->ptelen;
 	}
 
 	if (vma->vm_file)
@@ -2648,7 +2648,7 @@ static int call_mmap_prepare(struct mmap_state *map,
 	call_action_prepare(map, desc);
 
 	/* Update fields permitted to be changed. */
-	map->pgoff = desc->pgoff;
+	map->pteoff = desc->pteoff;
 	if (desc->vm_file != map->file) {
 		map->file_doesnt_need_get = true;
 		map->file = desc->vm_file;
