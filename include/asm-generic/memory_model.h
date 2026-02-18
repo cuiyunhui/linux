@@ -4,6 +4,10 @@
 
 #include <linux/pfn.h>
 
+#define PTES_PER_PAGE		(PG_SIZE / PTE_SIZE)
+#define PTES_TO_PAGES(x)	((x) / PTES_PER_PAGE)
+#define PAGES_TO_PTES(x)	((x) * PTES_PER_PAGE)
+
 #ifndef __ASSEMBLY__
 
 /*
@@ -15,8 +19,9 @@
 #define ARCH_PFN_OFFSET		(0UL)
 #endif
 
-#define __pfn_to_page(pfn)	(mem_map + ((pfn) - ARCH_PFN_OFFSET))
-#define __page_to_pfn(page)	((unsigned long)((page) - mem_map) + \
+#define __pfn_to_page(pfn)	(mem_map + \
+				 PTES_TO_PAGES((pfn) - ARCH_PFN_OFFSET))
+#define __page_to_pfn(page)	(PAGES_TO_PTES((unsigned long)((page) - mem_map)) + \
 				 ARCH_PFN_OFFSET)
 
 /* avoid <linux/mm.h> include hell */
@@ -43,24 +48,27 @@ static inline int pfn_valid(unsigned long pfn)
 #elif defined(CONFIG_SPARSEMEM_VMEMMAP)
 
 /* memmap is virtually contiguous.  */
-#define __pfn_to_page(pfn)	(vmemmap + (pfn))
-#define __page_to_pfn(page)	(unsigned long)((page) - vmemmap)
+#define __pfn_to_page(pfn)	(vmemmap + PTES_TO_PAGES(pfn))
+#define __page_to_pfn(page)	PAGES_TO_PTES((unsigned long)(((page) - vmemmap)))
 
 #elif defined(CONFIG_SPARSEMEM)
 /*
  * Note: section's mem_map is encoded to reflect its start_pfn.
  * section[i].section_mem_map == mem_map's address - start_pfn;
  */
-#define __page_to_pfn(pg)					\
-({	const struct page *__pg = (pg);				\
-	int __sec = memdesc_section(__pg->flags);		\
-	(unsigned long)(__pg - __section_mem_map_addr(__nr_to_section(__sec)));	\
+#define __page_to_pfn(pg)						\
+({	const struct page *__pg = (pg);					\
+	int __sec = memdesc_section(__pg->flags);			\
+	unsigned logn __ret;						\
+	__ret = (unsigned long)(__pg -					\
+		__section_mem_map_addr(__nr_to_section(__sec)));	\
+	PAGES_TO_PTES(__ret)						\
 })
 
-#define __pfn_to_page(pfn)				\
-({	unsigned long __pfn = (pfn);			\
-	struct mem_section *__sec = __pfn_to_section(__pfn);	\
-	__section_mem_map_addr(__sec) + __pfn;		\
+#define __pfn_to_page(pfn)						\
+({	unsigned long __pfn = (pfn);					\
+	struct mem_section *__sec = __pfn_to_section(__pfn);		\
+	__section_mem_map_addr(__sec) + PTES_TO_PAGES(__pfn);		\
 })
 #endif /* CONFIG_FLATMEM/SPARSEMEM */
 
