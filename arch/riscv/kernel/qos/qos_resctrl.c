@@ -936,6 +936,10 @@ static int cbqri_probe_controller(struct cbqri_controller_info *ctrl_info,
 	pr_info("controller info: type=%d addr=0x%lx size=%lu max-rcid=%u max-mcid=%u",
 		ctrl_info->type, ctrl_info->addr, ctrl_info->size,
 		ctrl_info->rcid_count, ctrl_info->mcid_count);
+	if (!ctrl_info->rcid_count && !ctrl_info->mcid_count) {
+		pr_warn("%s(): invalid controller: rcid=0 and mcid=0", __func__);
+		return -EINVAL;
+	}
 
 	/* max_rmid is used by resctrl_arch_system_num_rmid_idx() */
 	max_rmid = max_t(u32, max_rmid, ctrl_info->mcid_count);
@@ -956,11 +960,23 @@ static int cbqri_probe_controller(struct cbqri_controller_info *ctrl_info,
 		err = cbqri_probe_capacity_features(ctrl);
 		if (err)
 			goto err_iounmap;
+
+		/* OSPM must use RCID/MCID Count from RQSC regardless of hw reports */
+		if (!ctrl_info->rcid_count)
+			ctrl->alloc_capable = false;
+		if (!ctrl_info->mcid_count)
+			ctrl->mon_capable = false;
 	} else if (ctrl_info->type == CBQRI_CONTROLLER_TYPE_BANDWIDTH) {
 		pr_info("probe bandwidth controller");
 		err = cbqri_probe_bandwidth_features(ctrl);
 		if (err)
 			goto err_iounmap;
+
+		/* OSPM must use RCID/MCID Count from RQSC regardless of hw reports */
+		if (!ctrl_info->rcid_count)
+			ctrl->alloc_capable = false;
+		if (!ctrl_info->mcid_count)
+			ctrl->mon_capable = false;
 	} else {
 		pr_warn("controller type is UNKNOWN");
 		err = -ENODEV;

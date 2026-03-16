@@ -83,8 +83,14 @@ int acpi_parse_rqsc(struct acpi_table_header *table)
 		}
 		ctrl_info->addr = (unsigned long)base;
 		ctrl_info->size = size;
-		ctrl_info->rcid_count = rqsc->f[i].rcid;
-		ctrl_info->mcid_count = rqsc->f[i].mcid;
+		ctrl_info->rcid_count = (u32)rqsc->f[i].rcid;
+		ctrl_info->mcid_count = (u32)rqsc->f[i].mcid;
+		if (!ctrl_info->rcid_count && !ctrl_info->mcid_count) {
+			pr_warn("%s(): invalid controller entry: rcid=0 and mcid=0, skipping",
+				__func__);
+			kfree(ctrl_info);
+			continue;
+		}
 
 		pr_info("Found controller with type %u addr 0x%lx size  %lu rcid  %u mcid  %u",
 			ctrl_info->type, ctrl_info->addr, ctrl_info->size,
