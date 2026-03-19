@@ -1106,10 +1106,10 @@ static void qos_set_cbqri_res_base(struct cbqri_controller *ctrl,
 }
 
 static void qos_populate_res_fields(struct cbqri_controller *ctrl,
-					 struct rdt_resource *res,
-					 enum resctrl_res_level rid,
-					 const char *name,
-					 enum resctrl_scope scope)
+				 struct rdt_resource *res,
+				 enum resctrl_res_level rid,
+				 const char *name,
+				 enum resctrl_scope scope)
 {
 	/* Common fields */
 	res->mon.num_rmid = ctrl->ctrl_info->mcid_count;
@@ -1119,6 +1119,7 @@ static void qos_populate_res_fields(struct cbqri_controller *ctrl,
 	res->mon_capable = ctrl->mon_capable;
 	res->schema_fmt = RESCTRL_SCHEMA_BITMAP;
 	res->ctrl_scope = scope;
+	res->mon_scope = scope;
 
 	/* Cache-related fields */
 	res->cache.arch_has_sparse_bitmasks = false;
@@ -1129,7 +1130,7 @@ static void qos_populate_res_fields(struct cbqri_controller *ctrl,
 }
 
 static void qos_populate_mba_fields(struct cbqri_controller *ctrl,
-					 struct rdt_resource *res)
+				 struct rdt_resource *res)
 {
 	res->mon.num_rmid = ctrl->ctrl_info->mcid_count;
 	res->rid = RDT_RESOURCE_MBA;
@@ -1137,7 +1138,7 @@ static void qos_populate_mba_fields(struct cbqri_controller *ctrl,
 	res->schema_fmt = RESCTRL_SCHEMA_RANGE;
 	res->ctrl_scope = RESCTRL_L3_CACHE;
 	res->alloc_capable = ctrl->alloc_capable;
-	res->mon_capable = false;
+	res->mon_capable = ctrl->mon_capable;
 	res->membw.delay_linear = true;
 	res->membw.arch_needs_linear = true;
 	res->membw.throttle_mode = THREAD_THROTTLE_UNDEFINED;
@@ -1184,6 +1185,68 @@ static struct rdt_resource *qos_init_mba_resource(struct cbqri_controller *ctrl)
 	return res;
 }
 
+/*
+ * Add a monitoring domain for a given controller/domain pair when
+ * monitoring is supported by the hardware/controller. This encapsulates
+ * the bookkeeping and event enabling logic used during domain bring-up.
+ */
+static int qos_resctrl_add_mon_domain(struct cbqri_controller *ctrl,
+				      struct rdt_ctrl_domain *domain,
+				      struct rdt_resource *res, int id)
+{
+	struct cbqri_resctrl_dom *hw_dom;
+	struct rdt_mon_domain *mon_domain;
+	int err;
+
+	/* No-op unless monitoring is exposed for this resource. */
+	if (!ctrl->mon_capable || !res->mon_capable)
+		return 0;
+
+	/* Derive the monitoring domain storage from the hardware container. */
+	hw_dom = container_of(domain, struct cbqri_resctrl_dom, resctrl_ctrl_dom);
+	mon_domain = &hw_dom->resctrl_mon_dom;
+
+	INIT_LIST_HEAD(&mon_domain->hdr.list);
+	mon_domain->hdr.id = id;
+	mon_domain->hdr.type = RESCTRL_MON_DOMAIN;
+
+	if (!cpumask_empty(&ctrl->ctrl_info->cache.cpu_mask))
+		cpumask_copy(&mon_domain->hdr.cpu_mask,
+			     &ctrl->ctrl_info->cache.cpu_mask);
+	else
+		cpumask_copy(&mon_domain->hdr.cpu_mask, cpu_online_mask);
+
+	if (res->rid == RDT_RESOURCE_L3)
+		mon_domain->ci_id = ctrl->ctrl_info->cache.cache_id;
+	else
+		mon_domain->ci_id = id;
+
+	/*
+	 * Ensure mandatory L3 monitoring events are enabled when exposing an
+	 * L3 resource.
+	 *
+	 * CBQRI bandwidth monitoring currently only provides a total byte-count
+	 * event. Do not enable the x86-style "local" MBM event.
+	 *
+	 * The checks keep the operation idempotent.
+	 */
+	if (res->rid == RDT_RESOURCE_L3) {
+		if (!resctrl_is_mon_event_enabled(QOS_L3_OCCUP_EVENT_ID))
+			resctrl_enable_mon_event(QOS_L3_OCCUP_EVENT_ID, false,
+					 0, NULL);
+		if (!resctrl_is_mon_event_enabled(QOS_L3_MBM_TOTAL_EVENT_ID))
+			resctrl_enable_mon_event(QOS_L3_MBM_TOTAL_EVENT_ID, false,
+					 0, NULL);
+	}
+
+	err = resctrl_online_mon_domain(res, mon_domain);
+	if (err)
+		return err;
+
+	list_add_tail(&mon_domain->hdr.list, &res->mon_domains);
+	return 0;
+}
+
 static int qos_resctrl_add_controller_domain(struct cbqri_controller *ctrl, int *id)
 {
 	int err;
@@ -1212,6 +1275,11 @@ static int qos_resctrl_add_controller_domain(struct cbqri_controller *ctrl, int 
 		err = resctrl_online_ctrl_domain(res, domain);
 		if (err)
 			goto err_free_domain;
+
+		err = qos_resctrl_add_mon_domain(ctrl, domain, res, *id);
+		if (err)
+			goto err_offline_ctrl_domain;
+
 		list_add_tail(&domain->hdr.list, &res->ctrl_domains);
 
 		return 0;
@@ -1237,6 +1305,11 @@ static int qos_resctrl_add_controller_domain(struct cbqri_controller *ctrl, int 
 		err = resctrl_online_ctrl_domain(res, domain);
 		if (err)
 			goto err_free_domain;
+
+		err = qos_resctrl_add_mon_domain(ctrl, domain, res, *id);
+		if (err)
+			goto err_offline_ctrl_domain;
+
 		list_add_tail(&domain->hdr.list, &res->ctrl_domains);
 
 		return 0;
@@ -1245,6 +1318,9 @@ static int qos_resctrl_add_controller_domain(struct cbqri_controller *ctrl, int 
 		pr_warn("%s(): unknown resource %d", __func__, type);
 		return -ENODEV;
 	}
+
+err_offline_ctrl_domain:
+	resctrl_offline_ctrl_domain(res, domain);
 
 err_free_domain:
 	qos_free_domain(domain);
@@ -1335,10 +1411,17 @@ static void qos_free_all_domains(void)
 {
 	int i;
 	struct cbqri_resctrl_res *res;
+	struct rdt_mon_domain *mon_dom, *mon_dom_tmp;
 	struct rdt_ctrl_domain *domain, *domain_temp;
 
 	for (i = 0; i < RDT_NUM_RESOURCES; i++) {
 		res = &cbqri_resctrl_resources[i];
+		list_for_each_entry_safe(mon_dom, mon_dom_tmp,
+					 &res->resctrl_res.mon_domains, hdr.list) {
+			resctrl_offline_mon_domain(&res->resctrl_res, mon_dom);
+			list_del(&mon_dom->hdr.list);
+		}
+
 		list_for_each_entry_safe(domain, domain_temp,
 					 &res->resctrl_res.ctrl_domains, hdr.list) {
 			resctrl_offline_ctrl_domain(&res->resctrl_res, domain);
