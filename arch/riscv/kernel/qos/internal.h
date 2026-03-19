@@ -132,17 +132,13 @@ struct cbqri_controller {
 
 struct cbqri_resctrl_res {
 	struct rdt_resource     resctrl_res;
-	struct cbqri_controller controller;
 	u32 max_rcid;
 	u32 max_mcid;
 };
 
 struct cbqri_resctrl_dom {
-	struct rdt_domain_hdr       resctrl_dom_hdr;
 	struct rdt_ctrl_domain  resctrl_ctrl_dom;
 	struct rdt_mon_domain   resctrl_mon_dom;
-	u64 cbm;
-	u64 rbwb;
 	u64 *ctrl_val;
 	struct cbqri_controller *hw_ctrl;
 };

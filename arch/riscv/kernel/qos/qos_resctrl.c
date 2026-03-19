@@ -2,6 +2,8 @@
 
 #define pr_fmt(fmt) "qos: resctrl: " fmt
 
+#include <linux/iopoll.h>
+#include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/err.h>
 #include <linux/riscv_qos.h>
@@ -42,7 +44,7 @@ bool resctrl_arch_mon_capable(void)
 
 bool resctrl_arch_is_llc_occupancy_enabled(void)
 {
-	return true;
+	return resctrl_arch_mon_capable();
 }
 
 bool resctrl_arch_is_mbm_local_enabled(void)
@@ -148,6 +150,8 @@ int resctrl_arch_cntr_read(struct rdt_resource *r, struct rdt_mon_domain *d,
 			   enum resctrl_event_id eventid, u64 *val)
 {
 	/* not implemented for the RISC-V resctrl implementation */
+	if (val)
+		*val = 0;
 	return 0;
 }
 
@@ -280,6 +284,9 @@ int resctrl_arch_rmid_read(struct rdt_resource *r, struct rdt_mon_domain *d,
 	 * CBQRI terminology)
 	 */
 
+	if (val)
+		*val = 0;
+
 	return 0;
 }
 
@@ -313,13 +320,9 @@ void resctrl_arch_reset_all_ctrls(struct rdt_resource *r)
 static void cbqri_set_cbm(struct cbqri_controller *ctrl, u64 cbm)
 {
 	int reg_offset;
-	u64 reg;
 
 	reg_offset = CBQRI_CC_BLOCK_MASK_OFF;
-	reg = ioread64(ctrl->base + reg_offset);
-
-	reg = cbm;
-	iowrite64(reg, ctrl->base + reg_offset);
+	iowrite64(cbm, ctrl->base + reg_offset);
 }
 
 /* Set the Rbwb (reserved bandwidth blocks) field in bc_bw_alloc */
@@ -350,20 +353,17 @@ static u64 cbqri_get_rbwb(struct cbqri_controller *ctrl)
 
 static int cbqri_wait_busy_flag(struct cbqri_controller *ctrl, int reg_offset)
 {
-	unsigned long timeout = jiffies + usecs_to_jiffies(1000);
-	int busy;
 	u64 reg;
+	int ret;
 
-	while (time_before(jiffies, timeout)) {
-		reg = ioread64(ctrl->base + reg_offset);
-		busy = (reg >> CBQRI_CONTROL_REGISTERS_BUSY_SHIFT) &
-			CBQRI_CONTROL_REGISTERS_BUSY_MASK;
-		if (!busy)
-			return 0;
-	}
+	ret = read_poll_timeout(ioread64, reg,
+				!((reg >> CBQRI_CONTROL_REGISTERS_BUSY_SHIFT) &
+				  CBQRI_CONTROL_REGISTERS_BUSY_MASK),
+				1, 1000, false, ctrl->base + reg_offset);
+	if (ret)
+		pr_warn("%s(): busy timeout", __func__);
 
-	pr_warn("%s(): busy timeout", __func__);
-	return -EIO;
+	return ret;
 }
 
 /* Perform capacity allocation control operation on capacity controller */
@@ -565,6 +565,8 @@ int resctrl_arch_update_one(struct rdt_resource *r, struct rdt_ctrl_domain *d,
 		break;
 	case RDT_RESOURCE_MBA:
 		/* convert from percentage to bandwidth blocks */
+		if (!ctrl->bc.nbwblks)
+			return -EINVAL;
 		cfg.rbwb = cfg_val * ctrl->bc.nbwblks / 100;
 		err = cbqri_apply_bw_config(dom, closid, t, &cfg);
 		break;
@@ -602,11 +604,9 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_ctrl_domain *d,
 {
 	struct cbqri_resctrl_dom *hw_dom;
 	struct cbqri_controller *ctrl;
-	int reg_offset;
-	u32 percent;
-	u32 rbwb;
+	int reg_offset, err;
+	u32 percent, rbwb;
 	u64 reg;
-	int err;
 
 	hw_dom = container_of(d, struct cbqri_resctrl_dom, resctrl_ctrl_dom);
 
@@ -649,6 +649,8 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_ctrl_domain *d,
 		/* Convert from bandwidth blocks to percent */
 		rbwb = hw_dom->ctrl_val[closid];
 		rbwb *= 100;
+		if (!ctrl->bc.nbwblks)
+			return resctrl_get_default_ctrl(r);
 		percent = rbwb / ctrl->bc.nbwblks;
 		if (rbwb % ctrl->bc.nbwblks)
 			percent++;
@@ -720,207 +722,245 @@ static int cbqri_probe_feature(struct cbqri_controller *ctrl, int reg_offset,
 	return 0;
 }
 
-/*
- * Note: for the purposes of the CBQRI proof-of-concept, debug logging
- * has been left in this function that detects the properties of CBQRI
- * capable controllers in the system. pr_info calls would be removed
- * before submitting non-RFC patches.
- */
-static int cbqri_probe_controller(struct cbqri_controller_info *ctrl_info,
-				  struct cbqri_controller *ctrl)
+static int cbqri_map_controller(struct cbqri_controller_info *ctrl_info,
+				struct cbqri_controller *ctrl)
 {
-	int err = 0, status;
-	u64 reg;
-
-	pr_info("controller info: type=%d addr=0x%lx size=%lu max-rcid=%u max-mcid=%u",
-		ctrl_info->type, ctrl_info->addr, ctrl_info->size,
-		ctrl_info->rcid_count, ctrl_info->mcid_count);
-
-	/* max_rmid is used by resctrl_arch_system_num_rmid_idx() */
-	max_rmid = ctrl_info->mcid_count;
-
 	ctrl->ctrl_info = ctrl_info;
-
-	/* Try to access the memory-mapped CBQRI registers */
 	if (!request_mem_region(ctrl_info->addr, ctrl_info->size, "cbqri_controller")) {
 		pr_warn("%s(): request_mem_region failed for cbqri_controller at 0x%lx",
 			__func__, ctrl_info->addr);
 		return -EBUSY;
 	}
 	ctrl->base = ioremap(ctrl_info->addr, ctrl_info->size);
-	if (!ctrl->base) {
-		pr_warn("%s(): goto err_release_mem_region", __func__);
+	if (!ctrl->base)
+		return -ENOMEM;
+	return 0;
+}
+
+static int cc_read_caps(struct cbqri_controller *ctrl)
+{
+	u64 reg = ioread64(ctrl->base + CBQRI_CC_CAPABILITIES_OFF);
+
+	if (reg == 0)
+		return -ENODEV;
+	ctrl->ver_minor = reg & CBQRI_CC_CAPABILITIES_VER_MINOR_MASK;
+	ctrl->ver_major = reg & CBQRI_CC_CAPABILITIES_VER_MAJOR_MASK;
+	ctrl->cc.supports_alloc_op_flush_rcid = (reg >> CBQRI_CC_CAPABILITIES_FRCID_SHIFT) &
+						 CBQRI_CC_CAPABILITIES_FRCID_MASK;
+	ctrl->cc.ncblks = (reg >> CBQRI_CC_CAPABILITIES_NCBLKS_SHIFT) &
+				   CBQRI_CC_CAPABILITIES_NCBLKS_MASK;
+	if (!ctrl->cc.ncblks) {
+		pr_warn("%s(): invalid ncblks=0", __func__);
+		return -EINVAL;
+	}
+	ctrl->cc.blk_size = ctrl->ctrl_info->cache.cache_size / ctrl->cc.ncblks;
+	ctrl->cc.cache_level = ctrl->ctrl_info->cache.cache_level;
+	pr_info("version=%d.%d ncblks=%d blk_size=%d cache_level=%d",
+		ctrl->ver_major, ctrl->ver_minor,
+		ctrl->cc.ncblks, ctrl->cc.blk_size, ctrl->cc.cache_level);
+	return 0;
+}
+
+static int cc_probe_mon(struct cbqri_controller *ctrl)
+{
+	int err, status;
+
+	err = cbqri_probe_feature(ctrl, CBQRI_CC_MON_CTL_OFF,
+				CBQRI_CC_MON_CTL_OP_READ_COUNTER, &status,
+				&ctrl->cc.supports_mon_at_code);
+	if (err)
+		return err;
+	if (status == CBQRI_CC_MON_CTL_STATUS_SUCCESS) {
+		pr_info("cc_mon_ctl is supported");
+		ctrl->cc.supports_mon_op_config_event = true;
+		ctrl->cc.supports_mon_op_read_counter = true;
+		ctrl->mon_capable = true;
+		exposed_mon_capable = true;
+	} else {
+		pr_info("cc_mon_ctl is NOT supported");
+		ctrl->cc.supports_mon_op_config_event = false;
+		ctrl->cc.supports_mon_op_read_counter = false;
+		ctrl->mon_capable = false;
+	}
+	ctrl->cc.supports_mon_at_data = true;
+	pr_info("supports_mon_at_data: %d, supports_mon_at_code: %d",
+		ctrl->cc.supports_mon_at_data, ctrl->cc.supports_mon_at_code);
+	return 0;
+}
+
+static int cc_probe_alloc(struct cbqri_controller *ctrl)
+{
+	int err, status;
+
+	err = cbqri_probe_feature(ctrl, CBQRI_CC_ALLOC_CTL_OFF,
+				CBQRI_CC_ALLOC_CTL_OP_READ_LIMIT,
+				&status, &ctrl->cc.supports_alloc_at_code);
+	if (err)
+		return err;
+	if (status == CBQRI_CC_ALLOC_CTL_STATUS_SUCCESS) {
+		pr_info("cc_alloc_ctl is supported");
+		ctrl->cc.supports_alloc_op_config_limit = true;
+		ctrl->cc.supports_alloc_op_read_limit = true;
+		ctrl->alloc_capable = true;
+		exposed_alloc_capable = true;
+	} else {
+		pr_info("cc_alloc_ctl is NOT supported");
+		ctrl->cc.supports_alloc_op_config_limit = false;
+		ctrl->cc.supports_alloc_op_read_limit = false;
+		ctrl->alloc_capable = false;
+	}
+	ctrl->cc.supports_alloc_at_data = true;
+	pr_info("supports_alloc_at_data: %d, supports_alloc_at_code: %d",
+		ctrl->cc.supports_alloc_at_data, ctrl->cc.supports_alloc_at_code);
+	return 0;
+}
+
+static int cbqri_probe_capacity_features(struct cbqri_controller *ctrl)
+{
+	int err;
+
+	err = cc_read_caps(ctrl);
+	if (err)
+		return err;
+
+	err = cc_probe_mon(ctrl);
+	if (err)
+		return err;
+
+	err = cc_probe_alloc(ctrl);
+	if (err)
+		return err;
+
+	return 0;
+}
+
+static int bc_read_caps(struct cbqri_controller *ctrl)
+{
+	u64 reg = ioread64(ctrl->base + CBQRI_BC_CAPABILITIES_OFF);
+
+	if (reg == 0)
+		return -ENODEV;
+	ctrl->ver_minor = reg & CBQRI_BC_CAPABILITIES_VER_MINOR_MASK;
+	ctrl->ver_major = reg & CBQRI_BC_CAPABILITIES_VER_MAJOR_MASK;
+	ctrl->bc.nbwblks = (reg >> CBQRI_BC_CAPABILITIES_NBWBLKS_SHIFT) &
+				CBQRI_BC_CAPABILITIES_NBWBLKS_MASK;
+	ctrl->bc.mrbwb = (reg >> CBQRI_BC_CAPABILITIES_MRBWB_SHIFT) &
+				  CBQRI_BC_CAPABILITIES_MRBWB_MASK;
+	if (!ctrl->bc.nbwblks) {
+		pr_warn("%s(): invalid nbwblks=0", __func__);
+		return -EINVAL;
+	}
+	pr_info("version=%d.%d nbwblks=%d mrbwb=%d",
+		ctrl->ver_major, ctrl->ver_minor,
+		ctrl->bc.nbwblks, ctrl->bc.mrbwb);
+	return 0;
+}
+
+static int bc_probe_mon(struct cbqri_controller *ctrl)
+{
+	int err, status;
+
+	err = cbqri_probe_feature(ctrl, CBQRI_BC_MON_CTL_OFF,
+				CBQRI_BC_MON_CTL_OP_READ_COUNTER,
+				&status, &ctrl->bc.supports_mon_at_code);
+	if (err)
+		return err;
+	if (status == CBQRI_BC_MON_CTL_STATUS_SUCCESS) {
+		pr_info("bc_mon_ctl is supported");
+		ctrl->bc.supports_mon_op_config_event = true;
+		ctrl->bc.supports_mon_op_read_counter = true;
+		ctrl->mon_capable = true;
+		exposed_mon_capable = true;
+	} else {
+		pr_info("bc_mon_ctl is NOT supported");
+		ctrl->bc.supports_mon_op_config_event = false;
+		ctrl->bc.supports_mon_op_read_counter = false;
+		ctrl->mon_capable = false;
+	}
+	ctrl->bc.supports_mon_at_data = true;
+	pr_info("supports_mon_at_data: %d, supports_mon_at_code: %d",
+		ctrl->bc.supports_mon_at_data, ctrl->bc.supports_mon_at_code);
+	return 0;
+}
+
+static int bc_probe_alloc(struct cbqri_controller *ctrl)
+{
+	int err, status;
+
+	err = cbqri_probe_feature(ctrl, CBQRI_BC_ALLOC_CTL_OFF,
+				CBQRI_BC_ALLOC_CTL_OP_READ_LIMIT,
+				&status, &ctrl->bc.supports_alloc_at_code);
+	if (err)
+		return err;
+	if (status == CBQRI_BC_ALLOC_CTL_STATUS_SUCCESS) {
+		pr_info("bc_alloc_ctl is supported");
+		ctrl->bc.supports_alloc_op_config_limit = true;
+		ctrl->bc.supports_alloc_op_read_limit = true;
+		ctrl->alloc_capable = true;
+		exposed_alloc_capable = true;
+	} else {
+		pr_info("bc_alloc_ctl is NOT supported");
+		ctrl->bc.supports_alloc_op_config_limit = false;
+		ctrl->bc.supports_alloc_op_read_limit = false;
+		ctrl->alloc_capable = false;
+	}
+	ctrl->bc.supports_alloc_at_data = true;
+	pr_info("supports_alloc_at_data: %d, supports_alloc_at_code: %d",
+		ctrl->bc.supports_alloc_at_data, ctrl->bc.supports_alloc_at_code);
+	return 0;
+}
+
+static int cbqri_probe_bandwidth_features(struct cbqri_controller *ctrl)
+{
+	int err;
+
+	err = bc_read_caps(ctrl);
+	if (err)
+		return err;
+
+	err = bc_probe_mon(ctrl);
+	if (err)
+		return err;
+
+	err = bc_probe_alloc(ctrl);
+	if (err)
+		return err;
+
+	return 0;
+}
+static int cbqri_probe_controller(struct cbqri_controller_info *ctrl_info,
+				struct cbqri_controller *ctrl)
+{
+	int err = 0;
+
+	pr_info("controller info: type=%d addr=0x%lx size=%lu max-rcid=%u max-mcid=%u",
+		ctrl_info->type, ctrl_info->addr, ctrl_info->size,
+		ctrl_info->rcid_count, ctrl_info->mcid_count);
+
+	/* max_rmid is used by resctrl_arch_system_num_rmid_idx() */
+	max_rmid = max_t(u32, max_rmid, ctrl_info->mcid_count);
+
+	err = cbqri_map_controller(ctrl_info, ctrl);
+	if (err) {
+		if (err == -EBUSY)
+			return err;
 		goto err_release_mem_region;
 	}
 
 	ctrl->alloc_capable = false;
 	ctrl->mon_capable = false;
 
-	/* Probe capacity allocation and monitoring features */
+	/* Probe capacity/bandwidth features */
 	if (ctrl_info->type == CBQRI_CONTROLLER_TYPE_CAPACITY) {
 		pr_info("probe capacity controller");
-
-		/* Make sure the register is implemented */
-		reg = ioread64(ctrl->base + CBQRI_CC_CAPABILITIES_OFF);
-		if (reg == 0) {
-			err = -ENODEV;
+		err = cbqri_probe_capacity_features(ctrl);
+		if (err)
 			goto err_iounmap;
-		}
-
-		ctrl->ver_minor = reg & CBQRI_CC_CAPABILITIES_VER_MINOR_MASK;
-		ctrl->ver_major = reg & CBQRI_CC_CAPABILITIES_VER_MAJOR_MASK;
-
-		ctrl->cc.supports_alloc_op_flush_rcid = (reg >> CBQRI_CC_CAPABILITIES_FRCID_SHIFT)
-			& CBQRI_CC_CAPABILITIES_FRCID_MASK;
-
-		ctrl->cc.ncblks = (reg >> CBQRI_CC_CAPABILITIES_NCBLKS_SHIFT) &
-				   CBQRI_CC_CAPABILITIES_NCBLKS_MASK;
-
-		/* Calculate size of capacity block in bytes */
-		ctrl->cc.blk_size = ctrl_info->cache.cache_size / ctrl->cc.ncblks;
-		ctrl->cc.cache_level = ctrl_info->cache.cache_level;
-
-		pr_info("version=%d.%d ncblks=%d blk_size=%d cache_level=%d",
-			ctrl->ver_major, ctrl->ver_minor,
-			ctrl->cc.ncblks, ctrl->cc.blk_size, ctrl->cc.cache_level);
-
-		/* Probe monitoring features */
-		err = cbqri_probe_feature(ctrl, CBQRI_CC_MON_CTL_OFF,
-					  CBQRI_CC_MON_CTL_OP_READ_COUNTER, &status,
-					  &ctrl->cc.supports_mon_at_code);
-		if (err) {
-			pr_warn("%s() failed to probe cc_mon_ctl feature", __func__);
-			goto err_iounmap;
-		}
-
-		if (status == CBQRI_CC_MON_CTL_STATUS_SUCCESS) {
-			pr_info("cc_mon_ctl is supported");
-			ctrl->cc.supports_mon_op_config_event = true;
-			ctrl->cc.supports_mon_op_read_counter = true;
-			ctrl->mon_capable = true;
-		} else {
-			pr_info("cc_mon_ctl is NOT supported");
-			ctrl->cc.supports_mon_op_config_event = false;
-			ctrl->cc.supports_mon_op_read_counter = false;
-			ctrl->mon_capable = false;
-		}
-		/*
-		 * AT data is "always" supported as it has the same value
-		 * than when AT field is not supported.
-		 */
-		ctrl->cc.supports_mon_at_data = true;
-		pr_info("supports_mon_at_data: %d, supports_mon_at_code: %d",
-			ctrl->cc.supports_mon_at_data, ctrl->cc.supports_mon_at_code);
-
-		/* Probe allocation features */
-		err = cbqri_probe_feature(ctrl, CBQRI_CC_ALLOC_CTL_OFF,
-					  CBQRI_CC_ALLOC_CTL_OP_READ_LIMIT,
-					  &status, &ctrl->cc.supports_alloc_at_code);
-		if (err) {
-			pr_warn("%s() failed to probe cc_alloc_ctl feature", __func__);
-			goto err_iounmap;
-		}
-
-		if (status == CBQRI_CC_ALLOC_CTL_STATUS_SUCCESS) {
-			pr_info("cc_alloc_ctl is supported");
-			ctrl->cc.supports_alloc_op_config_limit = true;
-			ctrl->cc.supports_alloc_op_read_limit = true;
-			ctrl->alloc_capable = true;
-			exposed_alloc_capable = true;
-		} else {
-			pr_info("cc_alloc_ctl is NOT supported");
-			ctrl->cc.supports_alloc_op_config_limit = false;
-			ctrl->cc.supports_alloc_op_read_limit = false;
-			ctrl->alloc_capable = false;
-		}
-		/*
-		 * AT data is "always" supported as it has the same value
-		 * than when AT field is not supported
-		 */
-		ctrl->cc.supports_alloc_at_data = true;
-		pr_info("supports_alloc_at_data: %d, supports_alloc_at_code: %d",
-			ctrl->cc.supports_alloc_at_data,
-			ctrl->cc.supports_alloc_at_code);
 	} else if (ctrl_info->type == CBQRI_CONTROLLER_TYPE_BANDWIDTH) {
 		pr_info("probe bandwidth controller");
-
-		/* Make sure the register is implemented */
-		reg = ioread64(ctrl->base + CBQRI_BC_CAPABILITIES_OFF);
-		if (reg == 0) {
-			err = -ENODEV;
+		err = cbqri_probe_bandwidth_features(ctrl);
+		if (err)
 			goto err_iounmap;
-		}
-
-		ctrl->ver_minor = reg & CBQRI_BC_CAPABILITIES_VER_MINOR_MASK;
-		ctrl->ver_major = reg & CBQRI_BC_CAPABILITIES_VER_MAJOR_MASK;
-
-		ctrl->bc.nbwblks = (reg >> CBQRI_BC_CAPABILITIES_NBWBLKS_SHIFT) &
-				    CBQRI_BC_CAPABILITIES_NBWBLKS_MASK;
-		ctrl->bc.mrbwb = (reg >> CBQRI_BC_CAPABILITIES_MRBWB_SHIFT) &
-				  CBQRI_BC_CAPABILITIES_MRBWB_MASK;
-
-		pr_info("version=%d.%d nbwblks=%d mrbwb=%d",
-			ctrl->ver_major, ctrl->ver_minor,
-			ctrl->bc.nbwblks, ctrl->bc.mrbwb);
-
-		/* Probe monitoring features */
-		err = cbqri_probe_feature(ctrl, CBQRI_BC_MON_CTL_OFF,
-					  CBQRI_BC_MON_CTL_OP_READ_COUNTER,
-					  &status, &ctrl->bc.supports_mon_at_code);
-		if (err) {
-			pr_warn("%s() failed to probe bc_mon_ctl feature", __func__);
-			goto err_iounmap;
-		}
-
-		if (status == CBQRI_BC_MON_CTL_STATUS_SUCCESS) {
-			pr_info("bc_mon_ctl is supported");
-			ctrl->bc.supports_mon_op_config_event = true;
-			ctrl->bc.supports_mon_op_read_counter = true;
-			ctrl->mon_capable = true;
-			exposed_mon_capable = true;
-		} else {
-			pr_info("bc_mon_ctl is NOT supported");
-			ctrl->bc.supports_mon_op_config_event = false;
-			ctrl->bc.supports_mon_op_read_counter = false;
-			ctrl->mon_capable = false;
-		}
-		/*
-		 * AT data is "always" supported as it has the same value
-		 * than when AT field is not supported
-		 */
-		ctrl->bc.supports_mon_at_data = true;
-		pr_info("supports_mon_at_data: %d, supports_mon_at_code: %d",
-			ctrl->bc.supports_mon_at_data, ctrl->bc.supports_mon_at_code);
-
-		/* Probe allocation features */
-		err = cbqri_probe_feature(ctrl, CBQRI_BC_ALLOC_CTL_OFF,
-					  CBQRI_BC_ALLOC_CTL_OP_READ_LIMIT,
-					  &status, &ctrl->bc.supports_alloc_at_code);
-		if (err) {
-			pr_warn("%s() failed to probe bc_alloc_ctl feature", __func__);
-			goto err_iounmap;
-		}
-
-		if (status == CBQRI_BC_ALLOC_CTL_STATUS_SUCCESS) {
-			pr_warn("bc_alloc_ctl is supported");
-			ctrl->bc.supports_alloc_op_config_limit = true;
-			ctrl->bc.supports_alloc_op_read_limit = true;
-			ctrl->alloc_capable = true;
-			exposed_alloc_capable = true;
-		} else {
-			pr_warn("bc_alloc_ctl is NOT supported");
-			ctrl->bc.supports_alloc_op_config_limit = false;
-			ctrl->bc.supports_alloc_op_read_limit = false;
-			ctrl->alloc_capable = false;
-		}
-
-		/*
-		 * AT data is "always" supported as it has the same value
-		 * than when AT field is not supported
-		 */
-		ctrl->bc.supports_alloc_at_data = true;
-		pr_warn("supports_alloc_at_data: %d, supports_alloc_at_code: %d",
-			ctrl->bc.supports_alloc_at_data, ctrl->bc.supports_alloc_at_code);
 	} else {
 		pr_warn("controller type is UNKNOWN");
 		err = -ENODEV;
@@ -960,12 +1000,22 @@ static struct rdt_ctrl_domain *qos_new_domain(struct cbqri_controller *ctrl)
 	return domain;
 }
 
+static void qos_free_domain(struct rdt_ctrl_domain *domain)
+{
+	struct cbqri_resctrl_dom *hw_dom;
+
+	hw_dom = container_of(domain, struct cbqri_resctrl_dom, resctrl_ctrl_dom);
+	kfree(hw_dom->ctrl_val);
+	kfree(hw_dom);
+}
+
 static int qos_init_domain_ctrlval(struct rdt_resource *r, struct rdt_ctrl_domain *d)
 {
 	struct cbqri_resctrl_res *hw_res;
 	struct cbqri_resctrl_dom *hw_dom;
 	u64 *dc;
-	int err = 0;
+	u32 def_ctrl;
+	int err;
 	int i;
 
 	hw_res = container_of(r, struct cbqri_resctrl_res, resctrl_res);
@@ -976,151 +1026,242 @@ static int qos_init_domain_ctrlval(struct rdt_resource *r, struct rdt_ctrl_domai
 	if (!hw_dom)
 		return -ENOMEM;
 
-	dc = kmalloc_array(hw_res->max_rcid, sizeof(*hw_dom->ctrl_val),
-			   GFP_KERNEL);
+	dc = kcalloc(hw_res->max_rcid, sizeof(*dc), GFP_KERNEL);
 	if (!dc)
 		return -ENOMEM;
 
 	hw_dom->ctrl_val = dc;
+	def_ctrl = resctrl_get_default_ctrl(r);
+	if (!r->alloc_capable) {
+		for (i = 0; i < hw_res->max_rcid; i++)
+			hw_dom->ctrl_val[i] = def_ctrl;
+		return 0;
+	}
 
-	for (i = 0; i < hw_res->max_rcid; i++, dc++) {
-		err = resctrl_arch_update_one(r, d, i, 0, resctrl_get_default_ctrl(r));
-		if (err)
-			return 0;
-		*dc = resctrl_get_default_ctrl(r);
+	for (i = 0; i < hw_res->max_rcid; i++) {
+		err = resctrl_arch_update_one(r, d, i, 0, def_ctrl);
+		if (err) {
+			kfree(hw_dom->ctrl_val);
+			hw_dom->ctrl_val = NULL;
+			return err;
+		}
+		hw_dom->ctrl_val[i] = def_ctrl;
 	}
 	return 0;
+}
+
+static inline void qos_bind_domain_cpu_mask(struct rdt_ctrl_domain *domain,
+					   const struct cbqri_controller *ctrl)
+{
+	/* CBQRI Cache mask comes from the PPTT */
+	if (ctrl->ctrl_info && !cpumask_empty(&ctrl->ctrl_info->cache.cpu_mask))
+		cpumask_copy(&domain->hdr.cpu_mask,
+			     &ctrl->ctrl_info->cache.cpu_mask);
+	else
+		cpumask_copy(&domain->hdr.cpu_mask, cpu_online_mask);
+}
+
+static int qos_res_lvl_to_props(int level,
+				    enum resctrl_res_level *rid,
+				    const char **name,
+				    enum resctrl_scope *scope)
+{
+	if (level == 2) {
+		*rid = RDT_RESOURCE_L2;
+		*name = "L2";
+		*scope = RESCTRL_L2_CACHE;
+		return 0;
+	} else if (level == 3) {
+		*rid = RDT_RESOURCE_L3;
+		*name = "L3";
+		*scope = RESCTRL_L3_CACHE;
+		return 0;
+	}
+
+	pr_warn("%s(): unknown cache level %d", __func__, level);
+	return -ENODEV;
+}
+
+static void qos_set_cbqri_res_base(struct cbqri_controller *ctrl,
+				       struct cbqri_resctrl_res *cbqri_res)
+{
+	cbqri_res->max_rcid = ctrl->ctrl_info->rcid_count;
+	cbqri_res->max_mcid = ctrl->ctrl_info->mcid_count;
+}
+
+static void qos_populate_res_fields(struct cbqri_controller *ctrl,
+					 struct rdt_resource *res,
+					 enum resctrl_res_level rid,
+					 const char *name,
+					 enum resctrl_scope scope)
+{
+	/* Common fields */
+	res->mon.num_rmid = ctrl->ctrl_info->mcid_count;
+	res->rid = rid;
+	res->name = (char *)name;
+	res->alloc_capable = ctrl->alloc_capable;
+	res->mon_capable = ctrl->mon_capable;
+	res->schema_fmt = RESCTRL_SCHEMA_BITMAP;
+	res->ctrl_scope = scope;
+
+	/* Cache-related fields */
+	res->cache.arch_has_sparse_bitmasks = false;
+	res->cache.arch_has_per_cpu_cfg = false;
+	res->cache.cbm_len = ctrl->cc.ncblks;
+	res->cache.shareable_bits = resctrl_get_default_ctrl(res);
+	res->cache.min_cbm_bits = 1;
+}
+
+static void qos_populate_mba_fields(struct cbqri_controller *ctrl,
+					 struct rdt_resource *res)
+{
+	res->mon.num_rmid = ctrl->ctrl_info->mcid_count;
+	res->rid = RDT_RESOURCE_MBA;
+	res->name = (char *)"MB";
+	res->schema_fmt = RESCTRL_SCHEMA_RANGE;
+	res->ctrl_scope = RESCTRL_L3_CACHE;
+	res->alloc_capable = ctrl->alloc_capable;
+	res->mon_capable = false;
+	res->membw.delay_linear = true;
+	res->membw.arch_needs_linear = true;
+	res->membw.throttle_mode = THREAD_THROTTLE_UNDEFINED;
+	res->membw.min_bw = 1;
+	res->membw.max_bw = 80;
+	res->membw.bw_gran = 1;
+}
+
+/* init cache resource (L2/L3), return resource or ERR_PTR */
+static struct rdt_resource *qos_init_cache_resource(struct cbqri_controller *ctrl)
+{
+	int level = ctrl->ctrl_info->cache.cache_level;
+	enum resctrl_res_level rid;
+	const char *name;
+	enum resctrl_scope scope;
+	int err;
+	struct cbqri_resctrl_res *cbqri_res;
+	struct rdt_resource *res;
+
+	err = qos_res_lvl_to_props(level, &rid, &name, &scope);
+	if (err)
+		return ERR_PTR(err);
+
+	/* Fetch global resource entry first, then populate fields */
+	cbqri_res = &cbqri_resctrl_resources[rid];
+	qos_set_cbqri_res_base(ctrl, cbqri_res);
+	res = &cbqri_res->resctrl_res;
+	qos_populate_res_fields(ctrl, res, rid, name, scope);
+
+	return res;
+}
+
+/* init MBA resource, return resource or ERR_PTR */
+static struct rdt_resource *qos_init_mba_resource(struct cbqri_controller *ctrl)
+{
+	struct cbqri_resctrl_res *cbqri_res;
+	struct rdt_resource *res;
+
+	cbqri_res = &cbqri_resctrl_resources[RDT_RESOURCE_MBA];
+	qos_set_cbqri_res_base(ctrl, cbqri_res);
+	res = &cbqri_res->resctrl_res;
+	qos_populate_mba_fields(ctrl, res);
+
+	return res;
 }
 
 static int qos_resctrl_add_controller_domain(struct cbqri_controller *ctrl, int *id)
 {
-	struct rdt_ctrl_domain *domain = NULL;
-	struct cbqri_resctrl_res *cbqri_res = NULL;
-	struct rdt_resource *res = NULL;
-	int internal_id = *id;
-	int err = 0;
+	int err;
+	struct rdt_resource *res;
+	struct rdt_ctrl_domain *domain;
+	int type;
 
-	domain = qos_new_domain(ctrl);
-	if (!domain)
-		return -ENOSPC;
-	if (ctrl->ctrl_info->type == CBQRI_CONTROLLER_TYPE_CAPACITY) {
-		cpumask_copy(&domain->hdr.cpu_mask, &ctrl->ctrl_info->cache.cpu_mask);
-		if (ctrl->ctrl_info->cache.cache_level == 2) {
-			cbqri_res = &cbqri_resctrl_resources[RDT_RESOURCE_L2];
-			cbqri_res->max_rcid = ctrl->ctrl_info->rcid_count;
-			cbqri_res->max_mcid = ctrl->ctrl_info->mcid_count;
-			res = &cbqri_res->resctrl_res;
-			res->mon.num_rmid = ctrl->ctrl_info->mcid_count;
-			res->rid = RDT_RESOURCE_L2;
-			res->name = "L2";
-			res->alloc_capable = ctrl->alloc_capable;
-			res->mon_capable = ctrl->mon_capable;
-			res->schema_fmt = RESCTRL_SCHEMA_BITMAP;
-			res->ctrl_scope = RESCTRL_L2_CACHE;
-			res->cache.arch_has_sparse_bitmasks = false;
-			res->cache.arch_has_per_cpu_cfg = false;
-			res->cache.cbm_len = ctrl->cc.ncblks;
-			res->cache.shareable_bits = resctrl_get_default_ctrl(res);
-			res->cache.min_cbm_bits = 1;
-		} else if (ctrl->ctrl_info->cache.cache_level == 3) {
-			cbqri_res = &cbqri_resctrl_resources[RDT_RESOURCE_L3];
-			cbqri_res->max_rcid = ctrl->ctrl_info->rcid_count;
-			cbqri_res->max_mcid = ctrl->ctrl_info->mcid_count;
-			res = &cbqri_res->resctrl_res;
-			res->mon.num_rmid = ctrl->ctrl_info->mcid_count;
-			res->rid = RDT_RESOURCE_L3;
-			res->name = "L3";
-			res->schema_fmt = RESCTRL_SCHEMA_BITMAP;
-			res->ctrl_scope = RESCTRL_L3_CACHE;
-			res->alloc_capable = ctrl->alloc_capable;
-			res->mon_capable = ctrl->mon_capable;
-			res->cache.arch_has_sparse_bitmasks = false;
-			res->cache.arch_has_per_cpu_cfg = false;
-			res->cache.cbm_len = ctrl->cc.ncblks;
-			res->cache.shareable_bits = resctrl_get_default_ctrl(res);
-			res->cache.min_cbm_bits = 1;
-		} else {
-			pr_warn("%s(): unknown cache level %d", __func__,
-				ctrl->ctrl_info->cache.cache_level);
-			err = -ENODEV;
+	/* Use switch-case for controller type to improve readability */
+	type = ctrl->ctrl_info->type;
+
+	switch (type) {
+	case CBQRI_CONTROLLER_TYPE_CAPACITY:
+		res = qos_init_cache_resource(ctrl);
+		if (IS_ERR(res))
+			return PTR_ERR(res);
+
+		domain = qos_new_domain(ctrl);
+		if (!domain)
+			return -ENOMEM;
+		qos_bind_domain_cpu_mask(domain, ctrl);
+
+		domain->hdr.id = *id;
+		err = qos_init_domain_ctrlval(res, domain);
+		if (err)
 			goto err_free_domain;
-		}
-	} else if (ctrl->ctrl_info->type == CBQRI_CONTROLLER_TYPE_BANDWIDTH) {
-		if (ctrl->alloc_capable) {
-			cbqri_res = &cbqri_resctrl_resources[RDT_RESOURCE_MBA];
-			cbqri_res->max_rcid = ctrl->ctrl_info->rcid_count;
-			cbqri_res->max_mcid = ctrl->ctrl_info->mcid_count;
-			res = &cbqri_res->resctrl_res;
-			res->mon.num_rmid = ctrl->ctrl_info->mcid_count;
-			res->rid = RDT_RESOURCE_MBA;
-			res->name = "MB";
-			res->schema_fmt = RESCTRL_SCHEMA_RANGE;
-			res->ctrl_scope = RESCTRL_L3_CACHE;
-			res->alloc_capable = ctrl->alloc_capable;
-			res->mon_capable = false;
-			res->membw.delay_linear = true;
-			res->membw.arch_needs_linear = true;
-			res->membw.throttle_mode = THREAD_THROTTLE_UNDEFINED;
-			// The minimum percentage allowed by the CBQRI spec
-			res->membw.min_bw = 1;
-			// The maximum percentage allowed by the CBQRI spec
-			res->membw.max_bw = 80;
-			res->membw.bw_gran = 1;
-		}
-	} else {
-		pr_warn("%s(): unknown resource %d", __func__, ctrl->ctrl_info->type);
-		err = -ENODEV;
-		goto err_free_domain;
-	}
-
-	domain->hdr.id = internal_id;
-	err = qos_init_domain_ctrlval(res, domain);
-	if (err)
-		goto err_free_domain;
-
-	if (cbqri_res) {
-		list_add_tail(&domain->hdr.list, &cbqri_res->resctrl_res.ctrl_domains);
-		*id = internal_id;
 		err = resctrl_online_ctrl_domain(res, domain);
-		if (err) {
-			pr_warn("%s(): failed to online cbqri_res domain", __func__);
+		if (err)
 			goto err_free_domain;
-		}
-	}
+		list_add_tail(&domain->hdr.list, &res->ctrl_domains);
 
-	return 0;
+		return 0;
+
+	case CBQRI_CONTROLLER_TYPE_BANDWIDTH:
+		/* Skip when bandwidth controller is not allocation-capable */
+		if (!ctrl->alloc_capable)
+			return 0;
+
+		res = qos_init_mba_resource(ctrl);
+		if (IS_ERR(res))
+			return PTR_ERR(res);
+
+		domain = qos_new_domain(ctrl);
+		if (!domain)
+			return -ENOMEM;
+		qos_bind_domain_cpu_mask(domain, ctrl);
+
+		domain->hdr.id = *id;
+		err = qos_init_domain_ctrlval(res, domain);
+		if (err)
+			goto err_free_domain;
+		err = resctrl_online_ctrl_domain(res, domain);
+		if (err)
+			goto err_free_domain;
+		list_add_tail(&domain->hdr.list, &res->ctrl_domains);
+
+		return 0;
+
+	default:
+		pr_warn("%s(): unknown resource %d", __func__, type);
+		return -ENODEV;
+	}
 
 err_free_domain:
-	pr_warn("%s(): err_free_domain", __func__);
-	kfree(container_of(domain, struct cbqri_resctrl_dom, resctrl_ctrl_dom));
-
+	qos_free_domain(domain);
 	return err;
 }
 
-int qos_resctrl_setup(void)
+static int qos_probe_all_controllers(int *found_controllers)
 {
-	struct rdt_ctrl_domain *domain, *domain_temp;
 	struct cbqri_controller_info *ctrl_info;
-	struct cbqri_controller *ctrl;
-	struct cbqri_resctrl_res *res;
-	static int found_controllers;
 	int err = 0;
-	int id = 0;
-	int i;
 
 	list_for_each_entry(ctrl_info, &cbqri_controllers, list) {
-		err = cbqri_probe_controller(ctrl_info, &controllers[found_controllers]);
-		if (err) {
-			pr_warn("%s(): failed (%d)", __func__, err);
-			goto err_unmap_controllers;
-		}
-
-		found_controllers++;
-		if (found_controllers > MAX_CONTROLLERS) {
+		if (*found_controllers >= MAX_CONTROLLERS) {
 			pr_warn("%s(): increase MAX_CONTROLLERS value", __func__);
 			break;
 		}
+		err = cbqri_probe_controller(ctrl_info,
+					 &controllers[*found_controllers]);
+		if (err) {
+			pr_warn("%s(): failed (%d)", __func__, err);
+			return err;
+		}
+
+		(*found_controllers)++;
 	}
+
+	return 0;
+}
+
+static void qos_init_resctrl_resources(void)
+{
+	int i;
+	struct cbqri_resctrl_res *res;
 
 	for (i = 0; i < RDT_NUM_RESOURCES; i++) {
 		res = &cbqri_resctrl_resources[i];
@@ -1128,21 +1269,28 @@ int qos_resctrl_setup(void)
 		INIT_LIST_HEAD(&res->resctrl_res.mon_domains);
 		res->resctrl_res.rid = i;
 	}
+}
+
+static int qos_add_controller_domains(int found_controllers, int *id)
+{
+	int i, err = 0;
+	struct cbqri_controller *ctrl;
 
 	for (i = 0; i < found_controllers; i++) {
 		ctrl = &controllers[i];
-		err = qos_resctrl_add_controller_domain(ctrl, &id);
-		if (err) {
-			pr_warn("%s(): failed to add controller domain (%d)", __func__, err);
-			goto err_free_controllers_list;
-		}
-		id++;
 
-		/*
-		 * CDP (code data prioritization) on x86 is similar to
-		 * the AT (access type) field in CBQRI. CDP only supports
-		 * caches so this must be a CBQRI capacity controller.
-		 */
+		/* Add the primary control domain for this controller */
+		err = qos_resctrl_add_controller_domain(ctrl, id);
+		if (err) {
+			pr_warn("%s(): failed to add controller domain (%d)",
+				__func__, err);
+			return err;
+		}
+
+		/* Advance to next domain id for subsequent controllers */
+		(*id)++;
+
+		/* Update exposed CDP capability flags for capacity controllers */
 		if (ctrl->ctrl_info->type == CBQRI_CONTROLLER_TYPE_CAPACITY &&
 		    ctrl->cc.supports_alloc_at_code &&
 		    ctrl->cc.supports_alloc_at_data) {
@@ -1153,27 +1301,67 @@ int qos_resctrl_setup(void)
 		}
 	}
 
+	return 0;
+}
+
+static void qos_unmap_controllers(int found_controllers)
+{
+	int i;
+
+	for (i = 0; i < found_controllers; i++) {
+		iounmap(controllers[i].base);
+		release_mem_region(controllers[i].ctrl_info->addr,
+				  controllers[i].ctrl_info->size);
+	}
+}
+
+static void qos_free_all_domains(void)
+{
+	int i;
+	struct cbqri_resctrl_res *res;
+	struct rdt_ctrl_domain *domain, *domain_temp;
+
+	for (i = 0; i < RDT_NUM_RESOURCES; i++) {
+		res = &cbqri_resctrl_resources[i];
+		list_for_each_entry_safe(domain, domain_temp,
+					 &res->resctrl_res.ctrl_domains, hdr.list) {
+			resctrl_offline_ctrl_domain(&res->resctrl_res, domain);
+			list_del(&domain->hdr.list);
+			qos_free_domain(domain);
+		}
+	}
+}
+
+int qos_resctrl_setup(void)
+{
+	int found_controllers = 0, err = 0, id = 0;
+
+	err = qos_probe_all_controllers(&found_controllers);
+	if (err)
+		goto err_unmap_controllers;
+
+	qos_init_resctrl_resources();
+
+	err = qos_add_controller_domains(found_controllers, &id);
+	if (err)
+		goto err_free_controllers_list;
+
 	pr_info("exposed_alloc_capable = %d", exposed_alloc_capable);
 	pr_info("exposed_mon_capable = %d", exposed_mon_capable);
 	pr_info("exposed_cdp_l2_capable = %d", exposed_cdp_l2_capable);
 	pr_info("exposed_cdp_l3_capable = %d", exposed_cdp_l3_capable);
 
-	return resctrl_init();
+	err = resctrl_init();
+	if (err)
+		goto err_free_controllers_list;
+
+	return 0;
 
 err_free_controllers_list:
-	for (i = 0; i < RDT_NUM_RESOURCES; i++) {
-		res = &cbqri_resctrl_resources[i];
-		list_for_each_entry_safe(domain, domain_temp, &res->resctrl_res.ctrl_domains,
-					 hdr.list) {
-			kfree(domain);
-		}
-	}
+	qos_free_all_domains();
 
 err_unmap_controllers:
-	for (i = 0; i < found_controllers; i++) {
-		iounmap(controllers[i].base);
-		release_mem_region(controllers[i].ctrl_info->addr, controllers[i].ctrl_info->size);
-	}
+	qos_unmap_controllers(found_controllers);
 
 	return err;
 }
@@ -1189,4 +1377,3 @@ int qos_resctrl_offline_cpu(unsigned int cpu)
 	resctrl_offline_cpu(cpu);
 	return 0;
 }
-
