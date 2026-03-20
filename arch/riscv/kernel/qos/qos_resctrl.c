@@ -447,7 +447,7 @@ static int cbqri_apply_cache_config(struct cbqri_resctrl_dom *hw_dom, u32 closid
 		/* Clear cc_block_mask before read limit to verify op works*/
 		cbqri_set_cbm(ctrl, 0);
 
-		/* Performa capacity read limit operation to verify blockmask */
+		/* Perform a capacity read limit operation to verify block mask */
 		err = cbqri_cc_alloc_op(ctrl, CBQRI_CC_ALLOC_CTL_OP_READ_LIMIT, closid, type);
 		if (err < 0) {
 			pr_err("%s(): operation failed: err = %d", __func__, err);
@@ -515,7 +515,7 @@ static int cbqri_apply_bw_config(struct cbqri_resctrl_dom *hw_dom, u32 closid,
 		cbqri_set_rbwb(ctrl, cfg->rbwb);
 
 		/* Bandwidth config limit operation */
-		ret = cbqri_bc_alloc_op(ctrl, CBQRI_CC_ALLOC_CTL_OP_CONFIG_LIMIT, closid);
+		ret = cbqri_bc_alloc_op(ctrl, CBQRI_BC_ALLOC_CTL_OP_CONFIG_LIMIT, closid);
 		if (ret < 0) {
 			pr_err("%s(): operation failed: ret = %d", __func__, ret);
 			return ret;
@@ -525,7 +525,7 @@ static int cbqri_apply_bw_config(struct cbqri_resctrl_dom *hw_dom, u32 closid,
 		cbqri_set_rbwb(ctrl, 0);
 
 		/* Bandwidth allocation read limit operation to verify */
-		ret = cbqri_bc_alloc_op(ctrl, CBQRI_CC_ALLOC_CTL_OP_READ_LIMIT, closid);
+		ret = cbqri_bc_alloc_op(ctrl, CBQRI_BC_ALLOC_CTL_OP_READ_LIMIT, closid);
 		if (ret < 0) {
 			pr_err("%s(): operation failed: ret = %d", __func__, ret);
 			return ret;
@@ -564,7 +564,7 @@ int resctrl_arch_update_one(struct rdt_resource *r, struct rdt_ctrl_domain *d,
 		err = cbqri_apply_cache_config(dom, closid, t, &cfg);
 		break;
 	case RDT_RESOURCE_MBA:
-		/* covert from percentage to bandwidth blocks */
+		/* convert from percentage to bandwidth blocks */
 		cfg.rbwb = cfg_val * ctrl->bc.nbwblks / 100;
 		err = cbqri_apply_bw_config(dom, closid, t, &cfg);
 		break;
@@ -622,7 +622,7 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_ctrl_domain *d,
 		cbqri_set_cbm(ctrl, 0);
 
 		/* Capacity read limit operation for RCID (closid) */
-		err = cbqri_cc_alloc_op(ctrl, CBQRI_CC_ALLOC_CTL_OP_READ_LIMIT, type, closid);
+		err = cbqri_cc_alloc_op(ctrl, CBQRI_CC_ALLOC_CTL_OP_READ_LIMIT, closid, type);
 		if (err < 0) {
 			pr_err("%s(): operation failed: err = %d", __func__, err);
 			return resctrl_get_default_ctrl(r);
@@ -637,8 +637,8 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_ctrl_domain *d,
 		return hw_dom->ctrl_val[closid];
 
 	case RDT_RESOURCE_MBA:
-		/* Capacity read limit operation for RCID (closid) */
-		err = cbqri_bc_alloc_op(ctrl, CBQRI_CC_ALLOC_CTL_OP_READ_LIMIT, closid);
+		/* Bandwidth read limit operation for RCID (closid) */
+		err = cbqri_bc_alloc_op(ctrl, CBQRI_BC_ALLOC_CTL_OP_READ_LIMIT, closid);
 		if (err < 0) {
 			pr_err("%s(): operation failed: err = %d", __func__, err);
 			return resctrl_get_default_ctrl(r);
