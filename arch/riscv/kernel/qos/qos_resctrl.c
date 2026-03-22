@@ -317,8 +317,16 @@ void resctrl_arch_rmid_idx_decode(u32 idx, u32 *closid, u32 *rmid)
 	*rmid = idx;
 }
 
-/* RISC-V resctrl interface does not maintain a default srmcfg value for a given CPU */
-void resctrl_arch_set_cpu_default_closid_rmid(int cpu, u32 closid, u32 rmid) { }
+/* RISC-V resctrl interface maintains a default srmcfg value for each CPU */
+void resctrl_arch_set_cpu_default_closid_rmid(int cpu, u32 closid, u32 rmid)
+{
+	u32 default_val;
+
+	default_val = rmid << SRMCFG_MCID_SHIFT;
+	default_val |= closid;
+
+	WRITE_ONCE(per_cpu(cpu_srmcfg_default, cpu), default_val);
+}
 
 void resctrl_arch_sched_in(struct task_struct *tsk)
 {

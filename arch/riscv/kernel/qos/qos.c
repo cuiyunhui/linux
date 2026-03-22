@@ -10,8 +10,9 @@
 
 #include "internal.h"
 
-/* cached value of sqoscfg csr for each cpu */
+/* cached value of srmcfg csr for each cpu */
 DEFINE_PER_CPU(u32, cpu_srmcfg);
+DEFINE_PER_CPU(u32, cpu_srmcfg_default);
 
 static int __init qos_arch_late_init(void)
 {
