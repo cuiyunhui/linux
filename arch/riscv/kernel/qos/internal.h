@@ -52,6 +52,13 @@
 #define CBQRI_CONTROL_REGISTERS_ATV_MASK     0x1
 #define CBQRI_CONTROL_REGISTERS_RBWB_SHIFT   0
 #define CBQRI_CONTROL_REGISTERS_RBWB_MASK    0xFFFF
+/* bc_bw_alloc fields beyond Rbwb */
+#define CBQRI_BC_BW_ALLOC_MWEIGHT_SHIFT      20
+#define CBQRI_BC_BW_ALLOC_MWEIGHT_MASK       0xFF
+#define CBQRI_BC_BW_ALLOC_SHAREDAT_SHIFT     28
+#define CBQRI_BC_BW_ALLOC_SHAREDAT_MASK      0x7
+#define CBQRI_BC_BW_ALLOC_USESHARED_SHIFT    31
+#define CBQRI_BC_BW_ALLOC_USESHARED_MASK     0x1
 
 #define CBQRI_CC_MON_CTL_OP_CONFIG_EVENT 1
 #define CBQRI_CC_MON_CTL_OP_READ_COUNTER 2
@@ -158,6 +165,7 @@ struct cbqri_resctrl_dom {
 struct cbqri_config {
 	u64 cbm; /* capacity block mask */
 	u64 rbwb; /* reserved bandwidth blocks */
+	u64 mweight; /* memory bandwidth weight (if supported by HW) */
 };
 
 #endif /* _ASM_RISCV_QOS_INTERNAL_H */

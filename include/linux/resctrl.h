@@ -54,6 +54,8 @@ enum resctrl_res_level {
 	RDT_RESOURCE_MBA,
 	RDT_RESOURCE_SMBA,
 	RDT_RESOURCE_PERF_PKG,
+	/* CBQRI: Memory Bandwidth weight control */
+	RDT_RESOURCE_MB_WEIGHT,
 
 	/* Must be the last */
 	RDT_NUM_RESOURCES,

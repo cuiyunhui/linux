@@ -1420,12 +1420,13 @@ static bool rdtgroup_mode_test_exclusive(struct rdtgroup *rdtgrp)
 
 	list_for_each_entry(s, &resctrl_schema_all, list) {
 		r = s->res;
-		if (r->rid == RDT_RESOURCE_MBA || r->rid == RDT_RESOURCE_SMBA)
+		if (r->rid == RDT_RESOURCE_MBA || r->rid == RDT_RESOURCE_SMBA ||
+		    r->rid == RDT_RESOURCE_MB_WEIGHT)
 			continue;
 		has_cache = true;
 		list_for_each_entry(d, &r->ctrl_domains, hdr.list) {
 			ctrl = resctrl_arch_get_config(r, d, closid,
-						       s->conf_type);
+					       s->conf_type);
 			if (rdtgroup_cbm_overlaps(s, d, ctrl, closid, false)) {
 				rdt_last_cmd_puts("Schemata overlaps\n");
 				return false;
@@ -1625,7 +1626,8 @@ static int rdtgroup_size_show(struct kernfs_open_file *of,
 								       closid,
 								       type);
 				if (r->rid == RDT_RESOURCE_MBA ||
-				    r->rid == RDT_RESOURCE_SMBA)
+				    r->rid == RDT_RESOURCE_SMBA ||
+				    r->rid == RDT_RESOURCE_MB_WEIGHT)
 					size = ctrl;
 				else
 					size = rdtgroup_cbm_to_size(r, d, ctrl);
@@ -2414,6 +2416,9 @@ static unsigned long fflags_from_resource(struct rdt_resource *r)
 		return RFTYPE_RES_MB;
 	case RDT_RESOURCE_PERF_PKG:
 		return RFTYPE_RES_PERF_PKG;
+	/* Treat MB weight control as a memory bandwidth resource */
+	case RDT_RESOURCE_MB_WEIGHT:
+		return RFTYPE_RES_MB;
 	}
 
 	return WARN_ON_ONCE(1);
@@ -3677,7 +3682,8 @@ static int rdtgroup_init_alloc(struct rdtgroup *rdtgrp)
 	list_for_each_entry(s, &resctrl_schema_all, list) {
 		r = s->res;
 		if (r->rid == RDT_RESOURCE_MBA ||
-		    r->rid == RDT_RESOURCE_SMBA) {
+		    r->rid == RDT_RESOURCE_SMBA ||
+		    r->rid == RDT_RESOURCE_MB_WEIGHT) {
 			rdtgroup_init_mba(r, rdtgrp->closid);
 			if (is_mba_sc(r))
 				continue;

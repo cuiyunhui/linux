@@ -8,10 +8,13 @@
 #include <linux/err.h>
 #include <linux/riscv_qos.h>
 #include <linux/resctrl.h>
+#include <linux/string.h>
 #include <linux/types.h>
 #include <asm/csr.h>
 #include <asm/qos.h>
 #include "internal.h"
+/* For schemata alignment of resource labels */
+extern int max_name_width;
 
 #define MAX_CONTROLLERS 6
 static struct cbqri_controller controllers[MAX_CONTROLLERS];
@@ -39,6 +42,8 @@ static int cbqri_bc_read_snapshot(struct cbqri_controller *ctrl, u32 mcid,
 				  u64 *ctr, bool *valid);
 static int cbqri_bc_config_event_total_all_at(struct cbqri_controller *ctrl,
 					      u32 mcid);
+static inline void cbqri_set_mweight(struct cbqri_controller *ctrl, u64 w);
+static inline u64 cbqri_get_mweight(struct cbqri_controller *ctrl);
 
 /* Issue a MON_CTL operation (OP + RCID), wait BUSY clear, and return STATUS */
 static int cbqri_mon_ctl_do_op(struct cbqri_controller *ctrl, int reg_ctl,
@@ -430,6 +435,39 @@ static u64 cbqri_get_rbwb(struct cbqri_controller *ctrl)
 	return reg;
 }
 
+/* Set/get memory bandwidth weight in bc_bw_alloc (surrogate field) */
+static inline void cbqri_set_mweight(struct cbqri_controller *ctrl, u64 w)
+{
+	u64 reg;
+	u64 eff;
+
+	reg = ioread64(ctrl->base + CBQRI_BC_BW_ALLOC_OFF);
+	pr_debug("mweight: before reg=0x%llx write=%llu\n",
+		 (unsigned long long)reg, (unsigned long long)w);
+	reg &= ~((u64)CBQRI_BC_BW_ALLOC_MWEIGHT_MASK <<
+		 CBQRI_BC_BW_ALLOC_MWEIGHT_SHIFT);
+	reg |= ((w & CBQRI_BC_BW_ALLOC_MWEIGHT_MASK) <<
+		CBQRI_BC_BW_ALLOC_MWEIGHT_SHIFT);
+	iowrite64(reg, ctrl->base + CBQRI_BC_BW_ALLOC_OFF);
+
+	reg = ioread64(ctrl->base + CBQRI_BC_BW_ALLOC_OFF);
+	eff = (reg >> CBQRI_BC_BW_ALLOC_MWEIGHT_SHIFT) &
+		CBQRI_BC_BW_ALLOC_MWEIGHT_MASK;
+	pr_debug("mweight: after reg=0x%llx effective=%llu\n",
+		 (unsigned long long)reg, (unsigned long long)eff);
+}
+
+static inline u64 cbqri_get_mweight(struct cbqri_controller *ctrl)
+{
+	u64 reg;
+
+	reg = ioread64(ctrl->base + CBQRI_BC_BW_ALLOC_OFF);
+	reg = (reg >> CBQRI_BC_BW_ALLOC_MWEIGHT_SHIFT) &
+		CBQRI_BC_BW_ALLOC_MWEIGHT_MASK;
+	pr_debug("mweight: read=%llu\n", (unsigned long long)reg);
+	return reg;
+}
+
 static int cbqri_wait_busy_flag(struct cbqri_controller *ctrl, int reg_offset)
 {
 	u64 reg;
@@ -506,6 +544,9 @@ static int cbqri_bc_read_snapshot(struct cbqri_controller *ctrl, u32 mcid,
 
 	val = ioread64(ctrl->base + CBQRI_BC_MON_CTR_VAL_OFF);
 	cbqri_bc_decode_ctr(val, ctr, valid);
+	if ((val >> CBQRI_BC_MON_CTR_OVF_BIT) & 0x1)
+		pr_debug_ratelimited("bc_read_snapshot: mcid=%u overflow set\n",
+				    mcid);
 	return 0;
 }
 
@@ -759,6 +800,27 @@ int resctrl_arch_update_one(struct rdt_resource *r, struct rdt_ctrl_domain *d,
 		cfg.rbwb = cfg_val * ctrl->bc.nbwblks / 100;
 		err = cbqri_apply_bw_config(dom, closid, t, &cfg);
 		break;
+	case RDT_RESOURCE_MB_WEIGHT:
+	{
+		u64 readback;
+
+		cfg.mweight = cfg_val;
+		cbqri_set_mweight(ctrl, cfg.mweight);
+		/* Commit operands via CONFIG_LIMIT */
+		err = cbqri_bc_alloc_op(ctrl, CBQRI_BC_ALLOC_CTL_OP_CONFIG_LIMIT, closid);
+		if (err < 0)
+			return err;
+		/* Verify via READ_LIMIT then read back mweight */
+		err = cbqri_bc_alloc_op(ctrl, CBQRI_BC_ALLOC_CTL_OP_READ_LIMIT, closid);
+		if (err < 0)
+			return err;
+		readback = cbqri_get_mweight(ctrl);
+		if (readback != cfg.mweight)
+			pr_warn("%s(): verify mweight mismatch (expected=%llu got=%llu)\n",
+				__func__, (unsigned long long)cfg.mweight,
+				(unsigned long long)readback);
+	}
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -844,6 +906,14 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_ctrl_domain *d,
 		if (rbwb % ctrl->bc.nbwblks)
 			percent++;
 		return percent;
+
+	case RDT_RESOURCE_MB_WEIGHT:
+		/* Read back the surrogate weight and return raw value. */
+		err = cbqri_bc_alloc_op(ctrl, CBQRI_BC_ALLOC_CTL_OP_READ_LIMIT, closid);
+		if (err < 0)
+			return resctrl_get_default_ctrl(r);
+		hw_dom->ctrl_val[closid] = cbqri_get_mweight(ctrl);
+		return hw_dom->ctrl_val[closid];
 
 	default:
 		return resctrl_get_default_ctrl(r);
@@ -1375,6 +1445,64 @@ static struct rdt_resource *qos_init_mba_resource(struct cbqri_controller *ctrl)
 }
 
 /*
+ * Add MB weight (priority) resource for a bandwidth controller.
+ *
+ * This helper encapsulates the setup of a resctrl resource and its
+ * control domain for the memory bandwidth weight control. It mirrors
+ * the inline logic previously embedded in the controller domain add
+ * path and keeps the code aligned with kernel coding style guidelines.
+ */
+static int qos_add_mb_weight_resource(struct cbqri_controller *ctrl, int id)
+{
+	struct cbqri_resctrl_res *cbqri_res_pri;
+	struct rdt_resource *res_pri;
+	struct rdt_ctrl_domain *domain_pri;
+	int err;
+
+	/* Populate basic hardware-backed resource container fields. */
+	cbqri_res_pri = &cbqri_resctrl_resources[RDT_RESOURCE_MB_WEIGHT];
+	cbqri_res_pri->max_rcid = ctrl->ctrl_info->rcid_count;
+	cbqri_res_pri->max_mcid = ctrl->ctrl_info->mcid_count;
+
+	/* Configure resctrl resource attributes for MB weight. */
+	res_pri = &cbqri_res_pri->resctrl_res;
+	res_pri->rid = RDT_RESOURCE_MB_WEIGHT;
+	res_pri->name = (char *)"MWEIGHT";
+	if (strlen(res_pri->name) > (size_t)max_name_width)
+		max_name_width = strlen(res_pri->name);
+	res_pri->schema_fmt = RESCTRL_SCHEMA_RANGE;
+	res_pri->ctrl_scope = RESCTRL_L3_CACHE;
+	res_pri->alloc_capable = ctrl->alloc_capable;
+	res_pri->membw.min_bw = 0;
+	res_pri->membw.max_bw = 255;
+	res_pri->membw.bw_gran = 1;
+
+	/* Create and initialize the control domain for MB weight. */
+	domain_pri = qos_new_domain(ctrl);
+	if (!domain_pri)
+		return -ENOMEM;
+
+	domain_pri->hdr.id = id;
+	qos_bind_domain_cpu_mask(domain_pri, ctrl);
+
+	err = qos_init_domain_ctrlval(res_pri, domain_pri);
+	if (err)
+		goto err_free_domain;
+
+	err = resctrl_online_ctrl_domain(res_pri, domain_pri);
+	if (err)
+		goto err_free_domain;
+
+	list_add_tail(&domain_pri->hdr.list, &res_pri->ctrl_domains);
+
+	return 0;
+
+err_free_domain:
+	qos_free_domain(domain_pri);
+	return err;
+}
+
+/*
  * Add a monitoring domain for a given controller/domain pair when
  * monitoring is supported by the hardware/controller. This encapsulates
  * the bookkeeping and event enabling logic used during domain bring-up.
@@ -1500,6 +1628,11 @@ static int qos_resctrl_add_controller_domain(struct cbqri_controller *ctrl, int 
 			goto err_offline_ctrl_domain;
 
 		list_add_tail(&domain->hdr.list, &res->ctrl_domains);
+
+		/* Also expose MB weight control as a separate resource. */
+		err = qos_add_mb_weight_resource(ctrl, *id);
+		if (err)
+			return err;
 
 		return 0;
 
