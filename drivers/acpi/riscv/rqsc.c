@@ -162,7 +162,7 @@ static int rqsc_parse_capacity(struct cbqri_controller_info *ctrl_info,
 		ctrl_info->cache.cache_size = 0;
 	}
 
-	pr_info("Cache controller has ID 0x%x level %u size %u ",
+	pr_debug("Cache controller has ID 0x%x level %u size %u\n",
 		ctrl_info->cache.cache_id, ctrl_info->cache.cache_level,
 		ctrl_info->cache.cache_size);
 	rqsc_fill_cache_cpumask(ctrl_info);
@@ -182,7 +182,7 @@ static int rqsc_parse_bandwidth(struct cbqri_controller_info *ctrl_info,
 	}
 
 	ctrl_info->mem.prox_dom = (u32)id1;
-	pr_info("Memory controller with proximity domain %u",
+	pr_debug("Memory controller with proximity domain %u\n",
 		ctrl_info->mem.prox_dom);
 
 	return 0;
@@ -205,7 +205,7 @@ static int rqsc_controller_parse_type(struct cbqri_controller_info *ctrl_info,
 		err = rqsc_parse_bandwidth(ctrl_info, f);
 		break;
 	default:
-		pr_warn("%s(): unknown controller type %u, skipping",
+		pr_warn("%s(): unknown controller type %u, skipping\n",
 			caller, ctrl_info->type);
 		*skip = true;
 		return 0;
@@ -229,6 +229,7 @@ int acpi_parse_rqsc(struct acpi_table_header *table)
 	bool skip;
 	int ret;
 	unsigned int max_entries;
+	u32 total_ctrl, cache_ctrl, bw_ctrl;
 
 	if (WARN_ON_ONCE(acpi_disabled))
 		return -ENODEV;
@@ -263,6 +264,10 @@ int acpi_parse_rqsc(struct acpi_table_header *table)
 		num = max_entries;
 	}
 
+	total_ctrl = 0;
+	cache_ctrl = 0;
+	bw_ctrl = 0;
+
 	for (i = 0; i < num; i++) {
 		err = rqsc_controller_alloc_and_init(&rqsc->f[i], &ctrl_info, &phys,
 				     __func__);
@@ -273,7 +278,7 @@ int acpi_parse_rqsc(struct acpi_table_header *table)
 		if (!ctrl_info)
 			continue;
 
-		pr_info("Found controller type %u base %pa size 0x%lx rcid %u mcid %u\n",
+		pr_debug("Found controller type %u base %pa size 0x%lx rcid %u mcid %u\n",
 			ctrl_info->type, &phys, ctrl_info->size,
 			ctrl_info->rcid_count, ctrl_info->mcid_count);
 
@@ -289,10 +294,19 @@ int acpi_parse_rqsc(struct acpi_table_header *table)
 			goto out_free_new;
 		}
 
+		total_ctrl++;
+		if (ctrl_info->type == CBQRI_CONTROLLER_TYPE_CAPACITY)
+			cache_ctrl++;
+		else if (ctrl_info->type == CBQRI_CONTROLLER_TYPE_BANDWIDTH)
+			bw_ctrl++;
+
 		/* Fill the list shared with RISC-V QoS resctrl */
 		INIT_LIST_HEAD(&ctrl_info->list);
 		list_add_tail(&ctrl_info->list, &new_ctrls);
 	}
+
+	pr_info("RQSC controllers: total=%u cache=%u bw=%u\n",
+		total_ctrl, cache_ctrl, bw_ctrl);
 
 	list_splice_tail_init(&new_ctrls, &cbqri_controllers);
 	return 0;
