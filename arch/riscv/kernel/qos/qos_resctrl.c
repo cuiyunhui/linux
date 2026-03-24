@@ -1040,13 +1040,19 @@ static int cbqri_map_controller(struct cbqri_controller_info *ctrl_info,
 {
 	ctrl->ctrl_info = ctrl_info;
 	if (!request_mem_region(ctrl_info->addr, ctrl_info->size, "cbqri_controller")) {
-		pr_warn("%s(): request_mem_region failed for cbqri_controller at 0x%lx",
+		pr_warn("%s(): request_mem_region failed for cbqri_controller at 0x%lx\n",
 			__func__, ctrl_info->addr);
 		return -EBUSY;
 	}
 	ctrl->base = ioremap(ctrl_info->addr, ctrl_info->size);
-	if (!ctrl->base)
+	if (!ctrl->base) {
+		release_mem_region(ctrl_info->addr, ctrl_info->size);
 		return -ENOMEM;
+	}
+
+	pr_info("mapped cbqri_controller phys=0x%lx size=0x%lx base=0x%llx\n",
+		ctrl_info->addr, ctrl_info->size,
+		(unsigned long long)(uintptr_t)ctrl->base);
 	return 0;
 }
 
