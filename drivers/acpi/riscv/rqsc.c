@@ -9,6 +9,7 @@
 
 #include <linux/acpi.h>
 #include <linux/bits.h>
+#include <linux/cpumask.h>
 #include <linux/riscv_qos.h>
 #include <linux/slab.h>
 
@@ -34,6 +35,23 @@ static struct acpi_table_rqsc *acpi_get_rqsc(void)
 	}
 
 	return (struct acpi_table_rqsc *)rqsc;
+}
+
+static void rqsc_fill_cache_cpumask(struct cbqri_controller_info *ctrl_info)
+{
+	int err;
+
+	/*
+	 * For CBQRI, any cpu (technically a hart in RISC-V terms) can access the
+	 * memory-mapped registers of any CBQRI controller in the system.
+	 *
+	 * Prefer deriving the mask from PPTT cache topology. If the cache cannot
+	 * be found, fall back to allowing all possible CPUs.
+	 */
+	err = acpi_pptt_get_cpumask_from_cache_id(ctrl_info->cache.cache_id,
+					 &ctrl_info->cache.cpu_mask);
+	if (err)
+		cpumask_copy(&ctrl_info->cache.cpu_mask, cpu_possible_mask);
 }
 
 int acpi_parse_rqsc(struct acpi_table_header *table)
@@ -121,13 +139,7 @@ int acpi_parse_rqsc(struct acpi_table_header *table)
 			pr_info("Cache controller has ID 0x%x level %u size %u ",
 				ctrl_info->cache.cache_id, ctrl_info->cache.cache_level,
 				ctrl_info->cache.cache_size);
-
-			/*
-			 * For CBQRI, any cpu (technically a hart in RISC-V terms)
-			 * can access the memory-mapped registers of any CBQRI
-			 * controller in the system.
-			 */
-			cpumask_copy(&ctrl_info->cache.cpu_mask, cpu_possible_mask);
+			rqsc_fill_cache_cpumask(ctrl_info);
 
 		} else if (ctrl_info->type == CBQRI_CONTROLLER_TYPE_BANDWIDTH) {
 			id1 = rqsc->f[i].res.id1;
