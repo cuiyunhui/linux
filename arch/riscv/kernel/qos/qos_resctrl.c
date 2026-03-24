@@ -31,6 +31,57 @@ static u32 max_rmid;
 LIST_HEAD(cbqri_controllers);
 
 static int cbqri_wait_busy_flag(struct cbqri_controller *ctrl, int reg_offset);
+static int cbqri_cc_read_counter(struct cbqri_controller *ctrl, u32 mcid,
+				 u64 *ctr, bool *valid);
+static int cbqri_bc_read_counter(struct cbqri_controller *ctrl, u32 mcid,
+				 enum resctrl_event_id evtid, u64 *ctr, bool *valid);
+static int cbqri_bc_read_snapshot(struct cbqri_controller *ctrl, u32 mcid,
+				  u64 *ctr, bool *valid);
+static int cbqri_bc_config_event_total_all_at(struct cbqri_controller *ctrl,
+					      u32 mcid);
+
+/* Issue a MON_CTL operation (OP + RCID), wait BUSY clear, and return STATUS */
+static int cbqri_mon_ctl_do_op(struct cbqri_controller *ctrl, int reg_ctl,
+				       int op, u32 rcid)
+{
+	u64 reg;
+
+	if (!ctrl || !ctrl->base)
+		return -ENODEV;
+
+	reg = ioread64(ctrl->base + reg_ctl);
+	reg &= ~(CBQRI_CONTROL_REGISTERS_OP_MASK <<
+		 CBQRI_CONTROL_REGISTERS_OP_SHIFT);
+	reg |= (u64)(op & CBQRI_CONTROL_REGISTERS_OP_MASK) <<
+		CBQRI_CONTROL_REGISTERS_OP_SHIFT;
+	reg &= ~((u64)CBQRI_CONTROL_REGISTERS_RCID_MASK <<
+		 CBQRI_CONTROL_REGISTERS_RCID_SHIFT);
+	reg |= (u64)(rcid & CBQRI_CONTROL_REGISTERS_RCID_MASK) <<
+		CBQRI_CONTROL_REGISTERS_RCID_SHIFT;
+	iowrite64(reg, ctrl->base + reg_ctl);
+
+	if (cbqri_wait_busy_flag(ctrl, reg_ctl) < 0)
+		return -EIO;
+
+	reg = ioread64(ctrl->base + reg_ctl);
+	return (int)((reg >> CBQRI_CONTROL_REGISTERS_STATUS_SHIFT) &
+		 CBQRI_CONTROL_REGISTERS_STATUS_MASK);
+}
+
+/* Decode CC MON_CTR_VAL (CTR[62:0], INV at bit 63) */
+static inline void cbqri_cc_decode_ctr(u64 val, u64 *ctr, bool *valid)
+{
+	*valid = ((val >> CBQRI_CC_MON_CTR_INV_BIT) & 0x1) ? false : true;
+	*ctr = val & GENMASK_ULL(62, 0);
+}
+
+/* Decode BC MON_CTR_VAL (CTR[61:0], INV at bit 62, OVF at bit 63) */
+static inline void cbqri_bc_decode_ctr(u64 val, u64 *ctr, bool *valid)
+{
+	bool inv = ((val >> CBQRI_BC_MON_CTR_INV_BIT) & 0x1);
+	*valid = inv ? false : true;
+	*ctr = val & GENMASK_ULL(61, 0);
+}
 
 bool resctrl_arch_alloc_capable(void)
 {
@@ -275,18 +326,46 @@ int resctrl_arch_rmid_read(struct rdt_resource *r, struct rdt_mon_domain *d,
 			   u32 closid, u32 rmid, enum resctrl_event_id eventid,
 			   u64 *val, void *arch_mon_ctx)
 {
-	/*
-	 * The current Qemu implementation of CBQRI capacity and bandwidth
-	 * controllers do not emulate the utilization of resources over
-	 * time. Therefore, Qemu currently sets the invalid bit in
-	 * cc_mon_ctr_val and bc_mon_ctr_val, and there is no meaningful
-	 * value other than 0 to return for reading an RMID (e.g. MCID in
-	 * CBQRI terminology)
-	 */
+	struct cbqri_resctrl_dom *hw_dom;
+	struct cbqri_controller *ctrl;
+	bool is_capacity;
+	bool valid = false;
+	u64 ctr = 0;
+	int err;
 
-	if (val)
+	if (!r || !d || !val)
+		return -EINVAL;
+
+	hw_dom = container_of(d, struct cbqri_resctrl_dom, resctrl_mon_dom);
+	ctrl = hw_dom->hw_ctrl;
+	if (!ctrl || !ctrl->mon_capable || !ctrl->base) {
 		*val = 0;
+		return 0;
+	}
 
+	switch (r->rid) {
+	case RDT_RESOURCE_L2:
+	case RDT_RESOURCE_L3:
+		is_capacity = true;
+		break;
+	case RDT_RESOURCE_MBA:
+		is_capacity = false;
+		break;
+	default:
+		*val = 0;
+		return 0;
+	}
+
+	if (is_capacity)
+		err = cbqri_cc_read_counter(ctrl, rmid, &ctr, &valid);
+	else
+		err = cbqri_bc_read_counter(ctrl, rmid, eventid, &ctr, &valid);
+	if (err || !valid) {
+		*val = 0;
+		return 0;
+	}
+
+	*val = ctr;
 	return 0;
 }
 
@@ -364,6 +443,116 @@ static int cbqri_wait_busy_flag(struct cbqri_controller *ctrl, int reg_offset)
 		pr_warn("%s(): busy timeout", __func__);
 
 	return ret;
+}
+
+/* Capacity monitor: READ_COUNTER snapshot */
+static int cbqri_cc_read_snapshot(struct cbqri_controller *ctrl, u32 mcid,
+				  u64 *ctr, bool *valid)
+{
+	int status;
+	u64 val;
+
+	status = cbqri_mon_ctl_do_op(ctrl, CBQRI_CC_MON_CTL_OFF,
+					 CBQRI_CC_MON_CTL_OP_READ_COUNTER, mcid);
+	if (status != CBQRI_CC_MON_CTL_STATUS_SUCCESS)
+		return -EIO;
+
+	val = ioread64(ctrl->base + CBQRI_CC_MON_CTL_VAL_OFF);
+	cbqri_cc_decode_ctr(val, ctr, valid);
+	return 0;
+}
+
+static int cbqri_cc_read_counter(struct cbqri_controller *ctrl, u32 mcid,
+					 u64 *ctr, bool *valid)
+{
+	return cbqri_cc_read_snapshot(ctrl, mcid, ctr, valid);
+}
+
+/* Bandwidth monitor: optionally CONFIG_EVENT then READ_COUNTER */
+static int cbqri_bc_read_counter(struct cbqri_controller *ctrl, u32 mcid,
+					 enum resctrl_event_id evtid, u64 *ctr,
+					 bool *valid)
+{
+	u64 reg;
+	int status;
+
+	status = cbqri_mon_ctl_do_op(ctrl, CBQRI_BC_MON_CTL_OFF,
+					 CBQRI_BC_MON_CTL_OP_READ_COUNTER, mcid);
+	if (status == CBQRI_BC_MON_CTL_STATUS_SUCCESS) {
+		reg = ioread64(ctrl->base + CBQRI_BC_MON_CTR_VAL_OFF);
+		cbqri_bc_decode_ctr(reg, ctr, valid);
+		if (*valid)
+			return 0;
+	}
+
+	status = cbqri_bc_config_event_total_all_at(ctrl, mcid);
+	if (status != CBQRI_BC_MON_CTL_STATUS_SUCCESS)
+		return -EIO;
+
+	return cbqri_bc_read_snapshot(ctrl, mcid, ctr, valid);
+}
+
+/* Bandwidth monitor snapshot decode */
+static int cbqri_bc_read_snapshot(struct cbqri_controller *ctrl, u32 mcid,
+				  u64 *ctr, bool *valid)
+{
+	int status;
+	u64 val;
+
+	status = cbqri_mon_ctl_do_op(ctrl, CBQRI_BC_MON_CTL_OFF,
+					 CBQRI_BC_MON_CTL_OP_READ_COUNTER, mcid);
+	if (status != CBQRI_BC_MON_CTL_STATUS_SUCCESS)
+		return -EIO;
+
+	val = ioread64(ctrl->base + CBQRI_BC_MON_CTR_VAL_OFF);
+	cbqri_bc_decode_ctr(val, ctr, valid);
+	return 0;
+}
+
+/* CONFIG_EVENT for BC: EVT_ID=1 (total RW bytes), ATV=0 (all AT) */
+static inline void cbqri_bc_write_config_event(struct cbqri_controller *ctrl,
+					       u32 mcid, u32 evt_id, bool atv)
+{
+	u64 reg;
+
+	reg = ioread64(ctrl->base + CBQRI_BC_MON_CTL_OFF);
+	reg &= ~(CBQRI_CONTROL_REGISTERS_OP_MASK <<
+		 CBQRI_CONTROL_REGISTERS_OP_SHIFT);
+	reg |= (u64)(CBQRI_BC_MON_CTL_OP_CONFIG_EVENT &
+		   CBQRI_CONTROL_REGISTERS_OP_MASK) <<
+		CBQRI_CONTROL_REGISTERS_OP_SHIFT;
+	reg &= ~((u64)CBQRI_CONTROL_REGISTERS_RCID_MASK <<
+		 CBQRI_CONTROL_REGISTERS_RCID_SHIFT);
+	reg |= (u64)(mcid & CBQRI_CONTROL_REGISTERS_RCID_MASK) <<
+		CBQRI_CONTROL_REGISTERS_RCID_SHIFT;
+	if (atv)
+		reg |= (u64)1 << CBQRI_CONTROL_REGISTERS_ATV_SHIFT;
+	else
+		reg &= ~((u64)1 << CBQRI_CONTROL_REGISTERS_ATV_SHIFT);
+	reg &= ~((u64)CBQRI_CONTROL_REGISTERS_EVT_ID_MASK <<
+		 CBQRI_CONTROL_REGISTERS_EVT_ID_SHIFT);
+	reg |= (u64)(evt_id & CBQRI_CONTROL_REGISTERS_EVT_ID_MASK) <<
+		CBQRI_CONTROL_REGISTERS_EVT_ID_SHIFT;
+	iowrite64(reg, ctrl->base + CBQRI_BC_MON_CTL_OFF);
+}
+
+static int cbqri_bc_config_event_total_all_at(struct cbqri_controller *ctrl,
+					      u32 mcid)
+{
+	u64 reg;
+	int status;
+
+	if (!ctrl || !ctrl->base)
+		return -ENODEV;
+
+	cbqri_bc_write_config_event(ctrl, mcid, 1, false);
+
+	if (cbqri_wait_busy_flag(ctrl, CBQRI_BC_MON_CTL_OFF) < 0)
+		return -EIO;
+	reg = ioread64(ctrl->base + CBQRI_BC_MON_CTL_OFF);
+	status = (int)((reg >> CBQRI_CONTROL_REGISTERS_STATUS_SHIFT) &
+		 CBQRI_CONTROL_REGISTERS_STATUS_MASK);
+	return status;
 }
 
 /* Perform capacity allocation control operation on capacity controller */
