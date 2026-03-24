@@ -3,6 +3,7 @@
 #define pr_fmt(fmt) "qos: resctrl: " fmt
 
 #include <linux/iopoll.h>
+#include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/minmax.h>
 #include <linux/slab.h>
@@ -33,6 +34,50 @@ static u32 max_rmid;
 
 LIST_HEAD(cbqri_controllers);
 
+/*
+ * Some platforms cannot perform 64-bit wide MMIO accesses.
+ * Enable 32-bit IO mode via boot param: cbqri_32bit_io=1|true|on.
+ *
+ * When enabled, emulate 64-bit MMIO reads/writes as two 32-bit accesses.
+ */
+static bool cbqri_force_32bit_io;
+
+static int __init cbqri_io_width_setup(char *str)
+{
+	if (!str)
+		return 1;
+	if (!strcmp(str, "1") || !strcmp(str, "true") || !strcmp(str, "on"))
+		cbqri_force_32bit_io = true;
+	return 1;
+}
+__setup("cbqri_32bit_io=", cbqri_io_width_setup);
+
+/* MMIO helpers honoring 32-bit IO mode */
+static inline u64 cbqri_readq(struct cbqri_controller *ctrl, int off)
+{
+	u32 lo, hi;
+
+	if (!cbqri_force_32bit_io)
+		return ioread64(ctrl->base + off);
+
+	/* Read high word first to observe BUSY/STATUS coherently. */
+	hi = ioread32(ctrl->base + off + 4);
+	lo = ioread32(ctrl->base + off);
+	return ((u64)hi << 32) | lo;
+}
+
+static inline void cbqri_writeq(struct cbqri_controller *ctrl, int off, u64 val)
+{
+	if (!cbqri_force_32bit_io) {
+		iowrite64(val, ctrl->base + off);
+		return;
+	}
+
+	/* Write high word first; low word write triggers operations for OP-based regs. */
+	iowrite32((u32)(val >> 32), ctrl->base + off + 4);
+	iowrite32((u32)val, ctrl->base + off);
+}
+
 static int cbqri_wait_busy_flag(struct cbqri_controller *ctrl, int reg_offset);
 static int cbqri_cc_read_counter(struct cbqri_controller *ctrl, u32 mcid,
 				 u64 *ctr, bool *valid);
@@ -54,7 +99,7 @@ static int cbqri_mon_ctl_do_op(struct cbqri_controller *ctrl, int reg_ctl,
 	if (!ctrl || !ctrl->base)
 		return -ENODEV;
 
-	reg = ioread64(ctrl->base + reg_ctl);
+	reg = cbqri_readq(ctrl, reg_ctl);
 	reg &= ~(CBQRI_CONTROL_REGISTERS_OP_MASK <<
 		 CBQRI_CONTROL_REGISTERS_OP_SHIFT);
 	reg |= (u64)(op & CBQRI_CONTROL_REGISTERS_OP_MASK) <<
@@ -63,12 +108,12 @@ static int cbqri_mon_ctl_do_op(struct cbqri_controller *ctrl, int reg_ctl,
 		 CBQRI_CONTROL_REGISTERS_RCID_SHIFT);
 	reg |= (u64)(rcid & CBQRI_CONTROL_REGISTERS_RCID_MASK) <<
 		CBQRI_CONTROL_REGISTERS_RCID_SHIFT;
-	iowrite64(reg, ctrl->base + reg_ctl);
+	cbqri_writeq(ctrl, reg_ctl, reg);
 
 	if (cbqri_wait_busy_flag(ctrl, reg_ctl) < 0)
 		return -EIO;
 
-	reg = ioread64(ctrl->base + reg_ctl);
+	reg = cbqri_readq(ctrl, reg_ctl);
 	return (int)((reg >> CBQRI_CONTROL_REGISTERS_STATUS_SHIFT) &
 		 CBQRI_CONTROL_REGISTERS_STATUS_MASK);
 }
@@ -406,7 +451,7 @@ static void cbqri_set_cbm(struct cbqri_controller *ctrl, u64 cbm)
 	int reg_offset;
 
 	reg_offset = CBQRI_CC_BLOCK_MASK_OFF;
-	iowrite64(cbm, ctrl->base + reg_offset);
+	cbqri_writeq(ctrl, reg_offset, cbm);
 }
 
 /* Set the Rbwb (reserved bandwidth blocks) field in bc_bw_alloc */
@@ -416,11 +461,11 @@ static void cbqri_set_rbwb(struct cbqri_controller *ctrl, u64 rbwb)
 	u64 reg;
 
 	reg_offset = CBQRI_BC_BW_ALLOC_OFF;
-	reg = ioread64(ctrl->base + reg_offset);
+	reg = cbqri_readq(ctrl, reg_offset);
 	reg &= ~CBQRI_CONTROL_REGISTERS_RBWB_MASK;
 	rbwb &= CBQRI_CONTROL_REGISTERS_RBWB_MASK;
 	reg |= rbwb;
-	iowrite64(reg, ctrl->base + reg_offset);
+	cbqri_writeq(ctrl, reg_offset, reg);
 }
 
 /* Get the Rbwb (reserved bandwidth blocks) field in bc_bw_alloc */
@@ -430,7 +475,7 @@ static u64 cbqri_get_rbwb(struct cbqri_controller *ctrl)
 	u64 reg;
 
 	reg_offset = CBQRI_BC_BW_ALLOC_OFF;
-	reg = ioread64(ctrl->base + reg_offset);
+	reg = cbqri_readq(ctrl, reg_offset);
 	reg &= CBQRI_CONTROL_REGISTERS_RBWB_MASK;
 	return reg;
 }
@@ -441,16 +486,16 @@ static inline void cbqri_set_mweight(struct cbqri_controller *ctrl, u64 w)
 	u64 reg;
 	u64 eff;
 
-	reg = ioread64(ctrl->base + CBQRI_BC_BW_ALLOC_OFF);
+	reg = cbqri_readq(ctrl, CBQRI_BC_BW_ALLOC_OFF);
 	pr_debug("mweight: before reg=0x%llx write=%llu\n",
 		 (unsigned long long)reg, (unsigned long long)w);
 	reg &= ~((u64)CBQRI_BC_BW_ALLOC_MWEIGHT_MASK <<
 		 CBQRI_BC_BW_ALLOC_MWEIGHT_SHIFT);
 	reg |= ((w & CBQRI_BC_BW_ALLOC_MWEIGHT_MASK) <<
 		CBQRI_BC_BW_ALLOC_MWEIGHT_SHIFT);
-	iowrite64(reg, ctrl->base + CBQRI_BC_BW_ALLOC_OFF);
+	cbqri_writeq(ctrl, CBQRI_BC_BW_ALLOC_OFF, reg);
 
-	reg = ioread64(ctrl->base + CBQRI_BC_BW_ALLOC_OFF);
+	reg = cbqri_readq(ctrl, CBQRI_BC_BW_ALLOC_OFF);
 	eff = (reg >> CBQRI_BC_BW_ALLOC_MWEIGHT_SHIFT) &
 		CBQRI_BC_BW_ALLOC_MWEIGHT_MASK;
 	pr_debug("mweight: after reg=0x%llx effective=%llu\n",
@@ -461,7 +506,7 @@ static inline u64 cbqri_get_mweight(struct cbqri_controller *ctrl)
 {
 	u64 reg;
 
-	reg = ioread64(ctrl->base + CBQRI_BC_BW_ALLOC_OFF);
+	reg = cbqri_readq(ctrl, CBQRI_BC_BW_ALLOC_OFF);
 	reg = (reg >> CBQRI_BC_BW_ALLOC_MWEIGHT_SHIFT) &
 		CBQRI_BC_BW_ALLOC_MWEIGHT_MASK;
 	pr_debug("mweight: read=%llu\n", (unsigned long long)reg);
@@ -473,10 +518,10 @@ static int cbqri_wait_busy_flag(struct cbqri_controller *ctrl, int reg_offset)
 	u64 reg;
 	int ret;
 
-	ret = read_poll_timeout(ioread64, reg,
+	ret = read_poll_timeout(cbqri_readq, reg,
 				!((reg >> CBQRI_CONTROL_REGISTERS_BUSY_SHIFT) &
 				  CBQRI_CONTROL_REGISTERS_BUSY_MASK),
-				1, 1000, false, ctrl->base + reg_offset);
+				1, 1000, false, ctrl, reg_offset);
 	if (ret)
 		pr_warn("%s(): busy timeout", __func__);
 
@@ -495,7 +540,7 @@ static int cbqri_cc_read_snapshot(struct cbqri_controller *ctrl, u32 mcid,
 	if (status != CBQRI_CC_MON_CTL_STATUS_SUCCESS)
 		return -EIO;
 
-	val = ioread64(ctrl->base + CBQRI_CC_MON_CTL_VAL_OFF);
+	val = cbqri_readq(ctrl, CBQRI_CC_MON_CTL_VAL_OFF);
 	cbqri_cc_decode_ctr(val, ctr, valid);
 	return 0;
 }
@@ -515,9 +560,9 @@ static int cbqri_bc_read_counter(struct cbqri_controller *ctrl, u32 mcid,
 	int status;
 
 	status = cbqri_mon_ctl_do_op(ctrl, CBQRI_BC_MON_CTL_OFF,
-					 CBQRI_BC_MON_CTL_OP_READ_COUNTER, mcid);
+				 CBQRI_BC_MON_CTL_OP_READ_COUNTER, mcid);
 	if (status == CBQRI_BC_MON_CTL_STATUS_SUCCESS) {
-		reg = ioread64(ctrl->base + CBQRI_BC_MON_CTR_VAL_OFF);
+		reg = cbqri_readq(ctrl, CBQRI_BC_MON_CTR_VAL_OFF);
 		cbqri_bc_decode_ctr(reg, ctr, valid);
 		if (*valid)
 			return 0;
@@ -542,7 +587,7 @@ static int cbqri_bc_read_snapshot(struct cbqri_controller *ctrl, u32 mcid,
 	if (status != CBQRI_BC_MON_CTL_STATUS_SUCCESS)
 		return -EIO;
 
-	val = ioread64(ctrl->base + CBQRI_BC_MON_CTR_VAL_OFF);
+	val = cbqri_readq(ctrl, CBQRI_BC_MON_CTR_VAL_OFF);
 	cbqri_bc_decode_ctr(val, ctr, valid);
 	if ((val >> CBQRI_BC_MON_CTR_OVF_BIT) & 0x1)
 		pr_debug_ratelimited("bc_read_snapshot: mcid=%u overflow set\n",
@@ -556,7 +601,7 @@ static inline void cbqri_bc_write_config_event(struct cbqri_controller *ctrl,
 {
 	u64 reg;
 
-	reg = ioread64(ctrl->base + CBQRI_BC_MON_CTL_OFF);
+	reg = cbqri_readq(ctrl, CBQRI_BC_MON_CTL_OFF);
 	reg &= ~(CBQRI_CONTROL_REGISTERS_OP_MASK <<
 		 CBQRI_CONTROL_REGISTERS_OP_SHIFT);
 	reg |= (u64)(CBQRI_BC_MON_CTL_OP_CONFIG_EVENT &
@@ -574,7 +619,7 @@ static inline void cbqri_bc_write_config_event(struct cbqri_controller *ctrl,
 		 CBQRI_CONTROL_REGISTERS_EVT_ID_SHIFT);
 	reg |= (u64)(evt_id & CBQRI_CONTROL_REGISTERS_EVT_ID_MASK) <<
 		CBQRI_CONTROL_REGISTERS_EVT_ID_SHIFT;
-	iowrite64(reg, ctrl->base + CBQRI_BC_MON_CTL_OFF);
+	cbqri_writeq(ctrl, CBQRI_BC_MON_CTL_OFF, reg);
 }
 
 static int cbqri_bc_config_event_total_all_at(struct cbqri_controller *ctrl,
@@ -590,7 +635,7 @@ static int cbqri_bc_config_event_total_all_at(struct cbqri_controller *ctrl,
 
 	if (cbqri_wait_busy_flag(ctrl, CBQRI_BC_MON_CTL_OFF) < 0)
 		return -EIO;
-	reg = ioread64(ctrl->base + CBQRI_BC_MON_CTL_OFF);
+	reg = cbqri_readq(ctrl, CBQRI_BC_MON_CTL_OFF);
 	status = (int)((reg >> CBQRI_CONTROL_REGISTERS_STATUS_SHIFT) &
 		 CBQRI_CONTROL_REGISTERS_STATUS_MASK);
 	return status;
@@ -604,7 +649,7 @@ static int cbqri_cc_alloc_op(struct cbqri_controller *ctrl, int operation, int r
 	int status;
 	u64 reg;
 
-	reg = ioread64(ctrl->base + reg_offset);
+	reg = cbqri_readq(ctrl, reg_offset);
 	reg &= ~(CBQRI_CONTROL_REGISTERS_OP_MASK << CBQRI_CONTROL_REGISTERS_OP_SHIFT);
 	reg |= (operation & CBQRI_CONTROL_REGISTERS_OP_MASK) <<
 		CBQRI_CONTROL_REGISTERS_OP_SHIFT;
@@ -634,14 +679,14 @@ static int cbqri_cc_alloc_op(struct cbqri_controller *ctrl, int operation, int r
 		}
 	}
 
-	iowrite64(reg, ctrl->base + reg_offset);
+	cbqri_writeq(ctrl, reg_offset, reg);
 
 	if (cbqri_wait_busy_flag(ctrl, reg_offset) < 0) {
 		pr_err("%s(): BUSY timeout when executing the operation", __func__);
 		return -EIO;
 	}
 
-	reg = ioread64(ctrl->base + reg_offset);
+	reg = cbqri_readq(ctrl, reg_offset);
 	status = (reg >> CBQRI_CONTROL_REGISTERS_STATUS_SHIFT) &
 		  CBQRI_CONTROL_REGISTERS_STATUS_MASK;
 	if (status != 1) {
@@ -686,7 +731,7 @@ static int cbqri_apply_cache_config(struct cbqri_resctrl_dom *hw_dom, u32 closid
 
 		/* Read capacity blockmask to verify it matches the requested config */
 		reg_offset = CBQRI_CC_BLOCK_MASK_OFF;
-		reg = ioread64(ctrl->base + reg_offset);
+		reg = cbqri_readq(ctrl, reg_offset);
 		if (reg != cfg->cbm) {
 			pr_warn("%s(): failed to verify allocation (reg:%llx != cbm:%llx)",
 				__func__, reg, cfg->cbm);
@@ -704,21 +749,21 @@ static int cbqri_bc_alloc_op(struct cbqri_controller *ctrl, int operation, int r
 	int status;
 	u64 reg;
 
-	reg = ioread64(ctrl->base + reg_offset);
+	reg = cbqri_readq(ctrl, reg_offset);
 	reg &= ~(CBQRI_CONTROL_REGISTERS_OP_MASK << CBQRI_CONTROL_REGISTERS_OP_SHIFT);
 	reg |=  (operation & CBQRI_CONTROL_REGISTERS_OP_MASK) <<
 		 CBQRI_CONTROL_REGISTERS_OP_SHIFT;
 	reg &= ~(CBQRI_CONTROL_REGISTERS_RCID_MASK << CBQRI_CONTROL_REGISTERS_RCID_SHIFT);
 	reg |=  (rcid & CBQRI_CONTROL_REGISTERS_RCID_MASK) <<
 		 CBQRI_CONTROL_REGISTERS_RCID_SHIFT;
-	iowrite64(reg, ctrl->base + reg_offset);
+	cbqri_writeq(ctrl, reg_offset, reg);
 
 	if (cbqri_wait_busy_flag(ctrl, reg_offset) < 0) {
 		pr_err("%s(): BUSY timeout when executing the operation", __func__);
 		return -EIO;
 	}
 
-	reg = ioread64(ctrl->base + reg_offset);
+	reg = cbqri_readq(ctrl, reg_offset);
 	status = (reg >> CBQRI_CONTROL_REGISTERS_STATUS_SHIFT) &
 		  CBQRI_CONTROL_REGISTERS_STATUS_MASK;
 	if (status != 1) {
@@ -881,7 +926,7 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_ctrl_domain *d,
 
 		/* Read capacity block mask for RCID (closid) */
 		reg_offset = CBQRI_CC_BLOCK_MASK_OFF;
-		reg = ioread64(ctrl->base + reg_offset);
+		reg = cbqri_readq(ctrl, reg_offset);
 
 		/* Update the config value for the closid in this domain */
 		hw_dom->ctrl_val[closid] = reg;
@@ -926,21 +971,24 @@ static int cbqri_probe_feature(struct cbqri_controller *ctrl, int reg_offset,
 	u64 reg, saved_reg;
 	int at;
 
+	if (access_type_supported)
+		*access_type_supported = false;
+
 	/* Keep the initial register value to preserve the WPRI fields */
-	reg = ioread64(ctrl->base + reg_offset);
+	reg = cbqri_readq(ctrl, reg_offset);
 	saved_reg = reg;
 
 	/* Execute the requested operation to find if the register is implemented */
 	reg &= ~(CBQRI_CONTROL_REGISTERS_OP_MASK << CBQRI_CONTROL_REGISTERS_OP_SHIFT);
 	reg |= (operation & CBQRI_CONTROL_REGISTERS_OP_MASK) << CBQRI_CONTROL_REGISTERS_OP_SHIFT;
-	iowrite64(reg, ctrl->base + reg_offset);
+	cbqri_writeq(ctrl, reg_offset, reg);
 	if (cbqri_wait_busy_flag(ctrl, reg_offset) < 0) {
 		pr_err("%s(): BUSY timeout when executing the operation", __func__);
 		return -EIO;
 	}
 
 	/* Get the operation status */
-	reg = ioread64(ctrl->base + reg_offset);
+	reg = cbqri_readq(ctrl, reg_offset);
 	*status = (reg >> CBQRI_CONTROL_REGISTERS_STATUS_SHIFT) &
 		   CBQRI_CONTROL_REGISTERS_STATUS_MASK;
 
@@ -953,7 +1001,7 @@ static int cbqri_probe_feature(struct cbqri_controller *ctrl, int reg_offset,
 		reg = saved_reg;
 		reg &= ~(CBQRI_CONTROL_REGISTERS_AT_MASK << CBQRI_CONTROL_REGISTERS_AT_SHIFT);
 		reg |= CBQRI_CONTROL_REGISTERS_AT_CODE << CBQRI_CONTROL_REGISTERS_AT_SHIFT;
-		iowrite64(reg, ctrl->base + reg_offset);
+		cbqri_writeq(ctrl, reg_offset, reg);
 		if (cbqri_wait_busy_flag(ctrl, reg_offset) < 0) {
 			pr_err("%s(): BUSY timeout when setting AT field", __func__);
 			return -EIO;
@@ -963,16 +1011,14 @@ static int cbqri_probe_feature(struct cbqri_controller *ctrl, int reg_offset,
 		 * If the AT field value has been reset to zero,
 		 * then the AT support is not present
 		 */
-		reg = ioread64(ctrl->base + reg_offset);
+		reg = cbqri_readq(ctrl, reg_offset);
 		at = (reg >> CBQRI_CONTROL_REGISTERS_AT_SHIFT) & CBQRI_CONTROL_REGISTERS_AT_MASK;
 		if (at == CBQRI_CONTROL_REGISTERS_AT_CODE)
 			*access_type_supported = true;
-		else
-			*access_type_supported = false;
 	}
 
 	/* Restore the original register value */
-	iowrite64(saved_reg, ctrl->base + reg_offset);
+	cbqri_writeq(ctrl, reg_offset, saved_reg);
 	if (cbqri_wait_busy_flag(ctrl, reg_offset) < 0) {
 		pr_err("%s(): BUSY timeout when restoring the original register value", __func__);
 		return -EIO;
@@ -998,7 +1044,7 @@ static int cbqri_map_controller(struct cbqri_controller_info *ctrl_info,
 
 static int cc_read_caps(struct cbqri_controller *ctrl)
 {
-	u64 reg = ioread64(ctrl->base + CBQRI_CC_CAPABILITIES_OFF);
+	u64 reg = cbqri_readq(ctrl, CBQRI_CC_CAPABILITIES_OFF);
 
 	if (reg == 0)
 		return -ENODEV;
@@ -1095,7 +1141,7 @@ static int cbqri_probe_capacity_features(struct cbqri_controller *ctrl)
 
 static int bc_read_caps(struct cbqri_controller *ctrl)
 {
-	u64 reg = ioread64(ctrl->base + CBQRI_BC_CAPABILITIES_OFF);
+	u64 reg = cbqri_readq(ctrl, CBQRI_BC_CAPABILITIES_OFF);
 
 	if (reg == 0)
 		return -ENODEV;
