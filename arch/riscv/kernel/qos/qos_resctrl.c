@@ -4,6 +4,7 @@
 
 #include <linux/iopoll.h>
 #include <linux/kernel.h>
+#include <linux/minmax.h>
 #include <linux/slab.h>
 #include <linux/err.h>
 #include <linux/riscv_qos.h>
@@ -16,8 +17,7 @@
 /* For schemata alignment of resource labels */
 extern int max_name_width;
 
-#define MAX_CONTROLLERS 6
-static struct cbqri_controller controllers[MAX_CONTROLLERS];
+static struct cbqri_controller *controllers;
 static struct cbqri_resctrl_res cbqri_resctrl_resources[RDT_NUM_RESOURCES];
 
 static bool exposed_alloc_capable;
@@ -1564,7 +1564,7 @@ static int qos_resctrl_add_mon_domain(struct cbqri_controller *ctrl,
 	return 0;
 }
 
-static int qos_resctrl_add_controller_domain(struct cbqri_controller *ctrl, int *id)
+static int qos_resctrl_add_controller_domain(struct cbqri_controller *ctrl, int id)
 {
 	int err;
 	struct rdt_resource *res;
@@ -1585,7 +1585,7 @@ static int qos_resctrl_add_controller_domain(struct cbqri_controller *ctrl, int 
 			return -ENOMEM;
 		qos_bind_domain_cpu_mask(domain, ctrl);
 
-		domain->hdr.id = *id;
+		domain->hdr.id = id;
 		err = qos_init_domain_ctrlval(res, domain);
 		if (err)
 			goto err_free_domain;
@@ -1593,7 +1593,7 @@ static int qos_resctrl_add_controller_domain(struct cbqri_controller *ctrl, int 
 		if (err)
 			goto err_free_domain;
 
-		err = qos_resctrl_add_mon_domain(ctrl, domain, res, *id);
+		err = qos_resctrl_add_mon_domain(ctrl, domain, res, id);
 		if (err)
 			goto err_offline_ctrl_domain;
 
@@ -1615,7 +1615,7 @@ static int qos_resctrl_add_controller_domain(struct cbqri_controller *ctrl, int 
 			return -ENOMEM;
 		qos_bind_domain_cpu_mask(domain, ctrl);
 
-		domain->hdr.id = *id;
+		domain->hdr.id = id;
 		err = qos_init_domain_ctrlval(res, domain);
 		if (err)
 			goto err_free_domain;
@@ -1623,14 +1623,14 @@ static int qos_resctrl_add_controller_domain(struct cbqri_controller *ctrl, int 
 		if (err)
 			goto err_free_domain;
 
-		err = qos_resctrl_add_mon_domain(ctrl, domain, res, *id);
+		err = qos_resctrl_add_mon_domain(ctrl, domain, res, id);
 		if (err)
 			goto err_offline_ctrl_domain;
 
 		list_add_tail(&domain->hdr.list, &res->ctrl_domains);
 
 		/* Also expose MB weight control as a separate resource. */
-		err = qos_add_mb_weight_resource(ctrl, *id);
+		err = qos_add_mb_weight_resource(ctrl, id);
 		if (err)
 			return err;
 
@@ -1649,27 +1649,34 @@ err_free_domain:
 	return err;
 }
 
-static int qos_probe_all_controllers(int *found_controllers)
+static int qos_probe_all_controllers(void)
 {
 	struct cbqri_controller_info *ctrl_info;
 	int err = 0;
+	int idx = 0;
 
 	list_for_each_entry(ctrl_info, &cbqri_controllers, list) {
-		if (*found_controllers >= MAX_CONTROLLERS) {
-			pr_warn("%s(): increase MAX_CONTROLLERS value", __func__);
-			break;
-		}
 		err = cbqri_probe_controller(ctrl_info,
-					 &controllers[*found_controllers]);
+					 &controllers[idx]);
 		if (err) {
 			pr_warn("%s(): failed (%d)", __func__, err);
 			return err;
 		}
-
-		(*found_controllers)++;
+		idx++;
 	}
 
 	return 0;
+}
+
+static int qos_count_controller_info(void)
+{
+	struct cbqri_controller_info *ctrl_info;
+	int count = 0;
+
+	list_for_each_entry(ctrl_info, &cbqri_controllers, list)
+		count++;
+
+	return count;
 }
 
 static void qos_init_resctrl_resources(void)
@@ -1685,24 +1692,21 @@ static void qos_init_resctrl_resources(void)
 	}
 }
 
-static int qos_add_controller_domains(int found_controllers, int *id)
+static int qos_add_controller_domains(int num_controllers)
 {
 	int i, err = 0;
 	struct cbqri_controller *ctrl;
 
-	for (i = 0; i < found_controllers; i++) {
+	for (i = 0; i < num_controllers; i++) {
 		ctrl = &controllers[i];
 
 		/* Add the primary control domain for this controller */
-		err = qos_resctrl_add_controller_domain(ctrl, id);
+		err = qos_resctrl_add_controller_domain(ctrl, i);
 		if (err) {
 			pr_warn("%s(): failed to add controller domain (%d)",
 				__func__, err);
 			return err;
 		}
-
-		/* Advance to next domain id for subsequent controllers */
-		(*id)++;
 
 		/* Update exposed CDP capability flags for capacity controllers */
 		if (ctrl->ctrl_info->type == CBQRI_CONTROLLER_TYPE_CAPACITY &&
@@ -1718,14 +1722,17 @@ static int qos_add_controller_domains(int found_controllers, int *id)
 	return 0;
 }
 
-static void qos_unmap_controllers(int found_controllers)
+static void qos_unmap_controllers(int num_controllers)
 {
 	int i;
 
-	for (i = 0; i < found_controllers; i++) {
+	for (i = 0; i < num_controllers; i++) {
+		if (!controllers[i].base)
+			continue;
 		iounmap(controllers[i].base);
 		release_mem_region(controllers[i].ctrl_info->addr,
 				  controllers[i].ctrl_info->size);
+		controllers[i].base = NULL;
 	}
 }
 
@@ -1755,15 +1762,21 @@ static void qos_free_all_domains(void)
 
 int qos_resctrl_setup(void)
 {
-	int found_controllers = 0, err = 0, id = 0;
+	int err = 0;
+	int num_controllers;
 
-	err = qos_probe_all_controllers(&found_controllers);
+	num_controllers = qos_count_controller_info();
+	controllers = kcalloc(num_controllers, sizeof(*controllers), GFP_KERNEL);
+	if (!controllers)
+		return -ENOMEM;
+
+	err = qos_probe_all_controllers();
 	if (err)
 		goto err_unmap_controllers;
 
 	qos_init_resctrl_resources();
 
-	err = qos_add_controller_domains(found_controllers, &id);
+	err = qos_add_controller_domains(num_controllers);
 	if (err)
 		goto err_free_controllers_list;
 
@@ -1782,7 +1795,9 @@ err_free_controllers_list:
 	qos_free_all_domains();
 
 err_unmap_controllers:
-	qos_unmap_controllers(found_controllers);
+	qos_unmap_controllers(num_controllers);
+	kfree(controllers);
+	controllers = NULL;
 
 	return err;
 }
