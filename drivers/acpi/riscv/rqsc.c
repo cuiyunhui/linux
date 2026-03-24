@@ -12,6 +12,7 @@
 #include <linux/cpumask.h>
 #include <linux/riscv_qos.h>
 #include <linux/slab.h>
+#include <linux/stddef.h>
 
 #ifdef CONFIG_RISCV_ISA_SSQOSID
 
@@ -227,6 +228,7 @@ int acpi_parse_rqsc(struct acpi_table_header *table)
 	int err;
 	bool skip;
 	int ret;
+	unsigned int max_entries;
 
 	if (WARN_ON_ONCE(acpi_disabled))
 		return -ENODEV;
@@ -240,11 +242,25 @@ int acpi_parse_rqsc(struct acpi_table_header *table)
 		rqsc = (struct acpi_table_rqsc *)table;
 	}
 
+	if (rqsc->header.length < offsetof(struct acpi_table_rqsc, f)) {
+		pr_warn("%s(): invalid RQSC table length: %u\n",
+			__func__, rqsc->header.length);
+		return -EINVAL;
+	}
+
+	max_entries = (rqsc->header.length - offsetof(struct acpi_table_rqsc, f)) /
+		     sizeof(struct acpi_table_rqsc_fields);
+	if (!max_entries) {
+		pr_warn("%s(): invalid RQSC table length: %u\n",
+			__func__, rqsc->header.length);
+		return -EINVAL;
+	}
+
 	num = rqsc->num;
-	if (num > ARRAY_SIZE(rqsc->f)) {
-		pr_warn("RQSC num=%u exceeds table capacity %zu, truncating\n",
-			num, ARRAY_SIZE(rqsc->f));
-		num = ARRAY_SIZE(rqsc->f);
+	if (num > max_entries) {
+		pr_warn("RQSC num=%u exceeds table capacity %u, truncating\n",
+			num, max_entries);
+		num = max_entries;
 	}
 
 	for (i = 0; i < num; i++) {

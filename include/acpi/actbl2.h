@@ -3385,7 +3385,7 @@ struct acpi_table_rqsc_fields {
 struct acpi_table_rqsc {
 	struct acpi_table_header header;	/* Common ACPI table header */
 	u32 num;
-	struct acpi_table_rqsc_fields f[6];
+	struct acpi_table_rqsc_fields f[];
 };
 
 /* RQSC Flags */
