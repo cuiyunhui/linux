@@ -3096,7 +3096,7 @@ static void __split_huge_pmd_locked(struct vm_area_struct *vma, pmd_t *pmd,
 				rmap_flags |= RMAP_EXCLUSIVE;
 
 			folio_add_anon_rmap_ptes(folio, page, HPAGE_PMD_NR,
-						 vma, haddr, rmap_flags);
+						 vma, rmap_flags);
 		}
 	} else {
 		/*
