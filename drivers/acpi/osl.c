@@ -287,7 +287,7 @@ static void __iomem *acpi_map(acpi_physical_address pg_off, unsigned long pg_sz)
 {
 	unsigned long pfn;
 
-	pfn = pg_off >> PG_SHIFT;
+	pfn = pg_off >> PTE_SHIFT;
 	if (should_use_kmap(pfn)) {
 		if (pg_sz > PG_SIZE)
 			return NULL;
@@ -300,7 +300,7 @@ static void acpi_unmap(acpi_physical_address pg_off, void __iomem *vaddr)
 {
 	unsigned long pfn;
 
-	pfn = pg_off >> PG_SHIFT;
+	pfn = pg_off >> PTE_SHIFT;
 	if (should_use_kmap(pfn))
 		kunmap(pfn_to_page(pfn));
 	else
@@ -352,7 +352,7 @@ void __iomem __ref
 
 	pg_off = round_down(phys, PG_SIZE);
 	pg_sz = round_up(phys + size, PG_SIZE) - pg_off;
-	virt = acpi_map(phys, size);
+	virt = acpi_map(pg_off, pg_sz);
 	if (!virt) {
 		mutex_unlock(&acpi_ioremap_lock);
 		kfree(map);
