@@ -60,7 +60,7 @@ static struct page *nfs_page_iter_page_get(struct nfs_page_iter_page *i)
 
 	if (i->count != req->wb_bytes) {
 		size_t base = i->count + req->wb_pgbase;
-		size_t len = PAGE_SIZE - offset_in_page(base);
+		size_t len = PG_SIZE - offset_in_pg(base);
 
 		page = nfs_page_to_page(req, base);
 		nfs_page_iter_page_advance(i, len);
@@ -443,8 +443,8 @@ struct nfs_page *nfs_page_create_from_page(struct nfs_open_context *ctx,
 
 	if (IS_ERR(l_ctx))
 		return ERR_CAST(l_ctx);
-	ret = nfs_page_create(l_ctx, pgbase, offset >> PAGE_SHIFT,
-			      offset_in_page(offset), count);
+	ret = nfs_page_create(l_ctx, pgbase, offset >> PG_SHIFT,
+			      offset_in_pg(offset), count);
 	if (!IS_ERR(ret)) {
 		nfs_page_assign_page(ret, page);
 		nfs_page_group_init(ret, NULL);
@@ -624,8 +624,8 @@ size_t nfs_generic_pg_test(struct nfs_pageio_descriptor *desc,
 	 * Limit the request size so that we can still allocate a page array
 	 * for it without upsetting the slab allocator.
 	 */
-	if (((mirror->pg_count + req->wb_bytes) >> PAGE_SHIFT) *
-			sizeof(struct page *) > PAGE_SIZE)
+	if (((mirror->pg_count + req->wb_bytes) >> PG_SHIFT) *
+			sizeof(struct page *) > PG_SIZE)
 		return 0;
 
 	return min(mirror->pg_bsize - mirror->pg_count, (size_t)req->wb_bytes);
@@ -884,7 +884,7 @@ int nfs_generic_pgio(struct nfs_pageio_descriptor *desc,
 	struct nfs_commit_info cinfo;
 	struct nfs_page_array *pg_array = &hdr->page_array;
 	unsigned int pagecount, pageused;
-	unsigned int pg_base = offset_in_page(mirror->pg_base);
+	unsigned int pg_base = offset_in_pg(mirror->pg_base);
 	gfp_t gfp_flags = nfs_io_gfp_mask();
 
 	pagecount = nfs_page_array_len(pg_base, mirror->pg_count);

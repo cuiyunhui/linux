@@ -49,8 +49,8 @@ int pfn_is_nosave(unsigned long pfn)
 	unsigned long nosave_begin_pfn;
 	unsigned long nosave_end_pfn;
 
-	nosave_begin_pfn = __pa_symbol(&__nosave_begin) >> PAGE_SHIFT;
-	nosave_end_pfn = PAGE_ALIGN(__pa_symbol(&__nosave_end)) >> PAGE_SHIFT;
+	nosave_begin_pfn = __pa_symbol(&__nosave_begin) >> PTE_SHIFT;
+	nosave_end_pfn = PTE_ALIGN(__pa_symbol(&__nosave_end)) >> PTE_SHIFT;
 
 	return pfn >= nosave_begin_pfn && pfn < nosave_end_pfn;
 }
@@ -163,7 +163,7 @@ int relocate_restore_code(void)
 	if (!relocated_restore_code)
 		return -ENOMEM;
 
-	__memcpy((void *)relocated_restore_code, core_restore_code, PAGE_SIZE);
+	__memcpy((void *)relocated_restore_code, core_restore_code, PTE_SIZE);
 
 	/* Make the page containing the relocated code executable */
 	pgd = (pgd_t *)__va(read_cr3_pa()) +

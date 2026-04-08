@@ -526,7 +526,7 @@ static inline void mmu_notifier_range_init_owner(
 	__young |= mmu_notifier_clear_flush_young(___vma->vm_mm,	\
 						  ___address,		\
 						  ___address +		\
-						  ___nr * PAGE_SIZE);	\
+						  ___nr * PTE_SIZE);	\
 	__young;							\
 })
 

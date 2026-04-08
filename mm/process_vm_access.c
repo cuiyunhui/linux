@@ -33,7 +33,7 @@ static int process_vm_rw_pages(struct page **pages,
 	/* Do the copy for each page */
 	while (len && iov_iter_count(iter)) {
 		struct page *page = *pages++;
-		size_t copy = PAGE_SIZE - offset;
+		size_t copy = PG_SIZE - offset;
 		size_t copied;
 
 		if (copy > len)
@@ -56,7 +56,7 @@ static int process_vm_rw_pages(struct page **pages,
 #define PVM_MAX_KMALLOC_PAGES 2
 
 /* Maximum number of pages that can be stored at a time */
-#define PVM_MAX_USER_PAGES (PVM_MAX_KMALLOC_PAGES * PAGE_SIZE / sizeof(struct page *))
+#define PVM_MAX_USER_PAGES (PVM_MAX_KMALLOC_PAGES * PG_SIZE / sizeof(struct page *))
 
 /**
  * process_vm_rw_single_vec - read/write pages from task specified
@@ -78,7 +78,7 @@ static int process_vm_rw_single_vec(unsigned long addr,
 				    struct task_struct *task,
 				    int vm_write)
 {
-	unsigned long pa = addr & PAGE_MASK;
+	unsigned long pa = addr & PG_MASK;
 	unsigned long start_offset = addr - pa;
 	unsigned long nr_pages;
 	ssize_t rc = 0;
@@ -87,7 +87,7 @@ static int process_vm_rw_single_vec(unsigned long addr,
 	/* Work out address and page range required */
 	if (len == 0)
 		return 0;
-	nr_pages = (addr + len - 1) / PAGE_SIZE - addr / PAGE_SIZE + 1;
+	nr_pages = (addr + len - 1) / PG_SIZE - addr / PG_SIZE + 1;
 
 	if (vm_write)
 		flags |= FOLL_WRITE;
@@ -111,7 +111,7 @@ static int process_vm_rw_single_vec(unsigned long addr,
 		if (pinned_pages <= 0)
 			return -EFAULT;
 
-		bytes = pinned_pages * PAGE_SIZE - start_offset;
+		bytes = pinned_pages * PG_SIZE - start_offset;
 		if (bytes > len)
 			bytes = len;
 
@@ -121,7 +121,7 @@ static int process_vm_rw_single_vec(unsigned long addr,
 		len -= bytes;
 		start_offset = 0;
 		nr_pages -= pinned_pages;
-		pa += pinned_pages * PAGE_SIZE;
+		pa += pinned_pages * PG_SIZE;
 
 		/* If vm_write is set, the pages need to be made dirty: */
 		unpin_user_pages_dirty_lock(process_pages, pinned_pages,
@@ -173,8 +173,8 @@ static ssize_t process_vm_rw_core(pid_t pid, struct iov_iter *iter,
 		if (iov_len > 0) {
 			nr_pages_iov = ((unsigned long)rvec[i].iov_base
 					+ iov_len - 1)
-				/ PAGE_SIZE - (unsigned long)rvec[i].iov_base
-				/ PAGE_SIZE + 1;
+				/ PG_SIZE - (unsigned long)rvec[i].iov_base
+				/ PG_SIZE + 1;
 			nr_pages = max(nr_pages, nr_pages_iov);
 		}
 	}
@@ -185,7 +185,7 @@ static ssize_t process_vm_rw_core(pid_t pid, struct iov_iter *iter,
 	if (nr_pages > PVM_MAX_PP_ARRAY_COUNT) {
 		/* For reliability don't try to kmalloc more than
 		   2 pages worth */
-		process_pages = kmalloc(min_t(size_t, PVM_MAX_KMALLOC_PAGES * PAGE_SIZE,
+		process_pages = kmalloc(min_t(size_t, PVM_MAX_KMALLOC_PAGES * PG_SIZE,
 					      sizeof(struct page *)*nr_pages),
 					GFP_KERNEL);
 

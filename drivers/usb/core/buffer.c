@@ -181,7 +181,7 @@ void *hcd_buffer_alloc_pages(struct usb_hcd *hcd,
 
 	if (hcd->localmem_pool)
 		return gen_pool_dma_alloc_align(hcd->localmem_pool,
-				size, dma, PAGE_SIZE);
+				size, dma, PG_SIZE);
 
 	/* some USB hosts just use PIO */
 	if (!hcd_uses_dma(hcd)) {

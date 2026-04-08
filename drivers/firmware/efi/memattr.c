@@ -82,9 +82,9 @@ static bool entry_is_valid(const efi_memory_desc_t *in, efi_memory_desc_t *out)
 		return false;
 	}
 
-	if (PAGE_SIZE > EFI_PAGE_SIZE &&
-	    (!PAGE_ALIGNED(in->phys_addr) ||
-	     !PAGE_ALIGNED(in->num_pages << EFI_PAGE_SHIFT))) {
+	if (PTE_SIZE > EFI_PAGE_SIZE &&
+	    (!PTE_ALIGNED(in->phys_addr) ||
+	     !PTE_ALIGNED(in->num_pages << EFI_PAGE_SHIFT))) {
 		/*
 		 * Since arm64 may execute with page sizes of up to 64 KB, the
 		 * UEFI spec mandates that RuntimeServices memory regions must

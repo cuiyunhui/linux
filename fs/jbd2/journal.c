@@ -2674,7 +2674,7 @@ void jbd2_journal_ack_err(journal_t *journal)
 
 int jbd2_journal_blocks_per_folio(struct inode *inode)
 {
-	return 1 << (PAGE_SHIFT + mapping_max_folio_order(inode->i_mapping) -
+	return 1 << (PG_SHIFT + mapping_max_folio_order(inode->i_mapping) -
 		     inode->i_sb->s_blocksize_bits);
 }
 
@@ -2739,7 +2739,7 @@ static int jbd2_journal_create_slab(size_t size)
 	int i = order_base_2(size) - 10;
 	size_t slab_size;
 
-	if (size == PAGE_SIZE)
+	if (size == PG_SIZE)
 		return 0;
 
 	if (i >= JBD2_MAX_SLABS)
@@ -2781,7 +2781,7 @@ void *jbd2_alloc(size_t size, gfp_t flags)
 
 	BUG_ON(size & (size-1)); /* Must be a power of 2 */
 
-	if (size < PAGE_SIZE)
+	if (size < PG_SIZE)
 		ptr = kmem_cache_alloc(get_slab(size), flags);
 	else
 		ptr = (void *)__get_free_pages(flags, get_order(size));
@@ -2795,7 +2795,7 @@ void *jbd2_alloc(size_t size, gfp_t flags)
 
 void jbd2_free(void *ptr, size_t size)
 {
-	if (size < PAGE_SIZE)
+	if (size < PG_SIZE)
 		kmem_cache_free(get_slab(size), ptr);
 	else
 		free_pages((unsigned long)ptr, get_order(size));

@@ -190,7 +190,7 @@ static void list_get_page(struct dpages *dp,
 	struct page_list *pl = dp->context_ptr;
 
 	*p = pl->page;
-	*len = PAGE_SIZE - o;
+	*len = PG_SIZE - o;
 	*offset = o;
 }
 
@@ -256,12 +256,12 @@ static void vm_get_page(struct dpages *dp,
 {
 	*p = vmalloc_to_page(dp->context_ptr);
 	*offset = dp->context_u;
-	*len = PAGE_SIZE - dp->context_u;
+	*len = PG_SIZE - dp->context_u;
 }
 
 static void vm_next_page(struct dpages *dp)
 {
-	dp->context_ptr += PAGE_SIZE - dp->context_u;
+	dp->context_ptr += PG_SIZE - dp->context_u;
 	dp->context_u = 0;
 }
 
@@ -269,7 +269,7 @@ static void vm_dp_init(struct dpages *dp, void *data)
 {
 	dp->get_page = vm_get_page;
 	dp->next_page = vm_next_page;
-	dp->context_u = offset_in_page(data);
+	dp->context_u = offset_in_pg(data);
 	dp->context_ptr = data;
 }
 
@@ -281,12 +281,12 @@ static void km_get_page(struct dpages *dp, struct page **p, unsigned long *len,
 {
 	*p = virt_to_page(dp->context_ptr);
 	*offset = dp->context_u;
-	*len = PAGE_SIZE - dp->context_u;
+	*len = PG_SIZE - dp->context_u;
 }
 
 static void km_next_page(struct dpages *dp)
 {
-	dp->context_ptr += PAGE_SIZE - dp->context_u;
+	dp->context_ptr += PG_SIZE - dp->context_u;
 	dp->context_u = 0;
 }
 
@@ -294,7 +294,7 @@ static void km_dp_init(struct dpages *dp, void *data)
 {
 	dp->get_page = km_get_page;
 	dp->next_page = km_next_page;
-	dp->context_u = offset_in_page(data);
+	dp->context_u = offset_in_pg(data);
 	dp->context_ptr = data;
 }
 
@@ -347,7 +347,7 @@ static void do_region(const blk_opf_t opf, unsigned int region,
 			break;
 		default:
 			num_bvecs = bio_max_segs(dm_sector_div_up(remaining,
-						(PAGE_SIZE >> SECTOR_SHIFT)) + 1);
+						(PG_SIZE >> SECTOR_SHIFT)) + 1);
 		}
 
 		bio = bio_alloc_bioset(where->bdev, num_bvecs, opf, GFP_NOIO,

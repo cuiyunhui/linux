@@ -1606,7 +1606,7 @@ static bool mei_me_fw_type_sps_ign(const struct pci_dev *pdev)
 #define MEI_CFG_DMA_128 \
 	.dma_size[DMA_DSCR_HOST] = SZ_128K, \
 	.dma_size[DMA_DSCR_DEVICE] = SZ_128K, \
-	.dma_size[DMA_DSCR_CTRL] = PAGE_SIZE
+	.dma_size[DMA_DSCR_CTRL] = PG_SIZE
 
 #define MEI_CFG_TRC \
 	.hw_trc_supported = 1

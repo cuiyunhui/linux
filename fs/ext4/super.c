@@ -4774,7 +4774,7 @@ static int ext4_check_feature_compatibility(struct super_block *sb,
 		return -EINVAL;
 
 	if (sbi->s_daxdev) {
-		if (sb->s_blocksize == PAGE_SIZE)
+		if (sb->s_blocksize == PG_SIZE)
 			set_bit(EXT4_FLAGS_BDEV_IS_DAX, &sbi->s_ext4_flags);
 		else
 			ext4_msg(sb, KERN_ERR, "unsupported blocksize for DAX\n");
@@ -5079,10 +5079,10 @@ static const char *ext4_has_journal_option(struct super_block *sb)
 /*
  * Limit the maximum folio order to 2048 blocks to prevent overestimation
  * of reserve handle credits during the folio writeback in environments
- * where the PAGE_SIZE exceeds 4KB.
+ * where the PG_SIZE exceeds 4KB.
  */
 #define EXT4_MAX_PAGECACHE_ORDER(sb)		\
-		umin(MAX_PAGECACHE_ORDER, (11 + (sb)->s_blocksize_bits - PAGE_SHIFT))
+		umin(MAX_PAGECACHE_ORDER, (11 + (sb)->s_blocksize_bits - PG_SHIFT))
 static void ext4_set_max_mapping_order(struct super_block *sb)
 {
 	struct ext4_sb_info *sbi = EXT4_SB(sb);
@@ -5102,9 +5102,9 @@ static int ext4_check_large_folio(struct super_block *sb)
 
 	if (!err_str) {
 		ext4_set_max_mapping_order(sb);
-	} else if (sb->s_blocksize > PAGE_SIZE) {
+	} else if (sb->s_blocksize > PG_SIZE) {
 		ext4_msg(sb, KERN_ERR, "bs(%lu) > ps(%lu) unsupported for %s",
-			 sb->s_blocksize, PAGE_SIZE, err_str);
+			 sb->s_blocksize, PG_SIZE, err_str);
 		return -EINVAL;
 	}
 

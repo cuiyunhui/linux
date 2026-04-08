@@ -22,9 +22,9 @@ static ssize_t __copy_oldmem_page(struct iov_iter *iter, unsigned long pfn,
 		return 0;
 
 	if (encrypted)
-		vaddr = (__force void *)ioremap_encrypted(pfn << PAGE_SHIFT, PAGE_SIZE);
+		vaddr = (__force void *)ioremap_encrypted(pfn << PTE_SHIFT, PTE_SIZE);
 	else
-		vaddr = (__force void *)ioremap_cache(pfn << PAGE_SHIFT, PAGE_SIZE);
+		vaddr = (__force void *)ioremap_cache(pfn << PTE_SHIFT, PTE_SIZE);
 
 	if (!vaddr)
 		return -ENOMEM;

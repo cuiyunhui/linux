@@ -68,13 +68,13 @@ static void xprt_free_allocation(struct rpc_rqst *req)
 
 static void xprt_bc_reinit_xdr_buf(struct xdr_buf *buf)
 {
-	buf->head[0].iov_len = PAGE_SIZE;
+	buf->head[0].iov_len = PG_SIZE;
 	buf->tail[0].iov_len = 0;
 	buf->pages = NULL;
 	buf->page_len = 0;
 	buf->flags = 0;
 	buf->len = 0;
-	buf->buflen = PAGE_SIZE;
+	buf->buflen = PG_SIZE;
 }
 
 static int xprt_alloc_xdr_buf(struct xdr_buf *buf, gfp_t gfp_flags)
@@ -84,7 +84,7 @@ static int xprt_alloc_xdr_buf(struct xdr_buf *buf, gfp_t gfp_flags)
 	page = alloc_page(gfp_flags);
 	if (page == NULL)
 		return -ENOMEM;
-	xdr_buf_init(buf, page_address(page), PAGE_SIZE);
+	xdr_buf_init(buf, page_address(page), PG_SIZE);
 	return 0;
 }
 
@@ -105,7 +105,7 @@ static struct rpc_rqst *xprt_alloc_bc_req(struct rpc_xprt *xprt)
 		printk(KERN_ERR "Failed to create bc receive xbuf\n");
 		goto out_free;
 	}
-	req->rq_rcv_buf.len = PAGE_SIZE;
+	req->rq_rcv_buf.len = PG_SIZE;
 
 	/* Preallocate one XDR send buffer */
 	if (xprt_alloc_xdr_buf(&req->rq_snd_buf, gfp_flags) < 0) {
@@ -305,7 +305,7 @@ void xprt_free_bc_rqst(struct rpc_rqst *req)
 	if (xprt_need_to_requeue(xprt)) {
 		xprt_bc_reinit_xdr_buf(&req->rq_snd_buf);
 		xprt_bc_reinit_xdr_buf(&req->rq_rcv_buf);
-		req->rq_rcv_buf.len = PAGE_SIZE;
+		req->rq_rcv_buf.len = PG_SIZE;
 		list_add_tail(&req->rq_bc_pa_list, &xprt->bc_pa_list);
 		xprt->bc_alloc_count++;
 		atomic_inc(&xprt->bc_slot_count);

@@ -62,12 +62,12 @@ static void acpi_mp_cpu_die(unsigned int cpu)
 /* The argument is required to match type of x86_mapping_info::alloc_pgt_page */
 static void __init *alloc_pgt_page(void *dummy)
 {
-	return memblock_alloc(PAGE_SIZE, PAGE_SIZE);
+	return memblock_alloc(PTE_SIZE, PTE_SIZE);
 }
 
 static void __init free_pgt_page(void *pgt, void *dummy)
 {
-	return memblock_free(pgt, PAGE_SIZE);
+	return memblock_free(pgt, PTE_SIZE);
 }
 
 static int __init acpi_mp_setup_reset(u64 reset_vector)
@@ -86,16 +86,16 @@ static int __init acpi_mp_setup_reset(u64 reset_vector)
 		return -ENOMEM;
 
 	for (int i = 0; i < nr_pfn_mapped; i++) {
-		mstart = pfn_mapped[i].start << PAGE_SHIFT;
-		mend   = pfn_mapped[i].end << PAGE_SHIFT;
+		mstart = pfn_mapped[i].start << PTE_SHIFT;
+		mend   = pfn_mapped[i].end << PTE_SHIFT;
 		if (kernel_ident_mapping_init(&info, pgd, mstart, mend)) {
 			kernel_ident_mapping_free(&info, pgd);
 			return -ENOMEM;
 		}
 	}
 
-	mstart = PAGE_ALIGN_DOWN(reset_vector);
-	mend = mstart + PAGE_SIZE;
+	mstart = PTE_ALIGN_DOWN(reset_vector);
+	mend = mstart + PTE_SIZE;
 	if (kernel_ident_mapping_init(&info, pgd, mstart, mend)) {
 		kernel_ident_mapping_free(&info, pgd);
 		return -ENOMEM;
@@ -109,8 +109,8 @@ static int __init acpi_mp_setup_reset(u64 reset_vector)
 	 * before and after switching page tables.
 	 */
 	info.offset = __START_KERNEL_map - phys_base;
-	mstart = PAGE_ALIGN_DOWN(__pa(asm_acpi_mp_play_dead));
-	mend = mstart + PAGE_SIZE;
+	mstart = PTE_ALIGN_DOWN(__pa(asm_acpi_mp_play_dead));
+	mend = mstart + PTE_SIZE;
 	if (kernel_ident_mapping_init(&info, pgd, mstart, mend)) {
 		kernel_ident_mapping_free(&info, pgd);
 		return -ENOMEM;

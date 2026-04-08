@@ -2374,7 +2374,7 @@ struct rdma_user_mmap_entry {
 static inline u64
 rdma_user_mmap_get_offset(const struct rdma_user_mmap_entry *entry)
 {
-	return (u64)entry->start_pgoff << PAGE_SHIFT;
+	return (u64)entry->start_pgoff << PG_SHIFT;
 }
 
 /**

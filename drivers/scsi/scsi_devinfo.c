@@ -688,7 +688,7 @@ static ssize_t proc_scsi_devinfo_write(struct file *file,
 	char *buffer;
 	ssize_t err = length;
 
-	if (!buf || length>PAGE_SIZE)
+	if (!buf || length>PG_SIZE)
 		return -EINVAL;
 	if (!(buffer = (char *) __get_free_page(GFP_KERNEL)))
 		return -ENOMEM;
@@ -697,9 +697,9 @@ static ssize_t proc_scsi_devinfo_write(struct file *file,
 		goto out;
 	}
 
-	if (length < PAGE_SIZE)
+	if (length < PG_SIZE)
 		buffer[length] = '\0';
-	else if (buffer[PAGE_SIZE-1]) {
+	else if (buffer[PG_SIZE-1]) {
 		err = -EINVAL;
 		goto out;
 	}

@@ -192,7 +192,7 @@ SYSCALL_DEFINE4(request_key, const char __user *, _type,
 	callout_info = NULL;
 	callout_len = 0;
 	if (_callout_info) {
-		callout_info = strndup_user(_callout_info, PAGE_SIZE);
+		callout_info = strndup_user(_callout_info, PG_SIZE);
 		if (IS_ERR(callout_info)) {
 			ret = PTR_ERR(callout_info);
 			goto error2;
@@ -331,7 +331,7 @@ long keyctl_update_key(key_serial_t id,
 	long ret;
 
 	ret = -EINVAL;
-	if (plen > PAGE_SIZE)
+	if (plen > PG_SIZE)
 		goto error;
 
 	/* pull the payload in if one was supplied */
@@ -880,14 +880,14 @@ can_read_key:
 	 * transferring them to user buffer to avoid potential
 	 * deadlock involving page fault and mmap_lock.
 	 *
-	 * key_data_len = (buflen <= PAGE_SIZE)
+	 * key_data_len = (buflen <= PG_SIZE)
 	 *		? buflen : actual length of key data
 	 *
 	 * This prevents allocating arbitrary large buffer which can
 	 * be much larger than the actual key length. In the latter case,
 	 * at least 2 passes of this loop is required.
 	 */
-	key_data_len = (buflen <= PAGE_SIZE) ? buflen : 0;
+	key_data_len = (buflen <= PG_SIZE) ? buflen : 0;
 	for (;;) {
 		if (key_data_len) {
 			key_data = kvmalloc(key_data_len, GFP_KERNEL);
@@ -1747,7 +1747,7 @@ long keyctl_restrict_keyring(key_serial_t id, const char __user *_type,
 		if (ret < 0)
 			goto error;
 
-		restriction = strndup_user(_restriction, PAGE_SIZE);
+		restriction = strndup_user(_restriction, PG_SIZE);
 		if (IS_ERR(restriction)) {
 			ret = PTR_ERR(restriction);
 			goto error;

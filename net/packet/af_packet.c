@@ -744,10 +744,10 @@ static void prb_flush_block(struct tpacket_kbdq_core *pkc1,
 	start = (u8 *)pbd1;
 
 	/* Skip the block header(we know header WILL fit in 4K) */
-	start += PAGE_SIZE;
+	start += PG_SIZE;
 
-	end = (u8 *)PAGE_ALIGN((unsigned long)pkc1->pkblk_end);
-	for (; start < end; start += PAGE_SIZE)
+	end = (u8 *)PG_ALIGN((unsigned long)pkc1->pkblk_end);
+	for (; start < end; start += PG_SIZE)
 		flush_dcache_page(pgv_to_page(start));
 
 	smp_wmb();
@@ -2468,10 +2468,10 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,
 	if (po->tp_version <= TPACKET_V2) {
 		u8 *start, *end;
 
-		end = (u8 *) PAGE_ALIGN((unsigned long) h.raw +
+		end = (u8 *) PG_ALIGN((unsigned long) h.raw +
 					macoff + snaplen);
 
-		for (start = h.raw; start < end; start += PAGE_SIZE)
+		for (start = h.raw; start < end; start += PG_SIZE)
 			flush_dcache_page(pgv_to_page(start));
 	}
 	smp_wmb();
@@ -2611,8 +2611,8 @@ static int tpacket_fill_skb(struct packet_sock *po, struct sk_buff *skb,
 		to_write -= hdrlen;
 	}
 
-	offset = offset_in_page(data);
-	len_max = PAGE_SIZE - offset;
+	offset = offset_in_pg(data);
+	len_max = PG_SIZE - offset;
 	len = ((to_write > len_max) ? len_max : to_write);
 
 	skb->data_len = to_write;
@@ -2636,7 +2636,7 @@ static int tpacket_fill_skb(struct packet_sock *po, struct sk_buff *skb,
 		skb_fill_page_desc(skb, nr_frags, page, offset, len);
 		to_write -= len;
 		offset = 0;
-		len_max = PAGE_SIZE;
+		len_max = PG_SIZE;
 		len = ((to_write > len_max) ? len_max : to_write);
 	}
 
@@ -2918,11 +2918,11 @@ static struct sk_buff *packet_alloc_skb(struct sock *sk, size_t prepad,
 	struct sk_buff *skb;
 
 	/* Under a page?  Don't bother with paged skb. */
-	if (prepad + len < PAGE_SIZE || !linear)
+	if (prepad + len < PG_SIZE || !linear)
 		linear = len;
 
-	if (len - linear > MAX_SKB_FRAGS * (PAGE_SIZE << PAGE_ALLOC_COSTLY_ORDER))
-		linear = len - MAX_SKB_FRAGS * (PAGE_SIZE << PAGE_ALLOC_COSTLY_ORDER);
+	if (len - linear > MAX_SKB_FRAGS * (PG_SIZE << PAGE_ALLOC_COSTLY_ORDER))
+		linear = len - MAX_SKB_FRAGS * (PG_SIZE << PAGE_ALLOC_COSTLY_ORDER);
 	skb = sock_alloc_send_pskb(sk, prepad + linear, len - linear, noblock,
 				   err, PAGE_ALLOC_COSTLY_ORDER);
 	if (!skb)
@@ -4370,7 +4370,7 @@ static char *alloc_one_pg_vec_page(unsigned long order)
 		return buffer;
 
 	/* __get_free_pages failed, fall back to vmalloc */
-	buffer = vzalloc(array_size((1 << order), PAGE_SIZE));
+	buffer = vzalloc(array_size((1 << order), PG_SIZE));
 	if (buffer)
 		return buffer;
 
@@ -4457,7 +4457,7 @@ static int packet_set_ring(struct sock *sk, union tpacket_req_u *req_u,
 		err = -EINVAL;
 		if (unlikely((int)req->tp_block_size <= 0))
 			goto out;
-		if (unlikely(!PAGE_ALIGNED(req->tp_block_size)))
+		if (unlikely(!PG_ALIGNED(req->tp_block_size)))
 			goto out;
 		min_frame_size = po->tp_hdrlen + po->tp_reserve;
 		if (po->tp_version >= TPACKET_V3 &&
@@ -4545,7 +4545,7 @@ static int packet_set_ring(struct sock *sk, union tpacket_req_u *req_u,
 		swap(rb->pg_vec_order, order);
 		swap(rb->pg_vec_len, req->tp_block_nr);
 
-		rb->pg_vec_pages = req->tp_block_size/PAGE_SIZE;
+		rb->pg_vec_pages = req->tp_block_size/PG_SIZE;
 		po->prot_hook.func = (po->rx_ring.pg_vec) ?
 						tpacket_rcv : packet_rcv;
 		skb_queue_purge(rb_queue);
@@ -4587,7 +4587,7 @@ static int packet_mmap(struct file *file, struct socket *sock,
 	int err = -EINVAL;
 	int i;
 
-	if (vma->vm_pgoff)
+	if (vma->vm_pteoff)
 		return -EINVAL;
 
 	mutex_lock(&po->pg_vec_lock);
@@ -4597,7 +4597,7 @@ static int packet_mmap(struct file *file, struct socket *sock,
 		if (rb->pg_vec) {
 			expected_size += rb->pg_vec_len
 						* rb->pg_vec_pages
-						* PAGE_SIZE;
+						* PG_SIZE;
 		}
 	}
 
@@ -4623,8 +4623,8 @@ static int packet_mmap(struct file *file, struct socket *sock,
 				err = vm_insert_page(vma, start, page);
 				if (unlikely(err))
 					goto out;
-				start += PAGE_SIZE;
-				kaddr += PAGE_SIZE;
+				start += PG_SIZE;
+				kaddr += PG_SIZE;
 			}
 		}
 	}

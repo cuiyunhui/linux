@@ -163,8 +163,8 @@ int fsnotify_pre_content(const struct path *path, const loff_t *ppos,
 		return fsnotify_path(path, FS_PRE_ACCESS);
 
 	range.path = path;
-	range.pos = PAGE_ALIGN_DOWN(*ppos);
-	range.count = PAGE_ALIGN(*ppos + count) - range.pos;
+	range.pos = PG_ALIGN_DOWN(*ppos);
+	range.count = PG_ALIGN(*ppos + count) - range.pos;
 
 	return fsnotify_parent(path->dentry, FS_PRE_ACCESS, &range,
 			       FSNOTIFY_EVENT_FILE_RANGE);

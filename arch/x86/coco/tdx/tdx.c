@@ -618,7 +618,7 @@ static int handle_mmio(struct pt_regs *regs, struct ve_info *ve)
 	 * load_unaligned_zeropad() will recover using exception fixups.
 	 */
 	vaddr = (unsigned long)insn_get_addr_ref(&insn, regs);
-	if (vaddr / PAGE_SIZE != (vaddr + size - 1) / PAGE_SIZE)
+	if (vaddr / PTE_SIZE != (vaddr + size - 1) / PTE_SIZE)
 		return -EFAULT;
 
 	/* Handle writes first */
@@ -964,7 +964,7 @@ static bool tdx_map_gpa(phys_addr_t start, phys_addr_t end, bool enc)
 static bool tdx_enc_status_changed(unsigned long vaddr, int numpages, bool enc)
 {
 	phys_addr_t start = __pa(vaddr);
-	phys_addr_t end   = __pa(vaddr + numpages * PAGE_SIZE);
+	phys_addr_t end   = __pa(vaddr + numpages * PTE_SIZE);
 
 	if (!tdx_map_gpa(start, end, enc))
 		return false;
@@ -1046,7 +1046,7 @@ static void tdx_kexec_finish(void)
 		size = page_level_size(level);
 
 		if (pte && pte_decrypted(*pte)) {
-			int pages = size / PAGE_SIZE;
+			int pages = size / PTE_SIZE;
 
 			/*
 			 * Touching memory with shared bit set triggers implicit

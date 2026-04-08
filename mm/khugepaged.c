@@ -540,7 +540,7 @@ static enum scan_result __collapse_huge_page_isolate(struct vm_area_struct *vma,
 	enum scan_result result = SCAN_FAIL;
 
 	for (_pte = pte; _pte < pte + HPAGE_PMD_NR;
-	     _pte++, addr += PAGE_SIZE) {
+	     _pte++, addr += PG_SIZE) {
 		pte_t pteval = ptep_get(_pte);
 		if (pte_none_or_zero(pteval)) {
 			++none_or_zero;
@@ -680,7 +680,7 @@ static void __collapse_huge_page_copy_succeeded(pte_t *pte,
 	unsigned int nr_ptes;
 
 	for (_pte = pte; _pte < pte + HPAGE_PMD_NR; _pte += nr_ptes,
-	     address += nr_ptes * PAGE_SIZE) {
+	     address += nr_ptes * PG_SIZE) {
 		nr_ptes = 1;
 		pteval = ptep_get(_pte);
 		if (pte_none_or_zero(pteval)) {
@@ -700,7 +700,7 @@ static void __collapse_huge_page_copy_succeeded(pte_t *pte,
 			src = page_folio(src_page);
 
 			if (folio_test_large(src)) {
-				unsigned int max_nr_ptes = (end - address) >> PAGE_SHIFT;
+				unsigned int max_nr_ptes = (end - address) >> PG_SHIFT;
 
 				nr_ptes = folio_pte_batch(src, _pte, pteval, max_nr_ptes);
 			} else {
@@ -784,7 +784,7 @@ static enum scan_result __collapse_huge_page_copy(pte_t *pte, struct folio *foli
 	for (i = 0; i < HPAGE_PMD_NR; i++) {
 		pte_t pteval = ptep_get(pte + i);
 		struct page *page = folio_page(folio, i);
-		unsigned long src_addr = address + i * PAGE_SIZE;
+		unsigned long src_addr = address + i * PG_SIZE;
 		struct page *src_page;
 
 		if (pte_none_or_zero(pteval)) {
@@ -977,16 +977,16 @@ static enum scan_result __collapse_huge_page_swapin(struct mm_struct *mm,
 {
 	int swapped_in = 0;
 	vm_fault_t ret = 0;
-	unsigned long addr, end = start_addr + (HPAGE_PMD_NR * PAGE_SIZE);
+	unsigned long addr, end = start_addr + (HPAGE_PMD_NR * PG_SIZE);
 	enum scan_result result;
 	pte_t *pte = NULL;
 	spinlock_t *ptl;
 
-	for (addr = start_addr; addr < end; addr += PAGE_SIZE) {
+	for (addr = start_addr; addr < end; addr += PG_SIZE) {
 		struct vm_fault vmf = {
 			.vma = vma,
 			.address = addr,
-			.pgoff = linear_page_index(vma, addr),
+			.pteoff = linear_pte_index(vma, addr),
 			.flags = FAULT_FLAG_ALLOW_RETRY,
 			.pmd = pmd,
 		};
@@ -1259,7 +1259,7 @@ static enum scan_result hpage_collapse_scan_pmd(struct mm_struct *mm,
 	}
 
 	for (addr = start_addr, _pte = pte; _pte < pte + HPAGE_PMD_NR;
-	     _pte++, addr += PAGE_SIZE) {
+	     _pte++, addr += PG_SIZE) {
 		pte_t pteval = ptep_get(_pte);
 		if (pte_none_or_zero(pteval)) {
 			++none_or_zero;
@@ -1504,7 +1504,7 @@ static enum scan_result try_collapse_pte_mapped_thp(struct mm_struct *mm, unsign
 		return SCAN_PTE_UFFD_WP;
 
 	folio = filemap_lock_folio(vma->vm_file->f_mapping,
-			       linear_page_index(vma, haddr));
+			       linear_pte_index(vma, haddr));
 	if (IS_ERR(folio))
 		return SCAN_PAGE_NULL;
 
@@ -1534,7 +1534,7 @@ static enum scan_result try_collapse_pte_mapped_thp(struct mm_struct *mm, unsign
 
 	/* step 1: check all mapped PTEs are to the right huge page */
 	for (i = 0, addr = haddr, pte = start_pte;
-	     i < HPAGE_PMD_NR; i++, addr += PAGE_SIZE, pte++) {
+	     i < HPAGE_PMD_NR; i++, addr += PG_SIZE, pte++) {
 		struct page *page;
 		pte_t ptent = ptep_get(pte);
 
@@ -1589,9 +1589,9 @@ static enum scan_result try_collapse_pte_mapped_thp(struct mm_struct *mm, unsign
 
 	/* step 2: clear page table and adjust rmap */
 	for (i = 0, addr = haddr, pte = start_pte; i < HPAGE_PMD_NR;
-	     i += nr_batch_ptes, addr += nr_batch_ptes * PAGE_SIZE,
+	     i += nr_batch_ptes, addr += nr_batch_ptes * PG_SIZE,
 	     pte += nr_batch_ptes) {
-		unsigned int max_nr_batch_ptes = (end - addr) >> PAGE_SHIFT;
+		unsigned int max_nr_batch_ptes = (end - addr) >> PG_SHIFT;
 		struct page *page;
 		pte_t ptent = ptep_get(pte);
 
@@ -1752,7 +1752,7 @@ static void retract_page_tables(struct address_space *mapping, pgoff_t pgoff)
 		spinlock_t *ptl;
 		bool success = false;
 
-		addr = vma->vm_start + ((pgoff - vma->vm_pgoff) << PAGE_SHIFT);
+		addr = vma->vm_start + ((pgoff - vma->vm_pteoff) << PTE_SHIFT);
 		if (addr & ~HPAGE_PMD_MASK ||
 		    vma->vm_end < addr + HPAGE_PMD_SIZE)
 			continue;
@@ -2458,7 +2458,7 @@ static unsigned int khugepaged_scan_mm_slot(unsigned int pages, enum scan_result
 				  hend);
 			if (!vma_is_anonymous(vma)) {
 				struct file *file = get_file(vma->vm_file);
-				pgoff_t pgoff = linear_page_index(vma,
+				pgoff_t pgoff = linear_pte_index(vma,
 						khugepaged_scan.address);
 
 				mmap_read_unlock(mm);
@@ -2667,7 +2667,7 @@ static void set_recommended_min_free_kbytes(void)
 	/* don't ever allow to reserve more than 5% of the lowmem */
 	recommended_min = min(recommended_min,
 			      (unsigned long) nr_free_buffer_pages() / 20);
-	recommended_min <<= (PAGE_SHIFT-10);
+	recommended_min <<= (PG_SHIFT-10);
 
 	if (recommended_min > min_free_kbytes) {
 		if (user_min_free_kbytes >= 0)
@@ -2801,7 +2801,7 @@ retry:
 		mmap_assert_locked(mm);
 		if (!vma_is_anonymous(vma)) {
 			struct file *file = get_file(vma->vm_file);
-			pgoff_t pgoff = linear_page_index(vma, addr);
+			pgoff_t pgoff = linear_pte_index(vma, addr);
 
 			mmap_read_unlock(mm);
 			mmap_locked = false;
@@ -2811,7 +2811,7 @@ retry:
 
 			if (result == SCAN_PAGE_DIRTY_OR_WRITEBACK && !triggered_wb &&
 			    mapping_can_writeback(file->f_mapping)) {
-				loff_t lstart = (loff_t)pgoff << PAGE_SHIFT;
+				loff_t lstart = (loff_t)pgoff << PG_SHIFT;
 				loff_t lend = lstart + HPAGE_PMD_SIZE - 1;
 
 				filemap_write_and_wait_range(file->f_mapping, lstart, lend);

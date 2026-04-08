@@ -164,7 +164,7 @@ static ssize_t rpc_sysfs_xprt_srcaddr_show(struct kobject *kobj,
 					   char *buf)
 {
 	struct rpc_xprt *xprt = rpc_sysfs_xprt_kobj_get_xprt(kobj);
-	size_t buflen = PAGE_SIZE;
+	size_t buflen = PG_SIZE;
 	ssize_t ret;
 
 	if (!xprt || !xprt_connected(xprt)) {
@@ -215,7 +215,7 @@ static ssize_t rpc_sysfs_xprt_info_show(struct kobject *kobj,
 {
 	struct rpc_xprt *xprt = rpc_sysfs_xprt_kobj_get_xprt(kobj);
 	unsigned short srcport = 0;
-	size_t buflen = PAGE_SIZE;
+	size_t buflen = PG_SIZE;
 	ssize_t ret;
 
 	if (!xprt || !xprt_connected(xprt)) {

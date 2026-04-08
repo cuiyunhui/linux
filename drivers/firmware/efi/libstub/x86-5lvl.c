@@ -39,13 +39,13 @@ efi_status_t efi_setup_5level_paging(void)
 		return EFI_SUCCESS;
 
 	/* allocate some 32-bit addressable memory for code and a page table */
-	status = efi_allocate_pages(2 * PAGE_SIZE, (unsigned long *)&la57_code,
+	status = efi_allocate_pages(2 * PTE_SIZE, (unsigned long *)&la57_code,
 				    U32_MAX);
 	if (status != EFI_SUCCESS)
 		return status;
 
 	la57_toggle = memcpy(la57_code, trampoline_32bit_src, tmpl_size);
-	memset(la57_code + tmpl_size, 0x90, PAGE_SIZE - tmpl_size);
+	memset(la57_code + tmpl_size, 0x90, PTE_SIZE - tmpl_size);
 
 	/*
 	 * To avoid the need to allocate a 32-bit addressable stack, the
@@ -55,7 +55,7 @@ efi_status_t efi_setup_5level_paging(void)
 	 */
 	*(u32 *)&la57_code[trampoline_ljmp_imm_offset] += (unsigned long)la57_code;
 
-	efi_adjust_memory_range_protection((unsigned long)la57_toggle, PAGE_SIZE);
+	efi_adjust_memory_range_protection((unsigned long)la57_toggle, PTE_SIZE);
 
 	return EFI_SUCCESS;
 }
@@ -65,7 +65,7 @@ void efi_5level_switch(void)
 	bool want_la57 = !efi_no5lvl;
 	bool have_la57 = native_read_cr4() & X86_CR4_LA57;
 	bool need_toggle = want_la57 ^ have_la57;
-	u64 *pgt = (void *)la57_toggle + PAGE_SIZE;
+	u64 *pgt = (void *)la57_toggle + PTE_SIZE;
 	pgd_t *cr3 = (pgd_t *)native_read_cr3_pa();
 	u64 *new_cr3;
 
@@ -78,7 +78,7 @@ void efi_5level_switch(void)
 		 * to be allocated from the 32-bit addressable physical region,
 		 * with its first entry referring to the existing hierarchy.
 		 */
-		new_cr3 = memset(pgt, 0, PAGE_SIZE);
+		new_cr3 = memset(pgt, 0, PTE_SIZE);
 		new_cr3[0] = (u64)cr3 | _PAGE_TABLE_NOENC;
 	} else {
 		/* take the new root table pointer from the current entry #0 */
@@ -86,7 +86,7 @@ void efi_5level_switch(void)
 
 		/* copy the new root table if it is not 32-bit addressable */
 		if ((u64)new_cr3 > U32_MAX)
-			new_cr3 = memcpy(pgt, new_cr3, PAGE_SIZE);
+			new_cr3 = memcpy(pgt, new_cr3, PTE_SIZE);
 	}
 
 	native_load_gdt(&(struct desc_ptr){ sizeof(gdt) - 1, (u64)gdt });

@@ -5576,11 +5576,11 @@ int tcp_send_rcvq(struct sock *sk, struct msghdr *msg, size_t size)
 	if (size == 0)
 		return 0;
 
-	if (size > PAGE_SIZE) {
-		int npages = min_t(size_t, size >> PAGE_SHIFT, MAX_SKB_FRAGS);
+	if (size > PG_SIZE) {
+		int npages = min_t(size_t, size >> PG_SHIFT, MAX_SKB_FRAGS);
 
-		data_len = npages << PAGE_SHIFT;
-		size = data_len + (size & ~PAGE_MASK);
+		data_len = npages << PG_SHIFT;
+		size = data_len + (size & ~PG_MASK);
 	}
 	skb = alloc_skb_with_frags(size - data_len, data_len,
 				   PAGE_ALLOC_COSTLY_ORDER,
@@ -5923,7 +5923,7 @@ new_range:
 		    before(TCP_SKB_CB(skb)->end_seq, start)) {
 			/* Do not attempt collapsing tiny skbs */
 			if (range_truesize != head->truesize ||
-			    end - start >= SKB_WITH_OVERHEAD(PAGE_SIZE)) {
+			    end - start >= SKB_WITH_OVERHEAD(PG_SIZE)) {
 				tcp_collapse(sk, NULL, &tp->out_of_order_queue,
 					     head, skb, start, end);
 			} else {

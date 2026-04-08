@@ -627,7 +627,7 @@ xfs_attrmulti_by_handle(
 
 	error = -E2BIG;
 	size = am_hreq.opcount * sizeof(xfs_attr_multiop_t);
-	if (!size || size > 16 * PAGE_SIZE)
+	if (!size || size > 16 * PG_SIZE)
 		goto out_dput;
 
 	ops = memdup_user(am_hreq.ops, size);
@@ -773,7 +773,7 @@ xfs_getparents(
 	bufsize = round_down(gp->gp_bufsize, sizeof(uint64_t));
 	gpx->krecords = kvzalloc(bufsize, GFP_KERNEL);
 	if (!gpx->krecords) {
-		bufsize = min(bufsize, PAGE_SIZE);
+		bufsize = min(bufsize, PG_SIZE);
 		gpx->krecords = kvzalloc(bufsize, GFP_KERNEL);
 		if (!gpx->krecords)
 			return -ENOMEM;

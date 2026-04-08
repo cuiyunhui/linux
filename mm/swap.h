@@ -236,7 +236,7 @@ static inline struct address_space *swap_address_space(swp_entry_t entry)
  */
 static inline loff_t swap_dev_pos(swp_entry_t entry)
 {
-	return ((loff_t)swp_offset(entry)) << PAGE_SHIFT;
+	return ((loff_t)swp_offset(entry)) << PG_SHIFT;
 }
 
 /**

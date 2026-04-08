@@ -980,7 +980,7 @@ ssize_t mei_cldev_send_gsc_command(struct mei_cl_device *cldev,
 	for (i = 0, sg = sg_in; i < sg_in_nents; i++, sg++) {
 		ext_hdr->sgl[i].low = lower_32_bits(sg_dma_address(sg));
 		ext_hdr->sgl[i].high = upper_32_bits(sg_dma_address(sg));
-		sg_len = min_t(unsigned int, sg_dma_len(sg), PAGE_SIZE);
+		sg_len = min_t(unsigned int, sg_dma_len(sg), PG_SIZE);
 		ext_hdr->sgl[i].length = (sg_len <= total_in_len) ? sg_len : total_in_len;
 		total_in_len -= ext_hdr->sgl[i].length;
 	}
@@ -989,7 +989,7 @@ ssize_t mei_cldev_send_gsc_command(struct mei_cl_device *cldev,
 	for (i = sg_in_nents, sg = sg_out; i < sg_in_nents + sg_out_nents; i++, sg++) {
 		ext_hdr->sgl[i].low = lower_32_bits(sg_dma_address(sg));
 		ext_hdr->sgl[i].high = upper_32_bits(sg_dma_address(sg));
-		sg_len = min_t(unsigned int, sg_dma_len(sg), PAGE_SIZE);
+		sg_len = min_t(unsigned int, sg_dma_len(sg), PG_SIZE);
 		ext_hdr->sgl[i].length = sg_len;
 	}
 

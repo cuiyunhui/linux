@@ -828,9 +828,9 @@ unsigned long nfs_io_size(unsigned long iosize, enum xprt_transports proto)
 	else if (iosize >= NFS_MAX_FILE_IO_SIZE)
 		iosize = NFS_MAX_FILE_IO_SIZE;
 
-	if (proto == XPRT_TRANSPORT_UDP || iosize < PAGE_SIZE)
+	if (proto == XPRT_TRANSPORT_UDP || iosize < PG_SIZE)
 		return nfs_block_bits(iosize, NULL);
-	return iosize & PAGE_MASK;
+	return iosize & PG_MASK;
 }
 
 /*
@@ -897,8 +897,8 @@ unsigned char nfs_umode_to_dtype(umode_t mode)
  */
 static inline unsigned int nfs_page_array_len(unsigned int base, size_t len)
 {
-	return ((unsigned long)len + (unsigned long)base + PAGE_SIZE - 1) >>
-	       PAGE_SHIFT;
+	return ((unsigned long)len + (unsigned long)base + PG_SIZE - 1) >>
+	       PG_SHIFT;
 }
 
 /*

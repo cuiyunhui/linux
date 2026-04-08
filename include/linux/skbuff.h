@@ -265,7 +265,7 @@
 	SKB_DATA_ALIGN(sizeof(struct skb_shared_info)))
 
 #define SKB_MAX_ORDER(X, ORDER) \
-	SKB_WITH_OVERHEAD((PAGE_SIZE << (ORDER)) - (X))
+	SKB_WITH_OVERHEAD((PG_SIZE << (ORDER)) - (X))
 #define SKB_MAX_HEAD(X)		(SKB_MAX_ORDER((X), 0))
 #define SKB_MAX_ALLOC		(SKB_MAX_ORDER(0, 2))
 
@@ -434,14 +434,14 @@ static inline bool skb_frag_must_loop(struct page *p)
  *	regular page.
  */
 #define skb_frag_foreach_page(f, f_off, f_len, p, p_off, p_len, copied)	\
-	for (p = skb_frag_page(f) + ((f_off) >> PAGE_SHIFT),		\
-	     p_off = (f_off) & (PAGE_SIZE - 1),				\
+	for (p = skb_frag_page(f) + ((f_off) >> PG_SHIFT),		\
+	     p_off = (f_off) & (PG_SIZE - 1),				\
 	     p_len = skb_frag_must_loop(p) ?				\
-	     min_t(u32, f_len, PAGE_SIZE - p_off) : f_len,		\
+	     min_t(u32, f_len, PG_SIZE - p_off) : f_len,		\
 	     copied = 0;						\
 	     copied < f_len;						\
 	     copied += p_len, p++, p_off = 0,				\
-	     p_len = min_t(u32, f_len - copied, PAGE_SIZE))		\
+	     p_len = min_t(u32, f_len - copied, PG_SIZE))		\
 
 /**
  * struct skb_shared_hwtstamps - hardware time stamps

@@ -337,7 +337,7 @@ static noinstr void mce_panic(const char *msg, struct mce_hw_err *final, char *e
 		if (kexec_crash_loaded()) {
 			if (final && (final->m.status & MCI_STATUS_ADDRV)) {
 				struct page *p;
-				p = pfn_to_online_page(final->m.addr >> PAGE_SHIFT);
+				p = pfn_to_online_page(final->m.addr >> PTE_SHIFT);
 				if (p)
 					SetPageHWPoison(p);
 			}
@@ -567,7 +567,7 @@ static bool whole_page(struct mce *m)
 	if (!mca_cfg.ser || !(m->status & MCI_STATUS_MISCV))
 		return true;
 
-	return MCI_MISC_ADDR_LSB(m->misc) >= PAGE_SHIFT;
+	return MCI_MISC_ADDR_LSB(m->misc) >= PTE_SHIFT;
 }
 
 bool mce_is_correctable(struct mce *m)
@@ -643,7 +643,7 @@ static int uc_decode_notifier(struct notifier_block *nb, unsigned long val,
 	    mce->severity != MCE_DEFERRED_SEVERITY)
 		return NOTIFY_DONE;
 
-	pfn = (mce->addr & MCI_ADDR_PHYSADDR) >> PAGE_SHIFT;
+	pfn = (mce->addr & MCI_ADDR_PHYSADDR) >> PTE_SHIFT;
 	if (!memory_failure(pfn, 0)) {
 		set_mce_nospec(pfn);
 		mce->kflags |= MCE_HANDLED_UC;
@@ -1452,7 +1452,7 @@ static void kill_me_maybe(struct callback_head *cb)
 	if (!p->mce_ripv)
 		flags |= MF_MUST_KILL;
 
-	pfn = (p->mce_addr & MCI_ADDR_PHYSADDR) >> PAGE_SHIFT;
+	pfn = (p->mce_addr & MCI_ADDR_PHYSADDR) >> PTE_SHIFT;
 	ret = memory_failure(pfn, flags);
 	if (!ret) {
 		set_mce_nospec(pfn);
@@ -1481,7 +1481,7 @@ static void kill_me_never(struct callback_head *cb)
 
 	p->mce_count = 0;
 	pr_err("Kernel accessed poison in user space at %llx\n", p->mce_addr);
-	pfn = (p->mce_addr & MCI_ADDR_PHYSADDR) >> PAGE_SHIFT;
+	pfn = (p->mce_addr & MCI_ADDR_PHYSADDR) >> PTE_SHIFT;
 	if (!memory_failure(pfn, 0))
 		set_mce_nospec(pfn);
 }
@@ -1506,7 +1506,7 @@ static void queue_task_work(struct mce_hw_err *err, char *msg, void (*func)(stru
 			  err, msg);
 
 	/* Second or later call, make sure page address matches the one from first call */
-	if (count > 1 && (current->mce_addr >> PAGE_SHIFT) != (m->addr >> PAGE_SHIFT))
+	if (count > 1 && (current->mce_addr >> PTE_SHIFT) != (m->addr >> PTE_SHIFT))
 		mce_panic("Consecutive machine checks to different user pages", err, msg);
 
 	/* Do not call task_work_add() more than once */
@@ -1705,7 +1705,7 @@ noinstr void do_machine_check(struct pt_regs *regs)
 		 * be added to free list when the guest is terminated.
 		 */
 		if (mce_usable_address(m)) {
-			struct page *p = pfn_to_online_page(m->addr >> PAGE_SHIFT);
+			struct page *p = pfn_to_online_page(m->addr >> PTE_SHIFT);
 
 			if (p)
 				SetPageHWPoison(p);

@@ -1485,7 +1485,7 @@ static int copy_context_table(struct intel_iommu *iommu,
 			}
 
 			ret = -ENOMEM;
-			old_ce = memremap(old_ce_phys, PAGE_SIZE,
+			old_ce = memremap(old_ce_phys, PTE_SIZE,
 					MEMREMAP_WB);
 			if (!old_ce)
 				goto out;
@@ -1554,7 +1554,7 @@ static int copy_translation_tables(struct intel_iommu *iommu)
 	if (!old_rt_phys)
 		return -EINVAL;
 
-	old_rt = memremap(old_rt_phys, PAGE_SIZE, MEMREMAP_WB);
+	old_rt = memremap(old_rt_phys, PTE_SIZE, MEMREMAP_WB);
 	if (!old_rt)
 		return -ENOMEM;
 
@@ -1598,7 +1598,7 @@ static int copy_translation_tables(struct intel_iommu *iommu)
 
 	kfree(ctxt_tbls);
 
-	__iommu_flush_cache(iommu, iommu->root_entry, PAGE_SIZE);
+	__iommu_flush_cache(iommu, iommu->root_entry, PTE_SIZE);
 
 	ret = 0;
 
@@ -1900,8 +1900,8 @@ static inline void init_iommu_pm_ops(void) {}
 
 static int __init rmrr_sanity_check(struct acpi_dmar_reserved_memory *rmrr)
 {
-	if (!IS_ALIGNED(rmrr->base_address, PAGE_SIZE) ||
-	    !IS_ALIGNED(rmrr->end_address + 1, PAGE_SIZE) ||
+	if (!IS_ALIGNED(rmrr->base_address, PTE_SIZE) ||
+	    !IS_ALIGNED(rmrr->end_address + 1, PTE_SIZE) ||
 	    rmrr->end_address <= rmrr->base_address ||
 	    arch_rmrr_sanity_check(rmrr))
 		return -EINVAL;

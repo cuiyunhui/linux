@@ -176,9 +176,9 @@ void __init hugetlb_cma_reserve(void)
 			continue;
 		}
 
-		if (hugetlb_cma_size_in_node[nid] < (PAGE_SIZE << order)) {
+		if (hugetlb_cma_size_in_node[nid] < (PG_SIZE << order)) {
 			pr_warn("hugetlb_cma: cma area of node %d should be at least %lu MiB\n",
-				nid, (PAGE_SIZE << order) / SZ_1M);
+				nid, (PG_SIZE << order) / SZ_1M);
 			hugetlb_cma_size -= hugetlb_cma_size_in_node[nid];
 			hugetlb_cma_size_in_node[nid] = 0;
 		} else {
@@ -190,9 +190,9 @@ void __init hugetlb_cma_reserve(void)
 	if (!hugetlb_cma_size)
 		return;
 
-	if (hugetlb_cma_size < (PAGE_SIZE << order)) {
+	if (hugetlb_cma_size < (PG_SIZE << order)) {
 		pr_warn("hugetlb_cma: cma area should be at least %lu MiB\n",
-			(PAGE_SIZE << order) / SZ_1M);
+			(PG_SIZE << order) / SZ_1M);
 		hugetlb_cma_size = 0;
 		return;
 	}
@@ -222,7 +222,7 @@ void __init hugetlb_cma_reserve(void)
 			size = min(per_node, hugetlb_cma_size - reserved);
 		}
 
-		size = round_up(size, PAGE_SIZE << order);
+		size = round_up(size, PG_SIZE << order);
 
 		snprintf(name, sizeof(name), "hugetlb%d", nid);
 		/*
@@ -230,7 +230,7 @@ void __init hugetlb_cma_reserve(void)
 		 * may be returned to CMA allocator in the case of
 		 * huge page demotion.
 		 */
-		res = cma_declare_contiguous_multi(size, PAGE_SIZE << order,
+		res = cma_declare_contiguous_multi(size, PG_SIZE << order,
 					HUGETLB_PAGE_ORDER, name,
 					&hugetlb_cma[nid], nid);
 		if (res) {

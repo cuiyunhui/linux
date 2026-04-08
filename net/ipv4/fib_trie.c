@@ -323,7 +323,7 @@ static struct tnode *tnode_alloc(int bits)
 	/* determine size and verify it is non-zero and didn't overflow */
 	size = TNODE_SIZE(1ul << bits);
 
-	if (size <= PAGE_SIZE)
+	if (size <= PG_SIZE)
 		return kzalloc(size, GFP_KERNEL);
 	else
 		return vzalloc(size);

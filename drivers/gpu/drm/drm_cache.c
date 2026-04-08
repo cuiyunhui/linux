@@ -58,7 +58,7 @@ drm_clflush_page(struct page *page)
 		return;
 
 	page_virtual = kmap_atomic(page);
-	for (i = 0; i < PAGE_SIZE; i += size)
+	for (i = 0; i < PG_SIZE; i += size)
 		clflushopt(page_virtual + i);
 	kunmap_atomic(page_virtual);
 }
@@ -107,7 +107,7 @@ drm_clflush_pages(struct page *pages[], unsigned long num_pages)
 
 		page_virtual = kmap_atomic(page);
 		flush_dcache_range((unsigned long)page_virtual,
-				   (unsigned long)page_virtual + PAGE_SIZE);
+				   (unsigned long)page_virtual + PG_SIZE);
 		kunmap_atomic(page_virtual);
 	}
 #else

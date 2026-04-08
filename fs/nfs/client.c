@@ -863,7 +863,7 @@ static void nfs_server_set_fsinfo(struct nfs_server *server,
 		server->rsize = max_rpc_payload;
 	if (server->rsize > NFS_MAX_FILE_IO_SIZE)
 		server->rsize = NFS_MAX_FILE_IO_SIZE;
-	server->rpages = (server->rsize + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	server->rpages = (server->rsize + PG_SIZE - 1) >> PG_SHIFT;
 
 	if (server->wsize > max_rpc_payload)
 		server->wsize = max_rpc_payload;

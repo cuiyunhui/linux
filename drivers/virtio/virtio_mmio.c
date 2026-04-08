@@ -74,7 +74,7 @@
 
 /* The alignment to use between consumer and producer parts of vring.
  * Currently hardcoded to the page size. */
-#define VIRTIO_MMIO_VRING_ALIGN		PAGE_SIZE
+#define VIRTIO_MMIO_VRING_ALIGN		PG_SIZE
 
 
 
@@ -390,7 +390,7 @@ static struct virtqueue *vm_setup_vq(struct virtio_device *vdev, unsigned int in
 	/* Activate the queue */
 	writel(virtqueue_get_vring_size(vq), vm_dev->base + VIRTIO_MMIO_QUEUE_NUM);
 	if (vm_dev->version == 1) {
-		u64 q_pfn = virtqueue_get_desc_addr(vq) >> PAGE_SHIFT;
+		u64 q_pfn = virtqueue_get_desc_addr(vq) >> PG_SHIFT;
 
 		/*
 		 * virtio-mmio v1 uses a 32bit QUEUE PFN. If we have something
@@ -400,12 +400,12 @@ static struct virtqueue *vm_setup_vq(struct virtio_device *vdev, unsigned int in
 		if (q_pfn >> 32) {
 			dev_err(&vdev->dev,
 				"platform bug: legacy virtio-mmio must not be used with RAM above 0x%llxGB\n",
-				0x1ULL << (32 + PAGE_SHIFT - 30));
+				0x1ULL << (32 + PG_SHIFT - 30));
 			err = -E2BIG;
 			goto error_bad_pfn;
 		}
 
-		writel(PAGE_SIZE, vm_dev->base + VIRTIO_MMIO_QUEUE_ALIGN);
+		writel(PG_SIZE, vm_dev->base + VIRTIO_MMIO_QUEUE_ALIGN);
 		writel(q_pfn, vm_dev->base + VIRTIO_MMIO_QUEUE_PFN);
 	} else {
 		u64 addr;
@@ -548,7 +548,7 @@ static int virtio_mmio_restore(struct device *dev)
 	struct virtio_mmio_device *vm_dev = dev_get_drvdata(dev);
 
 	if (vm_dev->version == 1)
-		writel(PAGE_SIZE, vm_dev->base + VIRTIO_MMIO_GUEST_PAGE_SIZE);
+		writel(PG_SIZE, vm_dev->base + VIRTIO_MMIO_GUEST_PAGE_SIZE);
 
 	return virtio_device_restore(&vm_dev->vdev);
 }
@@ -619,7 +619,7 @@ static int virtio_mmio_probe(struct platform_device *pdev)
 	vm_dev->vdev.id.vendor = readl(vm_dev->base + VIRTIO_MMIO_VENDOR_ID);
 
 	if (vm_dev->version == 1) {
-		writel(PAGE_SIZE, vm_dev->base + VIRTIO_MMIO_GUEST_PAGE_SIZE);
+		writel(PG_SIZE, vm_dev->base + VIRTIO_MMIO_GUEST_PAGE_SIZE);
 
 		rc = dma_set_mask(&pdev->dev, DMA_BIT_MASK(64));
 		/*
@@ -628,7 +628,7 @@ static int virtio_mmio_probe(struct platform_device *pdev)
 		 */
 		if (!rc)
 			dma_set_coherent_mask(&pdev->dev,
-					      DMA_BIT_MASK(32 + PAGE_SHIFT));
+					      DMA_BIT_MASK(32 + PG_SHIFT));
 	} else {
 		rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
 	}
@@ -732,7 +732,7 @@ static int vm_cmdline_get_device(struct device *dev, void *data)
 	unsigned int len = strlen(buffer);
 	struct platform_device *pdev = to_platform_device(dev);
 
-	snprintf(buffer + len, PAGE_SIZE - len, "0x%llx@0x%llx:%llu:%d\n",
+	snprintf(buffer + len, PG_SIZE - len, "0x%llx@0x%llx:%llu:%d\n",
 			pdev->resource[0].end - pdev->resource[0].start + 1ULL,
 			(unsigned long long)pdev->resource[0].start,
 			(unsigned long long)pdev->resource[1].start,

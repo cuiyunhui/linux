@@ -38,11 +38,11 @@ static void netfs_set_group(struct folio *folio, struct netfs_group *netfs_group
 static struct folio *netfs_grab_folio_for_write(struct address_space *mapping,
 						loff_t pos, size_t part)
 {
-	pgoff_t index = pos / PAGE_SIZE;
+	pgoff_t index = pos / PG_SIZE;
 	fgf_t fgp_flags = FGP_WRITEBEGIN;
 
 	if (mapping_large_folio_support(mapping))
-		fgp_flags |= fgf_set_order(pos % PAGE_SIZE + part);
+		fgp_flags |= fgf_set_order(pos % PG_SIZE + part);
 
 	return __filemap_get_folio(mapping, index, fgp_flags,
 				   mapping_gfp_mask(mapping));

@@ -1014,7 +1014,7 @@ static pgoff_t vma_hugecache_offset(struct hstate *h,
 			struct vm_area_struct *vma, unsigned long address)
 {
 	return ((address - vma->vm_start) >> huge_page_shift(h)) +
-			(vma->vm_pgoff >> huge_page_order(h));
+			(vma->vm_pteoff >> huge_page_order(h));
 }
 
 /**
@@ -1030,7 +1030,7 @@ unsigned long vma_kernel_pagesize(struct vm_area_struct *vma)
 {
 	if (vma->vm_ops && vma->vm_ops->pagesize)
 		return vma->vm_ops->pagesize(vma);
-	return PAGE_SIZE;
+	return PG_SIZE;
 }
 EXPORT_SYMBOL_GPL(vma_kernel_pagesize);
 
@@ -3160,8 +3160,8 @@ found:
 	 * The head struct page is used to get folio information by the HugeTLB
 	 * subsystem like zone id and node id.
 	 */
-	memblock_reserved_mark_noinit(__pa((void *)m + PAGE_SIZE),
-		huge_page_size(h) - PAGE_SIZE);
+	memblock_reserved_mark_noinit(__pa((void *)m + PG_SIZE),
+		huge_page_size(h) - PG_SIZE);
 
 	return 1;
 }
@@ -3291,7 +3291,7 @@ bool __init hugetlb_bootmem_page_zones_valid(int nid,
 		goto out;
 	}
 
-	start_pfn = virt_to_phys(m) >> PAGE_SHIFT;
+	start_pfn = virt_to_phys(m) >> PG_SHIFT;
 
 	valid = !pfn_range_intersects_zones(nid, start_pfn,
 			pages_per_huge_page(m->hstate));
@@ -4041,7 +4041,7 @@ long demote_pool_huge_page(struct hstate *src, nodemask_t *nodes_allowed,
 		pr_warn("HugeTLB: NULL demote order passed to demote_pool_huge_page.\n");
 		return -EINVAL;		/* internal error */
 	}
-	dst = size_to_hstate(PAGE_SIZE << src->demote_order);
+	dst = size_to_hstate(PG_SIZE << src->demote_order);
 
 	for_each_node_mask_to_free(src, nr_nodes, node, nodes_allowed) {
 		LIST_HEAD(list);
@@ -4210,7 +4210,7 @@ void __init hugetlb_add_hstate(unsigned int order)
 	struct hstate *h;
 	unsigned long i;
 
-	if (size_to_hstate(PAGE_SIZE << order)) {
+	if (size_to_hstate(PG_SIZE << order)) {
 		return;
 	}
 	BUG_ON(hugetlb_max_hstate >= HUGE_MAX_HSTATE);
@@ -4424,7 +4424,7 @@ static int __init hugepagesz_setup(char *s)
 		return 0;
 	}
 
-	hugetlb_add_hstate(ilog2(size) - PAGE_SHIFT);
+	hugetlb_add_hstate(ilog2(size) - PG_SHIFT);
 	parsed_valid_hugepagesz = true;
 	return 0;
 }
@@ -4458,7 +4458,7 @@ static int __init default_hugepagesz_setup(char *s)
 		return -EINVAL;
 	}
 
-	hugetlb_add_hstate(ilog2(size) - PAGE_SHIFT);
+	hugetlb_add_hstate(ilog2(size) - PG_SHIFT);
 	parsed_valid_hugepagesz = true;
 	parsed_default_hugepagesz = true;
 	default_hstate_idx = hstate_index(size_to_hstate(size));
@@ -4629,7 +4629,7 @@ void hugetlb_report_usage(struct seq_file *m, struct mm_struct *mm)
 		   K(atomic_long_read(&mm->hugetlb_usage)));
 }
 
-/* Return the number pages of memory we physically have, in PAGE_SIZE units. */
+/* Return the number pages of memory we physically have, in PG_SIZE units. */
 unsigned long hugetlb_total_pages(void)
 {
 	struct hstate *h;
@@ -4836,7 +4836,7 @@ const struct vm_operations_struct hugetlb_vm_ops = {
 static pte_t make_huge_pte(struct vm_area_struct *vma, struct folio *folio,
 		bool try_mkwrite)
 {
-	pte_t entry = folio_mk_pte(folio, vma->vm_page_prot);
+	pte_t entry = folio_mkpte(folio, 0, vma->vm_page_prot);
 	unsigned int shift = huge_page_shift(hstate_vma(vma));
 
 	if (try_mkwrite && (vma->vm_flags & VM_WRITE)) {
@@ -5399,12 +5399,12 @@ static void unmap_ref_private(struct mm_struct *mm, struct vm_area_struct *vma,
 	pgoff_t pgoff;
 
 	/*
-	 * vm_pgoff is in PAGE_SIZE units, hence the different calculation
+	 * vm_pteoff is in PTE_SIZE units, hence the different calculation
 	 * from page cache lookup which is in HPAGE_SIZE units.
 	 */
 	address = address & huge_page_mask(h);
-	pgoff = ((address - vma->vm_start) >> PAGE_SHIFT) +
-			vma->vm_pgoff;
+	pgoff = ((address - vma->vm_start) >> PTE_SHIFT) +
+			vma->vm_pteoff;
 	mapping = vma->vm_file->f_mapping;
 
 	/*
@@ -5646,7 +5646,7 @@ bool hugetlbfs_pagecache_present(struct hstate *h,
 				 struct vm_area_struct *vma, unsigned long address)
 {
 	struct address_space *mapping = vma->vm_file->f_mapping;
-	pgoff_t idx = linear_page_index(vma, address);
+	pgoff_t idx = linear_pte_index(vma, address);
 	struct folio *folio;
 
 	folio = filemap_get_folio(mapping, idx);
@@ -5697,7 +5697,7 @@ static inline vm_fault_t hugetlb_handle_userfault(struct vm_fault *vmf,
 	 * userfault, any vma operation should be careful from here.
 	 */
 	hugetlb_vma_unlock_read(vmf->vma);
-	hash = hugetlb_fault_mutex_hash(mapping, vmf->pgoff);
+	hash = hugetlb_fault_mutex_hash(mapping, vmf->pteoff);
 	mutex_unlock(&hugetlb_fault_mutex_table[hash]);
 	return handle_userfault(vmf, reason);
 }
@@ -5722,7 +5722,7 @@ static bool hugetlb_pte_stable(struct hstate *h, struct mm_struct *mm, unsigned 
 static vm_fault_t hugetlb_no_page(struct address_space *mapping,
 			struct vm_fault *vmf)
 {
-	u32 hash = hugetlb_fault_mutex_hash(mapping, vmf->pgoff);
+	u32 hash = hugetlb_fault_mutex_hash(mapping, vmf->pteoff);
 	bool new_folio, new_anon_folio = false;
 	struct vm_area_struct *vma = vmf->vma;
 	struct mm_struct *mm = vma->vm_mm;
@@ -5750,10 +5750,10 @@ static vm_fault_t hugetlb_no_page(struct address_space *mapping,
 	 * before we get page_table_lock.
 	 */
 	new_folio = false;
-	folio = filemap_lock_hugetlb_folio(h, mapping, vmf->pgoff);
+	folio = filemap_lock_hugetlb_folio(h, mapping, vmf->pteoff);
 	if (IS_ERR(folio)) {
 		size = i_size_read(mapping->host) >> huge_page_shift(h);
-		if (vmf->pgoff >= size)
+		if (vmf->pteoff >= size)
 			goto out;
 		/* Check for page in userfault range */
 		if (userfaultfd_missing(vma)) {
@@ -5815,7 +5815,7 @@ static vm_fault_t hugetlb_no_page(struct address_space *mapping,
 
 		if (vma->vm_flags & VM_MAYSHARE) {
 			int err = hugetlb_add_to_page_cache(folio, mapping,
-							vmf->pgoff);
+							vmf->pteoff);
 			if (err) {
 				/*
 				 * err can't be -EEXIST which implies someone
@@ -5983,7 +5983,7 @@ vm_fault_t hugetlb_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 		.address = address & huge_page_mask(h),
 		.real_address = address,
 		.flags = flags,
-		.pgoff = vma_hugecache_offset(h, vma,
+		.pteoff = vma_hugecache_offset(h, vma,
 				address & huge_page_mask(h)),
 		/* TODO: Track hugetlb faults using vm_fault */
 
@@ -5999,7 +5999,7 @@ vm_fault_t hugetlb_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 	 * the same page in the page cache.
 	 */
 	mapping = vma->vm_file->f_mapping;
-	hash = hugetlb_fault_mutex_hash(mapping, vmf.pgoff);
+	hash = hugetlb_fault_mutex_hash(mapping, vmf.pteoff);
 	mutex_lock(&hugetlb_fault_mutex_table[hash]);
 
 	/*
@@ -6794,7 +6794,7 @@ static unsigned long page_table_shareable(struct vm_area_struct *svma,
 				struct vm_area_struct *vma,
 				unsigned long addr, pgoff_t idx)
 {
-	unsigned long saddr = ((idx - svma->vm_pgoff) << PAGE_SHIFT) +
+	unsigned long saddr = ((idx - svma->vm_pteoff) << PTE_SHIFT) +
 				svma->vm_start;
 	unsigned long sbase = saddr & PUD_MASK;
 	unsigned long s_end = sbase + PUD_SIZE;
@@ -6879,8 +6879,8 @@ pte_t *huge_pmd_share(struct mm_struct *mm, struct vm_area_struct *vma,
 		      unsigned long addr, pud_t *pud)
 {
 	struct address_space *mapping = vma->vm_file->f_mapping;
-	pgoff_t idx = ((addr - vma->vm_start) >> PAGE_SHIFT) +
-			vma->vm_pgoff;
+	pgoff_t idx = ((addr - vma->vm_start) >> PTE_SHIFT) +
+			vma->vm_pteoff;
 	struct vm_area_struct *svma;
 	unsigned long saddr;
 	pte_t *spte = NULL;
@@ -6908,7 +6908,7 @@ pte_t *huge_pmd_share(struct mm_struct *mm, struct vm_area_struct *vma,
 	spin_lock(&mm->page_table_lock);
 	if (pud_none(*pud)) {
 		pud_populate(mm, pud,
-				(pmd_t *)((unsigned long)spte & PAGE_MASK));
+				(pmd_t *)((unsigned long)spte & PG_MASK));
 		mm_inc_nr_pmds(mm);
 	} else {
 		ptdesc_pmd_pts_dec(virt_to_ptdesc(spte));

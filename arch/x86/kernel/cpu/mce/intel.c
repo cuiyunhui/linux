@@ -527,7 +527,7 @@ bool intel_mce_usable_address(struct mce *m)
 	if (!(m->status & MCI_STATUS_MISCV))
 		return false;
 
-	if (MCI_MISC_ADDR_LSB(m->misc) > PAGE_SHIFT)
+	if (MCI_MISC_ADDR_LSB(m->misc) > PTE_SHIFT)
 		return false;
 
 	if (MCI_MISC_ADDR_MODE(m->misc) != MCI_MISC_ADDR_PHYS)

@@ -92,9 +92,9 @@ void *bpf_internal_load_pointer_neg_helper(const struct sk_buff *skb, int k, uns
 	return NULL;
 }
 
-/* tell bpf programs that include vmlinux.h kernel's PAGE_SIZE */
+/* tell bpf programs that include vmlinux.h kernel's PG_SIZE */
 enum page_size_enum {
-	__PAGE_SIZE = PAGE_SIZE
+	__PAGE_SIZE = PG_SIZE
 };
 
 struct bpf_prog *bpf_prog_alloc_no_stats(unsigned int size, gfp_t gfp_extra_flags)
@@ -121,7 +121,7 @@ struct bpf_prog *bpf_prog_alloc_no_stats(unsigned int size, gfp_t gfp_extra_flag
 		return NULL;
 	}
 
-	fp->pages = size / PAGE_SIZE;
+	fp->pages = size / PG_SIZE;
 	fp->aux = aux;
 	fp->aux->main_prog_aux = aux;
 	fp->aux->prog = fp;
@@ -261,14 +261,14 @@ struct bpf_prog *bpf_prog_realloc(struct bpf_prog *fp_old, unsigned int size,
 	struct bpf_prog *fp;
 	u32 pages;
 
-	size = round_up(size, PAGE_SIZE);
-	pages = size / PAGE_SIZE;
+	size = round_up(size, PG_SIZE);
+	pages = size / PG_SIZE;
 	if (pages <= fp_old->pages)
 		return fp_old;
 
 	fp = __vmalloc(size, gfp_flags);
 	if (fp) {
-		memcpy(fp, fp_old, fp_old->pages * PAGE_SIZE);
+		memcpy(fp, fp_old, fp_old->pages * PG_SIZE);
 		fp->pages = pages;
 		fp->aux->prog = fp;
 
@@ -890,7 +890,7 @@ static DEFINE_MUTEX(pack_mutex);
 static LIST_HEAD(pack_list);
 
 /* PMD_SIZE is not available in some special config, e.g. ARCH=arm with
- * CONFIG_MMU=n. Use PAGE_SIZE in these cases.
+ * CONFIG_MMU=n. Use PG_SIZE in these cases.
  */
 #ifdef PMD_SIZE
 /* PMD_SIZE is really big for some archs. It doesn't make sense to
@@ -900,7 +900,7 @@ static LIST_HEAD(pack_list);
  */
 #define BPF_PROG_PACK_SIZE (SZ_2M * num_possible_nodes())
 #else
-#define BPF_PROG_PACK_SIZE PAGE_SIZE
+#define BPF_PROG_PACK_SIZE PG_SIZE
 #endif
 
 #define BPF_PROG_CHUNK_COUNT (BPF_PROG_PACK_SIZE / BPF_PROG_CHUNK_SIZE)
@@ -921,7 +921,7 @@ static struct bpf_prog_pack *alloc_new_pack(bpf_jit_fill_hole_t bpf_fill_ill_ins
 
 	set_vm_flush_reset_perms(pack->ptr);
 	err = set_memory_rox((unsigned long)pack->ptr,
-			     BPF_PROG_PACK_SIZE / PAGE_SIZE);
+			     BPF_PROG_PACK_SIZE / PG_SIZE);
 	if (err)
 		goto out;
 	list_add_tail(&pack->list, &pack_list);
@@ -942,7 +942,7 @@ void *bpf_prog_pack_alloc(u32 size, bpf_jit_fill_hole_t bpf_fill_ill_insns)
 
 	mutex_lock(&pack_mutex);
 	if (size > BPF_PROG_PACK_SIZE) {
-		size = round_up(size, PAGE_SIZE);
+		size = round_up(size, PG_SIZE);
 		ptr = bpf_jit_alloc_exec(size);
 		if (ptr) {
 			int err;
@@ -950,7 +950,7 @@ void *bpf_prog_pack_alloc(u32 size, bpf_jit_fill_hole_t bpf_fill_ill_insns)
 			bpf_fill_ill_insns(ptr, size);
 			set_vm_flush_reset_perms(ptr);
 			err = set_memory_rox((unsigned long)ptr,
-					     size / PAGE_SIZE);
+					     size / PG_SIZE);
 			if (err) {
 				bpf_jit_free_exec(ptr);
 				ptr = NULL;
@@ -1039,7 +1039,7 @@ static int __init bpf_jit_charge_init(void)
 	/* Only used as heuristic here to derive limit. */
 	bpf_jit_limit_max = bpf_jit_alloc_exec_limit();
 	bpf_jit_limit = min_t(u64, round_up(bpf_jit_limit_max >> 1,
-					    PAGE_SIZE), LONG_MAX);
+					    PG_SIZE), LONG_MAX);
 	return 0;
 }
 pure_initcall(bpf_jit_charge_init);
@@ -1086,7 +1086,7 @@ bpf_jit_binary_alloc(unsigned int proglen, u8 **image_ptr,
 	 * fill a page, allow at least 128 extra bytes to insert a
 	 * random section of illegal instructions.
 	 */
-	size = round_up(proglen + sizeof(*hdr) + 128, PAGE_SIZE);
+	size = round_up(proglen + sizeof(*hdr) + 128, PG_SIZE);
 
 	if (bpf_jit_charge_modmem(size))
 		return NULL;
@@ -1101,7 +1101,7 @@ bpf_jit_binary_alloc(unsigned int proglen, u8 **image_ptr,
 
 	hdr->size = size;
 	hole = min_t(unsigned int, size - (proglen + sizeof(*hdr)),
-		     PAGE_SIZE - sizeof(*hdr));
+		     PG_SIZE - sizeof(*hdr));
 	start = get_random_u32_below(hole) & ~(alignment - 1);
 
 	/* Leave a random number of instructions before BPF code. */
@@ -1454,13 +1454,13 @@ static struct bpf_prog *bpf_prog_clone_create(struct bpf_prog *fp_other,
 	gfp_t gfp_flags = GFP_KERNEL | __GFP_ZERO | gfp_extra_flags;
 	struct bpf_prog *fp;
 
-	fp = __vmalloc(fp_other->pages * PAGE_SIZE, gfp_flags);
+	fp = __vmalloc(fp_other->pages * PG_SIZE, gfp_flags);
 	if (fp != NULL) {
 		/* aux->prog still points to the fp_other one, so
 		 * when promoting the clone to the real program,
 		 * this still needs to be adapted.
 		 */
-		memcpy(fp, fp_other, fp_other->pages * PAGE_SIZE);
+		memcpy(fp, fp_other, fp_other->pages * PG_SIZE);
 	}
 
 	return fp;

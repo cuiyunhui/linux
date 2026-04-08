@@ -468,13 +468,13 @@ static int hugetlb_cgroup_read_numa_stat(struct seq_file *seq, void *dummy)
 		usage = 0;
 		for_each_node_state(nid, N_MEMORY)
 			usage += READ_ONCE(h_cg->nodeinfo[nid]->usage[idx]);
-		seq_printf(seq, "total=%lu", usage * PAGE_SIZE);
+		seq_printf(seq, "total=%lu", usage * PG_SIZE);
 
 		/* Simply print the per-node usage for the non-hierarchical total. */
 		for_each_node_state(nid, N_MEMORY)
 			seq_printf(seq, " N%d=%lu", nid,
 				   READ_ONCE(h_cg->nodeinfo[nid]->usage[idx]) *
-					   PAGE_SIZE);
+					   PG_SIZE);
 		seq_putc(seq, '\n');
 	}
 
@@ -483,7 +483,7 @@ static int hugetlb_cgroup_read_numa_stat(struct seq_file *seq, void *dummy)
 	 * counter, so use that.
 	 */
 	seq_printf(seq, "%stotal=%lu", legacy ? "hierarchical_" : "",
-		   page_counter_read(&h_cg->hugepage[idx]) * PAGE_SIZE);
+		   page_counter_read(&h_cg->hugepage[idx]) * PG_SIZE);
 
 	/*
 	 * For each node, transverse the css tree to obtain the hierarchical
@@ -498,7 +498,7 @@ static int hugetlb_cgroup_read_numa_stat(struct seq_file *seq, void *dummy)
 						   ->usage[idx]);
 		}
 		rcu_read_unlock();
-		seq_printf(seq, " N%d=%lu", nid, usage * PAGE_SIZE);
+		seq_printf(seq, " N%d=%lu", nid, usage * PG_SIZE);
 	}
 
 	seq_putc(seq, '\n');
@@ -518,17 +518,17 @@ static u64 hugetlb_cgroup_read_u64(struct cgroup_subsys_state *css,
 
 	switch (MEMFILE_ATTR(cft->private)) {
 	case RES_USAGE:
-		return (u64)page_counter_read(counter) * PAGE_SIZE;
+		return (u64)page_counter_read(counter) * PG_SIZE;
 	case RES_RSVD_USAGE:
-		return (u64)page_counter_read(rsvd_counter) * PAGE_SIZE;
+		return (u64)page_counter_read(rsvd_counter) * PG_SIZE;
 	case RES_LIMIT:
-		return (u64)counter->max * PAGE_SIZE;
+		return (u64)counter->max * PG_SIZE;
 	case RES_RSVD_LIMIT:
-		return (u64)rsvd_counter->max * PAGE_SIZE;
+		return (u64)rsvd_counter->max * PG_SIZE;
 	case RES_MAX_USAGE:
-		return (u64)counter->watermark * PAGE_SIZE;
+		return (u64)counter->watermark * PG_SIZE;
 	case RES_RSVD_MAX_USAGE:
-		return (u64)rsvd_counter->watermark * PAGE_SIZE;
+		return (u64)rsvd_counter->watermark * PG_SIZE;
 	case RES_FAILCNT:
 		return counter->failcnt;
 	case RES_RSVD_FAILCNT:
@@ -559,7 +559,7 @@ static int hugetlb_cgroup_read_u64_max(struct seq_file *seq, void *v)
 		fallthrough;
 	case RES_USAGE:
 		val = (u64)page_counter_read(counter);
-		seq_printf(seq, "%llu\n", val * PAGE_SIZE);
+		seq_printf(seq, "%llu\n", val * PG_SIZE);
 		break;
 	case RES_RSVD_LIMIT:
 		counter = &h_cg->rsvd_hugepage[idx];
@@ -569,7 +569,7 @@ static int hugetlb_cgroup_read_u64_max(struct seq_file *seq, void *v)
 		if (val == limit)
 			seq_puts(seq, "max\n");
 		else
-			seq_printf(seq, "%llu\n", val * PAGE_SIZE);
+			seq_printf(seq, "%llu\n", val * PG_SIZE);
 		break;
 	default:
 		BUG();

@@ -89,7 +89,7 @@ void nfs_pageio_complete_read(struct nfs_pageio_descriptor *pgio)
 
 	pgm = &pgio->pg_mirrors[0];
 	NFS_I(pgio->pg_inode)->read_io += pgm->pg_bytes_written;
-	npages = (pgm->pg_bytes_written + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	npages = (pgm->pg_bytes_written + PG_SIZE - 1) >> PG_SHIFT;
 	nfs_add_stats(pgio->pg_inode, NFSIOS_READPAGES, npages);
 }
 

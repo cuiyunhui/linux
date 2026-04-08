@@ -257,7 +257,7 @@ int calculate_normal_threshold(struct zone *zone)
 	 * 125		1024		10	16-32 GB	9
 	 */
 
-	mem = zone_managed_pages(zone) >> (27 - PAGE_SHIFT);
+	mem = zone_managed_pages(zone) >> (27 - PG_SHIFT);
 
 	threshold = 2 * fls(num_online_cpus()) * (1 + fls(mem));
 
@@ -388,8 +388,8 @@ void __mod_node_page_state(struct pglist_data *pgdat, enum node_stat_item item,
 		 * multiples of whole pages. Store them as pages
 		 * internally to keep the per-cpu counters compact.
 		 */
-		VM_WARN_ON_ONCE(delta & (PAGE_SIZE - 1));
-		delta >>= PAGE_SHIFT;
+		VM_WARN_ON_ONCE(delta & (PG_SIZE - 1));
+		delta >>= PG_SHIFT;
 	}
 
 	/* See __mod_zone_page_state() */
@@ -630,8 +630,8 @@ static inline void mod_node_state(struct pglist_data *pgdat,
 		 * multiples of whole pages. Store them as pages
 		 * internally to keep the per-cpu counters compact.
 		 */
-		VM_WARN_ON_ONCE(delta & (PAGE_SIZE - 1));
-		delta >>= PAGE_SHIFT;
+		VM_WARN_ON_ONCE(delta & (PG_SIZE - 1));
+		delta >>= PG_SHIFT;
 	}
 
 	o = this_cpu_read(*p);

@@ -90,7 +90,7 @@ static struct list_head virtio_chan_list;
 /* How many bytes left in this page. */
 static unsigned int rest_of_page(void *data)
 {
-	return PAGE_SIZE - offset_in_page(data);
+	return PG_SIZE - offset_in_pg(data);
 }
 
 /**
@@ -227,7 +227,7 @@ pack_sg_list_p(struct scatterlist *sg, int start, int limit,
 	 * page boundary find the offset
 	 */
 	while (nr_pages) {
-		s = PAGE_SIZE - data_off;
+		s = PG_SIZE - data_off;
 		if (s > count)
 			s = count;
 		BUG_ON(index >= limit);
@@ -334,7 +334,7 @@ static int p9_get_mapped_pages(struct virtio_chan *chan,
 		if (n < 0)
 			return n;
 		*need_drop = 1;
-		nr_pages = DIV_ROUND_UP(n + *offs, PAGE_SIZE);
+		nr_pages = DIV_ROUND_UP(n + *offs, PG_SIZE);
 		atomic_add(nr_pages, &vp_pinned);
 		return n;
 	} else {
@@ -355,21 +355,21 @@ static int p9_get_mapped_pages(struct virtio_chan *chan,
 		if (len > count)
 			len = count;
 
-		nr_pages = DIV_ROUND_UP((unsigned long)p + len, PAGE_SIZE) -
-			   (unsigned long)p / PAGE_SIZE;
+		nr_pages = DIV_ROUND_UP((unsigned long)p + len, PG_SIZE) -
+			   (unsigned long)p / PG_SIZE;
 
 		*pages = kmalloc_objs(struct page *, nr_pages, GFP_NOFS);
 		if (!*pages)
 			return -ENOMEM;
 
 		*need_drop = 0;
-		p -= (*offs = offset_in_page(p));
+		p -= (*offs = offset_in_pg(p));
 		for (index = 0; index < nr_pages; index++) {
 			if (is_vmalloc_addr(p))
 				(*pages)[index] = vmalloc_to_page(p);
 			else
 				(*pages)[index] = kmap_to_page(p);
-			p += PAGE_SIZE;
+			p += PG_SIZE;
 		}
 		iov_iter_advance(data, len);
 		return len;
@@ -395,7 +395,7 @@ static void handle_rerror(struct p9_req_t *req, int in_hdr_len,
 
 	// data won't span more than two pages
 	size = req->rc.size - in_hdr_len;
-	n = PAGE_SIZE - offs;
+	n = PG_SIZE - offs;
 	if (size > n) {
 		memcpy_from_page(to, *pages++, offs, n);
 		offs = 0;
@@ -441,7 +441,7 @@ p9_virtio_zc_request(struct p9_client *client, struct p9_req_t *req,
 			err = n;
 			goto err_out;
 		}
-		out_nr_pages = DIV_ROUND_UP(n + offs, PAGE_SIZE);
+		out_nr_pages = DIV_ROUND_UP(n + offs, PG_SIZE);
 		if (n != outlen) {
 			__le32 v = cpu_to_le32(n);
 			memcpy(&req->tc.sdata[req->tc.size - 4], &v, 4);
@@ -460,7 +460,7 @@ p9_virtio_zc_request(struct p9_client *client, struct p9_req_t *req,
 			err = n;
 			goto err_out;
 		}
-		in_nr_pages = DIV_ROUND_UP(n + offs, PAGE_SIZE);
+		in_nr_pages = DIV_ROUND_UP(n + offs, PG_SIZE);
 		if (n != inlen) {
 			__le32 v = cpu_to_le32(n);
 			memcpy(&req->tc.sdata[req->tc.size - 4], &v, 4);
@@ -799,7 +799,7 @@ static struct p9_trans_module p9_virtio_trans = {
 	 * that are not at page boundary, that can result in an extra
 	 * page in zero copy.
 	 */
-	.maxsize = PAGE_SIZE * (VIRTQUEUE_NUM - 3),
+	.maxsize = PG_SIZE * (VIRTQUEUE_NUM - 3),
 	.pooled_rbuffers = false,
 	.def = true,
 	.supports_vmalloc = false,

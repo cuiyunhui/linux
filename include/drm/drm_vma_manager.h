@@ -34,11 +34,11 @@
  * that the faked up offset will fit
  */
 #if BITS_PER_LONG == 64
-#define DRM_FILE_PAGE_OFFSET_START ((0xFFFFFFFFUL >> PAGE_SHIFT) + 1)
-#define DRM_FILE_PAGE_OFFSET_SIZE ((0xFFFFFFFFUL >> PAGE_SHIFT) * 256)
+#define DRM_FILE_PAGE_OFFSET_START ((0xFFFFFFFFUL >> PG_SHIFT) + 1)
+#define DRM_FILE_PAGE_OFFSET_SIZE ((0xFFFFFFFFUL >> PG_SHIFT) * 256)
 #else
-#define DRM_FILE_PAGE_OFFSET_START ((0xFFFFFFFUL >> PAGE_SHIFT) + 1)
-#define DRM_FILE_PAGE_OFFSET_SIZE ((0xFFFFFFFUL >> PAGE_SHIFT) * 16)
+#define DRM_FILE_PAGE_OFFSET_START ((0xFFFFFFFUL >> PG_SHIFT) + 1)
+#define DRM_FILE_PAGE_OFFSET_SIZE ((0xFFFFFFFUL >> PG_SHIFT) * 16)
 #endif
 
 struct drm_file;
@@ -159,7 +159,7 @@ static inline void drm_vma_node_reset(struct drm_vma_offset_node *node)
  * Return the start address of the given node. This can be used as offset into
  * the linear VM space that is provided by the VMA offset manager. Note that
  * this can only be used for page-based addressing. If you need a proper offset
- * for user-space mappings, you must apply "<< PAGE_SHIFT" or use the
+ * for user-space mappings, you must apply "<< PG_SHIFT" or use the
  * drm_vma_node_offset_addr() helper instead.
  *
  * RETURNS:
@@ -202,7 +202,7 @@ static inline unsigned long drm_vma_node_size(struct drm_vma_offset_node *node)
  */
 static inline __u64 drm_vma_node_offset_addr(struct drm_vma_offset_node *node)
 {
-	return ((__u64)node->vm_node.start) << PAGE_SHIFT;
+	return ((__u64)node->vm_node.start) << PG_SHIFT;
 }
 
 /**
@@ -223,7 +223,7 @@ static inline void drm_vma_node_unmap(struct drm_vma_offset_node *node,
 	if (drm_mm_node_allocated(&node->vm_node))
 		unmap_mapping_range(file_mapping,
 				    drm_vma_node_offset_addr(node),
-				    drm_vma_node_size(node) << PAGE_SHIFT, 1);
+				    drm_vma_node_size(node) << PG_SHIFT, 1);
 }
 
 /**

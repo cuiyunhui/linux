@@ -213,7 +213,7 @@ static int gssp_alloc_receive_pages(struct gssx_arg_accept_sec_context *arg)
 {
 	unsigned int i;
 
-	arg->npages = DIV_ROUND_UP(NGROUPS_MAX * 4, PAGE_SIZE);
+	arg->npages = DIV_ROUND_UP(NGROUPS_MAX * 4, PG_SIZE);
 	arg->pages = kzalloc_objs(struct page *, arg->npages);
 	if (!arg->pages)
 		return -ENOMEM;

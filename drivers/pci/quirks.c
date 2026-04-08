@@ -589,8 +589,8 @@ static void quirk_extend_bar_to_page(struct pci_dev *dev)
 		struct resource *r = &dev->resource[i];
 		const char *r_name = pci_resource_name(dev, i);
 
-		if (r->flags & IORESOURCE_MEM && resource_size(r) < PAGE_SIZE) {
-			resource_set_range(r, 0, PAGE_SIZE);
+		if (r->flags & IORESOURCE_MEM && resource_size(r) < PG_SIZE) {
+			resource_set_range(r, 0, PG_SIZE);
 			r->flags |= IORESOURCE_UNSET;
 			pci_info(dev, "%s %pR: expanded to page size\n",
 				 r_name, r);
@@ -5328,7 +5328,7 @@ static int pci_quirk_enable_intel_lpc_acs(struct pci_dev *dev)
 		return -EINVAL;
 
 	rcba_mem = ioremap(rcba & INTEL_LPC_RCBA_MASK,
-				   PAGE_ALIGN(INTEL_UPDCR_REG));
+				   PG_ALIGN(INTEL_UPDCR_REG));
 	if (!rcba_mem)
 		return -ENOMEM;
 

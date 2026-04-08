@@ -41,7 +41,7 @@ enum bh_state_bits {
 			 */
 };
 
-#define MAX_BUF_PER_PAGE (PAGE_SIZE / 512)
+#define MAX_BUF_PER_PAGE (PG_SIZE / 512)
 
 struct page;
 struct buffer_head;

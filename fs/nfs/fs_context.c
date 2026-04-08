@@ -1501,7 +1501,7 @@ static int nfs_fs_context_validate(struct fs_context *fc)
 	struct nfs_fs_context *ctx = nfs_fc2context(fc);
 	struct nfs_subversion *nfs_mod;
 	struct sockaddr_storage *sap = &ctx->nfs_server._address;
-	int max_namelen = PAGE_SIZE;
+	int max_namelen = PG_SIZE;
 	int max_pathlen = NFS_MAXPATHLEN;
 	int port = 0;
 	int ret;

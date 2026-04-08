@@ -43,7 +43,7 @@ init_iova_domain(struct iova_domain *iovad, unsigned long granule,
 	 * supported IOMMU page size; both *must* be capable of
 	 * representing individual CPU pages exactly.
 	 */
-	BUG_ON((granule > PAGE_SIZE) || !is_power_of_2(granule));
+	BUG_ON((granule > PTE_SIZE) || !is_power_of_2(granule));
 
 	spin_lock_init(&iovad->iova_rbtree_lock);
 	iovad->rbroot = RB_ROOT;
@@ -595,7 +595,7 @@ static struct kmem_cache *iova_magazine_cache;
 
 unsigned long iova_rcache_range(void)
 {
-	return PAGE_SIZE << (IOVA_RANGE_CACHE_MAX_SIZE - 1);
+	return PTE_SIZE << (IOVA_RANGE_CACHE_MAX_SIZE - 1);
 }
 
 static struct iova_magazine *iova_magazine_alloc(gfp_t flags)

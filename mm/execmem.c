@@ -67,11 +67,11 @@ struct vm_struct *execmem_vmap(size_t size)
 	struct execmem_range *range = &execmem_info->ranges[EXECMEM_MODULE_DATA];
 	struct vm_struct *area;
 
-	area = __get_vm_area_node(size, range->alignment, PAGE_SHIFT, VM_ALLOC,
+	area = __get_vm_area_node(size, range->alignment, PG_SHIFT, VM_ALLOC,
 				  range->start, range->end, NUMA_NO_NODE,
 				  GFP_KERNEL, __builtin_return_address(0));
 	if (!area && range->fallback_start)
-		area = __get_vm_area_node(size, range->alignment, PAGE_SHIFT, VM_ALLOC,
+		area = __get_vm_area_node(size, range->alignment, PG_SHIFT, VM_ALLOC,
 					  range->fallback_start, range->fallback_end,
 					  NUMA_NO_NODE, GFP_KERNEL, __builtin_return_address(0));
 
@@ -97,7 +97,7 @@ struct execmem_cache {
 #define FREE_DELAY	(msecs_to_jiffies(10))
 
 /* mark entries in busy_areas that should be freed asynchronously */
-#define PENDING_FREE_MASK	(1 << (PAGE_SHIFT - 1))
+#define PENDING_FREE_MASK	(1 << (PG_SHIFT - 1))
 
 static struct execmem_cache execmem_cache = {
 	.mutex = __MUTEX_INITIALIZER(execmem_cache.mutex),
@@ -136,7 +136,7 @@ err_restore:
 
 static int execmem_force_rw(void *ptr, size_t size)
 {
-	unsigned int nr = PAGE_ALIGN(size) >> PAGE_SHIFT;
+	unsigned int nr = PG_ALIGN(size) >> PG_SHIFT;
 	unsigned long addr = (unsigned long)ptr;
 	int ret;
 
@@ -149,7 +149,7 @@ static int execmem_force_rw(void *ptr, size_t size)
 
 int execmem_restore_rox(void *ptr, size_t size)
 {
-	unsigned int nr = PAGE_ALIGN(size) >> PAGE_SHIFT;
+	unsigned int nr = PG_ALIGN(size) >> PG_SHIFT;
 	unsigned long addr = (unsigned long)ptr;
 
 	return set_memory_rox(addr, nr);
@@ -466,7 +466,7 @@ void *execmem_alloc(enum execmem_type type, size_t size)
 	pgprot_t pgprot = range->pgprot;
 	void *p = NULL;
 
-	size = PAGE_ALIGN(size);
+	size = PG_ALIGN(size);
 
 	if (use_cache)
 		p = execmem_cache_alloc(range, size);

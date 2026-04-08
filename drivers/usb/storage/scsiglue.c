@@ -102,7 +102,7 @@ static int sdev_configure(struct scsi_device *sdev, struct queue_limits *lim)
 		unsigned int max_sectors = 64;
 
 		if (us->fflags & US_FL_MAX_SECTORS_MIN)
-			max_sectors = PAGE_SIZE >> 9;
+			max_sectors = PG_SIZE >> 9;
 		lim->max_hw_sectors = min(lim->max_hw_sectors, max_sectors);
 	} else if (sdev->type == TYPE_TAPE) {
 		/*

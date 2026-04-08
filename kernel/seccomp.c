@@ -1721,7 +1721,7 @@ static long seccomp_notify_addfd(struct seccomp_filter *filter,
 	BUILD_BUG_ON(sizeof(addfd) < SECCOMP_NOTIFY_ADDFD_SIZE_VER0);
 	BUILD_BUG_ON(sizeof(addfd) != SECCOMP_NOTIFY_ADDFD_SIZE_LATEST);
 
-	if (size < SECCOMP_NOTIFY_ADDFD_SIZE_VER0 || size >= PAGE_SIZE)
+	if (size < SECCOMP_NOTIFY_ADDFD_SIZE_VER0 || size >= PG_SIZE)
 		return -EINVAL;
 
 	ret = copy_struct_from_user(&addfd, sizeof(addfd), uaddfd, size);

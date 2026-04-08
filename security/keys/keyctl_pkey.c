@@ -86,7 +86,7 @@ static int keyctl_pkey_params_get(key_serial_t id,
 	memset(params, 0, sizeof(*params));
 	params->encoding = "raw";
 
-	p = strndup_user(_info, PAGE_SIZE);
+	p = strndup_user(_info, PG_SIZE);
 	if (IS_ERR(p))
 		return PTR_ERR(p);
 	params->info = p;

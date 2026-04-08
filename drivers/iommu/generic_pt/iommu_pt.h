@@ -647,10 +647,10 @@ static __always_inline int __do_map_single_page(struct pt_range *range,
 	if (pts.level == 0) {
 		if (pts.type != PT_ENTRY_EMPTY)
 			return -EADDRINUSE;
-		pt_install_leaf_entry(&pts, map->oa, PAGE_SHIFT,
+		pt_install_leaf_entry(&pts, map->oa, PTE_SHIFT,
 				      &map->attrs);
 		/* No flush, not used when incoherent */
-		map->oa += PAGE_SIZE;
+		map->oa += PTE_SIZE;
 		return 0;
 	}
 	if (pts.type == PT_ENTRY_TABLE)
@@ -881,12 +881,12 @@ int DOMAIN_NS(map_pages)(struct iommu_domain *domain, unsigned long iova,
 		return ret;
 
 	/* Calculate target page size and level for the leaves */
-	if (pt_has_system_page_size(common) && pgsize == PAGE_SIZE &&
+	if (pt_has_system_page_size(common) && pgsize == PTE_SIZE &&
 	    pgcount == 1) {
-		PT_WARN_ON(!(pgsize_bitmap & PAGE_SIZE));
-		if (log2_mod(iova | paddr, PAGE_SHIFT))
+		PT_WARN_ON(!(pgsize_bitmap & PTE_SIZE));
+		if (log2_mod(iova | paddr, PTE_SHIFT))
 			return -ENXIO;
-		map.leaf_pgsize_lg2 = PAGE_SHIFT;
+		map.leaf_pgsize_lg2 = PTE_SHIFT;
 		map.leaf_level = 0;
 		single_page = true;
 	} else {

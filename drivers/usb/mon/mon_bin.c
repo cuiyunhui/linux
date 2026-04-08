@@ -61,7 +61,7 @@
  * Woops, get_zeroed_page() returns a single page. I guess we're stuck with
  * page-sized chunks for the time being.
  */
-#define CHUNK_SIZE   PAGE_SIZE
+#define CHUNK_SIZE   PG_SIZE
 #define CHUNK_ALIGN(x)   (((x)+CHUNK_SIZE-1) & ~(CHUNK_SIZE-1))
 
 /*
@@ -1254,7 +1254,7 @@ static vm_fault_t mon_bin_vma_fault(struct vm_fault *vmf)
 	unsigned long flags;
 
 	spin_lock_irqsave(&rp->b_lock, flags);
-	offset = vmf->pgoff << PAGE_SHIFT;
+	offset = vmf->pteoff << PTE_SHIFT;
 	if (offset >= rp->b_size) {
 		spin_unlock_irqrestore(&rp->b_lock, flags);
 		return VM_FAULT_SIGBUS;

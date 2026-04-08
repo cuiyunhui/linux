@@ -869,7 +869,7 @@ static ssize_t show_scaling_available_governors(struct cpufreq_policy *policy,
 
 	mutex_lock(&cpufreq_governor_mutex);
 	for_each_governor(t) {
-		if (i >= (ssize_t) ((PAGE_SIZE / sizeof(char))
+		if (i >= (ssize_t) ((PG_SIZE / sizeof(char))
 		    - (CPUFREQ_NAME_LEN + 2)))
 			break;
 		i += sysfs_emit_at(buf, i, "%s ", t->name);
@@ -887,7 +887,7 @@ ssize_t cpufreq_show_cpus(const struct cpumask *mask, char *buf)
 
 	for_each_cpu(cpu, mask) {
 		i += sysfs_emit_at(buf, i, "%u ", cpu);
-		if (i >= (PAGE_SIZE - 5))
+		if (i >= (PG_SIZE - 5))
 			break;
 	}
 

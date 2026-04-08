@@ -146,7 +146,7 @@ xfs_sb_validate_fsb_count(
 		return -EFBIG;
 
 	/* Limited by ULONG_MAX of page cache index */
-	if (max_bytes >> PAGE_SHIFT > ULONG_MAX)
+	if (max_bytes >> PG_SHIFT > ULONG_MAX)
 		return -EFBIG;
 	return 0;
 }

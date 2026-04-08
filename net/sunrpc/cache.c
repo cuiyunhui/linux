@@ -585,7 +585,7 @@ EXPORT_SYMBOL_GPL(cache_purge);
  * it to be revisited when cache info is available
  */
 
-#define	DFR_HASHSIZE	(PAGE_SIZE/sizeof(struct list_head))
+#define	DFR_HASHSIZE	(PG_SIZE/sizeof(struct list_head))
 #define	DFR_HASH(item)	((((long)item)>>4 ^ (((long)item)>>13)) % DFR_HASHSIZE)
 
 #define	DFR_MAX	300	/* ??? */
@@ -825,12 +825,12 @@ static int cache_request(struct cache_detail *detail,
 			       struct cache_request *crq)
 {
 	char *bp = crq->buf;
-	int len = PAGE_SIZE;
+	int len = PG_SIZE;
 
 	detail->cache_request(detail, crq->item, &bp, &len);
 	if (len < 0)
 		return -E2BIG;
-	return PAGE_SIZE - len;
+	return PG_SIZE - len;
 }
 
 static ssize_t cache_read(struct file *filp, char __user *buf, size_t count,
@@ -1237,7 +1237,7 @@ static int cache_pipe_upcall(struct cache_detail *detail, struct cache_head *h)
 		/* Too late to make an upcall */
 		return -EAGAIN;
 
-	buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	buf = kmalloc(PG_SIZE, GFP_KERNEL);
 	if (!buf)
 		return -EAGAIN;
 

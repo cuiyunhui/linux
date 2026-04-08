@@ -622,7 +622,7 @@ static int pipapo_realloc_mt(struct nft_pipapo_field *f,
 			     unsigned int old_rules, unsigned int rules)
 {
 	union nft_pipapo_map_bucket *new_mt = NULL, *old_mt = f->mt;
-	const unsigned int extra = PAGE_SIZE / sizeof(*new_mt);
+	const unsigned int extra = PG_SIZE / sizeof(*new_mt);
 	unsigned int rules_alloc = rules;
 
 	might_sleep();

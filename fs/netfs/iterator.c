@@ -79,7 +79,7 @@ ssize_t netfs_extract_user_iter(struct iov_iter *orig, size_t orig_len,
 
 		count -= ret;
 		ret += offset;
-		cur_npages = DIV_ROUND_UP(ret, PAGE_SIZE);
+		cur_npages = DIV_ROUND_UP(ret, PG_SIZE);
 
 		if (npages + cur_npages > max_pages) {
 			pr_err("Out of bvec array capacity (%u vs %u)\n",
@@ -88,7 +88,7 @@ ssize_t netfs_extract_user_iter(struct iov_iter *orig, size_t orig_len,
 		}
 
 		for (i = 0; i < cur_npages; i++) {
-			len = ret > PAGE_SIZE ? PAGE_SIZE : ret;
+			len = ret > PG_SIZE ? PG_SIZE : ret;
 			bvec_set_page(bv + npages + i, *pages++, len - offset, offset);
 			ret -= len;
 			offset = 0;
@@ -195,7 +195,7 @@ static size_t netfs_limit_xarray(const struct iov_iter *iter, size_t start_offse
 	struct folio *folio;
 	unsigned int nsegs = 0;
 	loff_t pos = iter->xarray_start + iter->iov_offset;
-	pgoff_t index = pos / PAGE_SIZE;
+	pgoff_t index = pos / PG_SIZE;
 	size_t span = 0, n = iter->count;
 
 	XA_STATE(xas, iter->xarray, index);

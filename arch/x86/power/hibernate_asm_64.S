@@ -24,7 +24,7 @@
 #include <asm/nospec-branch.h>
 
 	 /* code below belongs to the image kernel */
-	.align PAGE_SIZE
+	.align PTE_SIZE
 SYM_FUNC_START(restore_registers)
 	ENDBR
 	/* go back to the original page tables */
@@ -137,7 +137,7 @@ SYM_FUNC_START(core_restore_code)
 	/* get addresses from the pbe and copy the page */
 	movq	pbe_address(%rdx), %rsi
 	movq	pbe_orig_address(%rdx), %rdi
-	movq	$(PAGE_SIZE >> 3), %rcx
+	movq	$(PTE_SIZE >> 3), %rcx
 	rep movsq
 
 	/* progress to the next pbe */

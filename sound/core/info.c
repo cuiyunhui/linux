@@ -316,12 +316,12 @@ static ssize_t snd_info_text_entry_write(struct file *file,
 			return -ENOMEM;
 	}
 	if (next > buf->len) {
-		char *nbuf = kvzalloc(PAGE_ALIGN(next), GFP_KERNEL);
+		char *nbuf = kvzalloc(PG_ALIGN(next), GFP_KERNEL);
 		if (!nbuf)
 			return -ENOMEM;
 		kvfree(buf->buffer);
 		buf->buffer = nbuf;
-		buf->len = PAGE_ALIGN(next);
+		buf->len = PG_ALIGN(next);
 	}
 	if (copy_from_user(buf->buffer + pos, buffer, count))
 		return -EFAULT;

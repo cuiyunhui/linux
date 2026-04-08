@@ -84,8 +84,8 @@ static int map_mmio_serial(struct x86_mapping_info *info, pgd_t *level4p)
 	if (!kexec_debug_8250_mmio32)
 		return 0;
 
-	mstart = kexec_debug_8250_mmio32 & PAGE_MASK;
-	mend = (kexec_debug_8250_mmio32 + PTE_SIZE + 23) & PAGE_MASK;
+	mstart = kexec_debug_8250_mmio32 & PTE_MASK;
+	mend = (kexec_debug_8250_mmio32 + PTE_SIZE + 23) & PTE_MASK;
 	pr_info("Map PCI serial at %lx - %lx\n", mstart, mend);
 	return kernel_ident_mapping_init(info, level4p, mstart, mend);
 }
@@ -669,7 +669,7 @@ static void kexec_mark_dm_crypt_keys(bool protect)
 	if (kexec_crash_image->dm_crypt_keys_addr) {
 		start_paddr = kexec_crash_image->dm_crypt_keys_addr;
 		end_paddr = start_paddr + kexec_crash_image->dm_crypt_keys_sz - 1;
-		nr_pages = (PAGE_ALIGN(end_paddr) - PAGE_ALIGN_DOWN(start_paddr))/PTE_SIZE;
+		nr_pages = (PTE_ALIGN(end_paddr) - PTE_ALIGN_DOWN(start_paddr))/PTE_SIZE;
 		if (protect)
 			set_memory_np((unsigned long)phys_to_virt(start_paddr), nr_pages);
 		else

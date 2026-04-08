@@ -32,8 +32,8 @@ static void netfs_unbuffered_write_done(struct netfs_io_request *wreq)
 		 * ->write_iter() is prevented from interfering by the DIO
 		 * counter.
 		 */
-		pgoff_t first = wreq->start >> PAGE_SHIFT;
-		pgoff_t last = (wreq->start + wreq->transferred - 1) >> PAGE_SHIFT;
+		pgoff_t first = wreq->start >> PG_SHIFT;
+		pgoff_t last = (wreq->start + wreq->transferred - 1) >> PG_SHIFT;
 
 		invalidate_inode_pages2_range(wreq->mapping, first, last);
 	}

@@ -172,7 +172,7 @@ static void rdevs_uninit_serial(struct mddev *mddev)
 static int rdev_init_serial(struct md_rdev *rdev)
 {
 	/* serial_nums equals with BARRIER_BUCKETS_NR */
-	int i, serial_nums = 1 << ((PAGE_SHIFT - ilog2(sizeof(atomic_t))));
+	int i, serial_nums = 1 << ((PG_SHIFT - ilog2(sizeof(atomic_t))));
 	struct serial_in_rdev *serial = NULL;
 
 	if (test_bit(CollisionCheck, &rdev->flags))
@@ -1898,7 +1898,7 @@ static int super_1_load(struct md_rdev *rdev, struct md_rdev *refdev, int minor_
 		__le64 *bbp;
 		int i;
 		int sectors = le16_to_cpu(sb->bblog_size);
-		if (sectors > (PAGE_SIZE / 512))
+		if (sectors > (PG_SIZE / 512))
 			return -EINVAL;
 		offset = le32_to_cpu(sb->bblog_offset);
 		if (offset == 0)
@@ -2285,7 +2285,7 @@ static void super_1_sync(struct mddev *mddev, struct md_rdev *rdev)
 retry:
 			seq = read_seqbegin(&bb->lock);
 
-			memset(bbp, 0xff, PAGE_SIZE);
+			memset(bbp, 0xff, PG_SIZE);
 
 			for (i = 0 ; i < bb->count ; i++) {
 				u64 internal_bb = p[i];
@@ -2448,7 +2448,7 @@ super_1_allow_new_offset(struct md_rdev *rdev,
 
 		err = mddev->bitmap_ops->get_stats(mddev->bitmap, &stats);
 		if (!err && rdev->sb_start + mddev->bitmap_info.offset +
-		    stats.file_pages * (PAGE_SIZE >> 9) > new_offset)
+		    stats.file_pages * (PG_SIZE >> 9) > new_offset)
 			return 0;
 	}
 
@@ -6180,8 +6180,8 @@ int mddev_stack_rdev_limits(struct mddev *mddev, struct queue_limits *lim,
 	 * Before RAID adding folio support, the logical_block_size
 	 * should be smaller than the page size.
 	 */
-	if (lim->logical_block_size > PAGE_SIZE) {
-		pr_err("%s: logical_block_size must not larger than PAGE_SIZE\n",
+	if (lim->logical_block_size > PG_SIZE) {
+		pr_err("%s: logical_block_size must not larger than PG_SIZE\n",
 			mdname(mddev));
 		return -EINVAL;
 	}
@@ -8817,7 +8817,7 @@ static void md_bitmap_status(struct seq_file *seq, struct mddev *mddev)
 	used_pages = stats.pages - stats.missing_pages;
 
 	seq_printf(seq, "bitmap: %lu/%lu pages [%luKB], %lu%s chunk",
-		   used_pages, stats.pages, used_pages << (PAGE_SHIFT - 10),
+		   used_pages, stats.pages, used_pages << (PG_SHIFT - 10),
 		   chunk_kb ? chunk_kb : mddev->bitmap_info.chunksize,
 		   chunk_kb ? "KB" : "B");
 
@@ -9629,7 +9629,7 @@ void md_do_sync(struct md_thread *thread)
 	/*
 	 * Tune reconstruction:
 	 */
-	window = 32 * (PAGE_SIZE / 512);
+	window = 32 * (PG_SIZE / 512);
 	pr_debug("md: using %dk window, over a total of %lluk.\n",
 		 window/2, (unsigned long long)max_sectors/2);
 

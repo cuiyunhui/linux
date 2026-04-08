@@ -1042,7 +1042,7 @@ sdev_show_wwid(struct device *dev, struct device_attribute *attr,
 	struct scsi_device *sdev = to_scsi_device(dev);
 	ssize_t count;
 
-	count = scsi_vpd_lun_id(sdev, buf, PAGE_SIZE);
+	count = scsi_vpd_lun_id(sdev, buf, PG_SIZE);
 	if (count > 0) {
 		buf[count] = '\n';
 		count++;
@@ -1075,14 +1075,14 @@ sdev_show_blacklist(struct device *dev, struct device_attribute *attr,
 			name = sdev_bflags_name[i];
 
 		if (name)
-			len += scnprintf(buf + len, PAGE_SIZE - len,
+			len += scnprintf(buf + len, PG_SIZE - len,
 					 "%s%s", len ? " " : "", name);
 		else
-			len += scnprintf(buf + len, PAGE_SIZE - len,
+			len += scnprintf(buf + len, PG_SIZE - len,
 					 "%sINVALID_BIT(%d)", len ? " " : "", i);
 	}
 	if (len)
-		len += scnprintf(buf + len, PAGE_SIZE - len, "\n");
+		len += scnprintf(buf + len, PG_SIZE - len, "\n");
 	return len;
 }
 static DEVICE_ATTR(blacklist, S_IRUGO, sdev_show_blacklist, NULL);

@@ -239,8 +239,8 @@ static int dma_buf_mmap_internal(struct file *file, struct vm_area_struct *vma)
 		return -EINVAL;
 
 	/* check for overflowing the buffer's size */
-	if (vma->vm_pgoff + vma_pages(vma) >
-	    dmabuf->size >> PAGE_SHIFT)
+	if (vma->vm_pteoff + vma_ptes(vma) >
+	    dmabuf->size >> PTE_SHIFT)
 		return -EINVAL;
 
 	DMA_BUF_TRACE(trace_dma_buf_mmap_internal, dmabuf);
@@ -1156,7 +1156,7 @@ EXPORT_SYMBOL_NS_GPL(dma_buf_unpin, "DMA_BUF");
  * on error. May return -EINTR if it is interrupted by a signal.
  *
  * On success, the DMA addresses and lengths in the returned scatterlist are
- * PAGE_SIZE aligned.
+ * PG_SIZE aligned.
  *
  * A mapping must be unmapped by using dma_buf_unmap_attachment(). Note that
  * the underlying backing storage is pinned for as long as a mapping exists,
@@ -1219,7 +1219,7 @@ struct sg_table *dma_buf_map_attachment(struct dma_buf_attachment *attach,
 		for_each_sgtable_dma_sg(sg_table, sg, i) {
 			addr = sg_dma_address(sg);
 			len = sg_dma_len(sg);
-			if (!PAGE_ALIGNED(addr) || !PAGE_ALIGNED(len)) {
+			if (!PTE_ALIGNED(addr) || !PTE_ALIGNED(len)) {
 				pr_debug("%s: addr %llx or len %x is not page aligned!\n",
 					 __func__, addr, len);
 				break;
@@ -1544,17 +1544,17 @@ int dma_buf_mmap(struct dma_buf *dmabuf, struct vm_area_struct *vma,
 		return -EINVAL;
 
 	/* check for offset overflow */
-	if (pgoff + vma_pages(vma) < pgoff)
+	if (pgoff + vma_ptes(vma) < pgoff)
 		return -EOVERFLOW;
 
 	/* check for overflowing the buffer's size */
-	if (pgoff + vma_pages(vma) >
-	    dmabuf->size >> PAGE_SHIFT)
+	if (pgoff + vma_ptes(vma) >
+	    dmabuf->size >> PTE_SHIFT)
 		return -EINVAL;
 
 	/* readjust the vma */
 	vma_set_file(vma, dmabuf->file);
-	vma->vm_pgoff = pgoff;
+	vma->vm_pteoff = pgoff;
 
 	DMA_BUF_TRACE(trace_dma_buf_mmap, dmabuf);
 

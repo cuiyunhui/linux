@@ -487,7 +487,7 @@ static ssize_t description_show(struct device *dev,
 		(wchar_t *)str_obj->buffer.pointer,
 		str_obj->buffer.length,
 		UTF16_LITTLE_ENDIAN, buf,
-		PAGE_SIZE - 1);
+		PG_SIZE - 1);
 
 	buf[result++] = '\n';
 

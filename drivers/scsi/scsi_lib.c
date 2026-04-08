@@ -3223,11 +3223,11 @@ void *scsi_kmap_atomic_sg(struct scatterlist *sgl, int sg_count,
 	/* Offset starting from the beginning of first page in this sg-entry */
 	*offset = *offset - len_complete + sg->offset;
 
-	page = sg_page(sg) + (*offset >> PAGE_SHIFT);
-	*offset &= ~PAGE_MASK;
+	page = sg_page(sg) + (*offset >> PG_SHIFT);
+	*offset &= ~PG_MASK;
 
 	/* Bytes in this sg-entry from *offset to the end of the page */
-	sg_len = PAGE_SIZE - *offset;
+	sg_len = PG_SIZE - *offset;
 	if (*len > sg_len)
 		*len = sg_len;
 

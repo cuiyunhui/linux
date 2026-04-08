@@ -65,7 +65,7 @@ struct snd_dma_buffer {
  */
 static inline unsigned int snd_sgbuf_aligned_pages(size_t size)
 {
-	return (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	return (size + PG_SIZE - 1) >> PG_SHIFT;
 }
 
 /* allocate/release a buffer */

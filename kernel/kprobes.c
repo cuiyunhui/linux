@@ -100,7 +100,7 @@ struct kprobe_insn_page {
 
 static int slots_per_page(struct kprobe_insn_cache *c)
 {
-	return PAGE_SIZE/(c->insn_size * sizeof(kprobe_opcode_t));
+	return PG_SIZE/(c->insn_size * sizeof(kprobe_opcode_t));
 }
 
 enum kprobe_slot_state {
@@ -117,7 +117,7 @@ void __weak *alloc_insn_page(void)
 	 * for most of the architectures.
 	 * (e.g. x86-64 needs this to handle the %rip-relative fixups.)
 	 */
-	return execmem_alloc(EXECMEM_KPROBES, PAGE_SIZE);
+	return execmem_alloc(EXECMEM_KPROBES, PG_SIZE);
 }
 
 static void free_insn_page(void *page)
@@ -191,7 +191,7 @@ kprobe_opcode_t *__get_insn_slot(struct kprobe_insn_cache *c)
 
 	/* Record the perf ksymbol register event after adding the page */
 	perf_event_ksymbol(PERF_RECORD_KSYMBOL_TYPE_OOL, (unsigned long)kip->insns,
-			   PAGE_SIZE, false, c->sym);
+			   PG_SIZE, false, c->sym);
 
 	return kip->insns;
 }
@@ -216,7 +216,7 @@ static bool collect_one_slot(struct kprobe_insn_page *kip, int idx)
 		 * the page.
 		 */
 		perf_event_ksymbol(PERF_RECORD_KSYMBOL_TYPE_OOL,
-				   (unsigned long)kip->insns, PAGE_SIZE, true,
+				   (unsigned long)kip->insns, PG_SIZE, true,
 				   kip->cache->sym);
 		list_del_rcu(&kip->list);
 		synchronize_rcu();
@@ -305,7 +305,7 @@ bool __is_insn_slot_addr(struct kprobe_insn_cache *c, unsigned long addr)
 	rcu_read_lock();
 	list_for_each_entry_rcu(kip, &c->pages, list) {
 		if (addr >= (unsigned long)kip->insns &&
-		    addr < (unsigned long)kip->insns + PAGE_SIZE) {
+		    addr < (unsigned long)kip->insns + PG_SIZE) {
 			ret = true;
 			break;
 		}

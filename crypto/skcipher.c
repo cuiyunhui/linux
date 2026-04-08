@@ -191,10 +191,10 @@ static int skcipher_next_fast(struct skcipher_walk *walk)
 {
 	unsigned long diff;
 
-	diff = offset_in_page(walk->in.offset) -
-	       offset_in_page(walk->out.offset);
-	diff |= (u8 *)(sg_page(walk->in.sg) + (walk->in.offset >> PAGE_SHIFT)) -
-		(u8 *)(sg_page(walk->out.sg) + (walk->out.offset >> PAGE_SHIFT));
+	diff = offset_in_pg(walk->in.offset) -
+	       offset_in_pg(walk->out.offset);
+	diff |= (u8 *)(sg_page(walk->in.sg) + (walk->in.offset >> PG_SHIFT)) -
+		(u8 *)(sg_page(walk->out.sg) + (walk->out.offset >> PG_SHIFT));
 
 	scatterwalk_map(&walk->out);
 	walk->in.__addr = walk->out.__addr;
@@ -675,9 +675,9 @@ int skcipher_prepare_alg_common(struct skcipher_alg_common *alg)
 {
 	struct crypto_alg *base = &alg->base;
 
-	if (alg->ivsize > PAGE_SIZE / 8 || alg->chunksize > PAGE_SIZE / 8 ||
-	    alg->statesize > PAGE_SIZE / 2 ||
-	    (alg->ivsize + alg->statesize) > PAGE_SIZE / 2)
+	if (alg->ivsize > PG_SIZE / 8 || alg->chunksize > PG_SIZE / 8 ||
+	    alg->statesize > PG_SIZE / 2 ||
+	    (alg->ivsize + alg->statesize) > PG_SIZE / 2)
 		return -EINVAL;
 
 	if (!alg->chunksize)
@@ -697,7 +697,7 @@ static int skcipher_prepare_alg(struct skcipher_alg *alg)
 	if (err)
 		return err;
 
-	if (alg->walksize > PAGE_SIZE / 8)
+	if (alg->walksize > PG_SIZE / 8)
 		return -EINVAL;
 
 	if (!alg->walksize)

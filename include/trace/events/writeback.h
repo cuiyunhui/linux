@@ -602,7 +602,7 @@ TRACE_EVENT(global_dirty_state,
 	)
 );
 
-#define KBps(x)			((x) << (PAGE_SHIFT - 10))
+#define KBps(x)			((x) << (PG_SHIFT - 10))
 
 TRACE_EVENT(bdi_dirty_ratelimit,
 

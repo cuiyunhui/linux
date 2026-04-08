@@ -1225,19 +1225,19 @@ sg_vma_fault(struct vm_fault *vmf)
 	if ((NULL == vma) || (!(sfp = (Sg_fd *) vma->vm_private_data)))
 		return VM_FAULT_SIGBUS;
 	rsv_schp = &sfp->reserve;
-	offset = vmf->pgoff << PAGE_SHIFT;
+	offset = vmf->pteoff << PTE_SHIFT;
 	if (offset >= rsv_schp->bufflen)
 		return VM_FAULT_SIGBUS;
 	SCSI_LOG_TIMEOUT(3, sg_printk(KERN_INFO, sfp->parentdp,
 				      "sg_vma_fault: offset=%lu, scatg=%d\n",
 				      offset, rsv_schp->k_use_sg));
 	sa = vma->vm_start;
-	length = 1 << (PAGE_SHIFT + rsv_schp->page_order);
+	length = 1 << (PG_SHIFT + rsv_schp->page_order);
 	for (k = 0; k < rsv_schp->k_use_sg && sa < vma->vm_end; k++) {
 		len = vma->vm_end - sa;
 		len = (len < length) ? len : length;
 		if (offset < len) {
-			struct page *page = rsv_schp->pages[k] + (offset >> PAGE_SHIFT);
+			struct page *page = rsv_schp->pages[k] + (offset >> PG_SHIFT);
 			get_page(page);	/* increment page count */
 			vmf->page = page;
 			return 0; /* success */
@@ -1268,7 +1268,7 @@ sg_mmap(struct file *filp, struct vm_area_struct *vma)
 	SCSI_LOG_TIMEOUT(3, sg_printk(KERN_INFO, sfp->parentdp,
 				      "sg_mmap starting, vm_start=%p, len=%d\n",
 				      (void *) vma->vm_start, (int) req_sz));
-	if (vma->vm_pgoff)
+	if (vma->vm_pteoff)
 		return -EINVAL;	/* want no offset */
 	rsv_schp = &sfp->reserve;
 	mutex_lock(&sfp->f_mutex);
@@ -1278,7 +1278,7 @@ sg_mmap(struct file *filp, struct vm_area_struct *vma)
 	}
 
 	sa = vma->vm_start;
-	length = 1 << (PAGE_SHIFT + rsv_schp->page_order);
+	length = 1 << (PG_SHIFT + rsv_schp->page_order);
 	for (k = 0; k < rsv_schp->k_use_sg && sa < vma->vm_end; k++) {
 		len = vma->vm_end - sa;
 		len = (len < length) ? len : length;
@@ -1634,7 +1634,7 @@ MODULE_VERSION(SG_VERSION_STR);
 MODULE_ALIAS_CHARDEV_MAJOR(SCSI_GENERIC_MAJOR);
 
 MODULE_PARM_DESC(scatter_elem_sz, "scatter gather element "
-                "size (default: max(SG_SCATTER_SZ, PAGE_SIZE))");
+                "size (default: max(SG_SCATTER_SZ, PG_SIZE))");
 MODULE_PARM_DESC(def_reserved_size, "size of buffer reserved for each fd");
 MODULE_PARM_DESC(allow_dio, "allow direct I/O (default: 0 (disallow))");
 
@@ -1672,8 +1672,8 @@ init_sg(void)
 {
 	int rc;
 
-	if (scatter_elem_sz < PAGE_SIZE) {
-		scatter_elem_sz = PAGE_SIZE;
+	if (scatter_elem_sz < PG_SIZE) {
+		scatter_elem_sz = PG_SIZE;
 		scatter_elem_sz_prev = scatter_elem_sz;
 	}
 	if (def_reserved_size >= 0)
@@ -1886,16 +1886,16 @@ sg_build_indirect(Sg_scatter_hold * schp, Sg_fd * sfp, int buff_size)
 
 	num = scatter_elem_sz;
 	if (unlikely(num != scatter_elem_sz_prev)) {
-		if (num < PAGE_SIZE) {
-			scatter_elem_sz = PAGE_SIZE;
-			scatter_elem_sz_prev = PAGE_SIZE;
+		if (num < PG_SIZE) {
+			scatter_elem_sz = PG_SIZE;
+			scatter_elem_sz_prev = PG_SIZE;
 		} else
 			scatter_elem_sz_prev = num;
 	}
 
 	order = get_order(num);
 retry:
-	ret_sz = 1 << (PAGE_SHIFT + order);
+	ret_sz = 1 << (PG_SHIFT + order);
 
 	for (k = 0, rem_sz = blk_size; rem_sz > 0 && k < mx_sc_elems;
 	     k++, rem_sz -= ret_sz) {
@@ -1974,7 +1974,7 @@ sg_read_oxfer(Sg_request * srp, char __user *outp, int num_read_xfer)
 	if ((!outp) || (num_read_xfer <= 0))
 		return 0;
 
-	num = 1 << (PAGE_SHIFT + schp->page_order);
+	num = 1 << (PG_SHIFT + schp->page_order);
 	for (k = 0; k < schp->k_use_sg && schp->pages[k]; k++) {
 		if (num > num_read_xfer) {
 			if (copy_to_user(outp, page_address(schp->pages[k]),
@@ -2003,14 +2003,14 @@ sg_build_reserve(Sg_fd * sfp, int req_size)
 	SCSI_LOG_TIMEOUT(4, sg_printk(KERN_INFO, sfp->parentdp,
 			 "sg_build_reserve: req_size=%d\n", req_size));
 	do {
-		if (req_size < PAGE_SIZE)
-			req_size = PAGE_SIZE;
+		if (req_size < PG_SIZE)
+			req_size = PG_SIZE;
 		if (0 == sg_build_indirect(schp, sfp, req_size))
 			return;
 		else
 			sg_remove_scat(sfp, schp);
 		req_size >>= 1;	/* divide by 2 */
-	} while (req_size > (PAGE_SIZE / 2));
+	} while (req_size > (PG_SIZE / 2));
 }
 
 static void
@@ -2025,7 +2025,7 @@ sg_link_reserve(Sg_fd * sfp, Sg_request * srp, int size)
 			 "sg_link_reserve: size=%d\n", size));
 	rem = size;
 
-	num = 1 << (PAGE_SHIFT + rsv_schp->page_order);
+	num = 1 << (PG_SHIFT + rsv_schp->page_order);
 	for (k = 0; k < rsv_schp->k_use_sg; k++) {
 		if (rem <= num) {
 			req_schp->k_use_sg = k + 1;

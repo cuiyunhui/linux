@@ -705,8 +705,8 @@ static int queue_folios_pte_range(pmd_t *pmd, unsigned long addr,
 		walk->action = ACTION_AGAIN;
 		return 0;
 	}
-	for (; addr != end; pte += nr, addr += nr * PAGE_SIZE) {
-		max_nr = (end - addr) >> PAGE_SHIFT;
+	for (; addr != end; pte += nr, addr += nr * PG_SIZE) {
+		max_nr = (end - addr) >> PG_SHIFT;
 		nr = 1;
 		ptent = ptep_get(pte);
 		if (pte_none(ptent))
@@ -1135,7 +1135,7 @@ static int lookup_node(struct mm_struct *mm, unsigned long addr)
 	struct page *p = NULL;
 	int ret;
 
-	ret = get_user_pages_fast(addr & PAGE_MASK, 1, 0, &p);
+	ret = get_user_pages_fast(addr & PG_MASK, 1, 0, &p);
 	if (ret > 0) {
 		ret = page_to_nid(p);
 		put_page(p);
@@ -1502,13 +1502,13 @@ static long do_mbind(unsigned long start, unsigned long len,
 	if ((flags & MPOL_MF_MOVE_ALL) && !capable(CAP_SYS_NICE))
 		return -EPERM;
 
-	if (start & ~PAGE_MASK)
+	if (start & ~PG_MASK)
 		return -EINVAL;
 
 	if (mode == MPOL_DEFAULT)
 		flags &= ~MPOL_MF_STRICT;
 
-	len = PAGE_ALIGN(len);
+	len = PG_ALIGN(len);
 	end = start + len;
 
 	if (end < start)
@@ -1662,7 +1662,7 @@ static int get_nodes(nodemask_t *nodes, const unsigned long __user *nmask,
 	nodes_clear(*nodes);
 	if (maxnode == 0 || !nmask)
 		return 0;
-	if (maxnode > PAGE_SIZE*BITS_PER_BYTE)
+	if (maxnode > PG_SIZE*BITS_PER_BYTE)
 		return -EINVAL;
 
 	/*
@@ -1702,7 +1702,7 @@ static int copy_nodes_to_user(unsigned long __user *mask, unsigned long maxnode,
 		nbytes = BITS_TO_COMPAT_LONGS(nr_node_ids) * sizeof(compat_long_t);
 
 	if (copy > nbytes) {
-		if (copy > PAGE_SIZE)
+		if (copy > PG_SIZE)
 			return -EINVAL;
 		if (clear_user((char __user *)mask + nbytes, copy - nbytes))
 			return -EFAULT;
@@ -1768,7 +1768,7 @@ SYSCALL_DEFINE4(set_mempolicy_home_node, unsigned long, start, unsigned long, le
 	VMA_ITERATOR(vmi, mm, start);
 
 	start = untagged_addr(start);
-	if (start & ~PAGE_MASK)
+	if (start & ~PG_MASK)
 		return -EINVAL;
 	/*
 	 * flags is used for future extension if any.
@@ -1783,7 +1783,7 @@ SYSCALL_DEFINE4(set_mempolicy_home_node, unsigned long, start, unsigned long, le
 	if (home_node >= MAX_NUMNODES || !node_online(home_node))
 		return -EINVAL;
 
-	len = PAGE_ALIGN(len);
+	len = PG_ALIGN(len);
 	end = start + len;
 
 	if (end < start)
@@ -2048,8 +2048,8 @@ struct mempolicy *get_vma_policy(struct vm_area_struct *vma,
 		pol = get_task_policy(current);
 	if (pol->mode == MPOL_INTERLEAVE ||
 	    pol->mode == MPOL_WEIGHTED_INTERLEAVE) {
-		*ilx += vma->vm_pgoff >> order;
-		*ilx += (addr - vma->vm_start) >> (PAGE_SHIFT + order);
+		*ilx += vma->vm_pteoff >> order;
+		*ilx += (addr - vma->vm_start) >> (PG_SHIFT + order);
 	}
 	return pol;
 }
@@ -2569,7 +2569,7 @@ struct page *alloc_frozen_pages_noprof(gfp_t gfp, unsigned order)
  *
  * Allocate 1 << @order contiguous pages.  The physical address of the
  * first page is naturally aligned (eg an order-3 allocation will be aligned
- * to a multiple of 8 * PAGE_SIZE bytes).  The NUMA policy of the current
+ * to a multiple of 8 * PG_SIZE bytes).  The NUMA policy of the current
  * process is honoured when in process context.
  *
  * Context: Can be called from any context, providing the appropriate GFP
@@ -3234,7 +3234,7 @@ void mpol_shared_policy_init(struct shared_policy *sp, struct mempolicy *mpol)
 			goto put_npol;
 
 		/* alloc node covering entire file; adds ref to file's npol */
-		sn = sp_alloc(0, MAX_LFS_FILESIZE >> PAGE_SHIFT, npol);
+		sn = sp_alloc(0, MAX_LFS_FILESIZE >> PG_SHIFT, npol);
 		if (sn)
 			sp_insert(sp, sn);
 put_npol:
@@ -3255,11 +3255,11 @@ int mpol_set_shared_policy(struct shared_policy *sp,
 	unsigned long sz = vma_pages(vma);
 
 	if (pol) {
-		new = sp_alloc(vma->vm_pgoff, vma->vm_pgoff + sz, pol);
+		new = sp_alloc(vma->vm_pteoff, vma->vm_pteoff + sz, pol);
 		if (!new)
 			return -ENOMEM;
 	}
-	err = shared_policy_replace(sp, vma->vm_pgoff, vma->vm_pgoff + sz, new);
+	err = shared_policy_replace(sp, vma->vm_pteoff, vma->vm_pteoff + sz, new);
 	if (err && new)
 		sp_free(new);
 	return err;
@@ -3371,7 +3371,7 @@ void __init numa_policy_init(void)
 		}
 
 		/* Interleave this node? */
-		if ((total_pages << PAGE_SHIFT) >= (16 << 20))
+		if ((total_pages << PG_SHIFT) >= (16 << 20))
 			node_set(nid, interleave_nodes);
 	}
 

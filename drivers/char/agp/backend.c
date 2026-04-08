@@ -116,10 +116,10 @@ static int agp_find_max(void)
 {
 	long memory, index, result;
 
-#if PAGE_SHIFT < 20
-	memory = totalram_pages() >> (20 - PAGE_SHIFT);
+#if PG_SHIFT < 20
+	memory = totalram_pages() >> (20 - PG_SHIFT);
 #else
-	memory = totalram_pages() << (PAGE_SHIFT - 20);
+	memory = totalram_pages() << (PG_SHIFT - 20);
 #endif
 	index = 1;
 
@@ -131,7 +131,7 @@ static int agp_find_max(void)
 	     (maxes_table[index].agp - maxes_table[index - 1].agp)) /
 	   (maxes_table[index].mem - maxes_table[index - 1].mem);
 
-	result = result << (20 - PAGE_SHIFT);
+	result = result << (20 - PG_SHIFT);
 	return result;
 }
 
@@ -173,7 +173,7 @@ static int agp_backend_initialize(struct agp_bridge_data *bridge)
 	}
 	got_gatt = 1;
 
-	bridge->key_list = vzalloc(PAGE_SIZE * 4);
+	bridge->key_list = vzalloc(PG_SIZE * 4);
 	if (bridge->key_list == NULL) {
 		dev_err(&bridge->dev->dev,
 			"can't allocate memory for key lists\n");

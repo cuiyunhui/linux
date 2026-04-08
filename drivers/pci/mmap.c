@@ -28,8 +28,8 @@ int pci_mmap_resource_range(struct pci_dev *pdev, int bar,
 	unsigned long size;
 	int ret;
 
-	size = ((pci_resource_len(pdev, bar) - 1) >> PAGE_SHIFT) + 1;
-	if (vma->vm_pgoff + vma_pages(vma) > size)
+	size = ((pci_resource_len(pdev, bar) - 1) >> PTE_SHIFT) + 1;
+	if (vma->vm_pteoff + vma_ptes(vma) > size)
 		return -EINVAL;
 
 	if (write_combine)
@@ -42,11 +42,11 @@ int pci_mmap_resource_range(struct pci_dev *pdev, int bar,
 		if (ret)
 			return ret;
 	} else
-		vma->vm_pgoff += (pci_resource_start(pdev, bar) >> PAGE_SHIFT);
+		vma->vm_pteoff += (pci_resource_start(pdev, bar) >> PTE_SHIFT);
 
 	vma->vm_ops = &pci_phys_vm_ops;
 
-	return io_remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
+	return io_remap_pfn_range(vma, vma->vm_start, vma->vm_pteoff,
 				  vma->vm_end - vma->vm_start,
 				  vma->vm_page_prot);
 }
@@ -64,13 +64,13 @@ int pci_mmap_fits(struct pci_dev *pdev, int resno, struct vm_area_struct *vma,
 
 	if (pci_resource_len(pdev, resno) == 0)
 		return 0;
-	nr = vma_pages(vma);
-	start = vma->vm_pgoff;
-	size = ((pci_resource_len(pdev, resno) - 1) >> PAGE_SHIFT) + 1;
+	nr = vma_ptes(vma);
+	start = vma->vm_pteoff;
+	size = ((pci_resource_len(pdev, resno) - 1) >> PTE_SHIFT) + 1;
 	if (mmap_api == PCI_MMAP_PROCFS) {
 		pci_resource_to_user(pdev, resno, &pdev->resource[resno],
 				     &pci_start, &pci_end);
-		pci_start >>= PAGE_SHIFT;
+		pci_start >>= PTE_SHIFT;
 	}
 	if (start >= pci_start && start < pci_start + size &&
 	    start + nr <= pci_start + size)

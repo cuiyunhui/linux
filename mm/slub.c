@@ -2512,7 +2512,7 @@ bool memcg_slab_post_charge(void *p, gfp_t flags)
 		 * not in the memcg stats. So, subtract from the global and use
 		 * the interface which adds to both global and memcg stats.
 		 */
-		size = PAGE_SIZE << order;
+		size = PG_SIZE << order;
 		mod_node_page_state(page_pgdat(page), NR_SLAB_UNRECLAIMABLE_B, -size);
 		mod_lruvec_page_state(page, NR_SLAB_UNRECLAIMABLE_B, size);
 		return true;

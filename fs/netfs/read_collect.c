@@ -135,7 +135,7 @@ static void netfs_read_unlock_folios(struct netfs_io_request *rreq,
 
 		order = folioq_folio_order(folioq, slot);
 		rreq->front_folio_order = order;
-		fsize = PAGE_SIZE << order;
+		fsize = PG_SIZE << order;
 		fpos = folio_pos(folio);
 		fend = fpos + fsize;
 
@@ -230,7 +230,7 @@ reassess:
 		 * subreqs.
 		 */
 		if (notes & BUFFERED) {
-			size_t fsize = PAGE_SIZE << rreq->front_folio_order;
+			size_t fsize = PG_SIZE << rreq->front_folio_order;
 
 			/* Clear the tail of a short read. */
 			if (!(notes & HIT_PENDING) &&
@@ -476,7 +476,7 @@ void netfs_read_subreq_progress(struct netfs_io_subrequest *subreq)
 {
 	struct netfs_io_request *rreq = subreq->rreq;
 	struct netfs_io_stream *stream = &rreq->io_streams[0];
-	size_t fsize = PAGE_SIZE << rreq->front_folio_order;
+	size_t fsize = PG_SIZE << rreq->front_folio_order;
 
 	trace_netfs_sreq(subreq, netfs_sreq_trace_progress);
 

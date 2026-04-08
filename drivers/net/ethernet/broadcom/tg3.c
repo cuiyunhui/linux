@@ -6673,7 +6673,7 @@ static void tg3_rx_data_free(struct tg3 *tp, struct ring_info *ri, u32 map_sz)
 
 	dma_unmap_single(&tp->pdev->dev, dma_unmap_addr(ri, mapping), map_sz,
 			 DMA_FROM_DEVICE);
-	tg3_frag_free(skb_size <= PAGE_SIZE, ri->data);
+	tg3_frag_free(skb_size <= PG_SIZE, ri->data);
 	ri->data = NULL;
 }
 
@@ -6726,7 +6726,7 @@ static int tg3_alloc_rx_data(struct tg3 *tp, struct tg3_rx_prodring_set *tpr,
 	 */
 	skb_size = SKB_DATA_ALIGN(data_size + TG3_RX_OFFSET(tp)) +
 		   SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
-	if (skb_size <= PAGE_SIZE) {
+	if (skb_size <= PG_SIZE) {
 		data = napi_alloc_frag(skb_size);
 		*frag_size = skb_size;
 	} else {
@@ -6739,7 +6739,7 @@ static int tg3_alloc_rx_data(struct tg3 *tp, struct tg3_rx_prodring_set *tpr,
 	mapping = dma_map_single(&tp->pdev->dev, data + TG3_RX_OFFSET(tp),
 				 data_size, DMA_FROM_DEVICE);
 	if (unlikely(dma_mapping_error(&tp->pdev->dev, mapping))) {
-		tg3_frag_free(skb_size <= PAGE_SIZE, data);
+		tg3_frag_free(skb_size <= PG_SIZE, data);
 		return -EIO;
 	}
 

@@ -16,7 +16,7 @@ struct swsusp_info {
 	unsigned long		image_pages;
 	unsigned long		pages;
 	unsigned long		size;
-} __aligned(PAGE_SIZE);
+} __aligned(PG_SIZE);
 
 #if defined(CONFIG_SUSPEND) || defined(CONFIG_HIBERNATION)
 extern int pm_sleep_fs_sync(void);
@@ -48,13 +48,13 @@ static inline const char *check_image_kernel(struct swsusp_info *info)
  * Keep some memory free so that I/O operations can succeed without paging
  * [Might this be more than 4 MB?]
  */
-#define PAGES_FOR_IO	((4096 * 1024) >> PAGE_SHIFT)
+#define PAGES_FOR_IO	((4096 * 1024) >> PG_SHIFT)
 
 /*
  * Keep 1 MB of memory free so that device drivers can allocate some pages in
  * their .suspend() routines without breaking the suspend to disk.
  */
-#define SPARE_PAGES	((1024 * 1024) >> PAGE_SHIFT)
+#define SPARE_PAGES	((1024 * 1024) >> PG_SHIFT)
 
 asmlinkage int swsusp_save(void);
 

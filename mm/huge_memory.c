@@ -152,7 +152,7 @@ unsigned long __thp_vma_allowable_orders(struct vm_area_struct *vma,
 		unsigned long addr;
 
 		while (orders) {
-			addr = vma->vm_end - (PAGE_SIZE << order);
+			addr = vma->vm_end - (PG_SIZE << order);
 			if (thp_vma_suitable_order(vma, addr, order))
 				break;
 			order = next_order(&orders, order);
@@ -169,7 +169,7 @@ unsigned long __thp_vma_allowable_orders(struct vm_area_struct *vma,
 	 */
 	if (!in_pf && shmem_file(vma->vm_file))
 		return orders & shmem_allowable_huge_orders(file_inode(vma->vm_file),
-						   vma, vma->vm_pgoff, 0,
+						   vma, vma->vm_pteoff, 0,
 						   forced_collapse);
 
 	if (!vma_is_anonymous(vma)) {
@@ -717,7 +717,7 @@ static int sysfs_add_group(struct kobject *kobj,
 
 static struct thpsize *thpsize_create(int order, struct kobject *parent)
 {
-	unsigned long size = (PAGE_SIZE << order) / SZ_1K;
+	unsigned long size = (PG_SIZE << order) / SZ_1K;
 	struct thpsize *thpsize;
 	int ret = -ENOMEM;
 
@@ -987,7 +987,7 @@ out:
 }
 __setup("transparent_hugepage=", setup_transparent_hugepage);
 
-static char str_dup[PAGE_SIZE] __initdata;
+static char str_dup[PG_SIZE] __initdata;
 static int __init setup_thp_anon(char *str)
 {
 	char *token, *range, *policy, *subtoken;
@@ -996,7 +996,7 @@ static int __init setup_thp_anon(char *str)
 	int start, end, nr;
 	char *p;
 
-	if (!str || strlen(str) + 1 > PAGE_SIZE)
+	if (!str || strlen(str) + 1 > PG_SIZE)
 		goto err;
 	strscpy(str_dup, str);
 
@@ -1206,7 +1206,7 @@ static unsigned long __thp_get_unmapped_area(struct file *filp,
 		return 0;
 
 	ret = mm_get_unmapped_area_vmflags(filp, addr, len_pad,
-					   off >> PAGE_SHIFT, flags, vm_flags);
+					   off >> PG_SHIFT, flags, vm_flags);
 
 	/*
 	 * The failure might be due to length padding. The caller will retry
@@ -1236,7 +1236,7 @@ unsigned long thp_get_unmapped_area_vmflags(struct file *filp, unsigned long add
 		vm_flags_t vm_flags)
 {
 	unsigned long ret;
-	loff_t off = (loff_t)pgoff << PAGE_SHIFT;
+	loff_t off = (loff_t)pgoff << PG_SHIFT;
 
 	ret = __thp_get_unmapped_area(filp, addr, len, off, flags, PMD_SIZE, vm_flags);
 	if (ret)
@@ -2969,7 +2969,7 @@ static void __split_huge_zero_page_pmd(struct vm_area_struct *vma,
 
 	pte = pte_offset_map(&_pmd, haddr);
 	VM_BUG_ON(!pte);
-	for (i = 0, addr = haddr; i < HPAGE_PMD_NR; i++, addr += PAGE_SIZE) {
+	for (i = 0, addr = haddr; i < HPAGE_PMD_NR; i++, addr += PG_SIZE) {
 		pte_t entry;
 
 		entry = pfn_pte(my_zero_pfn(addr), vma->vm_page_prot);
@@ -3185,7 +3185,7 @@ static void __split_huge_pmd_locked(struct vm_area_struct *vma, pmd_t *pmd,
 		pte_t entry;
 		swp_entry_t swp_entry;
 
-		for (i = 0, addr = haddr; i < HPAGE_PMD_NR; i++, addr += PAGE_SIZE) {
+		for (i = 0, addr = haddr; i < HPAGE_PMD_NR; i++, addr += PG_SIZE) {
 			if (write)
 				swp_entry = make_writable_migration_entry(
 							page_to_pfn(page + i));
@@ -3211,7 +3211,7 @@ static void __split_huge_pmd_locked(struct vm_area_struct *vma, pmd_t *pmd,
 		pte_t entry;
 		swp_entry_t swp_entry;
 
-		for (i = 0, addr = haddr; i < HPAGE_PMD_NR; i++, addr += PAGE_SIZE) {
+		for (i = 0, addr = haddr; i < HPAGE_PMD_NR; i++, addr += PG_SIZE) {
 			/*
 			 * anon_exclusive was already propagated to the relevant
 			 * pages corresponding to the pte entries when freeze
@@ -3237,7 +3237,7 @@ static void __split_huge_pmd_locked(struct vm_area_struct *vma, pmd_t *pmd,
 	} else {
 		pte_t entry;
 
-		entry = mk_pte(page, READ_ONCE(vma->vm_page_prot));
+		entry = mkpte(page, 0, READ_ONCE(vma->vm_page_prot));
 		if (write)
 			entry = pte_mkwrite(entry, vma);
 		if (!young)
@@ -4030,7 +4030,7 @@ static int __folio_split(struct folio *folio, unsigned int new_order,
 		 * So note end now: i_size itself may be changed at any moment,
 		 * but folio lock is good enough to serialize the trimming.
 		 */
-		end = DIV_ROUND_UP(i_size_read(mapping->host), PAGE_SIZE);
+		end = DIV_ROUND_UP(i_size_read(mapping->host), PG_SIZE);
 		if (shmem_mapping(mapping))
 			end = shmem_fallocend(mapping->host, end);
 	}
@@ -4590,8 +4590,8 @@ static int split_huge_pages_pid(int pid, unsigned long vaddr_start,
 	unsigned long total = 0, split = 0;
 	unsigned long addr;
 
-	vaddr_start &= PAGE_MASK;
-	vaddr_end &= PAGE_MASK;
+	vaddr_start &= PG_MASK;
+	vaddr_end &= PG_MASK;
 
 	task = find_get_task_by_vpid(pid);
 	if (!task) {
@@ -4613,10 +4613,10 @@ static int split_huge_pages_pid(int pid, unsigned long vaddr_start,
 
 	mmap_read_lock(mm);
 	/*
-	 * always increase addr by PAGE_SIZE, since we could have a PTE page
+	 * always increase addr by PG_SIZE, since we could have a PTE page
 	 * table filled with PTE-mapped THPs, each of which is distinct.
 	 */
-	for (addr = vaddr_start; addr < vaddr_end; addr += PAGE_SIZE) {
+	for (addr = vaddr_start; addr < vaddr_end; addr += PG_SIZE) {
 		struct vm_area_struct *vma = vma_lookup(mm, addr);
 		struct folio_walk fw;
 		struct folio *folio;

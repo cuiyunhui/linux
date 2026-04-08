@@ -76,7 +76,7 @@ void __init inet_initpeers(void)
 	u64 nr_entries;
 
 	 /* 1% of physical memory */
-	nr_entries = div64_ul((u64)totalram_pages() << PAGE_SHIFT,
+	nr_entries = div64_ul((u64)totalram_pages() << PG_SHIFT,
 			      100 * L1_CACHE_ALIGN(sizeof(struct inet_peer)));
 
 	inet_peer_threshold = clamp_val(nr_entries, 4096, 65536 + 128);

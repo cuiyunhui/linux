@@ -1158,11 +1158,11 @@ static unsigned sky2_get_rx_data_size(struct sky2_port *sky2)
 	/* Space needed for frame data + headers rounded up */
 	size = roundup(sky2->netdev->mtu + ETH_HLEN + VLAN_HLEN, 8);
 
-	sky2->rx_nfrags = size >> PAGE_SHIFT;
+	sky2->rx_nfrags = size >> PG_SHIFT;
 	BUG_ON(sky2->rx_nfrags > ARRAY_SIZE(re->frag_addr));
 
 	/* Compute residue after pages */
-	size -= sky2->rx_nfrags << PAGE_SHIFT;
+	size -= sky2->rx_nfrags << PG_SHIFT;
 
 	/* Optimize to handle small packets and headers */
 	if (size < copybreak)
@@ -1200,7 +1200,7 @@ static void sky2_rx_submit(struct sky2_port *sky2,
 	sky2_rx_add(sky2, OP_PACKET, re->data_addr, sky2->rx_data_size);
 
 	for (i = 0; i < skb_shinfo(re->skb)->nr_frags; i++)
-		sky2_rx_add(sky2, OP_BUFFER, re->frag_addr[i], PAGE_SIZE);
+		sky2_rx_add(sky2, OP_BUFFER, re->frag_addr[i], PG_SIZE);
 }
 
 
@@ -1467,7 +1467,7 @@ static struct sk_buff *sky2_rx_alloc(struct sky2_port *sky2, gfp_t gfp)
 
 		if (!page)
 			goto free_partial;
-		skb_fill_page_desc(skb, i, page, 0, PAGE_SIZE);
+		skb_fill_page_desc(skb, i, page, 0, PG_SIZE);
 	}
 
 	return skb;
@@ -2504,11 +2504,11 @@ static void skb_put_frags(struct sk_buff *skb, unsigned int hdr_space,
 			__skb_frag_unref(frag, false);
 			--skb_shinfo(skb)->nr_frags;
 		} else {
-			size = min(length, (unsigned) PAGE_SIZE);
+			size = min(length, (unsigned) PG_SIZE);
 
 			skb_frag_size_set(frag, size);
 			skb->data_len += size;
-			skb->truesize += PAGE_SIZE;
+			skb->truesize += PG_SIZE;
 			skb->len += size;
 			length -= size;
 		}

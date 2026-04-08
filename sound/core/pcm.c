@@ -939,7 +939,7 @@ int snd_pcm_attach_substream(struct snd_pcm *pcm, int stream,
 	if (runtime == NULL)
 		return -ENOMEM;
 
-	size = PAGE_ALIGN(sizeof(struct snd_pcm_mmap_status));
+	size = PG_ALIGN(sizeof(struct snd_pcm_mmap_status));
 	runtime->status = alloc_pages_exact(size, GFP_KERNEL);
 	if (runtime->status == NULL) {
 		kfree(runtime);
@@ -947,11 +947,11 @@ int snd_pcm_attach_substream(struct snd_pcm *pcm, int stream,
 	}
 	memset(runtime->status, 0, size);
 
-	size = PAGE_ALIGN(sizeof(struct snd_pcm_mmap_control));
+	size = PG_ALIGN(sizeof(struct snd_pcm_mmap_control));
 	runtime->control = alloc_pages_exact(size, GFP_KERNEL);
 	if (runtime->control == NULL) {
 		free_pages_exact(runtime->status,
-			       PAGE_ALIGN(sizeof(struct snd_pcm_mmap_status)));
+			       PG_ALIGN(sizeof(struct snd_pcm_mmap_status)));
 		kfree(runtime);
 		return -ENOMEM;
 	}
@@ -987,9 +987,9 @@ void snd_pcm_detach_substream(struct snd_pcm_substream *substream)
 	if (runtime->private_free != NULL)
 		runtime->private_free(runtime);
 	free_pages_exact(runtime->status,
-		       PAGE_ALIGN(sizeof(struct snd_pcm_mmap_status)));
+		       PG_ALIGN(sizeof(struct snd_pcm_mmap_status)));
 	free_pages_exact(runtime->control,
-		       PAGE_ALIGN(sizeof(struct snd_pcm_mmap_control)));
+		       PG_ALIGN(sizeof(struct snd_pcm_mmap_control)));
 	kfree(runtime->hw_constraints.rules);
 	/* Avoid concurrent access to runtime via PCM timer interface */
 	if (substream->timer) {

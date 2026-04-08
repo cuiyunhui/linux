@@ -256,7 +256,7 @@ copy_buffer:
 		goto free;
 	}
 
-	/* length is being truncated to PAGE_SIZE,
+	/* length is being truncated to PG_SIZE,
 	 * however buf_idx may point beyond that */
 	length = min_t(size_t, length, cb->buf_idx - *offset);
 
@@ -996,7 +996,7 @@ static ssize_t fw_status_show(struct device *device,
 	}
 
 	for (i = 0; i < fw_status.count; i++)
-		cnt += scnprintf(buf + cnt, PAGE_SIZE - cnt, "%08X\n",
+		cnt += scnprintf(buf + cnt, PG_SIZE - cnt, "%08X\n",
 				fw_status.status[i]);
 	return cnt;
 }
@@ -1098,7 +1098,7 @@ static ssize_t fw_ver_show(struct device *device,
 	ver = dev->fw_ver;
 
 	for (i = 0; i < MEI_MAX_FW_VER_BLOCKS; i++)
-		cnt += scnprintf(buf + cnt, PAGE_SIZE - cnt, "%u:%u.%u.%u.%u\n",
+		cnt += scnprintf(buf + cnt, PG_SIZE - cnt, "%u:%u.%u.%u.%u\n",
 				 ver[i].platform, ver[i].major, ver[i].minor,
 				 ver[i].hotfix, ver[i].buildno);
 	return cnt;

@@ -32,7 +32,7 @@ static inline struct map_attribute *to_map_attr(struct attribute *attr)
 
 static ssize_t type_show(struct efi_runtime_map_entry *entry, char *buf)
 {
-	return snprintf(buf, PAGE_SIZE, "0x%x\n", entry->md.type);
+	return snprintf(buf, PG_SIZE, "0x%x\n", entry->md.type);
 }
 
 #define EFI_RUNTIME_FIELD(var) entry->md.var
@@ -40,7 +40,7 @@ static ssize_t type_show(struct efi_runtime_map_entry *entry, char *buf)
 #define EFI_RUNTIME_U64_ATTR_SHOW(name) \
 static ssize_t name##_show(struct efi_runtime_map_entry *entry, char *buf) \
 { \
-	return snprintf(buf, PAGE_SIZE, "0x%llx\n", EFI_RUNTIME_FIELD(name)); \
+	return snprintf(buf, PG_SIZE, "0x%llx\n", EFI_RUNTIME_FIELD(name)); \
 }
 
 EFI_RUNTIME_U64_ATTR_SHOW(phys_addr);

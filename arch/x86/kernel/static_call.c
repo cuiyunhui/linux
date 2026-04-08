@@ -212,7 +212,7 @@ bool __static_call_fixup(void *tramp, u8 op, void *dest)
 	 *
 	 * This avoids the memcmp() below tripping over pagefaults etc..
 	 */
-	if (((addr >> PAGE_SHIFT) != ((addr + 7) >> PAGE_SHIFT)) &&
+	if (((addr >> PTE_SHIFT) != ((addr + 7) >> PTE_SHIFT)) &&
 	    !kernel_text_address(addr + 7))
 		return false;
 

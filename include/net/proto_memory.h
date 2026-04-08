@@ -6,7 +6,7 @@
 #include <net/hotdata.h>
 
 /* 1 MB per cpu, in page units */
-#define SK_MEMORY_PCPU_RESERVE (1 << (20 - PAGE_SHIFT))
+#define SK_MEMORY_PCPU_RESERVE (1 << (20 - PG_SHIFT))
 
 static inline bool sk_has_memory_pressure(const struct sock *sk)
 {

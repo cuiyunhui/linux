@@ -138,7 +138,7 @@ struct agp_memory *agp_create_memory(int scratch_pages)
 		return NULL;
 	}
 
-	agp_alloc_page_array(PAGE_SIZE * scratch_pages, new);
+	agp_alloc_page_array(PG_SIZE * scratch_pages, new);
 
 	if (new->pages == NULL) {
 		agp_free_key(new->key);
@@ -201,7 +201,7 @@ void agp_free_memory(struct agp_memory *curr)
 }
 EXPORT_SYMBOL(agp_free_memory);
 
-#define ENTRIES_PER_PAGE		(PAGE_SIZE / sizeof(unsigned long))
+#define ENTRIES_PER_PAGE		(PG_SIZE / sizeof(unsigned long))
 
 /**
  *	agp_allocate_memory  -  allocate a group of pages of a certain type.
@@ -344,7 +344,7 @@ int agp_num_entries(void)
 		break;
 	}
 
-	num_entries -= agp_memory_reserved>>PAGE_SHIFT;
+	num_entries -= agp_memory_reserved>>PG_SHIFT;
 	if (num_entries<0)
 		num_entries = 0;
 	return num_entries;
@@ -925,7 +925,7 @@ int agp_generic_create_gatt_table(struct agp_bridge_data *bridge)
 	if (table == NULL)
 		return -ENOMEM;
 
-	table_end = table + ((PAGE_SIZE * (1 << page_order)) - 1);
+	table_end = table + ((PG_SIZE * (1 << page_order)) - 1);
 
 	for (page = virt_to_page(table); page <= virt_to_page(table_end); page++)
 		SetPageReserved(page);
@@ -941,7 +941,7 @@ int agp_generic_create_gatt_table(struct agp_bridge_data *bridge)
 	bridge->gatt_table = (u32 __iomem *)table;
 #else
 	bridge->gatt_table = ioremap(virt_to_phys(table),
-					(PAGE_SIZE * (1 << page_order)));
+					(PG_SIZE * (1 << page_order)));
 	bridge->driver->cache_flush();
 #endif
 
@@ -1005,7 +1005,7 @@ int agp_generic_free_gatt_table(struct agp_bridge_data *bridge)
 	iounmap(bridge->gatt_table);
 #endif
 	table = (char *) bridge->gatt_table_real;
-	table_end = table + ((PAGE_SIZE * (1 << page_order)) - 1);
+	table_end = table + ((PG_SIZE * (1 << page_order)) - 1);
 
 	for (page = virt_to_page(table); page <= virt_to_page(table_end); page++)
 		ClearPageReserved(page);
@@ -1061,7 +1061,7 @@ int agp_generic_insert_memory(struct agp_memory * mem, off_t pg_start, int type)
 		break;
 	}
 
-	num_entries -= agp_memory_reserved/PAGE_SIZE;
+	num_entries -= agp_memory_reserved/PG_SIZE;
 	if (num_entries < 0) num_entries = 0;
 
 	if (type != mem->type)

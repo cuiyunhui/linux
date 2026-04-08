@@ -179,7 +179,7 @@ static void do_mpage_readpage(struct mpage_readpage_args *args)
 		goto confused;
 
 	block_in_file = folio_pos(folio) >> blkbits;
-	last_block = block_in_file + ((args->nr_pages * PAGE_SIZE) >> blkbits);
+	last_block = block_in_file + ((args->nr_pages * PG_SIZE) >> blkbits);
 	last_block_in_file = (i_size_read(inode) + blocksize - 1) >> blkbits;
 	if (last_block > last_block_in_file)
 		last_block = last_block_in_file;
@@ -333,7 +333,7 @@ confused:
  *
  * then this code just gives up and calls the buffer_head-based read function.
  * It does handle a page which has holes at the end - that is a common case:
- * the end-of-file on blocksize < PAGE_SIZE setups.
+ * the end-of-file on blocksize < PG_SIZE setups.
  *
  * BH_Boundary explanation:
  *

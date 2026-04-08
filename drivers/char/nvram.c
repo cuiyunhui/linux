@@ -236,7 +236,7 @@ static ssize_t nvram_misc_read(struct file *file, char __user *buf,
 		return 0;
 
 	count = min_t(size_t, count, nvram_size - *ppos);
-	count = min_t(size_t, count, PAGE_SIZE);
+	count = min_t(size_t, count, PG_SIZE);
 
 	tmp = kmalloc(count, GFP_KERNEL);
 	if (!tmp)
@@ -266,7 +266,7 @@ static ssize_t nvram_misc_write(struct file *file, const char __user *buf,
 		return 0;
 
 	count = min_t(size_t, count, nvram_size - *ppos);
-	count = min_t(size_t, count, PAGE_SIZE);
+	count = min_t(size_t, count, PG_SIZE);
 
 	tmp = memdup_user(buf, count);
 	if (IS_ERR(tmp))

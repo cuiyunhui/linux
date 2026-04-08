@@ -1180,7 +1180,7 @@ pnfs_alloc_init_layoutget_args(struct inode *ino,
 		return NULL;
 
 	if (max_reply_sz) {
-		size_t npages = (max_reply_sz + PAGE_SIZE - 1) >> PAGE_SHIFT;
+		size_t npages = (max_reply_sz + PG_SIZE - 1) >> PG_SHIFT;
 		if (npages < max_pages)
 			max_pages = npages;
 	}
@@ -1190,13 +1190,13 @@ pnfs_alloc_init_layoutget_args(struct inode *ino,
 		kfree(lgp);
 		return NULL;
 	}
-	lgp->args.layout.pglen = max_pages * PAGE_SIZE;
+	lgp->args.layout.pglen = max_pages * PG_SIZE;
 	lgp->res.layoutp = &lgp->args.layout;
 
 	/* Don't confuse uninitialised result and success */
 	lgp->res.status = -NFS4ERR_DELAY;
 
-	lgp->args.minlength = PAGE_SIZE;
+	lgp->args.minlength = PG_SIZE;
 	if (lgp->args.minlength > range->length)
 		lgp->args.minlength = range->length;
 	if (ino) {
@@ -1222,7 +1222,7 @@ pnfs_alloc_init_layoutget_args(struct inode *ino,
 
 void pnfs_layoutget_free(struct nfs4_layoutget *lgp)
 {
-	size_t max_pages = lgp->args.layout.pglen / PAGE_SIZE;
+	size_t max_pages = lgp->args.layout.pglen / PG_SIZE;
 
 	nfs4_free_pages(lgp->args.layout.pages, max_pages);
 	pnfs_put_layout_hdr(lgp->lo);
@@ -2291,13 +2291,13 @@ lookup_again:
 
 	_add_to_server_list(lo, server);
 
-	pg_offset = arg.offset & ~PAGE_MASK;
+	pg_offset = arg.offset & ~PG_MASK;
 	if (pg_offset) {
 		arg.offset -= pg_offset;
 		arg.length += pg_offset;
 	}
 	if (arg.length != NFS4_MAX_UINT64)
-		arg.length = PAGE_ALIGN(arg.length);
+		arg.length = PG_ALIGN(arg.length);
 
 	lgp = pnfs_alloc_init_layoutget_args(ino, ctx, &stateid, &arg, gfp_flags);
 	if (!lgp) {

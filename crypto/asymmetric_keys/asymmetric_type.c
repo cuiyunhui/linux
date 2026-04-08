@@ -517,7 +517,7 @@ static struct key_restriction *asymmetric_lookup_restriction(
 		return asymmetric_restriction_alloc(
 			restrict_link_by_builtin_and_secondary_trusted, NULL);
 
-	parse_buf = kstrndup(restriction, PAGE_SIZE, GFP_KERNEL);
+	parse_buf = kstrndup(restriction, PG_SIZE, GFP_KERNEL);
 	if (!parse_buf)
 		return ERR_PTR(-ENOMEM);
 

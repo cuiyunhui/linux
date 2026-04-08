@@ -95,7 +95,7 @@ static int proc_scsi_show(struct seq_file *m, void *v)
 static int proc_scsi_host_open(struct inode *inode, struct file *file)
 {
 	return single_open_size(file, proc_scsi_show, pde_data(inode),
-				4 * PAGE_SIZE);
+				4 * PG_SIZE);
 }
 
 static struct scsi_proc_entry *
@@ -387,7 +387,7 @@ static int scsi_remove_single_device(uint host, uint channel, uint id, uint lun)
  * proc_scsi_write - handle writes to /proc/scsi/scsi
  * @file: not used
  * @buf: buffer to write
- * @length: length of buf, at most PAGE_SIZE
+ * @length: length of buf, at most PG_SIZE
  * @ppos: not used
  *
  * Description: this provides a legacy mechanism to add or remove devices by
@@ -409,7 +409,7 @@ static ssize_t proc_scsi_write(struct file *file, const char __user *buf,
 	char *buffer, *end, *p;
 	int err;
 
-	if (!buf || length > PAGE_SIZE)
+	if (!buf || length > PG_SIZE)
 		return -EINVAL;
 
 	buffer = (char *)__get_free_page(GFP_KERNEL);
@@ -421,11 +421,11 @@ static ssize_t proc_scsi_write(struct file *file, const char __user *buf,
 		goto out;
 
 	err = -EINVAL;
-	if (length < PAGE_SIZE) {
+	if (length < PG_SIZE) {
 		end = buffer + length;
 		*end = '\0';
 	} else {
-		end = buffer + PAGE_SIZE - 1;
+		end = buffer + PG_SIZE - 1;
 		if (*end)
 			goto out;
 	}

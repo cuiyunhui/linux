@@ -191,7 +191,7 @@ SYM_FUNC_START_LOCAL(efi32_startup)
 	addl	$PMD_SIZE, %ecx
 	jnc	2b
 
-	movl	$PAGE_SIZE, %ecx
+	movl	$PTE_SIZE, %ecx
 	.irpc	l, 0123
 	movl	%edx, \l * 8(%eax)
 	addl	%ecx, %edx
@@ -249,5 +249,5 @@ SYM_DATA_END(efi32_call)
 SYM_DATA(efi_is64, .byte 1)
 
 	.bss
-	.balign PAGE_SIZE
-SYM_DATA_LOCAL(pte, .fill 6 * PAGE_SIZE, 1, 0)
+	.balign PTE_SIZE
+SYM_DATA_LOCAL(pte, .fill 6 * PTE_SIZE, 1, 0)

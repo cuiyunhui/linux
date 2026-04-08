@@ -58,7 +58,7 @@ static bool clean_pages_on_decompress;
  *
  * During resume we pick up all swap_map_page structures into a list.
  */
-#define MAP_PAGE_ENTRIES	(PAGE_SIZE / sizeof(sector_t) - 1)
+#define MAP_PAGE_ENTRIES	(PG_SIZE / sizeof(sector_t) - 1)
 
 /*
  * Number of free pages that are not high.
@@ -101,7 +101,7 @@ struct swap_map_handle {
 };
 
 struct swsusp_header {
-	char reserved[PAGE_SIZE - 20 - sizeof(sector_t) - sizeof(int) -
+	char reserved[PG_SIZE - 20 - sizeof(sector_t) - sizeof(int) -
 	              sizeof(u32) - sizeof(u32)];
 	u32	hw_sig;
 	u32	crc32;
@@ -253,7 +253,7 @@ static void hib_end_io(struct bio *bio)
 		put_page(page);
 	else if (clean_pages_on_read)
 		flush_icache_range((unsigned long)page_address(page),
-				   (unsigned long)page_address(page) + PAGE_SIZE);
+				   (unsigned long)page_address(page) + PG_SIZE);
 
 	if (bio->bi_status && !hb->error)
 		hb->error = bio->bi_status;
@@ -266,7 +266,7 @@ static void hib_end_io(struct bio *bio)
 static int hib_submit_io_sync(blk_opf_t opf, pgoff_t page_off, void *addr)
 {
 	return bdev_rw_virt(file_bdev(hib_resume_bdev_file),
-			page_off * (PAGE_SIZE >> 9), addr, PAGE_SIZE, opf);
+			page_off * (PG_SIZE >> 9), addr, PG_SIZE, opf);
 }
 
 static int hib_submit_io_async(blk_opf_t opf, pgoff_t page_off, void *addr,
@@ -276,8 +276,8 @@ static int hib_submit_io_async(blk_opf_t opf, pgoff_t page_off, void *addr,
 
 	bio = bio_alloc(file_bdev(hib_resume_bdev_file), 1, opf,
 			GFP_NOIO | __GFP_HIGH);
-	bio->bi_iter.bi_sector = page_off * (PAGE_SIZE >> 9);
-	bio_add_virt_nofail(bio, addr, PAGE_SIZE);
+	bio->bi_iter.bi_sector = page_off * (PG_SIZE >> 9);
+	bio_add_virt_nofail(bio, addr, PG_SIZE);
 	bio->bi_end_io = hib_end_io;
 	bio->bi_private = hb;
 	atomic_inc(&hb->count);
@@ -499,12 +499,12 @@ static int swap_writer_finish(struct swap_map_handle *handle,
 
 /* Number of pages/bytes we'll compress at one time. */
 #define UNC_PAGES	32
-#define UNC_SIZE	(UNC_PAGES * PAGE_SIZE)
+#define UNC_SIZE	(UNC_PAGES * PG_SIZE)
 
 /* Number of pages we need for compressed data (worst case). */
 #define CMP_PAGES	DIV_ROUND_UP(bytes_worst_compress(UNC_SIZE) + \
-				CMP_HEADER, PAGE_SIZE)
-#define CMP_SIZE	(CMP_PAGES * PAGE_SIZE)
+				CMP_HEADER, PG_SIZE)
+#define CMP_SIZE	(CMP_PAGES * PG_SIZE)
 
 /* Default number of threads for compression/decompression. */
 #define CMP_THREADS    3
@@ -806,7 +806,7 @@ static int save_compressed_image(struct swap_map_handle *handle,
 	start = ktime_get();
 	for (;;) {
 		for (thr = 0; thr < nr_threads; thr++) {
-			for (off = 0; off < UNC_SIZE; off += PAGE_SIZE) {
+			for (off = 0; off < UNC_SIZE; off += PG_SIZE) {
 				ret = snapshot_read_next(snapshot);
 				if (ret < 0)
 					goto out_finish;
@@ -815,7 +815,7 @@ static int save_compressed_image(struct swap_map_handle *handle,
 					break;
 
 				memcpy(data[thr].unc + off,
-				       data_of(*snapshot), PAGE_SIZE);
+				       data_of(*snapshot), PG_SIZE);
 
 				if (!(nr_pages % m))
 					pr_info("Image saving progress: %3d%%\n",
@@ -870,8 +870,8 @@ static int save_compressed_image(struct swap_map_handle *handle,
 			 */
 			for (off = 0;
 			     off < CMP_HEADER + data[thr].cmp_len;
-			     off += PAGE_SIZE) {
-				memcpy(page, data[thr].cmp + off, PAGE_SIZE);
+			     off += PG_SIZE) {
+				memcpy(page, data[thr].cmp + off, PG_SIZE);
 
 				ret = swap_write_page(handle, page, &hb);
 				if (ret)
@@ -963,7 +963,7 @@ int swsusp_write(unsigned int flags)
 	}
 	memset(&snapshot, 0, sizeof(struct snapshot_handle));
 	error = snapshot_read_next(&snapshot);
-	if (error < (int)PAGE_SIZE) {
+	if (error < (int)PG_SIZE) {
 		if (error >= 0)
 			error = -EFAULT;
 
@@ -1392,7 +1392,7 @@ static int load_compressed_image(struct swap_map_handle *handle,
 			}
 
 			need = DIV_ROUND_UP(data[thr].cmp_len + CMP_HEADER,
-			                    PAGE_SIZE);
+			                    PG_SIZE);
 			if (need > have) {
 				if (eof > 1) {
 					ret = -1;
@@ -1403,9 +1403,9 @@ static int load_compressed_image(struct swap_map_handle *handle,
 
 			for (off = 0;
 			     off < CMP_HEADER + data[thr].cmp_len;
-			     off += PAGE_SIZE) {
+			     off += PG_SIZE) {
 				memcpy(data[thr].cmp + off,
-				       page[pg], PAGE_SIZE);
+				       page[pg], PG_SIZE);
 				have--;
 				want++;
 				if (++pg >= ring_size)
@@ -1443,16 +1443,16 @@ static int load_compressed_image(struct swap_map_handle *handle,
 
 			if (unlikely(!data[thr].unc_len ||
 				data[thr].unc_len > UNC_SIZE ||
-				data[thr].unc_len & (PAGE_SIZE - 1))) {
+				data[thr].unc_len & (PG_SIZE - 1))) {
 				pr_err("Invalid %s uncompressed length\n", hib_comp_algo);
 				ret = -1;
 				goto out_finish;
 			}
 
 			for (off = 0;
-			     off < data[thr].unc_len; off += PAGE_SIZE) {
+			     off < data[thr].unc_len; off += PG_SIZE) {
 				memcpy(data_of(*snapshot),
-				       data[thr].unc + off, PAGE_SIZE);
+				       data[thr].unc + off, PG_SIZE);
 
 				if (!(nr_pages % m))
 					pr_info("Image loading progress: %3d%%\n",
@@ -1533,7 +1533,7 @@ int swsusp_read(unsigned int *flags_p)
 
 	memset(&snapshot, 0, sizeof(struct snapshot_handle));
 	error = snapshot_write_next(&snapshot);
-	if (error < (int)PAGE_SIZE)
+	if (error < (int)PG_SIZE)
 		return error < 0 ? error : -EFAULT;
 	header = (struct swsusp_info *)data_of(snapshot);
 	error = get_swap_reader(&handle, flags_p);

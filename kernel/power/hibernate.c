@@ -300,7 +300,7 @@ void swsusp_show_speed(ktime_t start, ktime_t stop,
 	centisecs = elapsed_centisecs64;
 	if (centisecs == 0)
 		centisecs = 1;	/* avoid div-by-zero */
-	k = nr_pages * (PAGE_SIZE / 1024);
+	k = nr_pages * (PG_SIZE / 1024);
 	kps = (k * 100) / centisecs;
 	pr_info("%s %u kbytes in %u.%02u seconds (%u.%02u MB/s)\n",
 		msg, k, centisecs / 100, centisecs % 100, kps / 1000,

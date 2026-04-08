@@ -980,7 +980,7 @@ int af_alg_sendmsg(struct socket *sock, struct msghdr *msg, size_t size,
 					 struct af_alg_tsgl, list);
 			sg = sgl->sg + sgl->cur - 1;
 			len = min_t(size_t, len,
-				    PAGE_SIZE - sg->offset - sg->length);
+				    PG_SIZE - sg->offset - sg->length);
 
 			err = memcpy_from_msg(page_address(sg_page(sg)) +
 					      sg->offset + sg->length,
@@ -990,7 +990,7 @@ int af_alg_sendmsg(struct socket *sock, struct msghdr *msg, size_t size,
 
 			sg->length += len;
 			ctx->merge = (sg->offset + sg->length) &
-				     (PAGE_SIZE - 1);
+				     (PG_SIZE - 1);
 
 			ctx->used += len;
 			copied += len;
@@ -1044,7 +1044,7 @@ int af_alg_sendmsg(struct socket *sock, struct msghdr *msg, size_t size,
 				struct page *pg;
 				unsigned int i = sgl->cur;
 
-				plen = min_t(size_t, len, PAGE_SIZE);
+				plen = min_t(size_t, len, PG_SIZE);
 
 				pg = alloc_page(GFP_KERNEL);
 				if (!pg) {
@@ -1071,7 +1071,7 @@ int af_alg_sendmsg(struct socket *sock, struct msghdr *msg, size_t size,
 				sgl->cur++;
 			} while (len && sgl->cur < MAX_SGL_ENTS);
 
-			ctx->merge = plen & (PAGE_SIZE - 1);
+			ctx->merge = plen & (PG_SIZE - 1);
 		}
 
 		if (!size)

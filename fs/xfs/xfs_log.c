@@ -1400,7 +1400,7 @@ xlog_alloc_log(
 	iclogp = &log->l_iclog;
 	ASSERT(log->l_iclog_size >= 4096);
 	for (i = 0; i < log->l_iclog_bufs; i++) {
-		size_t bvec_size = howmany(log->l_iclog_size, PAGE_SIZE) *
+		size_t bvec_size = howmany(log->l_iclog_size, PG_SIZE) *
 				sizeof(struct bio_vec);
 
 		iclog = kzalloc(sizeof(*iclog) + bvec_size,
@@ -1575,7 +1575,7 @@ xlog_write_iclog(
 	 * metadata writeback and causing priority inversions.
 	 */
 	bio_init(&iclog->ic_bio, log->l_targ->bt_bdev, iclog->ic_bvec,
-		 howmany(count, PAGE_SIZE),
+		 howmany(count, PG_SIZE),
 		 REQ_OP_WRITE | REQ_META | REQ_SYNC | REQ_IDLE);
 	iclog->ic_bio.bi_iter.bi_sector = log->l_logBBstart + bno;
 	iclog->ic_bio.bi_end_io = xlog_bio_end_io;

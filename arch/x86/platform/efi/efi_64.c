@@ -166,7 +166,7 @@ virt_to_phys_or_null_size(void *va, unsigned long size)
 	pa = slow_virt_to_phys(va);
 
 	/* check if the object crosses a page boundary */
-	if (WARN_ON((pa ^ (pa + size - 1)) & PAGE_MASK))
+	if (WARN_ON((pa ^ (pa + size - 1)) & PTE_MASK))
 		return 0;
 
 	return pa;
@@ -189,7 +189,7 @@ int __init efi_setup_page_tables(unsigned long pa_memmap, unsigned num_pages)
 	 * and ident-map those pages containing the map before calling
 	 * phys_efi_set_virtual_address_map().
 	 */
-	pfn = pa_memmap >> PAGE_SHIFT;
+	pfn = pa_memmap >> PTE_SHIFT;
 	pf = _PAGE_NX | _PAGE_RW | _PAGE_ENC;
 	if (kernel_map_pages_in_pgd(pgd, pfn, pa_memmap, num_pages, pf)) {
 		pr_err("Error ident-mapping new memmap (0x%lx)!\n", pa_memmap);
@@ -238,7 +238,7 @@ int __init efi_setup_page_tables(unsigned long pa_memmap, unsigned num_pages)
 
 	efi_mixed_mode_stack_pa = page_to_phys(page + 1); /* stack grows down */
 
-	npages = (_etext - _text) >> PAGE_SHIFT;
+	npages = (_etext - _text) >> PTE_SHIFT;
 	text = __pa(_text);
 
 	if (kernel_unmap_pages_in_pgd(pgd, text, npages)) {
@@ -246,9 +246,9 @@ int __init efi_setup_page_tables(unsigned long pa_memmap, unsigned num_pages)
 		return 1;
 	}
 
-	npages = (__end_rodata - __start_rodata) >> PAGE_SHIFT;
+	npages = (__end_rodata - __start_rodata) >> PTE_SHIFT;
 	rodata = __pa(__start_rodata);
-	pfn = rodata >> PAGE_SHIFT;
+	pfn = rodata >> PTE_SHIFT;
 
 	pf = _PAGE_NX | _PAGE_ENC;
 	if (kernel_map_pages_in_pgd(pgd, pfn, rodata, npages, pf)) {
@@ -257,7 +257,7 @@ int __init efi_setup_page_tables(unsigned long pa_memmap, unsigned num_pages)
 	}
 
 	tramp = __pa(__efi64_thunk_ret_tramp);
-	pfn = tramp >> PAGE_SHIFT;
+	pfn = tramp >> PTE_SHIFT;
 
 	pf = _PAGE_ENC;
 	if (kernel_map_pages_in_pgd(pgd, pfn, tramp, 1, pf)) {
@@ -297,7 +297,7 @@ static void __init __map_region(efi_memory_desc_t *md, u64 va)
 	    md->type != EFI_MEMORY_MAPPED_IO)
 		flags |= _PAGE_ENC;
 
-	pfn = md->phys_addr >> PAGE_SHIFT;
+	pfn = md->phys_addr >> PTE_SHIFT;
 	if (kernel_map_pages_in_pgd(pgd, pfn, va, md->num_pages, flags))
 		pr_warn("Error mapping PA 0x%llx -> VA 0x%llx!\n",
 			   md->phys_addr, va);
@@ -305,7 +305,7 @@ static void __init __map_region(efi_memory_desc_t *md, u64 va)
 
 void __init efi_map_region(efi_memory_desc_t *md)
 {
-	unsigned long size = md->num_pages << PAGE_SHIFT;
+	unsigned long size = md->num_pages << PTE_SHIFT;
 	u64 pa = md->phys_addr;
 
 	/*
@@ -374,7 +374,7 @@ static int __init efi_update_mappings(efi_memory_desc_t *md, unsigned long pf)
 	int err1, err2;
 
 	/* Update the 1:1 mapping */
-	pfn = md->phys_addr >> PAGE_SHIFT;
+	pfn = md->phys_addr >> PTE_SHIFT;
 	err1 = kernel_map_pages_in_pgd(pgd, pfn, md->phys_addr, md->num_pages, pf);
 	if (err1) {
 		pr_err("Error while updating 1:1 mapping PA 0x%llx -> VA 0x%llx!\n",

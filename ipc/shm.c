@@ -334,7 +334,7 @@ static void shm_destroy(struct ipc_namespace *ns, struct shmid_kernel *shp)
 
 	shm_file = shp->shm_file;
 	shp->shm_file = NULL;
-	ns->shm_tot -= (shp->shm_segsz + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	ns->shm_tot -= (shp->shm_segsz + PG_SIZE - 1) >> PG_SHIFT;
 	shm_rmid(shp);
 	shm_unlock(shp);
 	if (!is_file_hugepages(shm_file))
@@ -564,7 +564,7 @@ static unsigned long shm_pagesize(struct vm_area_struct *vma)
 	if (sfd->vm_ops->pagesize)
 		return sfd->vm_ops->pagesize(vma);
 
-	return PAGE_SIZE;
+	return PG_SIZE;
 }
 
 #ifdef CONFIG_NUMA
@@ -706,7 +706,7 @@ static int newseg(struct ipc_namespace *ns, struct ipc_params *params)
 	size_t size = params->u.size;
 	int error;
 	struct shmid_kernel *shp;
-	size_t numpages = (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	size_t numpages = (size + PG_SIZE - 1) >> PG_SHIFT;
 	const bool has_no_reserve = shmflg & SHM_NORESERVE;
 	vma_flags_t acctflag = EMPTY_VMA_FLAGS;
 	struct file *file;
@@ -715,7 +715,7 @@ static int newseg(struct ipc_namespace *ns, struct ipc_params *params)
 	if (size < SHMMIN || size > ns->shm_ctlmax)
 		return -EINVAL;
 
-	if (numpages << PAGE_SHIFT < size)
+	if (numpages << PG_SHIFT < size)
 		return -ENOSPC;
 
 	if (ns->shm_tot + numpages < ns->shm_tot ||
@@ -1550,7 +1550,7 @@ long do_shmat(int shmid, char __user *shmaddr, int shmflg,
 					goto out;
 			} else
 #ifndef __ARCH_FORCE_SHMLBA
-				if (addr & ~PAGE_MASK)
+				if (addr & ~PG_MASK)
 #endif
 					goto out;
 		}
@@ -1737,7 +1737,7 @@ long ksys_shmdt(char __user *shmaddr)
 	VMA_ITERATOR(vmi, mm, addr);
 #endif
 
-	if (addr & ~PAGE_MASK)
+	if (addr & ~PG_MASK)
 		return retval;
 
 	if (mmap_write_lock_killable(mm))
@@ -1773,7 +1773,7 @@ long ksys_shmdt(char __user *shmaddr)
 		 * otherwise it starts at this address with no hassles.
 		 */
 		if ((vma->vm_ops == &shm_vm_ops) &&
-			(vma->vm_start - addr)/PAGE_SIZE == vma->vm_pgoff) {
+			(vma->vm_start - addr)/PTE_SIZE == vma->vm_pteoff) {
 
 			/*
 			 * Record the file of the shm segment being
@@ -1802,11 +1802,11 @@ long ksys_shmdt(char __user *shmaddr)
 	 * could possibly have landed at. Also cast things to loff_t to
 	 * prevent overflows and make comparisons vs. equal-width types.
 	 */
-	size = PAGE_ALIGN(size);
+	size = PG_ALIGN(size);
 	while (vma && (loff_t)(vma->vm_end - addr) <= size) {
 		/* finding a matching vma now does not alter retval */
 		if ((vma->vm_ops == &shm_vm_ops) &&
-		    ((vma->vm_start - addr)/PAGE_SIZE == vma->vm_pgoff) &&
+		    ((vma->vm_start - addr)/PTE_SIZE == vma->vm_pteoff) &&
 		    (vma->vm_file == file)) {
 			do_vmi_align_munmap(&vmi, vma, mm, vma->vm_start,
 					    vma->vm_end, NULL, false);
@@ -1872,8 +1872,8 @@ static int sysvipc_shm_proc_show(struct seq_file *s, void *it)
 		   shp->shm_atim,
 		   shp->shm_dtim,
 		   shp->shm_ctim,
-		   rss * PAGE_SIZE,
-		   swp * PAGE_SIZE);
+		   rss * PG_SIZE,
+		   swp * PG_SIZE);
 
 	return 0;
 }

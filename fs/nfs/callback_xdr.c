@@ -915,7 +915,7 @@ static __be32 process_op(int nop, struct svc_rqst *rqstp,
 	}
 
 	maxlen = xdr_out->end - xdr_out->p;
-	if (maxlen > 0 && maxlen < PAGE_SIZE) {
+	if (maxlen > 0 && maxlen < PG_SIZE) {
 		status = op->decode_args(rqstp, &rqstp->rq_arg_stream,
 					 rqstp->rq_argp);
 		if (likely(status == 0))

@@ -33,12 +33,12 @@ static vm_fault_t relay_buf_fault(struct vm_fault *vmf)
 {
 	struct page *page;
 	struct rchan_buf *buf = vmf->vma->vm_private_data;
-	pgoff_t pgoff = vmf->pgoff;
+	pgoff_t pgoff = vmf->pteoff;
 
 	if (!buf)
 		return VM_FAULT_OOM;
 
-	page = vmalloc_to_page(buf->start + (pgoff << PAGE_SHIFT));
+	page = vmalloc_to_page(buf->start + (pgoff << PG_SHIFT));
 	if (!page)
 		return VM_FAULT_SIGBUS;
 	get_page(page);
@@ -110,8 +110,8 @@ static void *relay_alloc_buf(struct rchan_buf *buf, size_t *size)
 	void *mem;
 	unsigned int i, j, n_pages;
 
-	*size = PAGE_ALIGN(*size);
-	n_pages = *size >> PAGE_SHIFT;
+	*size = PG_ALIGN(*size);
+	n_pages = *size >> PG_SHIFT;
 
 	buf->page_array = relay_alloc_page_array(n_pages);
 	if (!buf->page_array)
@@ -502,7 +502,7 @@ struct rchan *relay_open(const char *base_filename,
 	chan->version = RELAYFS_CHANNEL_VERSION;
 	chan->n_subbufs = n_subbufs;
 	chan->subbuf_size = subbuf_size;
-	chan->alloc_size = PAGE_ALIGN(subbuf_size * n_subbufs);
+	chan->alloc_size = PG_ALIGN(subbuf_size * n_subbufs);
 	chan->parent = parent;
 	chan->private_data = private_data;
 	if (base_filename) {

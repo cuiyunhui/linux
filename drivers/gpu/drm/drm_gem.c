@@ -219,7 +219,7 @@ EXPORT_SYMBOL(drm_gem_object_init);
 void drm_gem_private_object_init(struct drm_device *dev,
 				 struct drm_gem_object *obj, size_t size)
 {
-	BUG_ON((size & (PAGE_SIZE - 1)) != 0);
+	BUG_ON((size & (PG_SIZE - 1)) != 0);
 
 	obj->dev = dev;
 	obj->filp = NULL;
@@ -602,7 +602,7 @@ drm_gem_create_mmap_offset_size(struct drm_gem_object *obj, size_t size)
 	struct drm_device *dev = obj->dev;
 
 	return drm_vma_offset_add(dev->vma_offset_manager, &obj->vma_node,
-				  size / PAGE_SIZE);
+				  size / PG_SIZE);
 }
 EXPORT_SYMBOL(drm_gem_create_mmap_offset_size);
 
@@ -680,9 +680,9 @@ struct page **drm_gem_get_pages(struct drm_gem_object *obj)
 	 * drm_gem_object_init(), so we should never hit this unless
 	 * driver author is doing something really wrong:
 	 */
-	WARN_ON((obj->size & (PAGE_SIZE - 1)) != 0);
+	WARN_ON((obj->size & (PG_SIZE - 1)) != 0);
 
-	npages = obj->size >> PAGE_SHIFT;
+	npages = obj->size >> PG_SHIFT;
 
 	pages = kvmalloc_objs(struct page *, npages);
 	if (pages == NULL)
@@ -751,9 +751,9 @@ void drm_gem_put_pages(struct drm_gem_object *obj, struct page **pages,
 	 * drm_gem_object_init(), so we should never hit this unless
 	 * driver author is doing something really wrong:
 	 */
-	WARN_ON((obj->size & (PAGE_SIZE - 1)) != 0);
+	WARN_ON((obj->size & (PG_SIZE - 1)) != 0);
 
-	npages = obj->size >> PAGE_SHIFT;
+	npages = obj->size >> PG_SHIFT;
 
 	folio_batch_init(&fbatch);
 	for (i = 0; i < npages; i++) {
@@ -1294,7 +1294,7 @@ drm_gem_object_lookup_at_offset(struct file *filp, unsigned long start,
  * filesystem which can appropriately align addresses to huge page sizes when
  * needed.
  *
- * Look up the GEM object based on the offset passed in (vma->vm_pgoff will
+ * Look up the GEM object based on the offset passed in (vma->vm_pteoff will
  * contain the fake offset we created) and call shmem_get_unmapped_area() with
  * the right file pointer.
  *
@@ -1308,7 +1308,7 @@ unsigned long drm_gem_get_unmapped_area(struct file *filp, unsigned long uaddr,
 	struct drm_gem_object *obj;
 	unsigned long ret;
 
-	obj = drm_gem_object_lookup_at_offset(filp, pgoff, len >> PAGE_SHIFT);
+	obj = drm_gem_object_lookup_at_offset(filp, pgoff, len >> PG_SHIFT);
 	if (IS_ERR(obj))
 		obj = NULL;
 
@@ -1332,7 +1332,7 @@ EXPORT_SYMBOL_GPL(drm_gem_get_unmapped_area);
  * If a driver supports GEM object mapping, mmap calls on the DRM file
  * descriptor will end up here.
  *
- * Look up the GEM object based on the offset passed in (vma->vm_pgoff will
+ * Look up the GEM object based on the offset passed in (vma->vm_pteoff will
  * contain the fake offset we created) and map it with a call to
  * drm_gem_mmap_obj().
  *
@@ -1344,13 +1344,13 @@ int drm_gem_mmap(struct file *filp, struct vm_area_struct *vma)
 	struct drm_gem_object *obj;
 	int ret;
 
-	obj = drm_gem_object_lookup_at_offset(filp, vma->vm_pgoff,
+	obj = drm_gem_object_lookup_at_offset(filp, vma->vm_pteoff,
 					      vma_pages(vma));
 	if (IS_ERR(obj))
 		return PTR_ERR(obj);
 
 	ret = drm_gem_mmap_obj(obj,
-			       drm_vma_node_size(&obj->vma_node) << PAGE_SHIFT,
+			       drm_vma_node_size(&obj->vma_node) << PG_SHIFT,
 			       vma);
 
 	drm_gem_object_put(obj);
@@ -1537,7 +1537,7 @@ EXPORT_SYMBOL(drm_gem_lru_init);
 static void
 drm_gem_lru_remove_locked(struct drm_gem_object *obj)
 {
-	obj->lru->count -= obj->size >> PAGE_SHIFT;
+	obj->lru->count -= obj->size >> PG_SHIFT;
 	WARN_ON(obj->lru->count < 0);
 	list_del(&obj->lru_node);
 	obj->lru = NULL;
@@ -1580,7 +1580,7 @@ drm_gem_lru_move_tail_locked(struct drm_gem_lru *lru, struct drm_gem_object *obj
 	if (obj->lru)
 		drm_gem_lru_remove_locked(obj);
 
-	lru->count += obj->size >> PAGE_SHIFT;
+	lru->count += obj->size >> PG_SHIFT;
 	list_add_tail(&obj->lru_node, &lru->list);
 	obj->lru = lru;
 }
@@ -1668,12 +1668,12 @@ drm_gem_lru_scan(struct drm_gem_lru *lru,
 		 * for this obj (ie. while it's lock is already held)
 		 */
 		if (!ww_mutex_trylock(&obj->resv->lock, ticket)) {
-			*remaining += obj->size >> PAGE_SHIFT;
+			*remaining += obj->size >> PG_SHIFT;
 			goto tail;
 		}
 
 		if (shrink(obj, ticket)) {
-			freed += obj->size >> PAGE_SHIFT;
+			freed += obj->size >> PG_SHIFT;
 
 			/*
 			 * If we succeeded in releasing the object's backing

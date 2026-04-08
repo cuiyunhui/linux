@@ -727,7 +727,7 @@ int snd_hdac_bus_alloc_stream_pages(struct hdac_bus *bus)
 		s->posbuf = (__le32 *)(bus->posbuf.area + s->index * 8);
 
 	/* single page (at least 4096 bytes) must suffice for both ringbuffes */
-	return snd_dma_alloc_pages(dma_type, bus->dev, PAGE_SIZE, &bus->rb);
+	return snd_dma_alloc_pages(dma_type, bus->dev, PG_SIZE, &bus->rb);
 }
 EXPORT_SYMBOL_GPL(snd_hdac_bus_alloc_stream_pages);
 

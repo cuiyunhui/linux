@@ -846,10 +846,10 @@ static ssize_t show_cpumask(struct padata_instance *pinst,
 	else
 		cpumask = pinst->cpumask.pcpu;
 
-	len = snprintf(buf, PAGE_SIZE, "%*pb\n",
+	len = snprintf(buf, PG_SIZE, "%*pb\n",
 		       nr_cpu_ids, cpumask_bits(cpumask));
 	mutex_unlock(&pinst->lock);
-	return len < PAGE_SIZE ? len : -EINVAL;
+	return len < PG_SIZE ? len : -EINVAL;
 }
 
 static ssize_t store_cpumask(struct padata_instance *pinst,

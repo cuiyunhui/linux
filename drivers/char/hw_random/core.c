@@ -426,10 +426,10 @@ static ssize_t rng_available_show(struct device *dev,
 		return -ERESTARTSYS;
 	buf[0] = '\0';
 	list_for_each_entry(rng, &rng_list, list) {
-		strlcat(buf, rng->name, PAGE_SIZE);
-		strlcat(buf, " ", PAGE_SIZE);
+		strlcat(buf, rng->name, PG_SIZE);
+		strlcat(buf, " ", PG_SIZE);
 	}
-	strlcat(buf, "none\n", PAGE_SIZE);
+	strlcat(buf, "none\n", PG_SIZE);
 	mutex_unlock(&rng_mutex);
 
 	return strlen(buf);

@@ -43,8 +43,8 @@ void accept_memory(phys_addr_t start, unsigned long size)
 	if (!unaccepted)
 		return;
 
-	end = PAGE_ALIGN(start + size);
-	start = PAGE_ALIGN_DOWN(start);
+	end = PTE_ALIGN(start + size);
+	start = PTE_ALIGN_DOWN(start);
 
 	unit_size = unaccepted->unit_size;
 
@@ -172,8 +172,8 @@ bool range_contains_unaccepted_memory(phys_addr_t start, unsigned long size)
 	if (!unaccepted)
 		return false;
 
-	end = PAGE_ALIGN(start + size);
-	start = PAGE_ALIGN_DOWN(start);
+	end = PTE_ALIGN(start + size);
+	start = PTE_ALIGN_DOWN(start);
 
 	unit_size = unaccepted->unit_size;
 

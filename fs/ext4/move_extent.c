@@ -208,7 +208,7 @@ static int mext_move_begin(struct mext_data *mext, struct folio *folio[2],
 	orig_pos = ((loff_t)mext->orig_map.m_lblk) << blkbits;
 	donor_pos = ((loff_t)mext->donor_lblk) << blkbits;
 	ret = mext_folio_double_lock(orig_inode, donor_inode,
-			orig_pos >> PAGE_SHIFT, donor_pos >> PAGE_SHIFT,
+			orig_pos >> PG_SHIFT, donor_pos >> PG_SHIFT,
 			((size_t)mext->orig_map.m_len) << blkbits, folio);
 	if (ret)
 		return ret;
@@ -521,8 +521,8 @@ static int mext_check_adjust_range(struct inode *orig_inode,
 	__u64 orig_eof, donor_eof;
 
 	/* Start offset should be same */
-	if ((orig_start & ~(PAGE_MASK >> orig_inode->i_blkbits)) !=
-	    (donor_start & ~(PAGE_MASK >> orig_inode->i_blkbits))) {
+	if ((orig_start & ~(PG_MASK >> orig_inode->i_blkbits)) !=
+	    (donor_start & ~(PG_MASK >> orig_inode->i_blkbits))) {
 		ext4_debug("ext4 move extent: orig and donor's start offsets are not aligned [ino:orig %lu, donor %lu]\n",
 			   orig_inode->i_ino, donor_inode->i_ino);
 		return -EINVAL;

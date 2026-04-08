@@ -45,12 +45,12 @@ note_buf_t __percpu *crash_notes;
 int kimage_crash_copy_vmcoreinfo(struct kimage *image)
 {
 	struct page *vmcoreinfo_base;
-	struct page *vmcoreinfo_pages[DIV_ROUND_UP(VMCOREINFO_BYTES, PAGE_SIZE)];
+	struct page *vmcoreinfo_pages[DIV_ROUND_UP(VMCOREINFO_BYTES, PG_SIZE)];
 	unsigned int order, nr_pages;
 	int i;
 	void *safecopy;
 
-	nr_pages = DIV_ROUND_UP(VMCOREINFO_BYTES, PAGE_SIZE);
+	nr_pages = DIV_ROUND_UP(VMCOREINFO_BYTES, PG_SIZE);
 	order = get_order(VMCOREINFO_BYTES);
 
 	if (!IS_ENABLED(CONFIG_CRASH_DUMP))
@@ -489,13 +489,13 @@ static int __init crash_notes_memory_init(void)
 	 * crash_notes is allocated inside one physical page.
 	 */
 	size = sizeof(note_buf_t);
-	align = min(roundup_pow_of_two(sizeof(note_buf_t)), PAGE_SIZE);
+	align = min(roundup_pow_of_two(sizeof(note_buf_t)), PG_SIZE);
 
 	/*
-	 * Break compile if size is bigger than PAGE_SIZE since crash_notes
+	 * Break compile if size is bigger than PG_SIZE since crash_notes
 	 * definitely will be in 2 pages with that.
 	 */
-	BUILD_BUG_ON(size > PAGE_SIZE);
+	BUILD_BUG_ON(size > PG_SIZE);
 
 	crash_notes = __alloc_percpu(size, align);
 	if (!crash_notes) {
@@ -612,7 +612,7 @@ static void crash_handle_hotplug_event(unsigned int hp_action, unsigned int cpu,
 
 		for (n = 0; n < image->nr_segments; n++) {
 			mem = image->segment[n].mem;
-			ptr = kmap_local_page(pfn_to_page(mem >> PAGE_SHIFT));
+			ptr = kmap_local_page(pfn_to_page(mem >> PTE_SHIFT));
 			if (ptr) {
 				/* The segment containing elfcorehdr */
 				if (memcmp(ptr, ELFMAG, SELFMAG) == 0)

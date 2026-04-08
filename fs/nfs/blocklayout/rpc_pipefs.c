@@ -68,7 +68,7 @@ bl_resolve_deviceid(struct nfs_server *server, struct pnfs_block_volume *b,
 	bl_pipe_msg.bl_wq = &nn->bl_wq;
 
 	b->simple.len += 4;	/* single volume */
-	if (b->simple.len > PAGE_SIZE)
+	if (b->simple.len > PG_SIZE)
 		goto out_unlock;
 
 	memset(msg, 0, sizeof(*msg));

@@ -1534,7 +1534,7 @@ static ssize_t atkbd_set_extra(struct atkbd *atkbd, const char *buf, size_t coun
 
 static ssize_t atkbd_show_force_release(struct atkbd *atkbd, char *buf)
 {
-	size_t len = scnprintf(buf, PAGE_SIZE - 1, "%*pbl",
+	size_t len = scnprintf(buf, PG_SIZE - 1, "%*pbl",
 			       ATKBD_KEYMAP_SIZE, atkbd->force_release_mask);
 
 	buf[len++] = '\n';

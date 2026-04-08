@@ -2891,7 +2891,7 @@ static void nfs4_xdr_enc_fs_locations(struct rpc_rqst *req,
 	}
 
 	rpc_prepare_reply_pages(req, (struct page **)&args->page, 0,
-				PAGE_SIZE, replen);
+				PG_SIZE, replen);
 	encode_nops(&hdr);
 }
 
@@ -5220,7 +5220,7 @@ static int decode_space_limit(struct xdr_stream *xdr,
 		blocksize = be32_to_cpup(p);
 		maxsize = (uint64_t)nblocks * (uint64_t)blocksize;
 	}
-	maxsize >>= PAGE_SHIFT;
+	maxsize >>= PG_SHIFT;
 	*pagemod_limit = min_t(u64, maxsize, ULONG_MAX);
 	return 0;
 }
@@ -5687,7 +5687,7 @@ static int decode_secinfo_common(struct xdr_stream *xdr, struct nfs4_secinfo_res
 
 	for (i = 0; i < num_flavors; i++) {
 		sec_flavor = &res->flavors->flavors[i];
-		if ((char *)&sec_flavor[1] - (char *)res->flavors > PAGE_SIZE)
+		if ((char *)&sec_flavor[1] - (char *)res->flavors > PG_SIZE)
 			break;
 
 		p = xdr_inline_decode(xdr, 4);
@@ -7206,7 +7206,7 @@ static int nfs4_xdr_dec_fs_locations(struct rpc_rqst *req,
 	if (status)
 		goto out;
 	if (res->migration) {
-		xdr_enter_page(xdr, PAGE_SIZE);
+		xdr_enter_page(xdr, PG_SIZE);
 		status = decode_getfattr_generic(xdr,
 					res->fs_locations->fattr,
 					 NULL, res->fs_locations,
@@ -7219,7 +7219,7 @@ static int nfs4_xdr_dec_fs_locations(struct rpc_rqst *req,
 		status = decode_lookup(xdr);
 		if (status)
 			goto out;
-		xdr_enter_page(xdr, PAGE_SIZE);
+		xdr_enter_page(xdr, PG_SIZE);
 		status = decode_getfattr_generic(xdr,
 					res->fs_locations->fattr,
 					 NULL, res->fs_locations,

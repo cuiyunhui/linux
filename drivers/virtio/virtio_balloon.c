@@ -24,7 +24,7 @@
  * multiple balloon pages.  All memory counters in this driver are in balloon
  * page units.
  */
-#define VIRTIO_BALLOON_PAGES_PER_PAGE (unsigned int)(PAGE_SIZE >> VIRTIO_BALLOON_PFN_SHIFT)
+#define VIRTIO_BALLOON_PAGES_PER_PAGE (unsigned int)(PG_SIZE >> VIRTIO_BALLOON_PFN_SHIFT)
 #define VIRTIO_BALLOON_ARRAY_PFNS_MAX 256
 /* Maximum number of (4k) pages to deflate on OOM notifications. */
 #define VIRTIO_BALLOON_OOM_NR_PAGES 256
@@ -36,7 +36,7 @@
 #define VIRTIO_BALLOON_HINT_BLOCK_ORDER MAX_PAGE_ORDER
 /* The size of a free page block in bytes */
 #define VIRTIO_BALLOON_HINT_BLOCK_BYTES \
-	(1 << (VIRTIO_BALLOON_HINT_BLOCK_ORDER + PAGE_SHIFT))
+	(1 << (VIRTIO_BALLOON_HINT_BLOCK_ORDER + PG_SHIFT))
 #define VIRTIO_BALLOON_HINT_BLOCK_PAGES (1 << VIRTIO_BALLOON_HINT_BLOCK_ORDER)
 
 enum virtio_balloon_vq {
@@ -138,7 +138,7 @@ static u32 page_to_balloon_pfn(struct page *page)
 {
 	unsigned long pfn = page_to_pfn(page);
 
-	BUILD_BUG_ON(PAGE_SHIFT < VIRTIO_BALLOON_PFN_SHIFT);
+	BUILD_BUG_ON(PG_SHIFT < VIRTIO_BALLOON_PFN_SHIFT);
 	/* Convert pfn from Linux page size to balloon page size. */
 	return pfn * VIRTIO_BALLOON_PAGES_PER_PAGE;
 }
@@ -342,7 +342,7 @@ static inline void update_stat(struct virtio_balloon *vb, int idx,
 	vb->stats[idx].val = cpu_to_virtio64(vb->vdev, val);
 }
 
-#define pages_to_bytes(x) ((u64)(x) << PAGE_SHIFT)
+#define pages_to_bytes(x) ((u64)(x) << PG_SHIFT)
 
 #ifdef CONFIG_VM_EVENT_COUNTERS
 /* Return the number of entries filled by vm events */

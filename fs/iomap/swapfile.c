@@ -42,9 +42,9 @@ static int iomap_swapfile_add_extent(struct iomap_swapfile_info *isi)
 	 * Round the start up and the end down so that the physical
 	 * extent aligns to a page boundary.
 	 */
-	first_ppage = ALIGN(iomap->addr, PAGE_SIZE) >> PAGE_SHIFT;
-	next_ppage = ALIGN_DOWN(iomap->addr + iomap->length, PAGE_SIZE) >>
-			PAGE_SHIFT;
+	first_ppage = ALIGN(iomap->addr, PG_SIZE) >> PG_SHIFT;
+	next_ppage = ALIGN_DOWN(iomap->addr + iomap->length, PG_SIZE) >>
+			PG_SHIFT;
 
 	/* Skip too-short physical extents. */
 	if (first_ppage >= next_ppage)
@@ -145,7 +145,7 @@ int iomap_swapfile_activate(struct swap_info_struct *sis,
 	struct iomap_iter iter = {
 		.inode	= inode,
 		.pos	= 0,
-		.len	= ALIGN_DOWN(i_size_read(inode), PAGE_SIZE),
+		.len	= ALIGN_DOWN(i_size_read(inode), PG_SIZE),
 		.flags	= IOMAP_REPORT,
 	};
 	struct iomap_swapfile_info isi = {

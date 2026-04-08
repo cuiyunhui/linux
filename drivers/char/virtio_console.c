@@ -878,11 +878,11 @@ static int pipe_to_sg(struct pipe_inode_info *pipe, struct pipe_buffer *buf,
 		if (!page)
 			return -ENOMEM;
 
-		offset = sd->pos & ~PAGE_MASK;
+		offset = sd->pos & ~PG_MASK;
 
 		len = sd->len;
-		if (len + offset > PAGE_SIZE)
-			len = PAGE_SIZE - offset;
+		if (len + offset > PG_SIZE)
+			len = PG_SIZE - offset;
 
 		src = kmap_local_page(buf->page);
 		memcpy(page_address(page) + offset, src + buf->offset, len);
@@ -1210,14 +1210,14 @@ static int init_port_console(struct port *port)
 	 * The third argument is a "struct hv_ops" containing the
 	 * put_chars() get_chars(), notifier_add() and notifier_del()
 	 * pointers.  The final argument is the output buffer size: we
-	 * can do any size, so we put PAGE_SIZE here.
+	 * can do any size, so we put PG_SIZE here.
 	 */
 	ret = ida_alloc_min(&vtermno_ida, 1, GFP_KERNEL);
 	if (ret < 0)
 		return ret;
 
 	port->cons.vtermno = ret;
-	port->cons.hvc = hvc_alloc(port->cons.vtermno, 0, &hv_ops, PAGE_SIZE);
+	port->cons.hvc = hvc_alloc(port->cons.vtermno, 0, &hv_ops, PG_SIZE);
 	if (IS_ERR(port->cons.hvc)) {
 		ret = PTR_ERR(port->cons.hvc);
 		dev_err(port->dev,
@@ -1295,7 +1295,7 @@ static int fill_queue(struct virtqueue *vq, spinlock_t *lock)
 
 	nr_added_bufs = 0;
 	do {
-		buf = alloc_buf(vq->vdev, PAGE_SIZE, 0);
+		buf = alloc_buf(vq->vdev, PG_SIZE, 0);
 		if (!buf)
 			return -ENOMEM;
 

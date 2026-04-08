@@ -760,7 +760,7 @@ repeat:
 			break;
 		case SIG('S', 'L'):
 			rpnt = get_symlink_chunk(rpnt, rr,
-						 link + (PAGE_SIZE - 1));
+						 link + (PG_SIZE - 1));
 			if (rpnt == NULL)
 				goto out;
 			break;

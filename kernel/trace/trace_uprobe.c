@@ -874,7 +874,7 @@ struct uprobe_cpu_buffer {
 };
 static struct uprobe_cpu_buffer __percpu *uprobe_cpu_buffer;
 static int uprobe_buffer_refcnt;
-#define MAX_UCB_BUFFER_SIZE PAGE_SIZE
+#define MAX_UCB_BUFFER_SIZE PG_SIZE
 
 static int uprobe_buffer_init(void)
 {

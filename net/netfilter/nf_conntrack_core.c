@@ -2530,7 +2530,7 @@ void *nf_ct_alloc_hashtable(unsigned int *sizep, int nulls)
 		return NULL;
 
 	BUILD_BUG_ON(sizeof(struct hlist_nulls_head) != sizeof(struct hlist_head));
-	nr_slots = *sizep = roundup(*sizep, PAGE_SIZE / sizeof(struct hlist_nulls_head));
+	nr_slots = *sizep = roundup(*sizep, PG_SIZE / sizeof(struct hlist_nulls_head));
 
 	if (nr_slots > (INT_MAX / sizeof(struct hlist_nulls_head)))
 		return NULL;
@@ -2643,12 +2643,12 @@ int nf_conntrack_init_start(void)
 
 	if (!nf_conntrack_htable_size) {
 		nf_conntrack_htable_size
-			= (((nr_pages << PAGE_SHIFT) / 16384)
+			= (((nr_pages << PG_SHIFT) / 16384)
 			   / sizeof(struct hlist_head));
 		if (BITS_PER_LONG >= 64 &&
-		    nr_pages > (4 * (1024 * 1024 * 1024 / PAGE_SIZE)))
+		    nr_pages > (4 * (1024 * 1024 * 1024 / PG_SIZE)))
 			nf_conntrack_htable_size = 262144;
-		else if (nr_pages > (1024 * 1024 * 1024 / PAGE_SIZE))
+		else if (nr_pages > (1024 * 1024 * 1024 / PG_SIZE))
 			nf_conntrack_htable_size = 65536;
 
 		if (nf_conntrack_htable_size < 1024)

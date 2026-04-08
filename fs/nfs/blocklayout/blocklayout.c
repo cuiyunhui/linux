@@ -239,7 +239,7 @@ bl_read_pagelist(struct nfs_pgio_header *header)
 	size_t bytes_left = header->args.count;
 	unsigned int pg_offset = header->args.pgbase, pg_len;
 	struct page **pages = header->args.pages;
-	int pg_index = header->args.pgbase >> PAGE_SHIFT;
+	int pg_index = header->args.pgbase >> PG_SHIFT;
 	const bool is_dio = (header->dreq != NULL);
 	struct blk_plug plug;
 	int i;
@@ -271,13 +271,13 @@ bl_read_pagelist(struct nfs_pgio_header *header)
 		}
 
 		if (is_dio) {
-			if (pg_offset + bytes_left > PAGE_SIZE)
-				pg_len = PAGE_SIZE - pg_offset;
+			if (pg_offset + bytes_left > PG_SIZE)
+				pg_len = PG_SIZE - pg_offset;
 			else
 				pg_len = bytes_left;
 		} else {
 			BUG_ON(pg_offset != 0);
-			pg_len = PAGE_SIZE;
+			pg_len = PG_SIZE;
 		}
 
 		if (is_hole(&be)) {
@@ -348,9 +348,9 @@ static void bl_write_cleanup(struct work_struct *work)
 
 	if (likely(!hdr->pnfs_error)) {
 		struct pnfs_block_layout *bl = BLK_LSEG2EXT(hdr->lseg);
-		u64 start = hdr->args.offset & (loff_t)PAGE_MASK;
+		u64 start = hdr->args.offset & (loff_t)PG_MASK;
 		u64 end = (hdr->args.offset + hdr->args.count +
-			PAGE_SIZE - 1) & (loff_t)PAGE_MASK;
+			PG_SIZE - 1) & (loff_t)PG_MASK;
 		u64 lwb = hdr->args.offset + hdr->args.count;
 
 		ext_tree_mark_written(bl, start >> SECTOR_SHIFT,
@@ -383,7 +383,7 @@ bl_write_pagelist(struct nfs_pgio_header *header, int sync)
 	loff_t offset = header->args.offset;
 	size_t count = header->args.count;
 	struct page **pages = header->args.pages;
-	int pg_index = header->args.pgbase >> PAGE_SHIFT;
+	int pg_index = header->args.pgbase >> PG_SHIFT;
 	unsigned int pg_len;
 	struct blk_plug plug;
 	int i;
@@ -402,7 +402,7 @@ bl_write_pagelist(struct nfs_pgio_header *header, int sync)
 	blk_start_plug(&plug);
 
 	/* we always write out the whole page */
-	offset = offset & (loff_t)PAGE_MASK;
+	offset = offset & (loff_t)PG_MASK;
 	isect = offset >> SECTOR_SHIFT;
 
 	for (i = pg_index; i < header->page_array.npages; i++) {
@@ -418,7 +418,7 @@ bl_write_pagelist(struct nfs_pgio_header *header, int sync)
 			extent_length = be.be_length - (isect - be.be_f_offset);
 		}
 
-		pg_len = PAGE_SIZE;
+		pg_len = PG_SIZE;
 		bio = do_add_page_to_bio(bio, header->page_array.npages - i,
 					 REQ_OP_WRITE, isect, pages[i], &map,
 					 &be, bl_end_io_write, par, 0, &pg_len);
@@ -782,7 +782,7 @@ bl_return_range(struct pnfs_layout_hdr *lo,
 
 		end = offset + (range->length >> SECTOR_SHIFT);
 	} else {
-		end = round_down(NFS4_MAX_UINT64, PAGE_SIZE);
+		end = round_down(NFS4_MAX_UINT64, PG_SIZE);
 	}
 
 	ext_tree_remove(bl, range->iomode & IOMODE_RW, offset, end);
@@ -809,7 +809,7 @@ bl_set_layoutdriver(struct nfs_server *server, const struct nfs_fh *fh)
 		dprintk("%s Server did not return blksize\n", __func__);
 		return -EINVAL;
 	}
-	if (server->pnfs_blksize > PAGE_SIZE) {
+	if (server->pnfs_blksize > PG_SIZE) {
 		printk(KERN_ERR "%s: pNFS blksize %d not supported.\n",
 			__func__, server->pnfs_blksize);
 		return -EINVAL;
@@ -891,7 +891,7 @@ static u64 pnfs_num_cont_bytes(struct inode *inode, pgoff_t idx)
 	pgoff_t end;
 
 	/* Optimize common case that writes from 0 to end of file */
-	end = DIV_ROUND_UP(i_size_read(inode), PAGE_SIZE);
+	end = DIV_ROUND_UP(i_size_read(inode), PG_SIZE);
 	if (end != inode->i_mapping->nrpages) {
 		rcu_read_lock();
 		end = page_cache_next_miss(mapping, idx + 1, ULONG_MAX);
@@ -899,9 +899,9 @@ static u64 pnfs_num_cont_bytes(struct inode *inode, pgoff_t idx)
 	}
 
 	if (!end)
-		return i_size_read(inode) - (idx << PAGE_SHIFT);
+		return i_size_read(inode) - (idx << PG_SHIFT);
 	else
-		return (end - idx) << PAGE_SHIFT;
+		return (end - idx) << PG_SHIFT;
 }
 
 static void
@@ -909,7 +909,7 @@ bl_pg_init_write(struct nfs_pageio_descriptor *pgio, struct nfs_page *req)
 {
 	u64 wb_size;
 
-	if (!is_aligned_req(pgio, req, PAGE_SIZE, true)) {
+	if (!is_aligned_req(pgio, req, PG_SIZE, true)) {
 		nfs_pageio_reset_write_mds(pgio);
 		return;
 	}
@@ -938,7 +938,7 @@ static size_t
 bl_pg_test_write(struct nfs_pageio_descriptor *pgio, struct nfs_page *prev,
 		 struct nfs_page *req)
 {
-	if (!is_aligned_req(pgio, req, PAGE_SIZE, true))
+	if (!is_aligned_req(pgio, req, PG_SIZE, true))
 		return 0;
 	return pnfs_generic_pg_test(pgio, prev, req);
 }

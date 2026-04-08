@@ -110,8 +110,8 @@ xfs_buf_free(
 
 	ASSERT(list_empty(&bp->b_lru));
 
-	if (!xfs_buftarg_is_mem(bp->b_target) && size >= PAGE_SIZE)
-		mm_account_reclaimed_pages(howmany(size, PAGE_SHIFT));
+	if (!xfs_buftarg_is_mem(bp->b_target) && size >= PG_SIZE)
+		mm_account_reclaimed_pages(howmany(size, PG_SHIFT));
 
 	if (is_vmalloc_addr(bp->b_addr))
 		vfree(bp->b_addr);
@@ -130,7 +130,7 @@ xfs_buf_alloc_kmem(
 	gfp_t			gfp_mask)
 {
 	ASSERT(is_power_of_2(size));
-	ASSERT(size < PAGE_SIZE);
+	ASSERT(size < PG_SIZE);
 
 	bp->b_addr = kmalloc(size, gfp_mask | __GFP_NOFAIL);
 	if (!bp->b_addr)
@@ -160,7 +160,7 @@ xfs_buf_alloc_kmem(
  * For real file system buffers there are three different kinds backing memory:
  *
  * The first type backs the buffer by a kmalloc allocation.  This is done for
- * less than PAGE_SIZE allocations to avoid wasting memory.
+ * less than PG_SIZE allocations to avoid wasting memory.
  *
  * The second type is a single folio buffer - this may be a high order folio or
  * just a single page sized folio, but either way they get treated the same way
@@ -191,24 +191,24 @@ xfs_buf_alloc_backing_mem(
 		gfp_mask |= __GFP_NORETRY;
 
 	/*
-	 * For buffers smaller than PAGE_SIZE use a kmalloc allocation if that
+	 * For buffers smaller than PG_SIZE use a kmalloc allocation if that
 	 * is properly aligned.  The slab allocator now guarantees an aligned
 	 * allocation for all power of two sizes, which matches most of the
-	 * smaller than PAGE_SIZE buffers used by XFS.
+	 * smaller than PG_SIZE buffers used by XFS.
 	 */
-	if (size < PAGE_SIZE && is_power_of_2(size))
+	if (size < PG_SIZE && is_power_of_2(size))
 		return xfs_buf_alloc_kmem(bp, size, gfp_mask);
 
 	/*
 	 * Don't bother with the retry loop for single PAGE allocations: vmalloc
 	 * won't do any better.
 	 */
-	if (size <= PAGE_SIZE)
+	if (size <= PG_SIZE)
 		gfp_mask |= __GFP_NOFAIL;
 
 	/*
 	 * Optimistically attempt a single high order folio allocation for
-	 * larger than PAGE_SIZE buffers.
+	 * larger than PG_SIZE buffers.
 	 *
 	 * Allocating a high order folio makes the assumption that buffers are a
 	 * power-of-2 size, matching the power-of-2 folios sizes available.
@@ -217,7 +217,7 @@ xfs_buf_alloc_backing_mem(
 	 * sized up to 64kB plus structure metadata, skip straight to the vmalloc
 	 * path for them instead of wasting memory here.
 	 */
-	if (size > PAGE_SIZE) {
+	if (size > PG_SIZE) {
 		if (!is_power_of_2(size))
 			goto fallback;
 		gfp_mask &= ~__GFP_DIRECT_RECLAIM;
@@ -225,7 +225,7 @@ xfs_buf_alloc_backing_mem(
 	}
 	folio = folio_alloc(gfp_mask, get_order(size));
 	if (!folio) {
-		if (size <= PAGE_SIZE)
+		if (size <= PG_SIZE)
 			return -ENOMEM;
 		trace_xfs_buf_backing_fallback(bp, _RET_IP_);
 		goto fallback;
@@ -1169,7 +1169,7 @@ __xfs_buf_ioend(
 	if (bp->b_flags & XBF_READ) {
 		if (!bp->b_error && is_vmalloc_addr(bp->b_addr))
 			invalidate_kernel_vmap_range(bp->b_addr,
-				roundup(BBTOB(bp->b_length), PAGE_SIZE));
+				roundup(BBTOB(bp->b_length), PG_SIZE));
 		if (!bp->b_error && bp->b_ops)
 			bp->b_ops->verify_read(bp);
 		if (!bp->b_error)

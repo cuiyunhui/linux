@@ -350,8 +350,8 @@ static int efivarfs_fill_super(struct super_block *sb, struct fs_context *fc)
 	int err;
 
 	sb->s_maxbytes          = MAX_LFS_FILESIZE;
-	sb->s_blocksize         = PAGE_SIZE;
-	sb->s_blocksize_bits    = PAGE_SHIFT;
+	sb->s_blocksize         = PG_SIZE;
+	sb->s_blocksize_bits    = PG_SHIFT;
 	sb->s_magic             = EFIVARFS_MAGIC;
 	sb->s_op                = &efivarfs_ops;
 	set_default_d_op(sb, &efivarfs_d_ops);

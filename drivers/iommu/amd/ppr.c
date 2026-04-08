@@ -126,7 +126,7 @@ static void iommu_call_iopf_notifier(struct amd_iommu *iommu, u64 *raw)
 
 	event.fault.type = IOMMU_FAULT_PAGE_REQ;
 	event.fault.prm.perm = ppr_flag_to_fault_perm(PPR_FLAGS(raw[0]));
-	event.fault.prm.addr = (u64)(raw[1] & PAGE_MASK);
+	event.fault.prm.addr = (u64)(raw[1] & PTE_MASK);
 	event.fault.prm.pasid = PPR_PASID(raw[0]);
 	event.fault.prm.grpid = PPR_TAG(raw[0]) & 0x1FF;
 

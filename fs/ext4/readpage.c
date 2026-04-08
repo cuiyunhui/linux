@@ -24,7 +24,7 @@
  *
  * then this code just gives up and calls the buffer_head-based read function.
  * It does handle a page which has holes at the end - that is a common case:
- * the end-of-file on blocksize < PAGE_SIZE setups.
+ * the end-of-file on blocksize < PG_SIZE setups.
  *
  */
 
@@ -406,7 +406,7 @@ int ext4_read_folio(struct file *file, struct folio *folio)
 			return ret;
 	}
 
-	if (folio->index < DIV_ROUND_UP(inode->i_size, PAGE_SIZE))
+	if (folio->index < DIV_ROUND_UP(inode->i_size, PG_SIZE))
 		vi = fsverity_get_info(inode);
 	if (vi)
 		fsverity_readahead(vi, folio->index, folio_nr_pages(folio));
@@ -422,7 +422,7 @@ void ext4_readahead(struct readahead_control *rac)
 	if (ext4_has_inline_data(inode))
 		return;
 
-	if (readahead_index(rac) < DIV_ROUND_UP(inode->i_size, PAGE_SIZE))
+	if (readahead_index(rac) < DIV_ROUND_UP(inode->i_size, PG_SIZE))
 		vi = fsverity_get_info(inode);
 	if (vi)
 		fsverity_readahead(vi, readahead_index(rac),

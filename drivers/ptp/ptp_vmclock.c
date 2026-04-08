@@ -377,11 +377,11 @@ static int vmclock_miscdev_mmap(struct file *fp, struct vm_area_struct *vma)
 	if ((vma->vm_flags & (VM_READ|VM_WRITE)) != VM_READ)
 		return -EROFS;
 
-	if (vma->vm_end - vma->vm_start != PAGE_SIZE || vma->vm_pgoff)
+	if (vma->vm_end - vma->vm_start != PG_SIZE || vma->vm_pteoff)
 		return -EINVAL;
 
 	if (io_remap_pfn_range(vma, vma->vm_start,
-			       st->res.start >> PAGE_SHIFT, PAGE_SIZE,
+			       st->res.start >> PG_SHIFT, PG_SIZE,
 			       vma->vm_page_prot))
 		return -EAGAIN;
 
@@ -397,10 +397,10 @@ static ssize_t vmclock_miscdev_read(struct file *fp, char __user *buf,
 	uint32_t seq, old_seq;
 	size_t max_count;
 
-	if (*ppos >= PAGE_SIZE)
+	if (*ppos >= PG_SIZE)
 		return 0;
 
-	max_count = PAGE_SIZE - *ppos;
+	max_count = PG_SIZE - *ppos;
 	if (count > max_count)
 		count = max_count;
 
@@ -733,7 +733,7 @@ static int vmclock_probe(struct platform_device *pdev)
 	 * use 4KiB PTEs to map smaller MMIO regions like this, but let's
 	 * cross that bridge if/when we come to it.
 	 */
-	if (le32_to_cpu(st->clk->size) >= PAGE_SIZE) {
+	if (le32_to_cpu(st->clk->size) >= PG_SIZE) {
 		st->miscdev.fops = &vmclock_miscdev_fops;
 		st->miscdev.name = st->name;
 

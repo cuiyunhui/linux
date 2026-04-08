@@ -1092,7 +1092,7 @@ out_no_revalidate:
 	    S_ISREG(inode->i_mode)) {
 		stat->result_mask |= STATX_DIOALIGN | STATX_DIO_READ_ALIGN;
 		stat->dio_mem_align = 4; /* 4-byte alignment */
-		stat->dio_offset_align = PAGE_SIZE;
+		stat->dio_offset_align = PG_SIZE;
 		stat->dio_read_offset_align = stat->dio_offset_align;
 	}
 out:

@@ -194,13 +194,13 @@ static int ext4_readdir(struct file *file, struct dir_context *ctx)
 		}
 		if (err > 0) {
 			pgoff_t index = map.m_pblk << inode->i_blkbits >>
-					PAGE_SHIFT;
+					PG_SHIFT;
 			if (!ra_has_index(&file->f_ra, index))
 				page_cache_sync_readahead(
 					sb->s_bdev->bd_mapping,
 					&file->f_ra, file, index,
 					1 << EXT4_SB(sb)->s_min_folio_order);
-			file->f_ra.prev_pos = (loff_t)index << PAGE_SHIFT;
+			file->f_ra.prev_pos = (loff_t)index << PG_SHIFT;
 			bh = ext4_bread(NULL, inode, map.m_lblk, 0);
 			if (IS_ERR(bh)) {
 				err = PTR_ERR(bh);

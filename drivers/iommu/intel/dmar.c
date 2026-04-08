@@ -665,7 +665,7 @@ parse_dmar_table(void)
 	if (!dmar)
 		return -ENODEV;
 
-	if (dmar->width < PAGE_SHIFT - 1) {
+	if (dmar->width < PTE_SHIFT - 1) {
 		pr_warn("Invalid DMAR haw\n");
 		return -EINVAL;
 	}

@@ -1304,7 +1304,7 @@ static int ext4_write_begin(const struct kiocb *iocb,
 	 */
 	needed_blocks = ext4_chunk_trans_extent(inode,
 			ext4_journal_blocks_per_folio(inode)) + 1;
-	index = pos >> PAGE_SHIFT;
+	index = pos >> PG_SHIFT;
 
 	if (ext4_test_inode_state(inode, EXT4_STATE_MAY_INLINE_DATA)) {
 		ret = ext4_try_to_write_inline_data(mapping, inode, pos, len,
@@ -1554,7 +1554,7 @@ static int ext4_journalled_write_end(const struct kiocb *iocb,
 	bool verity = ext4_verity_in_progress(inode);
 
 	trace_ext4_journalled_write_end(inode, pos, len, copied);
-	from = pos & (PAGE_SIZE - 1);
+	from = pos & (PG_SIZE - 1);
 	to = from + len;
 
 	BUG_ON(!ext4_handle_valid(handle));
@@ -1741,8 +1741,8 @@ static void mpage_release_unused_pages(struct mpage_da_data *mpd,
 	}
 
 	folio_batch_init(&fbatch);
-	index = mpd->start_pos >> PAGE_SHIFT;
-	end = mpd->next_pos >> PAGE_SHIFT;
+	index = mpd->start_pos >> PG_SHIFT;
+	end = mpd->next_pos >> PG_SHIFT;
 	while (index < end) {
 		nr = filemap_get_folios(mapping, &index, end - 1, &fbatch);
 		if (nr == 0)
@@ -2408,7 +2408,7 @@ static int mpage_submit_partial_folio(struct mpage_da_data *mpd)
 	int ret;
 
 	folio = filemap_get_folio(inode->i_mapping,
-				  mpd->start_pos >> PAGE_SHIFT);
+				  mpd->start_pos >> PG_SHIFT);
 	if (IS_ERR(folio))
 		return PTR_ERR(folio);
 	/*
@@ -2417,7 +2417,7 @@ static int mpage_submit_partial_folio(struct mpage_da_data *mpd)
 	 */
 	pos = ((loff_t)mpd->map.m_lblk) << inode->i_blkbits;
 	if (WARN_ON_ONCE((folio_pos(folio) == pos) ||
-			 !folio_contains(folio, pos >> PAGE_SHIFT)))
+			 !folio_contains(folio, pos >> PG_SHIFT)))
 		return -EINVAL;
 
 	ret = mpage_submit_folio(mpd, folio);
@@ -2618,8 +2618,8 @@ static int mpage_prepare_extent_to_map(struct mpage_da_data *mpd)
 	struct address_space *mapping = mpd->inode->i_mapping;
 	struct folio_batch fbatch;
 	unsigned int nr_folios;
-	pgoff_t index = mpd->start_pos >> PAGE_SHIFT;
-	pgoff_t end = mpd->end_pos >> PAGE_SHIFT;
+	pgoff_t index = mpd->start_pos >> PG_SHIFT;
+	pgoff_t end = mpd->end_pos >> PG_SHIFT;
 	xa_mark_t tag;
 	int i, err = 0;
 	ext4_lblk_t lblk;
@@ -2851,7 +2851,7 @@ static int ext4_do_writepages(struct mpage_da_data *mpd)
 		writeback_index = mapping->writeback_index;
 		if (writeback_index)
 			cycled = 0;
-		mpd->start_pos = writeback_index << PAGE_SHIFT;
+		mpd->start_pos = writeback_index << PG_SHIFT;
 		mpd->end_pos = LLONG_MAX;
 	} else {
 		mpd->start_pos = wbc->range_start;
@@ -2861,8 +2861,8 @@ static int ext4_do_writepages(struct mpage_da_data *mpd)
 	ext4_io_submit_init(&mpd->io_submit, wbc);
 retry:
 	if (wbc->sync_mode == WB_SYNC_ALL || wbc->tagged_writepages)
-		tag_pages_for_writeback(mapping, mpd->start_pos >> PAGE_SHIFT,
-					mpd->end_pos >> PAGE_SHIFT);
+		tag_pages_for_writeback(mapping, mpd->start_pos >> PG_SHIFT,
+					mpd->end_pos >> PG_SHIFT);
 	blk_start_plug(&plug);
 
 	/*
@@ -2990,7 +2990,7 @@ unplug:
 	blk_finish_plug(&plug);
 	if (!ret && !cycled && wbc->nr_to_write > 0) {
 		cycled = 1;
-		mpd->end_pos = (writeback_index << PAGE_SHIFT) - 1;
+		mpd->end_pos = (writeback_index << PG_SHIFT) - 1;
 		mpd->start_pos = 0;
 		goto retry;
 	}
@@ -3001,7 +3001,7 @@ unplug:
 		 * Set the writeback_index so that range_cyclic
 		 * mode will write it back later
 		 */
-		mapping->writeback_index = mpd->start_pos >> PAGE_SHIFT;
+		mapping->writeback_index = mpd->start_pos >> PG_SHIFT;
 
 out_writepages:
 	trace_ext4_writepages_result(inode, wbc, ret,
@@ -3126,7 +3126,7 @@ static int ext4_da_write_begin(const struct kiocb *iocb,
 	if (unlikely(ret))
 		return ret;
 
-	index = pos >> PAGE_SHIFT;
+	index = pos >> PG_SHIFT;
 
 	if (ext4_nonda_switch(inode->i_sb) || ext4_verity_in_progress(inode)) {
 		*fsdata = (void *)FALL_BACK_TO_NONDELALLOC;
@@ -4022,7 +4022,7 @@ static int __ext4_block_zero_page_range(handle_t *handle,
 	struct folio *folio;
 	int err = 0;
 
-	folio = __filemap_get_folio(mapping, from >> PAGE_SHIFT,
+	folio = __filemap_get_folio(mapping, from >> PG_SHIFT,
 				    FGP_LOCK | FGP_ACCESSED | FGP_CREAT,
 				    mapping_gfp_constraint(mapping, ~__GFP_FS));
 	if (IS_ERR(folio))
@@ -4255,7 +4255,7 @@ static inline void ext4_truncate_folio(struct inode *inode,
 	if (round_up(start, blocksize) >= round_down(end, blocksize))
 		return;
 
-	folio = filemap_lock_folio(inode->i_mapping, start >> PAGE_SHIFT);
+	folio = filemap_lock_folio(inode->i_mapping, start >> PG_SHIFT);
 	if (IS_ERR(folio))
 		return;
 
@@ -4292,14 +4292,14 @@ int ext4_truncate_page_cache_block_range(struct inode *inode,
 	 * ext4_page_mkwrite() can be called during subsequent write access
 	 * to these partial folios.
 	 */
-	if (!IS_ALIGNED(start | end, PAGE_SIZE) &&
-	    blocksize < PAGE_SIZE && start < inode->i_size) {
-		loff_t page_boundary = round_up(start, PAGE_SIZE);
+	if (!IS_ALIGNED(start | end, PG_SIZE) &&
+	    blocksize < PG_SIZE && start < inode->i_size) {
+		loff_t page_boundary = round_up(start, PG_SIZE);
 
 		ext4_truncate_folio(inode, start, min(page_boundary, end));
 		if (end > page_boundary)
 			ext4_truncate_folio(inode,
-					    round_down(end, PAGE_SIZE), end);
+					    round_down(end, PG_SIZE), end);
 	}
 
 truncate_pagecache:
@@ -5732,7 +5732,7 @@ static void ext4_wait_for_tail_page_commit(struct inode *inode)
 	int ret;
 	bool has_transaction;
 
-	offset = inode->i_size & (PAGE_SIZE - 1);
+	offset = inode->i_size & (PG_SIZE - 1);
 	/*
 	 * If the folio is fully truncated, we don't need to wait for any commit
 	 * (and we even should not as __ext4_journalled_invalidate_folio() may
@@ -5742,11 +5742,11 @@ static void ext4_wait_for_tail_page_commit(struct inode *inode)
 	 * the folio remain valid. This is most beneficial for the common case of
 	 * blocksize == PAGESIZE.
 	 */
-	if (!offset || offset > (PAGE_SIZE - i_blocksize(inode)))
+	if (!offset || offset > (PG_SIZE - i_blocksize(inode)))
 		return;
 	while (1) {
 		struct folio *folio = filemap_lock_folio(inode->i_mapping,
-				      inode->i_size >> PAGE_SHIFT);
+				      inode->i_size >> PG_SHIFT);
 		if (IS_ERR(folio))
 			return;
 		ret = __ext4_journalled_invalidate_folio(folio, offset,

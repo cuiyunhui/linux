@@ -2969,7 +2969,7 @@ int xfrm_user_policy(struct sock *sk, int optname, sockptr_t optval, int optlen)
 		return 0;
 	}
 
-	if (optlen <= 0 || optlen > PAGE_SIZE)
+	if (optlen <= 0 || optlen > PG_SIZE)
 		return -EMSGSIZE;
 
 	data = memdup_sockptr(optval, optlen);

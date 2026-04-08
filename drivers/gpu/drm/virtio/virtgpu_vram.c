@@ -46,7 +46,7 @@ static int virtio_gpu_vram_mmap(struct drm_gem_object *obj,
 	if (vram->map_state != STATE_OK)
 		return -EINVAL;
 
-	vma->vm_pgoff -= drm_vma_node_start(&obj->vma_node);
+	vma->vm_pteoff -= drm_vma_node_start(&obj->vma_node);
 	vm_flags_set(vma, VM_MIXEDMAP | VM_DONTEXPAND);
 	vma->vm_page_prot = vm_get_page_prot(vma->vm_flags);
 	vma->vm_page_prot = pgprot_decrypted(vma->vm_page_prot);
@@ -57,14 +57,14 @@ static int virtio_gpu_vram_mmap(struct drm_gem_object *obj,
 	else if (vram->map_info == VIRTIO_GPU_MAP_CACHE_UNCACHED)
 		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 
-	if (check_add_overflow(vma->vm_pgoff << PAGE_SHIFT, vm_size, &vm_end))
+	if (check_add_overflow(vma->vm_pteoff << PTE_SHIFT, vm_size, &vm_end))
 		return -EINVAL;
 
 	if (vm_end > vram->vram_node.size)
 		return -EINVAL;
 
 	ret = io_remap_pfn_range(vma, vma->vm_start,
-				 (vram->vram_node.start >> PAGE_SHIFT) + vma->vm_pgoff,
+				 (vram->vram_node.start >> PTE_SHIFT) + vma->vm_pteoff,
 				 vm_size, vma->vm_page_prot);
 	return ret;
 }
@@ -200,7 +200,7 @@ int virtio_gpu_vram_create(struct virtio_gpu_device *vgdev,
 	obj = &vram->base.base.base;
 	obj->funcs = &virtio_gpu_vram_funcs;
 
-	params->size = PAGE_ALIGN(params->size);
+	params->size = PG_ALIGN(params->size);
 	drm_gem_private_object_init(vgdev->ddev, obj, params->size);
 
 	/* Create fake offset */

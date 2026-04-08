@@ -9,6 +9,7 @@
 #include <linux/types.h>
 #include <linux/bug.h>
 #include <linux/mmdebug.h>
+#include <vdso/page.h>
 #ifndef __GENERATING_BOUNDS_H
 #include <linux/mm_types.h>
 #include <generated/bounds.h>
@@ -211,12 +212,12 @@ static __always_inline const struct page *page_fixed_fake_head(const struct page
 		return page;
 
 	/*
-	 * Only addresses aligned with PAGE_SIZE of struct page may be fake head
+	 * Only addresses aligned with PG_SIZE of struct page may be fake head
 	 * struct page. The alignment check aims to avoid access the fields (
 	 * e.g. compound_head) of the @page[1]. It can avoid touch a (possibly)
 	 * cold cacheline in some cases.
 	 */
-	if (IS_ALIGNED((unsigned long)page, PAGE_SIZE) &&
+	if (IS_ALIGNED((unsigned long)page, PG_SIZE) &&
 	    test_bit(PG_head, &page->flags.f)) {
 		/*
 		 * We can safely access the field of the @page[1] with PG_head

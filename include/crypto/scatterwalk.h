@@ -67,15 +67,15 @@ static inline unsigned int scatterwalk_clamp(struct scatter_walk *walk,
 	 * !HIGHMEM case: no mapping is needed; all pages of the sg entry are
 	 * already mapped contiguously in the kernel's direct map.  For improved
 	 * performance, allow the walker to return data segments that cross a
-	 * page boundary.  Do still cap the length to PAGE_SIZE, since some
+	 * page boundary.  Do still cap the length to PG_SIZE, since some
 	 * users rely on that to avoid disabling preemption for too long when
 	 * using SIMD.  It's also needed for when skcipher_walk uses a bounce
 	 * page due to the data not being aligned to the algorithm's alignmask.
 	 */
 	if (IS_ENABLED(CONFIG_HIGHMEM))
-		limit = PAGE_SIZE - offset_in_page(walk->offset);
+		limit = PG_SIZE - offset_in_pg(walk->offset);
 	else
-		limit = PAGE_SIZE;
+		limit = PG_SIZE;
 
 	return min3(nbytes, len_this_sg, limit);
 }
@@ -106,8 +106,8 @@ static inline void scatterwalk_map(struct scatter_walk *walk)
 	if (IS_ENABLED(CONFIG_HIGHMEM)) {
 		struct page *page;
 
-		page = base_page + (offset >> PAGE_SHIFT);
-		offset = offset_in_page(offset);
+		page = base_page + (offset >> PG_SHIFT);
+		offset = offset_in_pg(offset);
 		addr = kmap_local_page(page) + offset;
 	} else {
 		/*
@@ -188,15 +188,15 @@ static inline void __scatterwalk_flush_dcache_pages(struct page *base_page,
 {
 	unsigned int num_pages;
 
-	base_page += offset / PAGE_SIZE;
-	offset %= PAGE_SIZE;
+	base_page += offset / PG_SIZE;
+	offset %= PG_SIZE;
 
 	/*
 	 * This is an overflow-safe version of
-	 * num_pages = DIV_ROUND_UP(offset + nbytes, PAGE_SIZE).
+	 * num_pages = DIV_ROUND_UP(offset + nbytes, PG_SIZE).
 	 */
-	num_pages = nbytes / PAGE_SIZE;
-	num_pages += DIV_ROUND_UP(offset + (nbytes % PAGE_SIZE), PAGE_SIZE);
+	num_pages = nbytes / PG_SIZE;
+	num_pages += DIV_ROUND_UP(offset + (nbytes % PG_SIZE), PG_SIZE);
 
 	for (unsigned int i = 0; i < num_pages; i++)
 		flush_dcache_page(base_page + i);

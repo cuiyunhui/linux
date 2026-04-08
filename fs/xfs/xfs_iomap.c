@@ -997,7 +997,7 @@ allocate_blocks:
 	 * Note that the values needs to be less than 32-bits wide until the
 	 * lower level functions are updated.
 	 */
-	length = min_t(loff_t, length, 1024 * PAGE_SIZE);
+	length = min_t(loff_t, length, 1024 * PG_SIZE);
 	end_fsb = xfs_iomap_end_fsb(mp, offset, length);
 
 	if (offset + length > XFS_ISIZE(ip))
@@ -1688,7 +1688,7 @@ xfs_zoned_buffered_write_iomap_begin(
 	 */
 	end_fsb = min(end_fsb, got.br_startoff);
 	count_fsb = min3(end_fsb - offset_fsb, XFS_MAX_BMBT_EXTLEN,
-			 XFS_B_TO_FSB(mp, 1024 * PAGE_SIZE));
+			 XFS_B_TO_FSB(mp, 1024 * PG_SIZE));
 
 	/*
 	 * The block reservation is supposed to cover all blocks that the
@@ -1927,7 +1927,7 @@ xfs_buffered_write_iomap_begin(
 		 * Note that the values needs to be less than 32-bits wide until
 		 * the lower level functions are updated.
 		 */
-		count = min_t(loff_t, count, 1024 * PAGE_SIZE);
+		count = min_t(loff_t, count, 1024 * PG_SIZE);
 		end_fsb = xfs_iomap_end_fsb(mp, offset, count);
 
 		if (xfs_is_always_cow_inode(ip))

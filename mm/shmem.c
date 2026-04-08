@@ -2904,7 +2904,7 @@ static struct mempolicy *shmem_get_policy(struct vm_area_struct *vma,
 	 * by page order, as in shmem_get_pgoff_policy() and get_vma_policy()).
 	 */
 	*ilx = inode->i_ino;
-	index = ((addr - vma->vm_start) >> PG_SHIFT) + vma->vm_pgoff;
+	index = ((addr - vma->vm_start) >> PTE_SHIFT) + vma->vm_pteoff;
 	return mpol_shared_policy_lookup(&SHMEM_I(inode)->policy, index);
 }
 

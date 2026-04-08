@@ -1068,7 +1068,7 @@ static int gss_read_proxy_verf(struct svc_rqst *rqstp,
 	if (inlen > xdr_stream_remaining(xdr))
 		goto out_denied_free;
 
-	pages = DIV_ROUND_UP(inlen, PAGE_SIZE);
+	pages = DIV_ROUND_UP(inlen, PG_SIZE);
 	in_token->pages = kzalloc_objs(struct page *, pages + 1);
 	if (!in_token->pages)
 		goto out_denied_free;
@@ -1090,14 +1090,14 @@ static int gss_read_proxy_verf(struct svc_rqst *rqstp,
 	to_offs = length;
 	from_offs = rqstp->rq_arg.page_base;
 	while (inlen) {
-		pgto = to_offs >> PAGE_SHIFT;
-		pgfrom = from_offs >> PAGE_SHIFT;
-		pgto_offs = to_offs & ~PAGE_MASK;
-		pgfrom_offs = from_offs & ~PAGE_MASK;
+		pgto = to_offs >> PG_SHIFT;
+		pgfrom = from_offs >> PG_SHIFT;
+		pgto_offs = to_offs & ~PG_MASK;
+		pgfrom_offs = from_offs & ~PG_MASK;
 
 		length = min_t(unsigned int, inlen,
-			 min_t(unsigned int, PAGE_SIZE - pgto_offs,
-			       PAGE_SIZE - pgfrom_offs));
+			 min_t(unsigned int, PG_SIZE - pgto_offs,
+			       PG_SIZE - pgfrom_offs));
 		memcpy(page_address(in_token->pages[pgto]) + pgto_offs,
 		       page_address(rqstp->rq_arg.pages[pgfrom]) + pgfrom_offs,
 		       length);
@@ -1874,12 +1874,12 @@ static int svcauth_gss_wrap_priv(struct svc_rqst *rqstp)
 	 * both the head and tail.
 	 */
 	if (tail->iov_base) {
-		if (tail->iov_base >= head->iov_base + PAGE_SIZE)
+		if (tail->iov_base >= head->iov_base + PG_SIZE)
 			goto wrap_failed;
 		if (tail->iov_base < head->iov_base)
 			goto wrap_failed;
 		if (tail->iov_len + head->iov_len
-				+ 2 * RPC_MAX_AUTH_SIZE > PAGE_SIZE)
+				+ 2 * RPC_MAX_AUTH_SIZE > PG_SIZE)
 			goto wrap_failed;
 		memmove(tail->iov_base + RPC_MAX_AUTH_SIZE, tail->iov_base,
 			tail->iov_len);
@@ -1893,7 +1893,7 @@ static int svcauth_gss_wrap_priv(struct svc_rqst *rqstp)
 	 * head and tail.
 	 */
 	if (!tail->iov_base) {
-		if (head->iov_len + 2 * RPC_MAX_AUTH_SIZE > PAGE_SIZE)
+		if (head->iov_len + 2 * RPC_MAX_AUTH_SIZE > PG_SIZE)
 			goto wrap_failed;
 		tail->iov_base = head->iov_base
 			+ head->iov_len + RPC_MAX_AUTH_SIZE;

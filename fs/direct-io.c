@@ -184,15 +184,15 @@ static inline int dio_refill_pages(struct dio *dio, struct dio_submit *sdio)
 		sdio->head = 0;
 		sdio->tail = 1;
 		sdio->from = 0;
-		sdio->to = PAGE_SIZE;
+		sdio->to = PG_SIZE;
 		return 0;
 	}
 
 	if (ret >= 0) {
 		ret += sdio->from;
 		sdio->head = 0;
-		sdio->tail = (ret + PAGE_SIZE - 1) / PAGE_SIZE;
-		sdio->to = ((ret - 1) & (PAGE_SIZE - 1)) + 1;
+		sdio->tail = (ret + PG_SIZE - 1) / PG_SIZE;
+		sdio->to = ((ret - 1) & (PG_SIZE - 1)) + 1;
 		return 0;
 	}
 	return ret;	
@@ -695,7 +695,7 @@ static inline int dio_bio_add_page(struct dio *dio, struct dio_submit *sdio)
 		/*
 		 * Decrement count only, if we are done with this page
 		 */
-		if ((sdio->cur_page_len + sdio->cur_page_offset) == PAGE_SIZE)
+		if ((sdio->cur_page_len + sdio->cur_page_offset) == PG_SIZE)
 			sdio->pages_in_io--;
 		dio_pin_page(dio, sdio->cur_page);
 		sdio->final_block_in_bio = sdio->cur_page_block +
@@ -897,8 +897,8 @@ static inline void dio_zero_block(struct dio *dio, struct dio_submit *sdio,
  * with the size of IO which is permitted at this offset and this i_blkbits.
  *
  * For best results, the blockdev should be set up with 512-byte i_blkbits and
- * it should set b_size to PAGE_SIZE or more inside get_block().  This gives
- * fine alignment but still allows this function to work in PAGE_SIZE units.
+ * it should set b_size to PG_SIZE or more inside get_block().  This gives
+ * fine alignment but still allows this function to work in PG_SIZE units.
  */
 static int do_direct_IO(struct dio *dio, struct dio_submit *sdio,
 			struct buffer_head *map_bh)
@@ -918,7 +918,7 @@ static int do_direct_IO(struct dio *dio, struct dio_submit *sdio,
 			goto out;
 		}
 		from = sdio->head ? 0 : sdio->from;
-		to = (sdio->head == sdio->tail - 1) ? sdio->to : PAGE_SIZE;
+		to = (sdio->head == sdio->tail - 1) ? sdio->to : PG_SIZE;
 		sdio->head++;
 
 		while (from < to) {

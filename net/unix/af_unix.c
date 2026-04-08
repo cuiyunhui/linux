@@ -2118,10 +2118,10 @@ static int unix_dgram_sendmsg(struct socket *sock, struct msghdr *msg,
 	if (len > SKB_MAX_ALLOC) {
 		data_len = min_t(size_t,
 				 len - SKB_MAX_ALLOC,
-				 MAX_SKB_FRAGS * PAGE_SIZE);
-		data_len = PAGE_ALIGN(data_len);
+				 MAX_SKB_FRAGS * PG_SIZE);
+		data_len = PG_ALIGN(data_len);
 
-		BUILD_BUG_ON(SKB_MAX_ALLOC < PAGE_SIZE);
+		BUILD_BUG_ON(SKB_MAX_ALLOC < PG_SIZE);
 	}
 
 	skb = sock_alloc_send_pskb(sk, len - data_len, data_len,
@@ -2301,7 +2301,7 @@ out:
 /* We use paged skbs for stream sockets, and limit occupancy to 32768
  * bytes, and a minimum of a full page.
  */
-#define UNIX_SKB_FRAGS_SZ (PAGE_SIZE << get_order(32768))
+#define UNIX_SKB_FRAGS_SZ (PG_SIZE << get_order(32768))
 
 #if IS_ENABLED(CONFIG_AF_UNIX_OOB)
 static int queue_oob(struct sock *sk, struct msghdr *msg, struct sock *other,
@@ -2422,7 +2422,7 @@ static int unix_stream_sendmsg(struct socket *sock, struct msghdr *msg,
 
 			data_len = max_t(int, 0, size - SKB_MAX_HEAD(0));
 
-			data_len = min_t(size_t, size, PAGE_ALIGN(data_len));
+			data_len = min_t(size_t, size, PG_ALIGN(data_len));
 
 			skb = sock_alloc_send_pskb(sk, size - data_len, data_len,
 						   msg->msg_flags & MSG_DONTWAIT, &err,

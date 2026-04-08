@@ -614,8 +614,8 @@ static void ata_pio_sector(struct ata_queued_cmd *qc)
 	offset = qc->cursg->offset + qc->cursg_ofs;
 
 	/* get the current page and offset */
-	page += offset >> PAGE_SHIFT;
-	offset %= PAGE_SIZE;
+	page += offset >> PG_SHIFT;
+	offset %= PG_SIZE;
 
 	/* don't overrun current sg */
 	count = min(qc->cursg->length - qc->cursg_ofs, qc->sect_size);
@@ -627,8 +627,8 @@ static void ata_pio_sector(struct ata_queued_cmd *qc)
 	 * split still has to be dword aligned like all ATA data transfers.
 	 */
 	WARN_ON_ONCE(offset % 4);
-	if (offset + count > PAGE_SIZE) {
-		unsigned int split_len = PAGE_SIZE - offset;
+	if (offset + count > PG_SIZE) {
+		unsigned int split_len = PG_SIZE - offset;
 
 		ata_pio_xfer(qc, page, offset, split_len);
 		ata_pio_xfer(qc, page + 1, 0, count - split_len);
@@ -751,14 +751,14 @@ next_sg:
 	offset = sg->offset + qc->cursg_ofs;
 
 	/* get the current page and offset */
-	page += offset >> PAGE_SHIFT;
-	offset %= PAGE_SIZE;
+	page += offset >> PG_SHIFT;
+	offset %= PG_SIZE;
 
 	/* don't overrun current sg */
 	count = min(sg->length - qc->cursg_ofs, bytes);
 
 	/* don't cross page boundaries */
-	count = min(count, (unsigned int)PAGE_SIZE - offset);
+	count = min(count, (unsigned int)PG_SIZE - offset);
 
 	trace_atapi_pio_transfer_data(qc, offset, count);
 

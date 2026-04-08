@@ -136,7 +136,7 @@ pt_max_oa_lg2(const struct pt_common *common)
 #ifndef pt_has_system_page_size
 static inline bool pt_has_system_page_size(const struct pt_common *common)
 {
-	return PT_GRANULE_LG2SZ == PAGE_SHIFT;
+	return PT_GRANULE_LG2SZ == PTE_SHIFT;
 }
 #endif
 

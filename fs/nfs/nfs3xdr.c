@@ -1329,7 +1329,7 @@ static void nfs3_xdr_enc_getacl3args(struct rpc_rqst *req,
 	encode_uint32(xdr, args->mask);
 	if (args->mask & (NFS_ACL | NFS_DFACL)) {
 		rpc_prepare_reply_pages(req, args->pages, 0,
-					NFSACL_MAXPAGES << PAGE_SHIFT,
+					NFSACL_MAXPAGES << PG_SHIFT,
 					ACL3_getaclres_sz - NFS3_pagepad_sz);
 		req->rq_rcv_buf.flags |= XDRBUF_SPARSE_PAGES;
 	}

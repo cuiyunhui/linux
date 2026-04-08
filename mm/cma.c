@@ -45,7 +45,7 @@ phys_addr_t cma_get_base(const struct cma *cma)
 
 unsigned long cma_get_size(const struct cma *cma)
 {
-	return cma->count << PAGE_SHIFT;
+	return cma->count << PG_SHIFT;
 }
 
 const char *cma_get_name(const struct cma *cma)
@@ -238,7 +238,7 @@ static int __init cma_new_area(const char *name, phys_addr_t size,
 	else
 		snprintf(cma->name, CMA_MAX_NAME,  "cma%d\n", cma_area_count);
 
-	cma->available_count = cma->count = size >> PAGE_SHIFT;
+	cma->available_count = cma->count = size >> PG_SHIFT;
 	cma->order_per_bit = order_per_bit;
 	*res_cma = cma;
 	totalcma_pages += cma->count;
@@ -469,7 +469,7 @@ static int __init __cma_declare_contiguous_nid(phys_addr_t *basep,
 		fixed = false;
 
 	/* size should be aligned with order_per_bit */
-	if (!IS_ALIGNED(size >> PAGE_SHIFT, 1 << order_per_bit))
+	if (!IS_ALIGNED(size >> PG_SHIFT, 1 << order_per_bit))
 		return -EINVAL;
 
 
@@ -589,7 +589,7 @@ int __init cma_declare_contiguous_multi(phys_addr_t total_size,
 			continue;
 
 		size = end - start;
-		size = ALIGN_DOWN(size, (PAGE_SIZE << order_per_bit));
+		size = ALIGN_DOWN(size, (PG_SIZE << order_per_bit));
 		if (!size)
 			continue;
 		sizesum += size;
@@ -677,7 +677,7 @@ int __init cma_declare_contiguous_multi(phys_addr_t total_size,
 		cmrp = &cma->ranges[nr++];
 		cmrp->base_pfn = PHYS_PFN(mlp->base);
 		cmrp->early_pfn = cmrp->base_pfn;
-		cmrp->count = size >> PAGE_SHIFT;
+		cmrp->count = size >> PG_SHIFT;
 
 		sizeleft -= size;
 		if (sizeleft == 0)
@@ -934,7 +934,7 @@ struct page *cma_alloc_frozen_compound(struct cma *cma, unsigned int order)
  * cma_alloc() - allocate pages from contiguous area
  * @cma:   Contiguous memory region for which the allocation is performed.
  * @count: Requested number of pages.
- * @align: Requested alignment of pages (in PAGE_SIZE order).
+ * @align: Requested alignment of pages (in PG_SIZE order).
  * @no_warn: Avoid printing message about failed allocation
  *
  * This function allocates part of contiguous memory on specific
@@ -1120,10 +1120,10 @@ void __init *cma_reserve_early(struct cma *cma, unsigned long size)
 	if (!IS_ALIGNED(size, CMA_MIN_ALIGNMENT_BYTES))
 		return NULL;
 
-	if (!IS_ALIGNED(size, (PAGE_SIZE << cma->order_per_bit)))
+	if (!IS_ALIGNED(size, (PG_SIZE << cma->order_per_bit)))
 		return NULL;
 
-	size >>= PAGE_SHIFT;
+	size >>= PG_SHIFT;
 
 	if (size > cma->available_count)
 		return NULL;

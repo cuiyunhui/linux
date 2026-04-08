@@ -462,10 +462,10 @@ static int percpu_modalloc(struct module *mod, struct load_info *info)
 	if (!pcpusec->sh_size)
 		return 0;
 
-	if (align > PAGE_SIZE) {
+	if (align > PG_SIZE) {
 		pr_warn("%s: per-cpu alignment %li > %li\n",
-			mod->name, align, PAGE_SIZE);
-		align = PAGE_SIZE;
+			mod->name, align, PG_SIZE);
+		align = PG_SIZE;
 	}
 
 	mod->percpu = __alloc_reserved_percpu(pcpusec->sh_size, align);
@@ -585,7 +585,7 @@ static void setup_modinfo_##field(struct module *mod, const char *s)  \
 static ssize_t show_modinfo_##field(const struct module_attribute *mattr, \
 			struct module_kobject *mk, char *buffer)      \
 {                                                                     \
-	return scnprintf(buffer, PAGE_SIZE, "%s\n", mk->mod->field);  \
+	return scnprintf(buffer, PG_SIZE, "%s\n", mk->mod->field);  \
 }                                                                     \
 static int modinfo_##field##_exists(struct module *mod)               \
 {                                                                     \
@@ -1311,7 +1311,7 @@ void __weak module_arch_freeing_init(struct module *mod)
 
 static int module_memory_alloc(struct module *mod, enum mod_mem_type type)
 {
-	unsigned int size = PAGE_ALIGN(mod->mem[type].size);
+	unsigned int size = PG_ALIGN(mod->mem[type].size);
 	enum execmem_type execmem_type;
 	void *ptr;
 
@@ -2394,7 +2394,7 @@ static int elf_validity_cache_copy(struct load_info *info, int flags)
 	return 0;
 }
 
-#define COPY_CHUNK_SIZE (16*PAGE_SIZE)
+#define COPY_CHUNK_SIZE (16*PG_SIZE)
 
 static int copy_chunked_from_user(void *dst, const void __user *usrc, unsigned long len)
 {

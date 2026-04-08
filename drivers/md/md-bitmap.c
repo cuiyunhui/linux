@@ -98,8 +98,8 @@
 
 typedef __u16 bitmap_counter_t;
 
-#define PAGE_BITS (PAGE_SIZE << 3)
-#define PAGE_BIT_SHIFT (PAGE_SHIFT + 3)
+#define PAGE_BITS (PG_SIZE << 3)
+#define PAGE_BIT_SHIFT (PG_SHIFT + 3)
 
 #define COUNTER_BITS 16
 #define COUNTER_BIT_SHIFT 4
@@ -283,7 +283,7 @@ __acquires(bitmap->lock)
 	 * that sleeping here is allowed.
 	 */
 	sched_annotate_sleep();
-	mappage = kzalloc(PAGE_SIZE, GFP_NOIO);
+	mappage = kzalloc(PG_SIZE, GFP_NOIO);
 	spin_lock_irq(&bitmap->lock);
 
 	if (mappage == NULL) {
@@ -349,7 +349,7 @@ static int read_sb_page(struct mddev *mddev, loff_t offset,
 {
 
 	sector_t sector = mddev->bitmap_info.offset + offset +
-		index * (PAGE_SIZE / SECTOR_SIZE);
+		index * (PG_SIZE / SECTOR_SIZE);
 	struct md_rdev *rdev;
 
 	rdev_for_each(rdev, mddev) {
@@ -431,20 +431,20 @@ static int __write_sb_page(struct md_rdev *rdev, struct bitmap *bitmap,
 	struct mddev *mddev = bitmap->mddev;
 	struct bitmap_storage *store = &bitmap->storage;
 	unsigned long num_pages = bitmap->storage.file_pages;
-	unsigned int bitmap_limit = (num_pages - pg_index % num_pages) << PAGE_SHIFT;
+	unsigned int bitmap_limit = (num_pages - pg_index % num_pages) << PG_SHIFT;
 	loff_t sboff, offset = mddev->bitmap_info.offset;
-	sector_t ps = pg_index * PAGE_SIZE / SECTOR_SIZE;
-	unsigned int size = PAGE_SIZE;
-	unsigned int opt_size = PAGE_SIZE;
+	sector_t ps = pg_index * PG_SIZE / SECTOR_SIZE;
+	unsigned int size = PG_SIZE;
+	unsigned int opt_size = PG_SIZE;
 	sector_t doff;
 
 	bdev = (rdev->meta_bdev) ? rdev->meta_bdev : rdev->bdev;
 	/* we compare length (page numbers), not page offset. */
 	if ((pg_index - store->sb_index) == num_pages - 1) {
-		unsigned int last_page_size = store->bytes & (PAGE_SIZE - 1);
+		unsigned int last_page_size = store->bytes & (PG_SIZE - 1);
 
 		if (last_page_size == 0)
-			last_page_size = PAGE_SIZE;
+			last_page_size = PG_SIZE;
 		size = roundup(last_page_size, bdev_logical_block_size(bdev));
 		opt_size = optimal_io_size(bdev, last_page_size, size);
 	}
@@ -456,7 +456,7 @@ static int __write_sb_page(struct md_rdev *rdev, struct bitmap *bitmap,
 	if (mddev->external) {
 		/* Bitmap could be anywhere. */
 		if (sboff + ps > doff &&
-		    sboff < (doff + mddev->dev_sectors + PAGE_SIZE / SECTOR_SIZE))
+		    sboff < (doff + mddev->dev_sectors + PG_SIZE / SECTOR_SIZE))
 			return -EINVAL;
 	} else if (offset < 0) {
 		/* DATA  BITMAP METADATA  */
@@ -561,8 +561,8 @@ static int read_file_page(struct file *file, unsigned long index,
 	sector_t block, blk_cur;
 	unsigned long blocksize = i_blocksize(inode);
 
-	pr_debug("read bitmap file (%dB @ %llu)\n", (int)PAGE_SIZE,
-		 (unsigned long long)index << PAGE_SHIFT);
+	pr_debug("read bitmap file (%dB @ %llu)\n", (int)PG_SIZE,
+		 (unsigned long long)index << PG_SHIFT);
 
 	bh = alloc_page_buffers(page, blocksize);
 	if (!bh) {
@@ -570,7 +570,7 @@ static int read_file_page(struct file *file, unsigned long index,
 		goto out;
 	}
 	attach_page_private(page, bh);
-	blk_cur = index << (PAGE_SHIFT - inode->i_blkbits);
+	blk_cur = index << (PG_SHIFT - inode->i_blkbits);
 	while (bh) {
 		block = blk_cur;
 
@@ -609,8 +609,8 @@ static int read_file_page(struct file *file, unsigned long index,
 out:
 	if (ret)
 		pr_err("md: bitmap read error: (%dB @ %llu): %d\n",
-		       (int)PAGE_SIZE,
-		       (unsigned long long)index << PAGE_SHIFT,
+		       (int)PG_SIZE,
+		       (unsigned long long)index << PG_SHIFT,
 		       ret);
 	return ret;
 }
@@ -858,7 +858,7 @@ re_read:
 
 	if (bitmap->storage.file) {
 		loff_t isize = i_size_read(bitmap->storage.file->f_mapping->host);
-		int bytes = isize > PAGE_SIZE ? PAGE_SIZE : isize;
+		int bytes = isize > PG_SIZE ? PG_SIZE : isize;
 
 		err = read_file_page(bitmap->storage.file, 0,
 				bitmap, bytes, sb_page);
@@ -1022,7 +1022,7 @@ static int md_bitmap_storage_alloc(struct bitmap_storage *store,
 	if (with_super)
 		bytes += sizeof(bitmap_super_t);
 
-	num_pages = DIV_ROUND_UP(bytes, PAGE_SIZE);
+	num_pages = DIV_ROUND_UP(bytes, PG_SIZE);
 	offset = slot_number * num_pages;
 
 	store->filemap = kmalloc_objs(struct page *, num_pages);
@@ -1355,7 +1355,7 @@ static int md_bitmap_init_from_disk(struct bitmap *bitmap, sector_t start)
 	}
 
 	if (mddev_is_clustered(mddev))
-		node_offset = bitmap->cluster_slot * (DIV_ROUND_UP(store->bytes, PAGE_SIZE));
+		node_offset = bitmap->cluster_slot * (DIV_ROUND_UP(store->bytes, PG_SIZE));
 
 	for (i = 0; i < store->file_pages; i++) {
 		struct page *page = store->filemap[i];
@@ -1363,9 +1363,9 @@ static int md_bitmap_init_from_disk(struct bitmap *bitmap, sector_t start)
 
 		/* unmap the old page, we're done with it */
 		if (i == store->file_pages - 1)
-			count = store->bytes - i * PAGE_SIZE;
+			count = store->bytes - i * PG_SIZE;
 		else
-			count = PAGE_SIZE;
+			count = PG_SIZE;
 
 		if (file)
 			ret = read_file_page(file, i, bitmap, count, page);
@@ -1393,7 +1393,7 @@ static int md_bitmap_init_from_disk(struct bitmap *bitmap, sector_t start)
 			 * and write it out
 			 */
 			paddr = kmap_local_page(page);
-			memset(paddr + offset, 0xff, PAGE_SIZE - offset);
+			memset(paddr + offset, 0xff, PG_SIZE - offset);
 			kunmap_local(paddr);
 
 			filemap_write_page(bitmap, i, true);
@@ -1805,17 +1805,17 @@ static bool bitmap_start_sync(struct mddev *mddev, sector_t offset,
 			      sector_t *blocks, bool degraded)
 {
 	/* bitmap_start_sync must always report on multiples of whole
-	 * pages, otherwise resync (which is very PAGE_SIZE based) will
+	 * pages, otherwise resync (which is very PG_SIZE based) will
 	 * get confused.
 	 * So call __bitmap_start_sync repeatedly (if needed) until
-	 * At least PAGE_SIZE>>9 blocks are covered.
+	 * At least PG_SIZE>>9 blocks are covered.
 	 * Return the 'or' of the result.
 	 */
 	bool rv = false;
 	sector_t blocks1;
 
 	*blocks = 0;
-	while (*blocks < (PAGE_SIZE>>9)) {
+	while (*blocks < (PG_SIZE>>9)) {
 		rv |= __bitmap_start_sync(mddev->bitmap, offset,
 					  &blocks1, degraded);
 		offset += blocks1;

@@ -283,7 +283,7 @@ int serial8250_request_dma(struct uart_8250_port *p)
 
 	/* RX buffer */
 	if (!dma->rx_size)
-		dma->rx_size = PAGE_SIZE;
+		dma->rx_size = PG_SIZE;
 
 	dma->rx_buf = dma_alloc_coherent(dma->rxchan->device->dev, dma->rx_size,
 					&dma->rx_addr, GFP_KERNEL);

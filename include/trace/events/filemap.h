@@ -42,7 +42,7 @@ DECLARE_EVENT_CLASS(mm_filemap_op_page_cache,
 		MAJOR(__entry->s_dev), MINOR(__entry->s_dev),
 		__entry->i_ino,
 		__entry->pfn,
-		__entry->index << PAGE_SHIFT,
+		__entry->index << PG_SHIFT,
 		__entry->order)
 );
 
@@ -88,8 +88,8 @@ DECLARE_EVENT_CLASS(mm_filemap_op_page_cache_range,
 		"dev=%d:%d ino=%lx ofs=%lld-%lld",
 		MAJOR(__entry->s_dev),
 		MINOR(__entry->s_dev), __entry->i_ino,
-		((loff_t)__entry->index) << PAGE_SHIFT,
-		((((loff_t)__entry->last_index + 1) << PAGE_SHIFT) - 1)
+		((loff_t)__entry->index) << PG_SHIFT,
+		((((loff_t)__entry->last_index + 1) << PG_SHIFT) - 1)
 	)
 );
 
@@ -136,7 +136,7 @@ TRACE_EVENT(mm_filemap_fault,
 		"dev=%d:%d ino=%lx ofs=%lld",
 		MAJOR(__entry->s_dev),
 		MINOR(__entry->s_dev), __entry->i_ino,
-		((loff_t)__entry->index) << PAGE_SHIFT
+		((loff_t)__entry->index) << PG_SHIFT
 	)
 );
 

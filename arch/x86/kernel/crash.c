@@ -390,7 +390,7 @@ int crash_setup_memmap_entries(struct kimage *image, struct boot_params *params)
 		ei.size = cmem->ranges[i].end - cmem->ranges[i].start + 1;
 
 		/* If entry is less than a page, skip it */
-		if (ei.size < PAGE_SIZE)
+		if (ei.size < PTE_SIZE)
 			continue;
 		ei.addr = cmem->ranges[i].start;
 		ei.type = E820_TYPE_RAM;
@@ -549,7 +549,7 @@ void arch_crash_handle_hotplug_event(struct kimage *image, void *arg)
 	/*
 	 * Copy new elfcorehdr over the old elfcorehdr at destination.
 	 */
-	old_elfcorehdr = kmap_local_page(pfn_to_page(mem >> PAGE_SHIFT));
+	old_elfcorehdr = kmap_local_page(pfn_to_page(mem >> PTE_SHIFT));
 	if (!old_elfcorehdr) {
 		pr_err("mapping elfcorehdr segment failed\n");
 		goto out;

@@ -652,7 +652,7 @@ xfs_should_warn(struct xfs_mount *mp, long nr)
  * preallocation sizes.
  */
 #define XFS_MAX_IO_LOG		30	/* 1G */
-#define XFS_MIN_IO_LOG		PAGE_SHIFT
+#define XFS_MIN_IO_LOG		PG_SHIFT
 
 void xfs_do_force_shutdown(struct xfs_mount *mp, uint32_t flags, char *fname,
 		int lnnum);

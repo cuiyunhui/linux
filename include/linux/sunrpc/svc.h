@@ -113,7 +113,7 @@ void svc_destroy(struct svc_serv **svcp);
  *
  * These happen to all be powers of 2, which is not strictly
  * necessary but helps enforce the real limitation, which is
- * that they should be multiples of PAGE_SIZE.
+ * that they should be multiples of PG_SIZE.
  *
  * For UDP transports, a block plus NFS,RPC, and UDP headers
  * has to fit into the IP datagram limit of 64K.  The largest
@@ -169,7 +169,7 @@ extern u32 svc_max_payload(const struct svc_rqst *rqstp);
  */
 static inline unsigned long svc_serv_maxpages(const struct svc_serv *serv)
 {
-	return DIV_ROUND_UP(serv->sv_max_mesg, PAGE_SIZE) + 2 + 1;
+	return DIV_ROUND_UP(serv->sv_max_mesg, PG_SIZE) + 2 + 1;
 }
 
 /*
@@ -529,10 +529,10 @@ static inline void svcxdr_init_encode(struct svc_rqst *rqstp)
 	xdr->buf = buf;
 	xdr->iov = resv;
 	xdr->p   = resv->iov_base + resv->iov_len;
-	xdr->end = resv->iov_base + PAGE_SIZE;
+	xdr->end = resv->iov_base + PG_SIZE;
 	buf->len = resv->iov_len;
 	xdr->page_ptr = buf->pages - 1;
-	buf->buflen = PAGE_SIZE * (rqstp->rq_page_end - buf->pages);
+	buf->buflen = PG_SIZE * (rqstp->rq_page_end - buf->pages);
 	xdr->rqst = NULL;
 }
 

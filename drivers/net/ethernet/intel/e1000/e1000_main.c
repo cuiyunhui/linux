@@ -3558,10 +3558,10 @@ static int e1000_change_mtu(struct net_device *netdev, int new_mtu)
 	if (max_frame <= E1000_RXBUFFER_2048)
 		adapter->rx_buffer_len = E1000_RXBUFFER_2048;
 	else
-#if (PAGE_SIZE >= E1000_RXBUFFER_16384)
+#if (PG_SIZE >= E1000_RXBUFFER_16384)
 		adapter->rx_buffer_len = E1000_RXBUFFER_16384;
-#elif (PAGE_SIZE >= E1000_RXBUFFER_4096)
-		adapter->rx_buffer_len = PAGE_SIZE;
+#elif (PG_SIZE >= E1000_RXBUFFER_4096)
+		adapter->rx_buffer_len = PG_SIZE;
 #endif
 
 	/* adjust allocation if LPE protects us, and we aren't using SBP */
@@ -3986,7 +3986,7 @@ static void e1000_consume_page(struct e1000_rx_buffer *bi, struct sk_buff *skb,
 	bi->rxbuf.page = NULL;
 	skb->len += length;
 	skb->data_len += length;
-	skb->truesize += PAGE_SIZE;
+	skb->truesize += PG_SIZE;
 }
 
 /**

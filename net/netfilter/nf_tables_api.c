@@ -4777,16 +4777,16 @@ cont:
 				continue;
 			if (!sscanf(i->name, name, &tmp))
 				continue;
-			if (tmp < min || tmp >= min + BITS_PER_BYTE * PAGE_SIZE)
+			if (tmp < min || tmp >= min + BITS_PER_BYTE * PG_SIZE)
 				continue;
 
 			set_bit(tmp - min, inuse);
 		}
 
-		n = find_first_zero_bit(inuse, BITS_PER_BYTE * PAGE_SIZE);
-		if (n >= BITS_PER_BYTE * PAGE_SIZE) {
-			min += BITS_PER_BYTE * PAGE_SIZE;
-			memset(inuse, 0, PAGE_SIZE);
+		n = find_first_zero_bit(inuse, BITS_PER_BYTE * PG_SIZE);
+		if (n >= BITS_PER_BYTE * PG_SIZE) {
+			min += BITS_PER_BYTE * PG_SIZE;
+			memset(inuse, 0, PG_SIZE);
 			goto cont;
 		}
 		free_page((unsigned long)inuse);

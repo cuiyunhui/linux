@@ -106,7 +106,7 @@ static inline void hibernate_unmap_page(struct page *page)
 		if (ret)
 			pr_warn_once("Failed to remap page\n");
 
-		flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
+		flush_tlb_kernel_range(addr, addr + PG_SIZE);
 	} else {
 		debug_pagealloc_unmap_pages(page, 1);
 	}
@@ -125,7 +125,7 @@ unsigned long reserved_size;
 
 void __init hibernate_reserved_size_init(void)
 {
-	reserved_size = SPARE_PAGES * PAGE_SIZE;
+	reserved_size = SPARE_PAGES * PG_SIZE;
 }
 
 /*
@@ -138,7 +138,7 @@ unsigned long image_size;
 
 void __init hibernate_image_size_init(void)
 {
-	image_size = ((totalram_pages() * 2) / 5) * PAGE_SIZE;
+	image_size = ((totalram_pages() * 2) / 5) * PG_SIZE;
 }
 
 /*
@@ -151,7 +151,7 @@ struct pbe *restore_pblist;
 
 /* struct linked_page is used to build chains of pages */
 
-#define LINKED_PAGE_DATA_SIZE	(PAGE_SIZE - sizeof(void *))
+#define LINKED_PAGE_DATA_SIZE	(PG_SIZE - sizeof(void *))
 
 struct linked_page {
 	struct linked_page *next;
@@ -213,7 +213,7 @@ static void *__get_safe_page(gfp_t gfp_mask)
 		void *ret = safe_pages_list;
 
 		safe_pages_list = safe_pages_list->next;
-		memset(ret, 0, PAGE_SIZE);
+		memset(ret, 0, PG_SIZE);
 		return ret;
 	}
 	return get_image_page(gfp_mask, PG_SAFE);
@@ -288,7 +288,7 @@ static inline void free_list_of_pages(struct linked_page *list,
  * chain.
  *
  * NOTE: The chain allocator may be inefficient if the allocated objects
- * are not much smaller than PAGE_SIZE.
+ * are not much smaller than PG_SIZE.
  */
 struct chain_allocator {
 	struct linked_page *chain;	/* the chain */
@@ -371,8 +371,8 @@ static void *chain_alloc(struct chain_allocator *ca, unsigned int size)
 
 #define BM_END_OF_MAP	(~0UL)
 
-#define BM_BITS_PER_BLOCK	(PAGE_SIZE * BITS_PER_BYTE)
-#define BM_BLOCK_SHIFT		(PAGE_SHIFT + 3)
+#define BM_BITS_PER_BLOCK	(PG_SIZE * BITS_PER_BYTE)
+#define BM_BLOCK_SHIFT		(PG_SHIFT + 3)
 #define BM_BLOCK_MASK		((1UL << BM_BLOCK_SHIFT) - 1)
 
 /*
@@ -420,11 +420,11 @@ struct memory_bitmap {
 
 /* Functions that operate on memory bitmaps */
 
-#define BM_ENTRIES_PER_LEVEL	(PAGE_SIZE / sizeof(unsigned long))
+#define BM_ENTRIES_PER_LEVEL	(PG_SIZE / sizeof(unsigned long))
 #if BITS_PER_LONG == 32
-#define BM_RTREE_LEVEL_SHIFT	(PAGE_SHIFT - 2)
+#define BM_RTREE_LEVEL_SHIFT	(PG_SHIFT - 2)
 #else
-#define BM_RTREE_LEVEL_SHIFT	(PAGE_SHIFT - 3)
+#define BM_RTREE_LEVEL_SHIFT	(PG_SHIFT - 3)
 #endif
 #define BM_RTREE_LEVEL_MASK	((1UL << BM_RTREE_LEVEL_SHIFT) - 1)
 
@@ -1018,8 +1018,8 @@ void __init register_nosave_region(unsigned long start_pfn, unsigned long end_pf
 	list_add_tail(&region->list, &nosave_regions);
  Report:
 	pr_info("Registered nosave memory: [mem %#010llx-%#010llx]\n",
-		(unsigned long long) start_pfn << PAGE_SHIFT,
-		((unsigned long long) end_pfn << PAGE_SHIFT) - 1);
+		(unsigned long long) start_pfn << PTE_SHIFT,
+		((unsigned long long) end_pfn << PTE_SHIFT) - 1);
 }
 
 /*
@@ -1090,8 +1090,8 @@ static void mark_nosave_pages(struct memory_bitmap *bm)
 		unsigned long pfn;
 
 		pr_debug("Marking nosave pages: [mem %#010llx-%#010llx]\n",
-			 (unsigned long long) region->start_pfn << PAGE_SHIFT,
-			 ((unsigned long long) region->end_pfn << PAGE_SHIFT)
+			 (unsigned long long) region->start_pfn << PTE_SHIFT,
+			 ((unsigned long long) region->end_pfn << PTE_SHIFT)
 				- 1);
 
 		for_each_valid_pfn(pfn, region->start_pfn, region->end_pfn) {
@@ -1433,7 +1433,7 @@ static inline bool do_copy_page(long *dst, long *src)
 	long z = 0;
 	int n;
 
-	for (n = PAGE_SIZE / sizeof(long); n; n--) {
+	for (n = PG_SIZE / sizeof(long); n; n--) {
 		z |= *src;
 		*dst++ = *src++;
 	}
@@ -1807,12 +1807,12 @@ static unsigned long minimum_image_size(unsigned long saveable)
  * hibernation for allocations made while saving the image and for device
  * drivers, in case they need to allocate memory from their hibernation
  * callbacks (these two numbers are given by PAGES_FOR_IO (which is a rough
- * estimate) and reserved_size divided by PAGE_SIZE (which is tunable through
+ * estimate) and reserved_size divided by PG_SIZE (which is tunable through
  * /sys/power/reserved_size, respectively).  To make this happen, we compute the
  * total number of available page frames and allocate at least
  *
  * ([page frames total] - PAGES_FOR_IO - [metadata pages]) / 2
- *  - 2 * DIV_ROUND_UP(reserved_size, PAGE_SIZE)
+ *  - 2 * DIV_ROUND_UP(reserved_size, PG_SIZE)
  *
  * of them, which corresponds to the maximum size of a hibernation image.
  *
@@ -1879,9 +1879,9 @@ int hibernate_preallocate_memory(void)
 
 	/* Compute the maximum number of saveable pages to leave in memory. */
 	max_size = (count - (size + PAGES_FOR_IO)) / 2
-			- 2 * DIV_ROUND_UP(reserved_size, PAGE_SIZE);
+			- 2 * DIV_ROUND_UP(reserved_size, PG_SIZE);
 	/* Compute the desired number of image pages specified by image_size. */
-	size = DIV_ROUND_UP(image_size, PAGE_SIZE);
+	size = DIV_ROUND_UP(image_size, PG_SIZE);
 	if (size > max_size)
 		size = max_size;
 	/*
@@ -2140,7 +2140,7 @@ asmlinkage __visible int swsusp_save(void)
 	nr_pages += nr_highmem;
 	/* We don't actually copy the zero pages */
 	nr_zero_pages = nr_pages - nr_copy_pages;
-	nr_meta_pages = DIV_ROUND_UP(nr_pages * sizeof(long), PAGE_SIZE);
+	nr_meta_pages = DIV_ROUND_UP(nr_pages * sizeof(long), PG_SIZE);
 
 	pm_deferred_pr_dbg("Image created (%d pages copied, %d zero pages)\n",
 			   nr_copy_pages, nr_zero_pages);
@@ -2184,7 +2184,7 @@ static int init_header(struct swsusp_info *info)
 	info->image_pages = nr_copy_pages;
 	info->pages = snapshot_get_image_size();
 	info->size = info->pages;
-	info->size <<= PAGE_SHIFT;
+	info->size <<= PG_SHIFT;
 	return init_header_complete(info);
 }
 
@@ -2207,7 +2207,7 @@ static inline void pack_pfns(unsigned long *buf, struct memory_bitmap *bm,
 {
 	int j;
 
-	for (j = 0; j < PAGE_SIZE / sizeof(long); j++) {
+	for (j = 0; j < PG_SIZE / sizeof(long); j++) {
 		buf[j] = memory_bm_next_pfn(bm);
 		if (unlikely(buf[j] == BM_END_OF_MAP))
 			break;
@@ -2276,7 +2276,7 @@ int snapshot_read_next(struct snapshot_handle *handle)
 		}
 	}
 	handle->cur++;
-	return PAGE_SIZE;
+	return PG_SIZE;
 }
 
 static void duplicate_memory_bitmap(struct memory_bitmap *dst,
@@ -2363,7 +2363,7 @@ static int unpack_orig_pfns(unsigned long *buf, struct memory_bitmap *bm,
 	bool zero;
 	int j;
 
-	for (j = 0; j < PAGE_SIZE / sizeof(long); j++) {
+	for (j = 0; j < PG_SIZE / sizeof(long); j++) {
 		if (unlikely(buf[j] == BM_END_OF_MAP))
 			break;
 
@@ -2836,11 +2836,11 @@ next:
 	/* Zero pages were not included in the image, memset it and move on. */
 	if (handle->cur > nr_meta_pages + 1 &&
 	    memory_bm_test_bit(&zero_bm, memory_bm_get_current(&orig_bm))) {
-		memset(handle->buffer, 0, PAGE_SIZE);
+		memset(handle->buffer, 0, PG_SIZE);
 		goto next;
 	}
 
-	return PAGE_SIZE;
+	return PG_SIZE;
 }
 
 /**
@@ -2858,7 +2858,7 @@ int snapshot_write_finalize(struct snapshot_handle *handle)
 	/*
 	 * Call snapshot_write_next() to drain any trailing zero pages,
 	 * but make sure we're in the data page region first.
-	 * This function can return PAGE_SIZE if the kernel was expecting
+	 * This function can return PG_SIZE if the kernel was expecting
 	 * another copy page. Return -ENODATA in that situation.
 	 */
 	if (handle->cur > nr_meta_pages + 1) {

@@ -31,7 +31,7 @@ static int nfs_symlink_filler(struct file *file, struct folio *folio)
 	struct inode *inode = folio->mapping->host;
 	int error;
 
-	error = NFS_PROTO(inode)->readlink(inode, &folio->page, 0, PAGE_SIZE);
+	error = NFS_PROTO(inode)->readlink(inode, &folio->page, 0, PG_SIZE);
 	folio_end_read(folio, error == 0);
 	return error;
 }

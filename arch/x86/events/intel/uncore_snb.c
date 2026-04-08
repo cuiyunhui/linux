@@ -897,7 +897,7 @@ static void snb_uncore_imc_init_box(struct intel_uncore_box *box)
 	addr |= ((resource_size_t)pci_dword << 32);
 #endif
 
-	addr &= ~(PAGE_SIZE - 1);
+	addr &= ~(PTE_SIZE - 1);
 
 	box->io_addr = ioremap(addr, type->mmio_map_size);
 	if (!box->io_addr)

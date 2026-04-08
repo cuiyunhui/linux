@@ -476,7 +476,7 @@ struct range crashk_cma_ranges[CRASHKERNEL_CMA_RANGES_MAX];
 int crashk_cma_cnt;
 void __init reserve_crashkernel_cma(unsigned long long cma_size)
 {
-	unsigned long long request_size = roundup(cma_size, PAGE_SIZE);
+	unsigned long long request_size = roundup(cma_size, PG_SIZE);
 	unsigned long long reserved_size = 0;
 
 	if (!cma_size)
@@ -490,10 +490,10 @@ void __init reserve_crashkernel_cma(unsigned long long cma_size)
 		if (cma_declare_contiguous(0, request_size, 0, 0, 0, false,
 				       "crashkernel", &res)) {
 			/* reservation failed, try half-sized blocks */
-			if (request_size <= PAGE_SIZE)
+			if (request_size <= PG_SIZE)
 				break;
 
-			request_size = roundup(request_size / 2, PAGE_SIZE);
+			request_size = roundup(request_size / 2, PG_SIZE);
 			continue;
 		}
 

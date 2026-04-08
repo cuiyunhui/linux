@@ -1652,11 +1652,11 @@ static void udp_rmem_release(struct sock *sk, unsigned int size,
 	if (!rx_queue_lock_held)
 		spin_lock(&sk_queue->lock);
 
-	amt = (size + sk->sk_forward_alloc - partial) & ~(PAGE_SIZE - 1);
+	amt = (size + sk->sk_forward_alloc - partial) & ~(PG_SIZE - 1);
 	sk_forward_alloc_add(sk, size - amt);
 
 	if (amt)
-		__sk_mem_reduce_allocated(sk, amt >> PAGE_SHIFT);
+		__sk_mem_reduce_allocated(sk, amt >> PG_SHIFT);
 
 	atomic_sub(size, &sk->sk_rmem_alloc);
 
@@ -3850,8 +3850,8 @@ EXPORT_SYMBOL(udp_flow_hashrnd);
 
 static void __net_init udp_sysctl_init(struct net *net)
 {
-	net->ipv4.sysctl_udp_rmem_min = PAGE_SIZE;
-	net->ipv4.sysctl_udp_wmem_min = PAGE_SIZE;
+	net->ipv4.sysctl_udp_rmem_min = PG_SIZE;
+	net->ipv4.sysctl_udp_wmem_min = PG_SIZE;
 
 #ifdef CONFIG_NET_L3_MASTER_DEV
 	net->ipv4.sysctl_udp_l3mdev_accept = 0;

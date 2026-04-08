@@ -66,14 +66,14 @@ bool kexec_file_dbg_print;
  * In that environment kexec copies the new kernel to its final
  * resting place.  This means I can only support memory whose
  * physical address can fit in an unsigned long.  In particular
- * addresses where (pfn << PAGE_SHIFT) > ULONG_MAX cannot be handled.
+ * addresses where (pfn << PTE_SHIFT) > ULONG_MAX cannot be handled.
  * If the assembly stub has more restrictive requirements
  * KEXEC_SOURCE_MEMORY_LIMIT and KEXEC_DEST_MEMORY_LIMIT can be
  * defined more restrictively in <asm/kexec.h>.
  *
  * The code for the transition from the current kernel to the
  * new kernel is placed in the control_code_buffer, whose size
- * is given by KEXEC_CONTROL_PAGE_SIZE.  In the best case only a single
+ * is given by KEXEC_CONTROL_PG_SIZE.  In the best case only a single
  * page of memory is necessary, but some architectures require more.
  * Because this memory must be identity mapped in the transition from
  * virtual to physical addresses it must live in the range
@@ -102,7 +102,7 @@ bool kexec_file_dbg_print;
  * allocating pages whose destination address we do not care about.
  */
 #define KIMAGE_NO_DEST (-1UL)
-#define PAGE_COUNT(x) (((x) + PAGE_SIZE - 1) >> PAGE_SHIFT)
+#define PAGE_COUNT(x) (((x) + PG_SIZE - 1) >> PG_SHIFT)
 
 static struct page *kimage_alloc_page(struct kimage *image,
 				       gfp_t gfp_mask,
@@ -135,7 +135,7 @@ int sanity_check_segment_list(struct kimage *image)
 		mend   = mstart + image->segment[i].memsz;
 		if (mstart > mend)
 			return -EADDRNOTAVAIL;
-		if ((mstart & ~PAGE_MASK) || (mend & ~PAGE_MASK))
+		if ((mstart & ~PG_MASK) || (mend & ~PG_MASK))
 			return -EADDRNOTAVAIL;
 		if (mend >= KEXEC_DESTINATION_MEMORY_LIMIT)
 			return -EADDRNOTAVAIL;
@@ -361,9 +361,9 @@ static struct page *kimage_alloc_normal_control_pages(struct kimage *image,
 			break;
 		pfn   = page_to_boot_pfn(pages);
 		epfn  = pfn + count;
-		addr  = pfn << PAGE_SHIFT;
-		eaddr = (epfn << PAGE_SHIFT) - 1;
-		if ((epfn >= (KEXEC_CONTROL_MEMORY_LIMIT >> PAGE_SHIFT)) ||
+		addr  = pfn << PTE_SHIFT;
+		eaddr = (epfn << PTE_SHIFT) - 1;
+		if ((epfn >= (KEXEC_CONTROL_MEMORY_LIMIT >> PTE_SHIFT)) ||
 			      kimage_is_destination_range(image, addr, eaddr)) {
 			list_add(&pages->lru, &extra_pages);
 			pages = NULL;
@@ -422,7 +422,7 @@ static struct page *kimage_alloc_crash_control_pages(struct kimage *image,
 	struct page *pages;
 
 	pages = NULL;
-	size = (1 << order) << PAGE_SHIFT;
+	size = (1 << order) << PG_SHIFT;
 	hole_start = ALIGN(image->control_page, size);
 	hole_end   = hole_start + size - 1;
 	while (hole_end <= crashk_res.end) {
@@ -447,7 +447,7 @@ static struct page *kimage_alloc_crash_control_pages(struct kimage *image,
 		}
 		/* If I don't overlap any segments I have found my hole! */
 		if (i == image->nr_segments) {
-			pages = pfn_to_page(hole_start >> PAGE_SHIFT);
+			pages = pfn_to_page(hole_start >> PTE_SHIFT);
 			image->control_page = hole_end + 1;
 			break;
 		}
@@ -498,7 +498,7 @@ static int kimage_add_entry(struct kimage *image, kimage_entry_t entry)
 		*image->entry = virt_to_boot_phys(ind_page) | IND_INDIRECTION;
 		image->entry = ind_page;
 		image->last_entry = ind_page +
-				      ((PAGE_SIZE/sizeof(kimage_entry_t)) - 1);
+				      ((PG_SIZE/sizeof(kimage_entry_t)) - 1);
 	}
 	*image->entry = entry;
 	image->entry++;
@@ -510,7 +510,7 @@ static int kimage_add_entry(struct kimage *image, kimage_entry_t entry)
 static int kimage_set_destination(struct kimage *image,
 				   unsigned long destination)
 {
-	destination &= PAGE_MASK;
+	destination &= PG_MASK;
 
 	return kimage_add_entry(image, destination | IND_DESTINATION);
 }
@@ -518,7 +518,7 @@ static int kimage_set_destination(struct kimage *image,
 
 static int kimage_add_page(struct kimage *image, unsigned long page)
 {
-	page &= PAGE_MASK;
+	page &= PG_MASK;
 
 	return kimage_add_entry(image, page | IND_SOURCE);
 }
@@ -545,13 +545,13 @@ void kimage_terminate(struct kimage *image)
 #define for_each_kimage_entry(image, ptr, entry) \
 	for (ptr = &image->head; (entry = *ptr) && !(entry & IND_DONE); \
 		ptr = (entry & IND_INDIRECTION) ? \
-			boot_phys_to_virt((entry & PAGE_MASK)) : ptr + 1)
+			boot_phys_to_virt((entry & PG_MASK)) : ptr + 1)
 
 static void kimage_free_entry(kimage_entry_t entry)
 {
 	struct page *page;
 
-	page = boot_pfn_to_page(entry >> PAGE_SHIFT);
+	page = boot_pfn_to_page(entry >> PTE_SHIFT);
 	kimage_free_pages(page);
 }
 
@@ -561,7 +561,7 @@ static void kimage_free_cma(struct kimage *image)
 
 	for (i = 0; i < image->nr_segments; i++) {
 		struct page *cma = image->segment_cma[i];
-		u32 nr_pages = image->segment[i].memsz >> PAGE_SHIFT;
+		u32 nr_pages = image->segment[i].memsz >> PG_SHIFT;
 
 		if (!cma)
 			continue;
@@ -632,11 +632,11 @@ static kimage_entry_t *kimage_dst_used(struct kimage *image,
 
 	for_each_kimage_entry(image, ptr, entry) {
 		if (entry & IND_DESTINATION)
-			destination = entry & PAGE_MASK;
+			destination = entry & PG_MASK;
 		else if (entry & IND_SOURCE) {
 			if (page == destination)
 				return ptr;
-			destination += PAGE_SIZE;
+			destination += PG_SIZE;
 		}
 	}
 
@@ -673,7 +673,7 @@ static struct page *kimage_alloc_page(struct kimage *image,
 	 * have a match.
 	 */
 	list_for_each_entry(page, &image->dest_pages, lru) {
-		addr = page_to_boot_pfn(page) << PAGE_SHIFT;
+		addr = page_to_boot_pfn(page) << PTE_SHIFT;
 		if (addr == destination) {
 			list_del(&page->lru);
 			return page;
@@ -689,11 +689,11 @@ static struct page *kimage_alloc_page(struct kimage *image,
 			return NULL;
 		/* If the page cannot be used file it away */
 		if (page_to_boot_pfn(page) >
-				(KEXEC_SOURCE_MEMORY_LIMIT >> PAGE_SHIFT)) {
+				(KEXEC_SOURCE_MEMORY_LIMIT >> PTE_SHIFT)) {
 			list_add(&page->lru, &image->unusable_pages);
 			continue;
 		}
-		addr = page_to_boot_pfn(page) << PAGE_SHIFT;
+		addr = page_to_boot_pfn(page) << PTE_SHIFT;
 
 		/* If it is the destination page we want use it */
 		if (addr == destination)
@@ -701,7 +701,7 @@ static struct page *kimage_alloc_page(struct kimage *image,
 
 		/* If the page is not a destination page use it */
 		if (!kimage_is_destination_range(image, addr,
-						  addr + PAGE_SIZE - 1))
+						  addr + PG_SIZE - 1))
 			break;
 
 		/*
@@ -715,10 +715,10 @@ static struct page *kimage_alloc_page(struct kimage *image,
 			unsigned long old_addr;
 			struct page *old_page;
 
-			old_addr = *old & PAGE_MASK;
-			old_page = boot_pfn_to_page(old_addr >> PAGE_SHIFT);
+			old_addr = *old & PG_MASK;
+			old_page = boot_pfn_to_page(old_addr >> PTE_SHIFT);
 			copy_highpage(page, old_page);
-			*old = addr | (*old & ~PAGE_MASK);
+			*old = addr | (*old & ~PG_MASK);
 
 			/* The old page I have found cannot be a
 			 * destination page, so return it if it's
@@ -760,7 +760,7 @@ static int kimage_load_cma_segment(struct kimage *image, int idx)
 	while (mbytes) {
 		size_t uchunk, mchunk;
 
-		mchunk = min_t(size_t, mbytes, PAGE_SIZE);
+		mchunk = min_t(size_t, mbytes, PG_SIZE);
 		uchunk = min(ubytes, mchunk);
 
 		if (uchunk) {
@@ -829,14 +829,14 @@ static int kimage_load_normal_segment(struct kimage *image, int idx)
 			goto out;
 		}
 		result = kimage_add_page(image, page_to_boot_pfn(page)
-								<< PAGE_SHIFT);
+								<< PTE_SHIFT);
 		if (result < 0)
 			goto out;
 
 		ptr = kmap_local_page(page);
 		/* Start with a clear page */
 		clear_page(ptr);
-		mchunk = min_t(size_t, mbytes, PAGE_SIZE);
+		mchunk = min_t(size_t, mbytes, PG_SIZE);
 		uchunk = min(ubytes, mchunk);
 
 		if (uchunk) {
@@ -892,14 +892,14 @@ static int kimage_load_crash_segment(struct kimage *image, int idx)
 		char *ptr;
 		size_t uchunk, mchunk;
 
-		page = boot_pfn_to_page(maddr >> PAGE_SHIFT);
+		page = boot_pfn_to_page(maddr >> PTE_SHIFT);
 		if (!page) {
 			result  = -ENOMEM;
 			goto out;
 		}
 		arch_kexec_post_alloc_pages(page_address(page), 1, 0);
 		ptr = kmap_local_page(page);
-		mchunk = min_t(size_t, mbytes, PAGE_SIZE);
+		mchunk = min_t(size_t, mbytes, PG_SIZE);
 		uchunk = min(ubytes, mchunk);
 		if (mchunk > uchunk) {
 			/* Zero the trailing part of the page */
@@ -984,15 +984,15 @@ void *kimage_map_segment(struct kimage *image, int idx)
 	i = 0;
 	for_each_kimage_entry(image, ptr, entry) {
 		if (entry & IND_DESTINATION) {
-			dest_page_addr = entry & PAGE_MASK;
+			dest_page_addr = entry & PG_MASK;
 		} else if (entry & IND_SOURCE) {
 			if (dest_page_addr >= addr && dest_page_addr < eaddr) {
-				src_page_addr = entry & PAGE_MASK;
+				src_page_addr = entry & PG_MASK;
 				src_pages[i++] =
 					virt_to_page(__va(src_page_addr));
 				if (i == npages)
 					break;
-				dest_page_addr += PAGE_SIZE;
+				dest_page_addr += PG_SIZE;
 			}
 		}
 	}

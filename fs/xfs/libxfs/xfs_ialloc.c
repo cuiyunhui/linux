@@ -3078,8 +3078,8 @@ xfs_ialloc_setup_geometry(
 	else
 		igeo->ialloc_align = 0;
 
-	if (mp->m_sb.sb_blocksize > PAGE_SIZE)
-		igeo->min_folio_order = mp->m_sb.sb_blocklog - PAGE_SHIFT;
+	if (mp->m_sb.sb_blocksize > PG_SIZE)
+		igeo->min_folio_order = mp->m_sb.sb_blocklog - PG_SHIFT;
 	else
 		igeo->min_folio_order = 0;
 }

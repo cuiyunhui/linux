@@ -406,8 +406,8 @@ static int mqueue_fill_super(struct super_block *sb, struct fs_context *fc)
 	struct ipc_namespace *ns = sb->s_fs_info;
 
 	sb->s_iflags |= SB_I_NOEXEC | SB_I_NODEV;
-	sb->s_blocksize = PAGE_SIZE;
-	sb->s_blocksize_bits = PAGE_SHIFT;
+	sb->s_blocksize = PG_SIZE;
+	sb->s_blocksize_bits = PG_SHIFT;
 	sb->s_magic = MQUEUE_MAGIC;
 	sb->s_op = &mqueue_super_ops;
 	sb->s_d_flags = DCACHE_DONTCACHE;

@@ -499,7 +499,7 @@ static int nfs4_try_replacing_one_location(struct nfs_server *server,
 		const struct nfs4_string *buf = &location->servers[s];
 		char *hostname;
 
-		if (buf->len <= 0 || buf->len > PAGE_SIZE)
+		if (buf->len <= 0 || buf->len > PG_SIZE)
 			continue;
 
 		if (memchr(buf->data, IPV6_SCOPE_DELIMITER, buf->len) != NULL)

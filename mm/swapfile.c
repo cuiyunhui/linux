@@ -288,8 +288,8 @@ static int discard_swap(struct swap_info_struct *si)
 
 	/* Do not discard the swap header page! */
 	se = first_se(si);
-	start_block = (se->start_block + 1) << (PAGE_SHIFT - 9);
-	nr_blocks = ((sector_t)se->nr_pages - 1) << (PAGE_SHIFT - 9);
+	start_block = (se->start_block + 1) << (PG_SHIFT - 9);
+	nr_blocks = ((sector_t)se->nr_pages - 1) << (PG_SHIFT - 9);
 	if (nr_blocks) {
 		err = blkdev_issue_discard(si->bdev, start_block,
 				nr_blocks, GFP_KERNEL);
@@ -299,8 +299,8 @@ static int discard_swap(struct swap_info_struct *si)
 	}
 
 	for (se = next_se(se); se; se = next_se(se)) {
-		start_block = se->start_block << (PAGE_SHIFT - 9);
-		nr_blocks = (sector_t)se->nr_pages << (PAGE_SHIFT - 9);
+		start_block = se->start_block << (PG_SHIFT - 9);
+		nr_blocks = (sector_t)se->nr_pages << (PG_SHIFT - 9);
 
 		err = blkdev_issue_discard(si->bdev, start_block,
 				nr_blocks, GFP_KERNEL);
@@ -342,7 +342,7 @@ sector_t swap_folio_sector(struct folio *folio)
 	offset = swp_offset(folio->swap);
 	se = offset_to_swap_extent(sis, offset);
 	sector = se->start_block + (offset - se->start_page);
-	return sector << (PAGE_SHIFT - 9);
+	return sector << (PG_SHIFT - 9);
 }
 
 /*
@@ -364,8 +364,8 @@ static void discard_swap_cluster(struct swap_info_struct *si,
 		start_page += nr_blocks;
 		nr_pages -= nr_blocks;
 
-		start_block <<= PAGE_SHIFT - 9;
-		nr_blocks <<= PAGE_SHIFT - 9;
+		start_block <<= PG_SHIFT - 9;
+		nr_blocks <<= PG_SHIFT - 9;
 		if (blkdev_issue_discard(si->bdev, start_block,
 					nr_blocks, GFP_NOIO))
 			break;
@@ -1773,7 +1773,7 @@ int swp_swapcount(swp_entry_t entry)
 	n = SWAP_MAP_MAX + 1;
 
 	page = vmalloc_to_page(si->swap_map + offset);
-	offset &= ~PAGE_MASK;
+	offset &= ~PG_MASK;
 	VM_BUG_ON(page_private(page) != SWP_CONTINUED);
 
 	do {
@@ -1975,7 +1975,7 @@ void swap_free_hibernation_slot(swp_entry_t entry)
 /*
  * Find the swap type that corresponds to given device (if any).
  *
- * @offset - number of the PAGE_SIZE-sized block of the device, starting
+ * @offset - number of the PG_SIZE-sized block of the device, starting
  * from 0, in which the swap header is expected to be located.
  *
  * This is needed for the suspend to disk (aka swsusp).
@@ -2026,7 +2026,7 @@ int find_first_swap(dev_t *device)
 }
 
 /*
- * Get the (PAGE_SIZE) block corresponding to given offset on the swapdev
+ * Get the (PG_SIZE) block corresponding to given offset on the swapdev
  * corresponding to given index in swap_info (swap type).
  */
 sector_t swapdev_block(int type, pgoff_t offset)
@@ -2167,7 +2167,7 @@ static int unuse_pte(struct vm_area_struct *vma, pmd_t *pmd,
 		folio_add_new_anon_rmap(folio, vma, addr, RMAP_EXCLUSIVE);
 		folio_add_lru_vma(folio, vma);
 	}
-	new_pte = pte_mkold(mk_pte(page, vma->vm_page_prot));
+	new_pte = pte_mkold(mkpte(page, 0, vma->vm_page_prot));
 	if (pte_swp_soft_dirty(old_pte))
 		new_pte = pte_mksoft_dirty(new_pte);
 	if (pte_swp_uffd_wp(old_pte))
@@ -2250,7 +2250,7 @@ static int unuse_pte_range(struct vm_area_struct *vma, pmd_t *pmd,
 		folio_free_swap(folio);
 		folio_unlock(folio);
 		folio_put(folio);
-	} while (addr += PAGE_SIZE, addr != end);
+	} while (addr += PG_SIZE, addr != end);
 
 	if (pte)
 		pte_unmap(pte);
@@ -2599,12 +2599,12 @@ EXPORT_SYMBOL_GPL(add_swap_extent);
  * swap files identically.
  *
  * Whether the swapdev is an S_ISREG file or an S_ISBLK blockdev, the swap
- * extent rbtree operates in PAGE_SIZE disk blocks.  Both S_ISREG and S_ISBLK
+ * extent rbtree operates in PG_SIZE disk blocks.  Both S_ISREG and S_ISBLK
  * swapfiles are handled *identically* after swapon time.
  *
  * For S_ISREG swapfiles, setup_swap_extents() will walk all the file's blocks
- * and will parse them into a rbtree, in PAGE_SIZE chunks.  If some stray
- * blocks are found which do not fall within the PAGE_SIZE alignment
+ * and will parse them into a rbtree, in PG_SIZE chunks.  If some stray
+ * blocks are found which do not fall within the PG_SIZE alignment
  * requirements, they are simply tossed out - we will never use those blocks
  * for swapping.
  *
@@ -3209,7 +3209,7 @@ static unsigned long read_swap_header(struct swap_info_struct *si,
 
 	if (!maxpages)
 		return 0;
-	swapfilepages = i_size_read(inode) >> PAGE_SHIFT;
+	swapfilepages = i_size_read(inode) >> PG_SHIFT;
 	if (swapfilepages && maxpages > swapfilepages) {
 		pr_warn("Swap area shorter than signature indicates\n");
 		return 0;
@@ -3687,7 +3687,7 @@ int swap_dup_entry_direct(swp_entry_t entry)
  * add_swap_count_continuation - called when a swap count is duplicated
  * beyond SWAP_MAP_MAX, it allocates a new page and links that to the entry's
  * page of the original vmalloc'ed swap_map, to hold the continuation count
- * (for that entry and for its neighbouring PAGE_SIZE swap entries).  Called
+ * (for that entry and for its neighbouring PG_SIZE swap entries).  Called
  * again when count is duplicated beyond SWAP_MAP_MAX * SWAP_CONT_MAX, etc.
  *
  * These continuation pages are seldom referenced: the common paths all work
@@ -3745,7 +3745,7 @@ int add_swap_count_continuation(swp_entry_t entry, gfp_t gfp_mask)
 	}
 
 	head = vmalloc_to_page(si->swap_map + offset);
-	offset &= ~PAGE_MASK;
+	offset &= ~PG_MASK;
 
 	spin_lock(&si->cont_lock);
 	/*
@@ -3818,7 +3818,7 @@ static bool swap_count_continued(struct swap_info_struct *si,
 	}
 
 	spin_lock(&si->cont_lock);
-	offset &= ~PAGE_MASK;
+	offset &= ~PG_MASK;
 	page = list_next_entry(head, lru);
 	map = kmap_local_page(page) + offset;
 
@@ -3891,7 +3891,7 @@ static void free_swap_count_continuations(struct swap_info_struct *si)
 {
 	pgoff_t offset;
 
-	for (offset = 0; offset < si->max; offset += PAGE_SIZE) {
+	for (offset = 0; offset < si->max; offset += PG_SIZE) {
 		struct page *head;
 		head = vmalloc_to_page(si->swap_map + offset);
 		if (page_private(head)) {

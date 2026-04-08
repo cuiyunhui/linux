@@ -227,11 +227,11 @@ COMPAT_SYSCALL_DEFINE1(ia32_mmap, struct mmap_arg_struct32 __user *, arg)
 	if (copy_from_user(&a, arg, sizeof(a)))
 		return -EFAULT;
 
-	if (a.offset & ~PAGE_MASK)
+	if (a.offset & ~PG_MASK)
 		return -EINVAL;
 
 	return ksys_mmap_pgoff(a.addr, a.len, a.prot, a.flags, a.fd,
-			       a.offset>>PAGE_SHIFT);
+			       a.offset>>PG_SHIFT);
 }
 
 /*

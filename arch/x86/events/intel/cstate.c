@@ -126,7 +126,7 @@ static ssize_t __cstate_##_var##_show(struct device *dev,	\
 				struct device_attribute *attr,	\
 				char *page)			\
 {								\
-	BUILD_BUG_ON(sizeof(_format) >= PAGE_SIZE);		\
+	BUILD_BUG_ON(sizeof(_format) >= PG_SIZE);		\
 	return sprintf(page, _format "\n");			\
 }								\
 static struct device_attribute format_attr_##_var =		\

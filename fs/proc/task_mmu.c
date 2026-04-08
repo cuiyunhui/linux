@@ -2001,7 +2001,7 @@ static int pagemap_pmd_range_thp(pmd_t *pmdp, unsigned long addr,
 		unsigned long end, struct vm_area_struct *vma,
 		struct pagemapread *pm)
 {
-	unsigned int idx = (addr & ~PMD_MASK) >> PAGE_SHIFT;
+	unsigned int idx = (addr & ~PMD_MASK) >> PG_SHIFT;
 	u64 flags = 0, frame = 0;
 	pmd_t pmd = *pmdp;
 	struct page *page = NULL;

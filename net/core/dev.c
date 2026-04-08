@@ -1359,7 +1359,7 @@ static int __dev_alloc_name(struct net *net, const char *name, char *res)
 {
 	int i = 0;
 	const char *p;
-	const int max_netdevices = 8*PAGE_SIZE;
+	const int max_netdevices = 8*PG_SIZE;
 	unsigned long *inuse;
 	struct net_device *d;
 	char buf[IFNAMSIZ];
@@ -13153,8 +13153,8 @@ static void __init net_dev_struct_check(void)
  *
  */
 
-/* We allocate 256 pages for each CPU if PAGE_SHIFT is 12 */
-#define SYSTEM_PERCPU_PAGE_POOL_SIZE	((1 << 20) / PAGE_SIZE)
+/* We allocate 256 pages for each CPU if PG_SHIFT is 12 */
+#define SYSTEM_PERCPU_PAGE_POOL_SIZE	((1 << 20) / PG_SIZE)
 
 static int net_page_pool_create(int cpuid)
 {

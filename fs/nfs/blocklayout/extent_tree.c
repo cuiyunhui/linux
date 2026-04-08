@@ -493,7 +493,7 @@ static void ext_tree_free_commitdata(struct nfs4_layoutcommit_args *arg,
 		size_t buffer_size)
 {
 	if (arg->layoutupdate_pages != &arg->layoutupdate_page) {
-		int nr_pages = DIV_ROUND_UP(buffer_size, PAGE_SIZE), i;
+		int nr_pages = DIV_ROUND_UP(buffer_size, PG_SIZE), i;
 
 		for (i = 0; i < nr_pages; i++)
 			put_page(arg->layoutupdate_pages[i]);
@@ -634,7 +634,7 @@ int
 ext_tree_prepare_commit(struct nfs4_layoutcommit_args *arg)
 {
 	struct pnfs_block_layout *bl = BLK_LO2EXT(NFS_I(arg->inode)->layout);
-	size_t count = 0, buffer_size = PAGE_SIZE;
+	size_t count = 0, buffer_size = PG_SIZE;
 	__be32 *start_p;
 	int ret;
 
@@ -654,7 +654,7 @@ ext_tree_prepare_commit(struct nfs4_layoutcommit_args *arg)
 
 		arg->layoutupdate_pages =
 			kzalloc_objs(struct page *,
-				     DIV_ROUND_UP(buffer_size, PAGE_SIZE),
+				     DIV_ROUND_UP(buffer_size, PG_SIZE),
 				     GFP_NOFS);
 		if (!arg->layoutupdate_pages)
 			return -ENOMEM;
@@ -678,7 +678,7 @@ ext_tree_prepare_commit(struct nfs4_layoutcommit_args *arg)
 		int i = 0;
 
 		arg->start_p = start_p;
-		for ( ; p < end; p += PAGE_SIZE) {
+		for ( ; p < end; p += PG_SIZE) {
 			page = vmalloc_to_page(p);
 			arg->layoutupdate_pages[i++] = page;
 			get_page(page);

@@ -915,14 +915,14 @@ xfs_healthmon_alloc_outbuf(
 {
 	void			*outbuf;
 	size_t			bufsize =
-		min(XFS_HEALTHMON_MAX_OUTBUF, max(PAGE_SIZE, user_bufsize));
+		min(XFS_HEALTHMON_MAX_OUTBUF, max(PG_SIZE, user_bufsize));
 
 	outbuf = kzalloc(bufsize, GFP_KERNEL);
 	if (!outbuf) {
-		if (bufsize == PAGE_SIZE)
+		if (bufsize == PG_SIZE)
 			return -ENOMEM;
 
-		bufsize = PAGE_SIZE;
+		bufsize = PG_SIZE;
 		outbuf = kzalloc(bufsize, GFP_KERNEL);
 		if (!outbuf)
 			return -ENOMEM;

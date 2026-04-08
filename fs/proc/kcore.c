@@ -128,7 +128,7 @@ static void update_kcore_size(void)
 			   ALIGN(sizeof(struct elf_prpsinfo), 4) +
 			   ALIGN(arch_task_struct_size, 4) +
 			   ALIGN(vmcoreinfo_size, 4));
-	kcore_data_offset = PAGE_ALIGN(sizeof(struct elfhdr) + kcore_phdrs_len +
+	kcore_data_offset = PG_ALIGN(sizeof(struct elfhdr) + kcore_phdrs_len +
 				       kcore_notes_len);
 	proc_root_kcore->size = kcore_data_offset + size;
 }
@@ -147,7 +147,7 @@ static int kcore_ram_list(struct list_head *head)
 	if (!ent)
 		return -ENOMEM;
 	ent->addr = (unsigned long)__va(0);
-	ent->size = max_low_pfn << PAGE_SHIFT;
+	ent->size = max_low_pfn << PG_SHIFT;
 	ent->type = KCORE_RAM;
 	list_add(&ent->list, head);
 	return 0;
@@ -160,15 +160,15 @@ static int kcore_ram_list(struct list_head *head)
 static int
 get_sparsemem_vmemmap_info(struct kcore_list *ent, struct list_head *head)
 {
-	unsigned long pfn = __pa(ent->addr) >> PAGE_SHIFT;
-	unsigned long nr_pages = ent->size >> PAGE_SHIFT;
+	unsigned long pfn = __pa(ent->addr) >> PG_SHIFT;
+	unsigned long nr_pages = ent->size >> PG_SHIFT;
 	unsigned long start, end;
 	struct kcore_list *vmm, *tmp;
 
 
-	start = ((unsigned long)pfn_to_page(pfn)) & PAGE_MASK;
+	start = ((unsigned long)pfn_to_page(pfn)) & PG_MASK;
 	end = ((unsigned long)pfn_to_page(pfn + nr_pages)) - 1;
-	end = PAGE_ALIGN(end);
+	end = PG_ALIGN(end);
 	/* overlap check (because we have to align page */
 	list_for_each_entry(tmp, head, list) {
 		if (tmp->type != KCORE_VMEMMAP)
@@ -214,7 +214,7 @@ kclist_add_private(unsigned long pfn, unsigned long nr_pages, void *arg)
 	if (!ent)
 		return -ENOMEM;
 	ent->addr = (unsigned long)page_to_virt(p);
-	ent->size = nr_pages << PAGE_SHIFT;
+	ent->size = nr_pages << PG_SHIFT;
 
 	if (!virt_addr_valid((void *)ent->addr))
 		goto free_out;
@@ -406,7 +406,7 @@ static ssize_t read_kcore_iter(struct kiocb *iocb, struct iov_iter *iter)
 			else
 				phdr->p_paddr = (elf_addr_t)-1;
 			phdr->p_filesz = phdr->p_memsz = m->size;
-			phdr->p_align = PAGE_SIZE;
+			phdr->p_align = PG_SIZE;
 			phdr++;
 		}
 
@@ -478,7 +478,7 @@ static ssize_t read_kcore_iter(struct kiocb *iocb, struct iov_iter *iter)
 	 * the addresses in the elf_phdr on our list.
 	 */
 	start = kc_offset_to_vaddr(*fpos - kcore_data_offset);
-	if ((tsz = (PAGE_SIZE - (start & ~PAGE_MASK))) > buflen)
+	if ((tsz = (PG_SIZE - (start & ~PG_MASK))) > buflen)
 		tsz = buflen;
 
 	m = NULL;
@@ -554,7 +554,7 @@ static ssize_t read_kcore_iter(struct kiocb *iocb, struct iov_iter *iter)
 			break;
 		case KCORE_RAM:
 			phys = __pa(start);
-			pfn =  phys >> PAGE_SHIFT;
+			pfn =  phys >> PG_SHIFT;
 			page = pfn_to_online_page(pfn);
 
 			/*
@@ -621,7 +621,7 @@ skip:
 		buflen -= tsz;
 		*fpos += tsz;
 		start += tsz;
-		tsz = (buflen > PAGE_SIZE ? PAGE_SIZE : buflen);
+		tsz = (buflen > PG_SIZE ? PG_SIZE : buflen);
 	}
 
 out:
@@ -642,7 +642,7 @@ static int open_kcore(struct inode *inode, struct file *filp)
 	if (ret)
 		return ret;
 
-	filp->private_data = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	filp->private_data = kmalloc(PG_SIZE, GFP_KERNEL);
 	if (!filp->private_data)
 		return -ENOMEM;
 

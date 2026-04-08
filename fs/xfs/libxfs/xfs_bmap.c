@@ -3323,11 +3323,11 @@ xfs_bmap_compute_alignments(
 		div_u64_rem(ap->offset, args->prod, &args->mod);
 		if (args->mod)
 			args->mod = args->prod - args->mod;
-	} else if (mp->m_sb.sb_blocksize >= PAGE_SIZE) {
+	} else if (mp->m_sb.sb_blocksize >= PG_SIZE) {
 		args->prod = 1;
 		args->mod = 0;
 	} else {
-		args->prod = PAGE_SIZE >> mp->m_sb.sb_blocklog;
+		args->prod = PG_SIZE >> mp->m_sb.sb_blocklog;
 		div_u64_rem(ap->offset, args->prod, &args->mod);
 		if (args->mod)
 			args->mod = args->prod - args->mod;

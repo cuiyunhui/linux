@@ -119,7 +119,7 @@ static inline netmem_ref page_pool_alloc_netmem(struct page_pool *pool,
 						unsigned int *offset,
 						unsigned int *size, gfp_t gfp)
 {
-	unsigned int max_size = PAGE_SIZE << pool->p.order;
+	unsigned int max_size = PG_SIZE << pool->p.order;
 	netmem_ref netmem;
 
 	if ((*size << 1) > max_size) {
@@ -430,7 +430,7 @@ static inline dma_addr_t page_pool_get_dma_addr_netmem(netmem_ref netmem)
 	dma_addr_t ret = netmem_get_dma_addr(netmem);
 
 	if (PAGE_POOL_32BIT_ARCH_WITH_64BIT_DMA)
-		ret <<= PAGE_SHIFT;
+		ret <<= PG_SHIFT;
 
 	return ret;
 }

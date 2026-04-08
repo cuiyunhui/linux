@@ -277,7 +277,7 @@ static int usbdev_mmap(struct file *file, struct vm_area_struct *vma)
 	 */
 	if (dma_handle == DMA_MAPPING_ERROR) {
 		if (remap_pfn_range(vma, vma->vm_start,
-				    virt_to_phys(usbm->mem) >> PAGE_SHIFT,
+				    virt_to_phys(usbm->mem) >> PG_SHIFT,
 				    size, vma->vm_page_prot) < 0) {
 			dec_usb_memory_use_count(usbm, &usbm->vma_use_count);
 			return -EAGAIN;
@@ -1181,10 +1181,10 @@ static int do_proc_control(struct usb_dev_state *ps,
 			      ctrl->wIndex);
 	if (ret)
 		return ret;
-	wLength = ctrl->wLength;	/* To suppress 64k PAGE_SIZE warning */
-	if (wLength > PAGE_SIZE)
+	wLength = ctrl->wLength;	/* To suppress 64k PG_SIZE warning */
+	if (wLength > PG_SIZE)
 		return -EINVAL;
-	ret = usbfs_increase_memory_usage(PAGE_SIZE + sizeof(struct urb) +
+	ret = usbfs_increase_memory_usage(PG_SIZE + sizeof(struct urb) +
 			sizeof(struct usb_ctrlrequest));
 	if (ret)
 		return ret;
@@ -1266,7 +1266,7 @@ static int do_proc_control(struct usb_dev_state *ps,
 	kfree(dr);
 	usb_free_urb(urb);
 	free_page((unsigned long) tbuf);
-	usbfs_decrease_memory_usage(PAGE_SIZE + sizeof(struct urb) +
+	usbfs_decrease_memory_usage(PG_SIZE + sizeof(struct urb) +
 			sizeof(struct usb_ctrlrequest));
 	return ret;
 }

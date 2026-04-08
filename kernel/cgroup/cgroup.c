@@ -4381,7 +4381,7 @@ static int cgroup_seqfile_show(struct seq_file *m, void *arg)
 }
 
 static struct kernfs_ops cgroup_kf_single_ops = {
-	.atomic_write_len	= PAGE_SIZE,
+	.atomic_write_len	= PG_SIZE,
 	.open			= cgroup_file_open,
 	.release		= cgroup_file_release,
 	.write			= cgroup_file_write,
@@ -4390,7 +4390,7 @@ static struct kernfs_ops cgroup_kf_single_ops = {
 };
 
 static struct kernfs_ops cgroup_kf_ops = {
-	.atomic_write_len	= PAGE_SIZE,
+	.atomic_write_len	= PG_SIZE,
 	.open			= cgroup_file_open,
 	.release		= cgroup_file_release,
 	.write			= cgroup_file_write,
@@ -4518,7 +4518,7 @@ static void cgroup_exit_cftypes(struct cftype *cfts)
 
 	for (cft = cfts; cft->name[0] != '\0'; cft++) {
 		/* free copy for custom atomic_write_len, see init_cftypes() */
-		if (cft->max_write_len && cft->max_write_len != PAGE_SIZE)
+		if (cft->max_write_len && cft->max_write_len != PG_SIZE)
 			kfree(cft->kf_ops);
 		cft->kf_ops = NULL;
 		cft->ss = NULL;
@@ -4553,7 +4553,7 @@ static int cgroup_init_cftypes(struct cgroup_subsys *ss, struct cftype *cfts)
 		 * Ugh... if @cft wants a custom max_write_len, we need to
 		 * make a copy of kf_ops to set its atomic_write_len.
 		 */
-		if (cft->max_write_len && cft->max_write_len != PAGE_SIZE) {
+		if (cft->max_write_len && cft->max_write_len != PG_SIZE) {
 			kf_ops = kmemdup(kf_ops, sizeof(*kf_ops), GFP_KERNEL);
 			if (!kf_ops) {
 				ret = -ENOMEM;
@@ -7487,14 +7487,14 @@ static ssize_t delegate_show(struct kobject *kobj, struct kobj_attribute *attr,
 	ssize_t ret = 0;
 
 	ret = show_delegatable_files(cgroup_base_files, buf + ret,
-				     PAGE_SIZE - ret, NULL);
+				     PG_SIZE - ret, NULL);
 	if (cgroup_psi_enabled())
 		ret += show_delegatable_files(cgroup_psi_files, buf + ret,
-					      PAGE_SIZE - ret, NULL);
+					      PG_SIZE - ret, NULL);
 
 	for_each_subsys(ss, ssid)
 		ret += show_delegatable_files(ss->dfl_cftypes, buf + ret,
-					      PAGE_SIZE - ret,
+					      PG_SIZE - ret,
 					      cgroup_subsys_name[ssid]);
 
 	return ret;
@@ -7504,7 +7504,7 @@ static struct kobj_attribute cgroup_delegate_attr = __ATTR_RO(delegate);
 static ssize_t features_show(struct kobject *kobj, struct kobj_attribute *attr,
 			     char *buf)
 {
-	return snprintf(buf, PAGE_SIZE,
+	return snprintf(buf, PG_SIZE,
 			"nsdelegate\n"
 			"favordynmods\n"
 			"memory_localevents\n"

@@ -108,7 +108,7 @@ static int suspend_nvs_register(unsigned long start, unsigned long size)
 
 		list_add_tail(&entry->node, &nvs_list);
 		entry->phys_start = start;
-		nr_bytes = PAGE_SIZE - (start & ~PAGE_MASK);
+		nr_bytes = PG_SIZE - (start & ~PG_MASK);
 		entry->size = (size < nr_bytes) ? size : nr_bytes;
 
 		start += entry->size;

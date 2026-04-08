@@ -16,7 +16,7 @@
  * Reserve one vmemmap page, all vmemmap addresses are mapped to it. See
  * Documentation/mm/vmemmap_dedup.rst.
  */
-#define HUGETLB_VMEMMAP_RESERVE_SIZE	PAGE_SIZE
+#define HUGETLB_VMEMMAP_RESERVE_SIZE	PG_SIZE
 #define HUGETLB_VMEMMAP_RESERVE_PAGES	(HUGETLB_VMEMMAP_RESERVE_SIZE / sizeof(struct page))
 
 #ifdef CONFIG_HUGETLB_PAGE_OPTIMIZE_VMEMMAP

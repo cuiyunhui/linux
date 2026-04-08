@@ -45,10 +45,10 @@ early_param("no-kvmclock-vsyscall", parse_no_kvmclock_vsyscall);
 
 /* Aligned to page sizes to match what's mapped via vsyscalls to userspace */
 #define HVC_BOOT_ARRAY_SIZE \
-	(PAGE_SIZE / sizeof(struct pvclock_vsyscall_time_info))
+	(PTE_SIZE / sizeof(struct pvclock_vsyscall_time_info))
 
 static struct pvclock_vsyscall_time_info
-			hv_clock_boot[HVC_BOOT_ARRAY_SIZE] __bss_decrypted __aligned(PAGE_SIZE);
+			hv_clock_boot[HVC_BOOT_ARRAY_SIZE] __bss_decrypted __aligned(PTE_SIZE);
 static struct pvclock_wall_clock wall_clock __bss_decrypted;
 static struct pvclock_vsyscall_time_info *hvclock_mem;
 DEFINE_PER_CPU(struct pvclock_vsyscall_time_info *, hv_clock_per_cpu);
@@ -236,7 +236,7 @@ static void __init kvmclock_init_mem(void)
 		}
 	}
 
-	memset(hvclock_mem, 0, PAGE_SIZE << order);
+	memset(hvclock_mem, 0, PTE_SIZE << order);
 }
 
 static int __init kvm_setup_vsyscall_timeinfo(void)

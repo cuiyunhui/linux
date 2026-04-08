@@ -5924,11 +5924,11 @@ static bool nfs4_server_supports_acls(const struct nfs_server *server,
 	}
 }
 
-/* Assuming that XATTR_SIZE_MAX is a multiple of PAGE_SIZE, and that
- * it's OK to put sizeof(void) * (XATTR_SIZE_MAX/PAGE_SIZE) bytes on
+/* Assuming that XATTR_SIZE_MAX is a multiple of PG_SIZE, and that
+ * it's OK to put sizeof(void) * (XATTR_SIZE_MAX/PG_SIZE) bytes on
  * the stack.
  */
-#define NFS4ACL_MAXPAGES DIV_ROUND_UP(XATTR_SIZE_MAX, PAGE_SIZE)
+#define NFS4ACL_MAXPAGES DIV_ROUND_UP(XATTR_SIZE_MAX, PG_SIZE)
 
 int nfs4_buf_to_pages_noslab(const void *buf, size_t buflen,
 		struct page **pages)
@@ -5939,7 +5939,7 @@ int nfs4_buf_to_pages_noslab(const void *buf, size_t buflen,
 	spages = pages;
 
 	do {
-		len = min_t(size_t, PAGE_SIZE, buflen);
+		len = min_t(size_t, PG_SIZE, buflen);
 		newpage = alloc_page(GFP_KERNEL);
 
 		if (newpage == NULL)
@@ -6016,7 +6016,7 @@ static void nfs4_write_cached_acl(struct inode *inode, struct page **pages,
 	struct nfs4_cached_acl *acl;
 	size_t buflen = sizeof(*acl) + acl_len;
 
-	if (buflen <= PAGE_SIZE) {
+	if (buflen <= PG_SIZE) {
 		acl = kmalloc(buflen, GFP_KERNEL);
 		if (acl == NULL)
 			goto out;
@@ -6069,7 +6069,7 @@ static ssize_t __nfs4_get_acl_uncached(struct inode *inode, void *buf,
 	if (buflen == 0)
 		buflen = server->rsize;
 
-	npages = DIV_ROUND_UP(buflen, PAGE_SIZE) + 1;
+	npages = DIV_ROUND_UP(buflen, PG_SIZE) + 1;
 	pages = kmalloc_objs(struct page *, npages);
 	if (!pages)
 		return -ENOMEM;
@@ -6087,7 +6087,7 @@ static ssize_t __nfs4_get_acl_uncached(struct inode *inode, void *buf,
 	if (!res.acl_scratch)
 		goto out_free;
 
-	args.acl_len = npages * PAGE_SIZE;
+	args.acl_len = npages * PG_SIZE;
 
 	dprintk("%s  buf %p buflen %zu npages %d args.acl_len %zu\n",
 		__func__, buf, buflen, npages, args.acl_len);
@@ -6181,7 +6181,7 @@ static int __nfs4_proc_set_acl(struct inode *inode, const void *buf,
 		.rpc_argp	= &arg,
 		.rpc_resp	= &res,
 	};
-	unsigned int npages = DIV_ROUND_UP(buflen, PAGE_SIZE);
+	unsigned int npages = DIV_ROUND_UP(buflen, PG_SIZE);
 	int ret, i;
 
 	/* You can't remove system.nfs4_acl: */

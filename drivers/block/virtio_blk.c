@@ -539,7 +539,7 @@ static void *virtblk_alloc_report_buffer(struct virtio_blk *vblk,
 		nr_zones * sizeof(struct virtio_blk_zone_descriptor);
 	bufsize = min_t(size_t, bufsize,
 			queue_max_hw_sectors(q) << SECTOR_SHIFT);
-	bufsize = min_t(size_t, bufsize, queue_max_segments(q) << PAGE_SHIFT);
+	bufsize = min_t(size_t, bufsize, queue_max_segments(q) << PG_SHIFT);
 
 	while (bufsize >= sizeof(struct virtio_blk_zone_report)) {
 		buf = __vmalloc(bufsize, GFP_KERNEL | __GFP_NORETRY);
@@ -893,8 +893,8 @@ static ssize_t serial_show(struct device *dev,
 	struct gendisk *disk = dev_to_disk(dev);
 	int err;
 
-	/* sysfs gives us a PAGE_SIZE buffer */
-	BUILD_BUG_ON(PAGE_SIZE < VIRTIO_BLK_ID_BYTES);
+	/* sysfs gives us a PG_SIZE buffer */
+	BUILD_BUG_ON(PG_SIZE < VIRTIO_BLK_ID_BYTES);
 
 	buf[VIRTIO_BLK_ID_BYTES] = '\0';
 	err = virtblk_get_id(disk, buf);

@@ -1180,7 +1180,7 @@ struct sk_buff *netlink_alloc_large_skb(unsigned int size, int broadcast)
 	struct sk_buff *skb;
 	void *data;
 
-	if (head_size <= PAGE_SIZE || broadcast)
+	if (head_size <= PG_SIZE || broadcast)
 		return alloc_skb(size, GFP_KERNEL);
 
 	data = kvmalloc(head_size, GFP_KERNEL);

@@ -89,12 +89,12 @@ static const struct fs_parameter_spec hugetlb_fs_parameters[] = {
 /*
  * Mask used when checking the page offset value passed in via system
  * calls.  This value will be converted to a loff_t which is signed.
- * Therefore, we want to check the upper PAGE_SHIFT + 1 bits of the
+ * Therefore, we want to check the upper PG_SHIFT + 1 bits of the
  * value.  The extra bit (- 1 in the shift value) is to take the sign
  * bit into account.
  */
 #define PGOFF_LOFFT_MAX \
-	(((1UL << (PAGE_SHIFT + 1)) - 1) <<  (BITS_PER_LONG - (PAGE_SHIFT + 1)))
+	(((1UL << (PG_SHIFT + 1)) - 1) <<  (BITS_PER_LONG - (PG_SHIFT + 1)))
 
 static int hugetlb_file_mmap_prepare_success(const struct vm_area_struct *vma)
 {
@@ -123,22 +123,22 @@ static int hugetlbfs_file_mmap_prepare(struct vm_area_desc *desc)
 	desc->vm_ops = &hugetlb_vm_ops;
 
 	/*
-	 * page based offset in vm_pgoff could be sufficiently large to
+	 * page based offset in vm_pteoff could be sufficiently large to
 	 * overflow a loff_t when converted to byte offset.  This can
 	 * only happen on architectures where sizeof(loff_t) ==
 	 * sizeof(unsigned long).  So, only check in those instances.
 	 */
 	if (sizeof(unsigned long) == sizeof(loff_t)) {
-		if (desc->pgoff & PGOFF_LOFFT_MAX)
+		if (desc->pteoff & PGOFF_LOFFT_MAX)
 			return -EINVAL;
 	}
 
 	/* must be huge page aligned */
-	if (desc->pgoff & (~huge_page_mask(h) >> PAGE_SHIFT))
+	if (desc->pteoff & (~huge_page_mask(h) >> PTE_SHIFT))
 		return -EINVAL;
 
 	vma_len = (loff_t)vma_desc_size(desc);
-	len = vma_len + ((loff_t)desc->pgoff << PAGE_SHIFT);
+	len = vma_len + ((loff_t)desc->pteoff << PTE_SHIFT);
 	/* check for overflow */
 	if (len < vma_len)
 		return -EINVAL;
@@ -158,7 +158,7 @@ static int hugetlbfs_file_mmap_prepare(struct vm_area_desc *desc)
 		vma_flags_set(&vma_flags, VMA_NORESERVE_BIT);
 
 	if (hugetlb_reserve_pages(inode,
-			desc->pgoff >> huge_page_order(h),
+			desc->pteoff >> huge_page_order(h),
 			len >> huge_page_shift(h), desc,
 			vma_flags) < 0)
 		goto out;
@@ -215,17 +215,17 @@ hugetlb_get_unmapped_area(struct file *file, unsigned long addr,
 static size_t adjust_range_hwpoison(struct folio *folio, size_t offset,
 		size_t bytes)
 {
-	struct page *page = folio_page(folio, offset / PAGE_SIZE);
+	struct page *page = folio_page(folio, offset / PG_SIZE);
 	size_t safe_bytes;
 
 	if (is_raw_hwpoison_page_in_hugepage(page))
 		return 0;
 	/* Safe to read the remaining bytes in this page. */
-	safe_bytes = PAGE_SIZE - (offset % PAGE_SIZE);
+	safe_bytes = PG_SIZE - (offset % PG_SIZE);
 	page++;
 
 	/* Check each remaining page as long as we are not done yet. */
-	for (; safe_bytes < bytes; safe_bytes += PAGE_SIZE, page++)
+	for (; safe_bytes < bytes; safe_bytes += PG_SIZE, page++)
 		if (is_raw_hwpoison_page_in_hugepage(page))
 			break;
 
@@ -373,8 +373,8 @@ static unsigned long vma_offset_start(struct vm_area_struct *vma, pgoff_t start)
 {
 	unsigned long offset = 0;
 
-	if (vma->vm_pgoff < start)
-		offset = (start - vma->vm_pgoff) << PAGE_SHIFT;
+	if (vma->vm_pteoff < start)
+		offset = (start - vma->vm_pteoff) << PTE_SHIFT;
 
 	return vma->vm_start + offset;
 }
@@ -386,7 +386,7 @@ static unsigned long vma_offset_end(struct vm_area_struct *vma, pgoff_t end)
 	if (!end)
 		return vma->vm_end;
 
-	t_end = ((end - vma->vm_pgoff) << PAGE_SHIFT) + vma->vm_start;
+	t_end = ((end - vma->vm_pteoff) << PTE_SHIFT) + vma->vm_start;
 	if (t_end > vma->vm_end)
 		t_end = vma->vm_end;
 	return t_end;
@@ -579,14 +579,14 @@ static void remove_inode_hugepages(struct inode *inode, loff_t lstart,
 {
 	struct hstate *h = hstate_inode(inode);
 	struct address_space *mapping = &inode->i_data;
-	const pgoff_t end = lend >> PAGE_SHIFT;
+	const pgoff_t end = lend >> PG_SHIFT;
 	struct folio_batch fbatch;
 	pgoff_t next, index;
 	int i, freed = 0;
 	bool truncate_op = (lend == LLONG_MAX);
 
 	folio_batch_init(&fbatch);
-	next = lstart >> PAGE_SHIFT;
+	next = lstart >> PG_SHIFT;
 	while (filemap_get_folios(mapping, &next, end - 1, &fbatch)) {
 		for (i = 0; i < folio_batch_count(&fbatch); ++i) {
 			struct folio *folio = fbatch.folios[i];
@@ -642,7 +642,7 @@ static void hugetlb_vmtruncate(struct inode *inode, loff_t offset)
 	struct hstate *h = hstate_inode(inode);
 
 	BUG_ON(offset & ~huge_page_mask(h));
-	pgoff = offset >> PAGE_SHIFT;
+	pgoff = offset >> PG_SHIFT;
 
 	i_size_write(inode, offset);
 	i_mmap_lock_write(mapping);
@@ -709,8 +709,8 @@ static long hugetlbfs_punch_hole(struct inode *inode, loff_t offset, loff_t len)
 	if (hole_end > hole_start) {
 		if (!RB_EMPTY_ROOT(&mapping->i_mmap.rb_root))
 			hugetlb_vmdelete_list(&mapping->i_mmap,
-					      hole_start >> PAGE_SHIFT,
-					      hole_end >> PAGE_SHIFT, 0);
+					      hole_start >> PG_SHIFT,
+					      hole_end >> PG_SHIFT, 0);
 	}
 
 	/* If range extends beyond last full page, zero partial page. */

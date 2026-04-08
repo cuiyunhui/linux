@@ -3024,7 +3024,7 @@ static int __init dquot_init(void)
 		panic("Cannot create dquot stat counters");
 
 	/* Find power-of-two hlist_heads which can fit into allocation */
-	nr_hash = (1UL << order) * PAGE_SIZE / sizeof(struct hlist_head);
+	nr_hash = (1UL << order) * PG_SIZE / sizeof(struct hlist_head);
 	dq_hash_bits = ilog2(nr_hash);
 
 	nr_hash = 1UL << dq_hash_bits;
@@ -3033,7 +3033,7 @@ static int __init dquot_init(void)
 		INIT_HLIST_HEAD(dquot_hash + i);
 
 	pr_info("VFS: Dquot-cache hash table entries: %ld (order %ld,"
-		" %ld bytes)\n", nr_hash, order, (PAGE_SIZE << order));
+		" %ld bytes)\n", nr_hash, order, (PG_SIZE << order));
 
 	dqcache_shrinker = shrinker_alloc(0, "dquota-cache");
 	if (!dqcache_shrinker)

@@ -926,7 +926,7 @@ void sk_forced_mem_schedule(struct sock *sk, int size)
 		return;
 
 	amt = sk_mem_pages(delta);
-	sk_forward_alloc_add(sk, amt << PAGE_SHIFT);
+	sk_forward_alloc_add(sk, amt << PG_SHIFT);
 
 	if (mem_cgroup_sk_enabled(sk))
 		mem_cgroup_sk_charge(sk, amt, gfp_memcg_charge() | __GFP_NOFAIL);
@@ -1934,7 +1934,7 @@ static bool can_map_frag(const skb_frag_t *frag)
 {
 	struct page *page;
 
-	if (skb_frag_size(frag) != PAGE_SIZE || skb_frag_off(frag))
+	if (skb_frag_size(frag) != PG_SIZE || skb_frag_off(frag))
 		return false;
 
 	page = skb_frag_page(frag);
@@ -2071,7 +2071,7 @@ static int tcp_zc_handle_leftover(struct tcp_zerocopy_receive *zc,
 
 	if (!copylen)
 		return 0;
-	/* skb is null if inq < PAGE_SIZE. */
+	/* skb is null if inq < PG_SIZE. */
 	if (skb) {
 		offset = *seq - TCP_SKB_CB(skb)->seq;
 	} else {
@@ -2104,7 +2104,7 @@ static int tcp_zerocopy_vm_insert_batch_error(struct vm_area_struct *vma,
 
 		maybe_zap_len = total_bytes_to_map -  /* All bytes to map */
 				*length + /* Mapped or pending */
-				(pages_remaining * PAGE_SIZE); /* Failed map. */
+				(pages_remaining * PG_SIZE); /* Failed map. */
 		zap_page_range_single(vma, *address, maybe_zap_len, NULL);
 		err = 0;
 	}
@@ -2117,7 +2117,7 @@ static int tcp_zerocopy_vm_insert_batch_error(struct vm_area_struct *vma,
 		err = vm_insert_pages(vma, *address,
 				      pending_pages,
 				      &pages_remaining);
-		bytes_mapped = PAGE_SIZE * (leftover_pages - pages_remaining);
+		bytes_mapped = PG_SIZE * (leftover_pages - pages_remaining);
 		*seq += bytes_mapped;
 		*address += bytes_mapped;
 	}
@@ -2127,7 +2127,7 @@ static int tcp_zerocopy_vm_insert_batch_error(struct vm_area_struct *vma,
 		 * is the number of pages we were unable to map, and we unroll
 		 * some state we speculatively touched before.
 		 */
-		const int bytes_not_mapped = PAGE_SIZE * pages_remaining;
+		const int bytes_not_mapped = PG_SIZE * pages_remaining;
 
 		*length -= bytes_not_mapped;
 		zc->recv_skip_hint += bytes_not_mapped;
@@ -2151,7 +2151,7 @@ static int tcp_zerocopy_vm_insert_batch(struct vm_area_struct *vma,
 
 	err = vm_insert_pages(vma, *address, pages, &pages_remaining);
 	pages_mapped = pages_to_map - (unsigned int)pages_remaining;
-	bytes_mapped = PAGE_SIZE * pages_mapped;
+	bytes_mapped = PG_SIZE * pages_mapped;
 	/* Even if vm_insert_pages fails, it may have partially succeeded in
 	 * mapping (some but not all of the pages).
 	 */
@@ -2242,7 +2242,7 @@ static int tcp_zerocopy_receive(struct sock *sk,
 	zc->copybuf_len = 0;
 	zc->msg_flags = 0;
 
-	if (address & (PAGE_SIZE - 1) || address != zc->address)
+	if (address & (PG_SIZE - 1) || address != zc->address)
 		return -EINVAL;
 
 	if (sk->sk_state == TCP_LISTEN)
@@ -2253,7 +2253,7 @@ static int tcp_zerocopy_receive(struct sock *sk,
 	if (inq && inq <= copybuf_len)
 		return receive_fallback_to_copy(sk, zc, inq, tss);
 
-	if (inq < PAGE_SIZE) {
+	if (inq < PG_SIZE) {
 		zc->length = 0;
 		zc->recv_skip_hint = inq;
 		if (!inq && sock_flag(sk, SOCK_DONE))
@@ -2267,7 +2267,7 @@ static int tcp_zerocopy_receive(struct sock *sk,
 
 	vma_len = min_t(unsigned long, zc->length, vma->vm_end - address);
 	avail_len = min_t(u32, vma_len, inq);
-	total_bytes_to_map = avail_len & ~(PAGE_SIZE - 1);
+	total_bytes_to_map = avail_len & ~(PG_SIZE - 1);
 	if (total_bytes_to_map) {
 		if (!(zc->flags & TCP_RECEIVE_ZEROCOPY_FLAG_TLB_CLEAN_HINT))
 			zap_page_range_single(vma, address, total_bytes_to_map,
@@ -2279,11 +2279,11 @@ static int tcp_zerocopy_receive(struct sock *sk,
 		zc->recv_skip_hint = avail_len;
 	}
 	ret = 0;
-	while (length + PAGE_SIZE <= zc->length) {
+	while (length + PG_SIZE <= zc->length) {
 		int mappable_offset;
 		struct page *page;
 
-		if (zc->recv_skip_hint < PAGE_SIZE) {
+		if (zc->recv_skip_hint < PG_SIZE) {
 			u32 offset_frag;
 
 			if (skb) {
@@ -2320,11 +2320,11 @@ static int tcp_zerocopy_receive(struct sock *sk,
 
 		prefetchw(page);
 		pages[pages_to_map++] = page;
-		length += PAGE_SIZE;
-		zc->recv_skip_hint -= PAGE_SIZE;
+		length += PG_SIZE;
+		zc->recv_skip_hint -= PG_SIZE;
 		frags++;
 		if (pages_to_map == TCP_ZEROCOPY_PAGE_BATCH_SIZE ||
-		    zc->recv_skip_hint < PAGE_SIZE) {
+		    zc->recv_skip_hint < PG_SIZE) {
 			/* Either full batch, or we're about to go to next skb
 			 * (and we cannot unroll failed ops across skbs).
 			 */
@@ -5340,15 +5340,15 @@ void __init tcp_init(void)
 
 	tcp_init_mem();
 	/* Set per-socket limits to no more than 1/128 the pressure threshold */
-	limit = nr_free_buffer_pages() << (PAGE_SHIFT - 7);
+	limit = nr_free_buffer_pages() << (PG_SHIFT - 7);
 	max_wshare = min(4UL*1024*1024, limit);
 	max_rshare = min(32UL*1024*1024, limit);
 
-	init_net.ipv4.sysctl_tcp_wmem[0] = PAGE_SIZE;
+	init_net.ipv4.sysctl_tcp_wmem[0] = PG_SIZE;
 	init_net.ipv4.sysctl_tcp_wmem[1] = 16*1024;
 	init_net.ipv4.sysctl_tcp_wmem[2] = max(64*1024, max_wshare);
 
-	init_net.ipv4.sysctl_tcp_rmem[0] = PAGE_SIZE;
+	init_net.ipv4.sysctl_tcp_rmem[0] = PG_SIZE;
 	init_net.ipv4.sysctl_tcp_rmem[1] = 131072;
 	init_net.ipv4.sysctl_tcp_rmem[2] = max(131072, max_rshare);
 

@@ -381,7 +381,7 @@ static void *vring_alloc_queue(struct virtio_device *vdev, size_t size,
 		return virtqueue_map_alloc_coherent(vdev, map, size,
 						    map_handle, flag);
 	} else {
-		void *queue = alloc_pages_exact(PAGE_ALIGN(size), flag);
+		void *queue = alloc_pages_exact(PG_ALIGN(size), flag);
 
 		if (queue) {
 			phys_addr_t phys_addr = virt_to_phys(queue);
@@ -399,7 +399,7 @@ static void *vring_alloc_queue(struct virtio_device *vdev, size_t size,
 			 * unrepresentable address.
 			 */
 			if (WARN_ON_ONCE(*map_handle != phys_addr)) {
-				free_pages_exact(queue, PAGE_ALIGN(size));
+				free_pages_exact(queue, PG_ALIGN(size));
 				return NULL;
 			}
 		}
@@ -415,7 +415,7 @@ static void vring_free_queue(struct virtio_device *vdev, size_t size,
 		virtqueue_map_free_coherent(vdev, map, size,
 					    queue, map_handle);
 	else
-		free_pages_exact(queue, PAGE_ALIGN(size));
+		free_pages_exact(queue, PG_ALIGN(size));
 }
 
 /*
@@ -1259,7 +1259,7 @@ static int vring_alloc_queue_split(struct vring_virtqueue_split *vring_split,
 	}
 
 	/* TODO: allocate each queue chunk individually */
-	for (; num && vring_size(num, vring_align) > PAGE_SIZE; num /= 2) {
+	for (; num && vring_size(num, vring_align) > PG_SIZE; num /= 2) {
 		queue = vring_alloc_queue(vdev, vring_size(num, vring_align),
 					  &dma_addr,
 					  GFP_KERNEL | __GFP_NOWARN | __GFP_ZERO,
@@ -3803,7 +3803,7 @@ dma_addr_t virtqueue_map_single_attrs(const struct virtqueue *_vq, void *ptr,
 		return DMA_MAPPING_ERROR;
 
 	return virtqueue_map_page_attrs(&vq->vq, virt_to_page(ptr),
-					offset_in_page(ptr), size, dir, attrs);
+					offset_in_pg(ptr), size, dir, attrs);
 }
 EXPORT_SYMBOL_GPL(virtqueue_map_single_attrs);
 

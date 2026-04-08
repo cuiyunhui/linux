@@ -694,8 +694,8 @@ static __init void reserve_unaccepted(struct efi_unaccepted_memory *unaccepted)
 {
 	phys_addr_t start, end;
 
-	start = PAGE_ALIGN_DOWN(efi.unaccepted);
-	end = PAGE_ALIGN(efi.unaccepted + sizeof(*unaccepted) + unaccepted->size);
+	start = PG_ALIGN_DOWN(efi.unaccepted);
+	end = PG_ALIGN(efi.unaccepted + sizeof(*unaccepted) + unaccepted->size);
 
 	memblock_add(start, end - start);
 	memblock_reserve(start, end - start);
@@ -778,14 +778,14 @@ int __init efi_config_parse_tables(const efi_config_table_t *config_tables,
 			 * anyway, and it permits us to map the entire entry
 			 * before knowing its size.
 			 */
-			p = early_memremap(ALIGN_DOWN(prsv, PAGE_SIZE),
-					   PAGE_SIZE);
+			p = early_memremap(ALIGN_DOWN(prsv, PG_SIZE),
+					   PG_SIZE);
 			if (p == NULL) {
 				pr_err("Could not map UEFI memreserve entry!\n");
 				return -ENOMEM;
 			}
 
-			rsv = (void *)(p + prsv % PAGE_SIZE);
+			rsv = (void *)(p + prsv % PG_SIZE);
 
 			/* reserve the entry itself */
 			memblock_reserve(prsv,
@@ -797,7 +797,7 @@ int __init efi_config_parse_tables(const efi_config_table_t *config_tables,
 			}
 
 			prsv = rsv->next;
-			early_memunmap(p, PAGE_SIZE);
+			early_memunmap(p, PG_SIZE);
 		}
 	}
 

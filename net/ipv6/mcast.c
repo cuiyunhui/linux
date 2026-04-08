@@ -1771,7 +1771,7 @@ static struct sk_buff *mld_newpack(struct inet6_dev *idev, unsigned int mtu)
 	/* we assume size > sizeof(ra) here
 	 * Also try to not allocate high-order pages for big MTU
 	 */
-	size = min_t(int, mtu, PAGE_SIZE / 2) + hlen + tlen;
+	size = min_t(int, mtu, PG_SIZE / 2) + hlen + tlen;
 	skb = alloc_skb(size, GFP_KERNEL);
 	if (!skb)
 		return NULL;

@@ -7,7 +7,7 @@
 #include <linux/tracepoint.h>
 #include <trace/events/mmflags.h>
 
-#define PG_COUNT_TO_KB(x) ((x) << (PAGE_SHIFT - 10))
+#define PG_COUNT_TO_KB(x) ((x) << (PG_SHIFT - 10))
 
 TRACE_EVENT(oom_score_adj_update,
 

@@ -437,7 +437,7 @@ static void node_init_caches(unsigned int nid) { }
 static void node_remove_caches(struct node *node) { }
 #endif
 
-#define K(x) ((x) << (PAGE_SHIFT - 10))
+#define K(x) ((x) << (PG_SHIFT - 10))
 static ssize_t node_read_meminfo(struct device *dev,
 			struct device_attribute *attr, char *buf)
 {
@@ -626,10 +626,10 @@ static ssize_t node_read_distance(struct device *dev,
 	int i;
 
 	/*
-	 * buf is currently PAGE_SIZE in length and each node needs 4 chars
+	 * buf is currently PG_SIZE in length and each node needs 4 chars
 	 * at the most (distance + space or newline).
 	 */
-	BUILD_BUG_ON(MAX_NUMNODES * 4 > PAGE_SIZE);
+	BUILD_BUG_ON(MAX_NUMNODES * 4 > PG_SIZE);
 
 	for_each_online_node(i) {
 		len += sysfs_emit_at(buf, len, "%s%d",

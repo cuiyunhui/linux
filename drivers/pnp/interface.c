@@ -218,7 +218,7 @@ static ssize_t options_show(struct device *dmdev, struct device_attribute *attr,
 	if (!buffer)
 		return -ENOMEM;
 
-	buffer->len = PAGE_SIZE;
+	buffer->len = PG_SIZE;
 	buffer->buffer = buf;
 	buffer->curr = buffer->buffer;
 
@@ -261,7 +261,7 @@ static ssize_t resources_show(struct device *dmdev,
 	if (!buffer)
 		return -ENOMEM;
 
-	buffer->len = PAGE_SIZE;
+	buffer->len = PG_SIZE;
 	buffer->buffer = buf;
 	buffer->curr = buffer->buffer;
 

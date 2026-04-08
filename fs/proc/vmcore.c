@@ -167,13 +167,13 @@ ssize_t read_from_oldmem(struct iov_iter *iter, size_t count,
 	if (!count)
 		return 0;
 
-	offset = (unsigned long)(*ppos % PAGE_SIZE);
-	pfn = (unsigned long)(*ppos / PAGE_SIZE);
+	offset = (unsigned long)(*ppos % PG_SIZE);
+	pfn = (unsigned long)(*ppos / PG_SIZE);
 
 	idx = srcu_read_lock(&vmcore_cb_srcu);
 	do {
-		if (count > (PAGE_SIZE - offset))
-			nr_bytes = PAGE_SIZE - offset;
+		if (count > (PG_SIZE - offset))
+			nr_bytes = PG_SIZE - offset;
 		else
 			nr_bytes = count;
 
@@ -482,10 +482,10 @@ static vm_fault_t mmap_vmcore_fault(struct vm_fault *vmf)
 	if (!page)
 		return VM_FAULT_OOM;
 	if (!PageUptodate(page)) {
-		offset = (loff_t) index << PAGE_SHIFT;
+		offset = (loff_t) index << PG_SHIFT;
 		kvec.iov_base = page_address(page);
-		kvec.iov_len = PAGE_SIZE;
-		iov_iter_kvec(&iter, ITER_DEST, &kvec, 1, PAGE_SIZE);
+		kvec.iov_len = PG_SIZE;
+		iov_iter_kvec(&iter, ITER_DEST, &kvec, 1, PG_SIZE);
 
 		rc = __read_vmcore(&iter, &offset);
 		if (rc < 0) {
@@ -529,7 +529,7 @@ static int remap_oldmem_pfn_checked(struct vm_area_struct *vma,
 	size_t len = 0;
 
 	pos_start = pfn;
-	pos_end = pfn + (size >> PAGE_SHIFT);
+	pos_end = pfn + (size >> PG_SHIFT);
 
 	for (pos = pos_start; pos < pos_end; ++pos) {
 		if (!pfn_is_ram(pos)) {
@@ -540,7 +540,7 @@ static int remap_oldmem_pfn_checked(struct vm_area_struct *vma,
 			 */
 			if (pos > pos_start) {
 				/* Remap continuous region */
-				map_size = (pos - pos_start) << PAGE_SHIFT;
+				map_size = (pos - pos_start) << PG_SHIFT;
 				if (remap_oldmem_pfn_range(vma, from + len,
 							   pos_start, map_size,
 							   prot))
@@ -550,15 +550,15 @@ static int remap_oldmem_pfn_checked(struct vm_area_struct *vma,
 			/* Remap the zero page */
 			if (remap_oldmem_pfn_range(vma, from + len,
 						   zeropage_pfn,
-						   PAGE_SIZE, prot))
+						   PG_SIZE, prot))
 				goto fail;
-			len += PAGE_SIZE;
+			len += PG_SIZE;
 			pos_start = pos + 1;
 		}
 	}
 	if (pos > pos_start) {
 		/* Remap the rest */
-		map_size = (pos - pos_start) << PAGE_SHIFT;
+		map_size = (pos - pos_start) << PG_SHIFT;
 		if (remap_oldmem_pfn_range(vma, from + len, pos_start,
 					   map_size, prot))
 			goto fail;
@@ -594,7 +594,7 @@ static int mmap_vmcore(struct file *file, struct vm_area_struct *vma)
 	u64 start, end, len, tsz;
 	struct vmcore_range *m;
 
-	start = (u64)vma->vm_pgoff << PAGE_SHIFT;
+	start = (u64)vma->vm_pteoff << PTE_SHIFT;
 	end = start + size;
 
 	if (size > vmcore_size || end > vmcore_size)
@@ -612,7 +612,7 @@ static int mmap_vmcore(struct file *file, struct vm_area_struct *vma)
 		u64 pfn;
 
 		tsz = min(elfcorebuf_sz - (size_t)start, size);
-		pfn = __pa(elfcorebuf + start) >> PAGE_SHIFT;
+		pfn = __pa(elfcorebuf + start) >> PG_SHIFT;
 		if (remap_pfn_range(vma, vma->vm_start, pfn, tsz,
 				    vma->vm_page_prot))
 			return -EAGAIN;
@@ -683,7 +683,7 @@ static int mmap_vmcore(struct file *file, struct vm_area_struct *vma)
 					    m->offset + m->size - start, size);
 			paddr = m->paddr + start - m->offset;
 			if (vmcore_remap_oldmem_pfn(vma, vma->vm_start + len,
-						    paddr >> PAGE_SHIFT, tsz,
+						    paddr >> PG_SHIFT, tsz,
 						    vma->vm_page_prot))
 				goto fail;
 			size -= tsz;
@@ -877,7 +877,7 @@ static int __init merge_note_headers_elf64(char *elfptr, size_t *elfsz,
 	if (rc < 0)
 		return rc;
 
-	*notes_sz = roundup(phdr_sz, PAGE_SIZE);
+	*notes_sz = roundup(phdr_sz, PG_SIZE);
 	*notes_buf = vmcore_alloc_buf(*notes_sz);
 	if (!*notes_buf)
 		return -ENOMEM;
@@ -891,7 +891,7 @@ static int __init merge_note_headers_elf64(char *elfptr, size_t *elfsz,
 	phdr.p_flags   = 0;
 	note_off = sizeof(Elf64_Ehdr) +
 			(ehdr_ptr->e_phnum - nr_ptnote +1) * sizeof(Elf64_Phdr);
-	phdr.p_offset  = roundup(note_off, PAGE_SIZE);
+	phdr.p_offset  = roundup(note_off, PG_SIZE);
 	phdr.p_vaddr   = phdr.p_paddr = 0;
 	phdr.p_filesz  = phdr.p_memsz = phdr_sz;
 	phdr.p_align   = 4;
@@ -906,7 +906,7 @@ static int __init merge_note_headers_elf64(char *elfptr, size_t *elfsz,
 	*elfsz = *elfsz - i;
 	memmove(tmp, tmp+i, ((*elfsz)-sizeof(Elf64_Ehdr)-sizeof(Elf64_Phdr)));
 	memset(elfptr + *elfsz, 0, i);
-	*elfsz = roundup(*elfsz, PAGE_SIZE);
+	*elfsz = roundup(*elfsz, PG_SIZE);
 
 	/* Modify e_phnum to reflect merged headers. */
 	ehdr_ptr->e_phnum = ehdr_ptr->e_phnum - nr_ptnote + 1;
@@ -1068,7 +1068,7 @@ static int __init merge_note_headers_elf32(char *elfptr, size_t *elfsz,
 	if (rc < 0)
 		return rc;
 
-	*notes_sz = roundup(phdr_sz, PAGE_SIZE);
+	*notes_sz = roundup(phdr_sz, PG_SIZE);
 	*notes_buf = vmcore_alloc_buf(*notes_sz);
 	if (!*notes_buf)
 		return -ENOMEM;
@@ -1082,7 +1082,7 @@ static int __init merge_note_headers_elf32(char *elfptr, size_t *elfsz,
 	phdr.p_flags   = 0;
 	note_off = sizeof(Elf32_Ehdr) +
 			(ehdr_ptr->e_phnum - nr_ptnote +1) * sizeof(Elf32_Phdr);
-	phdr.p_offset  = roundup(note_off, PAGE_SIZE);
+	phdr.p_offset  = roundup(note_off, PG_SIZE);
 	phdr.p_vaddr   = phdr.p_paddr = 0;
 	phdr.p_filesz  = phdr.p_memsz = phdr_sz;
 	phdr.p_align   = 4;
@@ -1097,7 +1097,7 @@ static int __init merge_note_headers_elf32(char *elfptr, size_t *elfsz,
 	*elfsz = *elfsz - i;
 	memmove(tmp, tmp+i, ((*elfsz)-sizeof(Elf32_Ehdr)-sizeof(Elf32_Phdr)));
 	memset(elfptr + *elfsz, 0, i);
-	*elfsz = roundup(*elfsz, PAGE_SIZE);
+	*elfsz = roundup(*elfsz, PG_SIZE);
 
 	/* Modify e_phnum to reflect merged headers. */
 	ehdr_ptr->e_phnum = ehdr_ptr->e_phnum - nr_ptnote + 1;
@@ -1135,8 +1135,8 @@ static int __init process_ptload_program_headers_elf64(char *elfptr,
 			continue;
 
 		paddr = phdr_ptr->p_offset;
-		start = rounddown(paddr, PAGE_SIZE);
-		end = roundup(paddr + phdr_ptr->p_memsz, PAGE_SIZE);
+		start = rounddown(paddr, PG_SIZE);
+		end = roundup(paddr + phdr_ptr->p_memsz, PG_SIZE);
 		size = end - start;
 
 		if (vmcore_alloc_add_range(vc_list, start, size))
@@ -1172,8 +1172,8 @@ static int __init process_ptload_program_headers_elf32(char *elfptr,
 			continue;
 
 		paddr = phdr_ptr->p_offset;
-		start = rounddown(paddr, PAGE_SIZE);
-		end = roundup(paddr + phdr_ptr->p_memsz, PAGE_SIZE);
+		start = rounddown(paddr, PG_SIZE);
+		end = roundup(paddr + phdr_ptr->p_memsz, PG_SIZE);
 		size = end - start;
 
 		if (vmcore_alloc_add_range(vc_list, start, size))
@@ -1411,9 +1411,9 @@ static void vmcoredd_update_program_headers(char *elfptr, size_t elfnotesz,
 				continue;
 			}
 
-			start = rounddown(phdr->p_offset, PAGE_SIZE);
+			start = rounddown(phdr->p_offset, PG_SIZE);
 			end = roundup(phdr->p_offset + phdr->p_memsz,
-				      PAGE_SIZE);
+				      PG_SIZE);
 			size = end - start;
 			phdr->p_offset = vmcore_off + (phdr->p_offset - start);
 			vmcore_off += size;
@@ -1431,9 +1431,9 @@ static void vmcoredd_update_program_headers(char *elfptr, size_t elfnotesz,
 				continue;
 			}
 
-			start = rounddown(phdr->p_offset, PAGE_SIZE);
+			start = rounddown(phdr->p_offset, PG_SIZE);
 			end = roundup(phdr->p_offset + phdr->p_memsz,
-				      PAGE_SIZE);
+				      PG_SIZE);
 			size = end - start;
 			phdr->p_offset = vmcore_off + (phdr->p_offset - start);
 			vmcore_off += size;
@@ -1453,7 +1453,7 @@ static void vmcoredd_update_program_headers(char *elfptr, size_t elfnotesz,
 static void vmcoredd_update_size(size_t dump_size)
 {
 	vmcoredd_orig_sz += dump_size;
-	elfnotes_sz = roundup(elfnotes_orig_sz, PAGE_SIZE) + vmcoredd_orig_sz;
+	elfnotes_sz = roundup(elfnotes_orig_sz, PG_SIZE) + vmcoredd_orig_sz;
 	vmcoredd_update_program_headers(elfcorebuf, elfnotes_sz,
 					vmcoredd_orig_sz);
 
@@ -1495,7 +1495,7 @@ int vmcore_add_device_dump(struct vmcoredd_data *data)
 
 	/* Keep size of the buffer page aligned so that it can be mmaped */
 	data_size = roundup(sizeof(struct vmcoredd_header) + data->size,
-			    PAGE_SIZE);
+			    PG_SIZE);
 
 	/* Allocate buffer for driver's to write their dumps */
 	buf = vmcore_alloc_buf(data_size);
@@ -1582,8 +1582,8 @@ static void vmcore_reset_offsets_elf64(void)
 			continue;
 		}
 
-		start = rounddown(phdr->p_offset, PAGE_SIZE);
-		end = roundup(phdr->p_offset + phdr->p_memsz, PAGE_SIZE);
+		start = rounddown(phdr->p_offset, PG_SIZE);
+		end = roundup(phdr->p_offset + phdr->p_memsz, PG_SIZE);
 		phdr->p_offset = vmcore_off + (phdr->p_offset - start);
 		vmcore_off = vmcore_off + end - start;
 	}
@@ -1607,7 +1607,7 @@ static int vmcore_add_device_ram_elf64(struct list_head *list, size_t count)
 	/* elfcorebuf_sz must always cover full pages. */
 	new_size = sizeof(Elf64_Ehdr) +
 		   (ehdr->e_phnum + count) * sizeof(Elf64_Phdr);
-	new_size = roundup(new_size, PAGE_SIZE);
+	new_size = roundup(new_size, PG_SIZE);
 
 	/*
 	 * Make sure we have sufficient space to include the new PT_LOAD
@@ -1625,7 +1625,7 @@ static int vmcore_add_device_ram_elf64(struct list_head *list, size_t count)
 	/* Fill the added PT_LOAD entries. */
 	phdr = phdr_start + ehdr->e_phnum;
 	list_for_each_entry(cur, list, list) {
-		WARN_ON_ONCE(!IS_ALIGNED(cur->paddr | cur->size, PAGE_SIZE));
+		WARN_ON_ONCE(!IS_ALIGNED(cur->paddr | cur->size, PG_SIZE));
 		elfcorehdr_fill_device_ram_ptload_elf64(phdr, cur->paddr, cur->size);
 
 		/* p_offset will be adjusted later. */

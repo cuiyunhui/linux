@@ -64,8 +64,8 @@ xdr_skb_read_bits(struct xdr_skb_reader *desc, void *to, size_t len)
 static ssize_t
 xdr_partial_copy_from_skb(struct xdr_buf *xdr, struct xdr_skb_reader *desc)
 {
-	struct page **ppage = xdr->pages + (xdr->page_base >> PAGE_SHIFT);
-	unsigned int poff = xdr->page_base & ~PAGE_MASK;
+	struct page **ppage = xdr->pages + (xdr->page_base >> PG_SHIFT);
+	unsigned int poff = xdr->page_base & ~PG_MASK;
 	unsigned int pglen = xdr->page_len;
 	ssize_t copied = 0;
 	size_t ret;
@@ -80,7 +80,7 @@ xdr_partial_copy_from_skb(struct xdr_buf *xdr, struct xdr_skb_reader *desc)
 	copied += ret;
 
 	while (pglen) {
-		unsigned int len = min(PAGE_SIZE - poff, pglen);
+		unsigned int len = min(PG_SIZE - poff, pglen);
 		char *kaddr;
 
 		/* ACL likes to be lazy in allocating pages - ACLs

@@ -390,7 +390,7 @@ xfs_compat_attrmulti_by_handle(
 
 	error = -E2BIG;
 	size = am_hreq.opcount * sizeof(compat_xfs_attr_multiop_t);
-	if (!size || size > 16 * PAGE_SIZE)
+	if (!size || size > 16 * PG_SIZE)
 		goto out_dput;
 
 	ops = memdup_user(compat_ptr(am_hreq.ops), size);

@@ -286,9 +286,9 @@ static int htable_create(struct net *net, struct hashlimit_cfg3 *cfg,
 	if (cfg->size) {
 		size = cfg->size;
 	} else {
-		size = (nr_pages << PAGE_SHIFT) / 16384 /
+		size = (nr_pages << PG_SHIFT) / 16384 /
 		       sizeof(struct hlist_head);
-		if (nr_pages > 1024 * 1024 * 1024 / PAGE_SIZE)
+		if (nr_pages > 1024 * 1024 * 1024 / PG_SIZE)
 			size = 8192;
 		if (size < 16)
 			size = 16;

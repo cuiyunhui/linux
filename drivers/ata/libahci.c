@@ -338,14 +338,14 @@ static ssize_t ahci_read_em_buffer(struct device *dev,
 
 	count = hpriv->em_buf_sz;
 
-	/* the count should not be larger than PAGE_SIZE */
-	if (count > PAGE_SIZE) {
+	/* the count should not be larger than PG_SIZE */
+	if (count > PG_SIZE) {
 		if (printk_ratelimit())
 			ata_port_warn(ap,
 				      "EM read buffer size too large: "
 				      "buffer size %u, page size %lu\n",
-				      hpriv->em_buf_sz, PAGE_SIZE);
-		count = PAGE_SIZE;
+				      hpriv->em_buf_sz, PG_SIZE);
+		count = PG_SIZE;
 	}
 
 	for (i = 0; i < count; i += 4) {

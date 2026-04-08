@@ -1019,7 +1019,7 @@ EXPORT_SYMBOL(sock_set_mark);
 static void sock_release_reserved_memory(struct sock *sk, int bytes)
 {
 	/* Round down bytes to multiple of pages */
-	bytes = round_down(bytes, PAGE_SIZE);
+	bytes = round_down(bytes, PG_SIZE);
 
 	WARN_ON(bytes > sk->sk_reserved_mem);
 	WRITE_ONCE(sk->sk_reserved_mem, sk->sk_reserved_mem - bytes);
@@ -1063,10 +1063,10 @@ static int sock_reserve_memory(struct sock *sk, int bytes)
 	}
 
 success:
-	sk_forward_alloc_add(sk, pages << PAGE_SHIFT);
+	sk_forward_alloc_add(sk, pages << PG_SHIFT);
 
 	WRITE_ONCE(sk->sk_reserved_mem,
-		   sk->sk_reserved_mem + (pages << PAGE_SHIFT));
+		   sk->sk_reserved_mem + (pages << PG_SHIFT));
 
 	return 0;
 }
@@ -3125,7 +3125,7 @@ DEFINE_STATIC_KEY_FALSE(net_high_order_alloc_disable_key);
  *
  * Note: While this allocator tries to use high order pages, there is
  * no guarantee that allocations succeed. Therefore, @sz MUST be
- * less or equal than PAGE_SIZE.
+ * less or equal than PG_SIZE.
  */
 bool skb_page_frag_refill(unsigned int sz, struct page_frag *pfrag, gfp_t gfp)
 {
@@ -3148,13 +3148,13 @@ bool skb_page_frag_refill(unsigned int sz, struct page_frag *pfrag, gfp_t gfp)
 					  __GFP_NORETRY,
 					  SKB_FRAG_PAGE_ORDER);
 		if (likely(pfrag->page)) {
-			pfrag->size = PAGE_SIZE << SKB_FRAG_PAGE_ORDER;
+			pfrag->size = PG_SIZE << SKB_FRAG_PAGE_ORDER;
 			return true;
 		}
 	}
 	pfrag->page = alloc_page(gfp);
 	if (likely(pfrag->page)) {
-		pfrag->size = PAGE_SIZE;
+		pfrag->size = PG_SIZE;
 		return true;
 	}
 	return false;
@@ -3405,10 +3405,10 @@ int __sk_mem_schedule(struct sock *sk, int size, int kind)
 {
 	int ret, amt = sk_mem_pages(size);
 
-	sk_forward_alloc_add(sk, amt << PAGE_SHIFT);
+	sk_forward_alloc_add(sk, amt << PG_SHIFT);
 	ret = __sk_mem_raise_allocated(sk, size, amt, kind);
 	if (!ret)
-		sk_forward_alloc_add(sk, -(amt << PAGE_SHIFT));
+		sk_forward_alloc_add(sk, -(amt << PG_SHIFT));
 	return ret;
 }
 EXPORT_SYMBOL(__sk_mem_schedule);
@@ -3438,12 +3438,12 @@ void __sk_mem_reduce_allocated(struct sock *sk, int amount)
 /**
  *	__sk_mem_reclaim - reclaim sk_forward_alloc and memory_allocated
  *	@sk: socket
- *	@amount: number of bytes (rounded down to a PAGE_SIZE multiple)
+ *	@amount: number of bytes (rounded down to a PG_SIZE multiple)
  */
 void __sk_mem_reclaim(struct sock *sk, int amount)
 {
-	amount >>= PAGE_SHIFT;
-	sk_forward_alloc_add(sk, -(amount << PAGE_SHIFT));
+	amount >>= PG_SHIFT;
+	sk_forward_alloc_add(sk, -(amount << PG_SHIFT));
 	__sk_mem_reduce_allocated(sk, amount);
 }
 EXPORT_SYMBOL(__sk_mem_reclaim);

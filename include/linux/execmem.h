@@ -9,9 +9,9 @@
 #if (defined(CONFIG_KASAN_GENERIC) || defined(CONFIG_KASAN_SW_TAGS)) && \
 		!defined(CONFIG_KASAN_VMALLOC)
 #include <linux/kasan.h>
-#define MODULE_ALIGN (PAGE_SIZE << KASAN_SHADOW_SCALE_SHIFT)
+#define MODULE_ALIGN (PTE_SIZE << KASAN_SHADOW_SCALE_SHIFT)
 #else
-#define MODULE_ALIGN PAGE_SIZE
+#define MODULE_ALIGN PTE_SIZE
 #endif
 
 /**

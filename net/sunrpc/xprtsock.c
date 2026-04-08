@@ -343,13 +343,13 @@ xs_alloc_sparse_pages(struct xdr_buf *buf, size_t want, gfp_t gfp)
 
 	if (!want || !(buf->flags & XDRBUF_SPARSE_PAGES))
 		return want;
-	n = (buf->page_base + want + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	n = (buf->page_base + want + PG_SIZE - 1) >> PG_SHIFT;
 	for (i = 0; i < n; i++) {
 		if (buf->pages[i])
 			continue;
 		buf->bvec[i].bv_page = buf->pages[i] = alloc_page(gfp);
 		if (!buf->pages[i]) {
-			i *= PAGE_SIZE;
+			i *= PG_SIZE;
 			return i > buf->page_base ? i - buf->page_base : 0;
 		}
 	}
@@ -466,7 +466,7 @@ xs_flush_bvec(const struct bio_vec *bvec, size_t count, size_t seek)
 	};
 	struct bio_vec bv;
 
-	bvec_iter_advance(bvec, &bi, seek & PAGE_MASK);
+	bvec_iter_advance(bvec, &bi, seek & PG_MASK);
 	for_each_bvec(bv, bvec, bi, bi)
 		flush_dcache_page(bv.bv_page);
 }
@@ -1508,7 +1508,7 @@ static void xs_tcp_force_close(struct rpc_xprt *xprt)
 #if defined(CONFIG_SUNRPC_BACKCHANNEL)
 static size_t xs_tcp_bc_maxpayload(struct rpc_xprt *xprt)
 {
-	return PAGE_SIZE;
+	return PG_SIZE;
 }
 #endif /* CONFIG_SUNRPC_BACKCHANNEL */
 
@@ -2949,7 +2949,7 @@ static int bc_malloc(struct rpc_task *task)
 	struct page *page;
 	struct rpc_buffer *buf;
 
-	if (size > PAGE_SIZE - sizeof(struct rpc_buffer)) {
+	if (size > PG_SIZE - sizeof(struct rpc_buffer)) {
 		WARN_ONCE(1, "xprtsock: large bc buffer request (size %zu)\n",
 			  size);
 		return -EINVAL;
@@ -2960,7 +2960,7 @@ static int bc_malloc(struct rpc_task *task)
 		return -ENOMEM;
 
 	buf = page_address(page);
-	buf->len = PAGE_SIZE;
+	buf->len = PG_SIZE;
 
 	rqst->rq_buffer = buf->data;
 	rqst->rq_rbuffer = (char *)rqst->rq_buffer + rqst->rq_callsize;

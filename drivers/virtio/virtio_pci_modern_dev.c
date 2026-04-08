@@ -330,7 +330,7 @@ int vp_modern_probe(struct virtio_pci_modern_device *mdev)
 	 * If notify length is small, map it all now.
 	 * Otherwise, map each VQ individually later.
 	 */
-	if ((u64)notify_length + (notify_offset % PAGE_SIZE) <= PAGE_SIZE) {
+	if ((u64)notify_length + (notify_offset % PG_SIZE) <= PG_SIZE) {
 		mdev->notify_base = vp_modern_map_capability(mdev, notify,
 							     2, 2,
 							     0, notify_length,
@@ -342,12 +342,12 @@ int vp_modern_probe(struct virtio_pci_modern_device *mdev)
 		mdev->notify_map_cap = notify;
 	}
 
-	/* Again, we don't know how much we should map, but PAGE_SIZE
+	/* Again, we don't know how much we should map, but PG_SIZE
 	 * is more than enough for all existing devices.
 	 */
 	if (device) {
 		mdev->device = vp_modern_map_capability(mdev, device, 0, 4,
-							0, PAGE_SIZE,
+							0, PG_SIZE,
 							&mdev->device_len,
 							NULL);
 		if (!mdev->device)

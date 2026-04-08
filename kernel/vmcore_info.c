@@ -160,7 +160,7 @@ static int __init crash_save_vmcoreinfo_init(void)
 
 	VMCOREINFO_OSRELEASE(init_uts_ns.name.release);
 	VMCOREINFO_BUILD_ID();
-	VMCOREINFO_PAGESIZE(PAGE_SIZE);
+	VMCOREINFO_PAGESIZE(PG_SIZE);
 
 	VMCOREINFO_SYMBOL(init_uts_ns);
 	VMCOREINFO_OFFSET(uts_namespace, name);

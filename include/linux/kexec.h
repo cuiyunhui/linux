@@ -69,7 +69,7 @@ extern note_buf_t __percpu *crash_notes;
 #endif
 
 #ifndef KEXEC_CRASH_MEM_ALIGN
-#define KEXEC_CRASH_MEM_ALIGN PAGE_SIZE
+#define KEXEC_CRASH_MEM_ALIGN PG_SIZE
 #endif
 
 /*

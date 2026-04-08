@@ -234,7 +234,7 @@ static int aead_prepare_alg(struct aead_alg *alg)
 	struct crypto_alg *base = &alg->base;
 
 	if (max3(alg->maxauthsize, alg->ivsize, alg->chunksize) >
-	    PAGE_SIZE / 8)
+	    PG_SIZE / 8)
 		return -EINVAL;
 
 	if (!alg->chunksize)

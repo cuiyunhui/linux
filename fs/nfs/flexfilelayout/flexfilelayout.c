@@ -2584,7 +2584,7 @@ ff_layout_encode_layoutreturn(struct xdr_stream *xdr,
 				.iov_base = page_address(ff_args->pages[0]),
 			},
 		},
-		.buflen = PAGE_SIZE,
+		.buflen = PG_SIZE,
 	};
 	struct xdr_stream tmp_xdr;
 	__be32 *start;

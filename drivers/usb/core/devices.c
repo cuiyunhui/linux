@@ -466,10 +466,10 @@ static ssize_t usb_device_dump(char __user **buffer, size_t *nbytes,
 				bus->bandwidth_isoc_reqs);
 
 	}
-	data_end = usb_dump_desc(data_end, pages_start + (2 * PAGE_SIZE) - 256,
+	data_end = usb_dump_desc(data_end, pages_start + (2 * PG_SIZE) - 256,
 				 usbdev);
 
-	if (data_end > (pages_start + (2 * PAGE_SIZE) - 256))
+	if (data_end > (pages_start + (2 * PG_SIZE) - 256))
 		data_end += sprintf(data_end, "(truncated)\n");
 
 	length = data_end - pages_start;

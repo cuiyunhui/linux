@@ -45,17 +45,17 @@ static bool enable_vma_readahead __read_mostly = true;
 
 #define SWAP_RA_ORDER_CEILING	5
 
-#define SWAP_RA_WIN_SHIFT	(PAGE_SHIFT / 2)
+#define SWAP_RA_WIN_SHIFT	(PG_SHIFT / 2)
 #define SWAP_RA_HITS_MASK	((1UL << SWAP_RA_WIN_SHIFT) - 1)
 #define SWAP_RA_HITS_MAX	SWAP_RA_HITS_MASK
-#define SWAP_RA_WIN_MASK	(~PAGE_MASK & ~SWAP_RA_HITS_MASK)
+#define SWAP_RA_WIN_MASK	(~PG_MASK & ~SWAP_RA_HITS_MASK)
 
 #define SWAP_RA_HITS(v)		((v) & SWAP_RA_HITS_MASK)
 #define SWAP_RA_WIN(v)		(((v) & SWAP_RA_WIN_MASK) >> SWAP_RA_WIN_SHIFT)
-#define SWAP_RA_ADDR(v)		((v) & PAGE_MASK)
+#define SWAP_RA_ADDR(v)		((v) & PG_MASK)
 
 #define SWAP_RA_VAL(addr, win, hits)				\
-	(((addr) & PAGE_MASK) |					\
+	(((addr) & PG_MASK) |					\
 	 (((win) << SWAP_RA_WIN_SHIFT) & SWAP_RA_WIN_MASK) |	\
 	 ((hits) & SWAP_RA_HITS_MASK))
 
@@ -794,13 +794,13 @@ static int swap_vma_ra_win(struct vm_fault *vmf, unsigned long *start,
 	if (win == 1)
 		return 1;
 
-	if (faddr == prev_faddr + PAGE_SIZE)
+	if (faddr == prev_faddr + PG_SIZE)
 		left = faddr;
-	else if (prev_faddr == faddr + PAGE_SIZE)
-		left = faddr - (win << PAGE_SHIFT) + PAGE_SIZE;
+	else if (prev_faddr == faddr + PG_SIZE)
+		left = faddr - (win << PG_SHIFT) + PG_SIZE;
 	else
-		left = faddr - (((win - 1) / 2) << PAGE_SHIFT);
-	right = left + (win << PAGE_SHIFT);
+		left = faddr - (((win - 1) / 2) << PG_SHIFT);
+	right = left + (win << PG_SHIFT);
 	if ((long)left < 0)
 		left = 0;
 	*start = max3(left, vma->vm_start, faddr & PMD_MASK);
@@ -844,7 +844,7 @@ static struct folio *swap_vma_readahead(swp_entry_t targ_entry, gfp_t gfp_mask,
 	ilx = targ_ilx - PFN_DOWN(vmf->address - start);
 
 	blk_start_plug(&plug);
-	for (addr = start; addr < end; ilx++, addr += PAGE_SIZE) {
+	for (addr = start; addr < end; ilx++, addr += PG_SIZE) {
 		struct swap_info_struct *si = NULL;
 		softleaf_t entry;
 

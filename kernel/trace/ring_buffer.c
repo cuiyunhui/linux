@@ -1787,7 +1787,7 @@ static bool rb_cpu_meta_valid(struct ring_buffer_cpu_meta *meta, int cpu,
 			      struct trace_buffer *buffer, int nr_pages,
 			      unsigned long *subbuf_mask)
 {
-	int subbuf_size = PAGE_SIZE;
+	int subbuf_size = PG_SIZE;
 	struct buffer_data_page *subbuf;
 	unsigned long buffers_start;
 	unsigned long buffers_end;
@@ -2127,7 +2127,7 @@ static void rb_range_meta_init(struct trace_buffer *buffer, int nr_pages, int sc
 		memset(meta, 0, next_meta - (void *)meta);
 
 		meta->nr_subbufs = nr_pages + 1;
-		meta->subbuf_size = PAGE_SIZE;
+		meta->subbuf_size = PG_SIZE;
 
 		subbuf = rb_subbufs_from_meta(meta);
 
@@ -2494,7 +2494,7 @@ static struct trace_buffer *alloc_buffer(unsigned long size, unsigned flags,
 		return NULL;
 
 	buffer->subbuf_order = order;
-	subbuf_size = (PAGE_SIZE << order);
+	subbuf_size = (PG_SIZE << order);
 	buffer->subbuf_size = subbuf_size - BUF_PAGE_HDR_SIZE;
 
 	/* Max payload is buffer page size - header (8bytes) */
@@ -3253,7 +3253,7 @@ rb_event_index(struct ring_buffer_per_cpu *cpu_buffer, struct ring_buffer_event 
 {
 	unsigned long addr = (unsigned long)event;
 
-	addr &= (PAGE_SIZE << cpu_buffer->buffer->subbuf_order) - 1;
+	addr &= (PG_SIZE << cpu_buffer->buffer->subbuf_order) - 1;
 
 	return addr - BUF_PAGE_HDR_SIZE;
 }
@@ -3846,7 +3846,7 @@ rb_try_to_discard(struct ring_buffer_per_cpu *cpu_buffer,
 	new_index = rb_event_index(cpu_buffer, event);
 	old_index = new_index + rb_event_ts_length(event);
 	addr = (unsigned long)event;
-	addr &= ~((PAGE_SIZE << cpu_buffer->buffer->subbuf_order) - 1);
+	addr &= ~((PG_SIZE << cpu_buffer->buffer->subbuf_order) - 1);
 
 	bpage = READ_ONCE(cpu_buffer->tail_page);
 
@@ -4755,7 +4755,7 @@ rb_decrement_entry(struct ring_buffer_per_cpu *cpu_buffer,
 	struct buffer_page *bpage = cpu_buffer->commit_page;
 	struct buffer_page *start;
 
-	addr &= ~((PAGE_SIZE << cpu_buffer->buffer->subbuf_order) - 1);
+	addr &= ~((PG_SIZE << cpu_buffer->buffer->subbuf_order) - 1);
 
 	/* Do the likely case first */
 	if (likely(bpage->page == (void *)addr)) {
@@ -6156,7 +6156,7 @@ static void rb_update_meta_page(struct ring_buffer_per_cpu *cpu_buffer)
 	meta->read = cpu_buffer->read;
 
 	/* Some archs do not have data cache coherency between kernel and user-space */
-	flush_kernel_vmap_range(cpu_buffer->meta_page, PAGE_SIZE);
+	flush_kernel_vmap_range(cpu_buffer->meta_page, PG_SIZE);
 }
 
 static void
@@ -6867,7 +6867,7 @@ int ring_buffer_subbuf_order_set(struct trace_buffer *buffer, int order)
 	if (buffer->subbuf_order == order)
 		return 0;
 
-	psize = (1 << order) * PAGE_SIZE;
+	psize = (1 << order) * PG_SIZE;
 	if (psize <= BUF_PAGE_HDR_SIZE)
 		return -EINVAL;
 
@@ -7151,7 +7151,7 @@ static int __rb_inc_dec_mapped(struct ring_buffer_per_cpu *cpu_buffer,
 static int __rb_map_vma(struct ring_buffer_per_cpu *cpu_buffer,
 			struct vm_area_struct *vma)
 {
-	unsigned long nr_subbufs, nr_pages, nr_vma_pages, pgoff = vma->vm_pgoff;
+	unsigned long nr_subbufs, nr_pages, nr_vma_pages, pgoff = vma->vm_pteoff;
 	unsigned int subbuf_pages, subbuf_order;
 	struct page **pages __free(kfree) = NULL;
 	int p = 0, s = 0;
@@ -7206,7 +7206,7 @@ static int __rb_map_vma(struct ring_buffer_per_cpu *cpu_buffer,
 		meta_page_padding = subbuf_pages - 1;
 		while (meta_page_padding-- && p < nr_pages) {
 			unsigned long __maybe_unused zero_addr =
-				vma->vm_start + (PAGE_SIZE * p);
+				vma->vm_start + (PG_SIZE * p);
 
 			pages[p++] = ZERO_PAGE(zero_addr);
 		}

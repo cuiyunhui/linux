@@ -18,7 +18,7 @@
  *  MIGRATE_CMA, we can use pageblock_nr_pages.
  */
 #define CMA_MIN_ALIGNMENT_PAGES pageblock_nr_pages
-#define CMA_MIN_ALIGNMENT_BYTES (PAGE_SIZE * CMA_MIN_ALIGNMENT_PAGES)
+#define CMA_MIN_ALIGNMENT_BYTES (PG_SIZE * CMA_MIN_ALIGNMENT_PAGES)
 
 struct cma;
 

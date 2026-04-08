@@ -826,7 +826,7 @@ xfs_flush_unmap_range(
 	 * boundaries so any extent range overlapping the start/end
 	 * of the modification we are about to do is clean and idle.
 	 */
-	rounding = max_t(xfs_off_t, xfs_inode_alloc_unitsize(ip), PAGE_SIZE);
+	rounding = max_t(xfs_off_t, xfs_inode_alloc_unitsize(ip), PG_SIZE);
 	start = rounddown_64(offset, rounding);
 	end = roundup_64(offset + len, rounding) - 1;
 
@@ -907,9 +907,9 @@ xfs_free_file_space(
 	 * page could be mmap'd and xfs_zero_range doesn't do that for us.
 	 * Writeback of the eof page will do this, albeit clumsily.
 	 */
-	if (offset + len >= XFS_ISIZE(ip) && offset_in_page(offset + len) > 0) {
+	if (offset + len >= XFS_ISIZE(ip) && offset_in_pg(offset + len) > 0) {
 		error = filemap_write_and_wait_range(VFS_I(ip)->i_mapping,
-				round_down(offset + len, PAGE_SIZE), LLONG_MAX);
+				round_down(offset + len, PG_SIZE), LLONG_MAX);
 	}
 
 	return error;

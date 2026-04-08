@@ -855,7 +855,7 @@ static int snd_pcm_hw_params(struct snd_pcm_substream *substream,
 		size_t size = runtime->dma_bytes;
 
 		if (runtime->info & SNDRV_PCM_INFO_MMAP)
-			size = PAGE_ALIGN(size);
+			size = PG_ALIGN(size);
 		memset(runtime->dma_area, 0, size);
 	}
 
@@ -3747,7 +3747,7 @@ static int snd_pcm_mmap_status(struct snd_pcm_substream *substream, struct file 
 	if (!(area->vm_flags & VM_READ))
 		return -EINVAL;
 	size = area->vm_end - area->vm_start;
-	if (size != PAGE_ALIGN(sizeof(struct snd_pcm_mmap_status)))
+	if (size != PG_ALIGN(sizeof(struct snd_pcm_mmap_status)))
 		return -EINVAL;
 	area->vm_ops = &snd_pcm_vm_ops_status;
 	area->vm_private_data = substream;
@@ -3785,7 +3785,7 @@ static int snd_pcm_mmap_control(struct snd_pcm_substream *substream, struct file
 	if (!(area->vm_flags & VM_READ))
 		return -EINVAL;
 	size = area->vm_end - area->vm_start;
-	if (size != PAGE_ALIGN(sizeof(struct snd_pcm_mmap_control)))
+	if (size != PG_ALIGN(sizeof(struct snd_pcm_mmap_control)))
 		return -EINVAL;
 	area->vm_ops = &snd_pcm_vm_ops_control;
 	area->vm_private_data = substream;
@@ -3880,9 +3880,9 @@ static vm_fault_t snd_pcm_mmap_data_fault(struct vm_fault *vmf)
 	if (substream == NULL)
 		return VM_FAULT_SIGBUS;
 	runtime = substream->runtime;
-	offset = vmf->pgoff << PAGE_SHIFT;
-	dma_bytes = PAGE_ALIGN(runtime->dma_bytes);
-	if (offset > dma_bytes - PAGE_SIZE)
+	offset = vmf->pteoff << PTE_SHIFT;
+	dma_bytes = PG_ALIGN(runtime->dma_bytes);
+	if (offset > dma_bytes - PG_SIZE)
 		return VM_FAULT_SIGBUS;
 	if (substream->ops->page)
 		page = substream->ops->page(substream, offset);
@@ -3991,8 +3991,8 @@ int snd_pcm_mmap_data(struct snd_pcm_substream *substream, struct file *file,
 	    runtime->access == SNDRV_PCM_ACCESS_RW_NONINTERLEAVED)
 		return -EINVAL;
 	size = area->vm_end - area->vm_start;
-	offset = area->vm_pgoff << PAGE_SHIFT;
-	dma_bytes = PAGE_ALIGN(runtime->dma_bytes);
+	offset = area->vm_pteoff << PTE_SHIFT;
+	dma_bytes = PG_ALIGN(runtime->dma_bytes);
 	if ((size_t)size > dma_bytes)
 		return -EINVAL;
 	if (offset > dma_bytes - size)
@@ -4023,7 +4023,7 @@ static int snd_pcm_mmap(struct file *file, struct vm_area_struct *area)
 	if (substream->runtime->state == SNDRV_PCM_STATE_DISCONNECTED)
 		return -EBADFD;
 
-	offset = area->vm_pgoff << PAGE_SHIFT;
+	offset = area->vm_pteoff << PTE_SHIFT;
 	switch (offset) {
 	case SNDRV_PCM_MMAP_OFFSET_STATUS_OLD:
 		if (pcm_file->no_compat_mmap || !IS_ENABLED(CONFIG_64BIT))
@@ -4184,7 +4184,7 @@ static unsigned long snd_pcm_get_unmapped_area(struct file *file,
 	struct snd_pcm_file *pcm_file = file->private_data;
 	struct snd_pcm_substream *substream = pcm_file->substream;
 	struct snd_pcm_runtime *runtime = substream->runtime;
-	unsigned long offset = pgoff << PAGE_SHIFT;
+	unsigned long offset = pgoff << PG_SHIFT;
 
 	switch (offset) {
 	case SNDRV_PCM_MMAP_OFFSET_STATUS_NEW:

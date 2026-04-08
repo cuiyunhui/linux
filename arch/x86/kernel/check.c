@@ -110,14 +110,14 @@ void __init setup_bios_corruption_check(void)
 	if (!memory_corruption_check)
 		return;
 
-	corruption_check_size = round_up(corruption_check_size, PAGE_SIZE);
+	corruption_check_size = round_up(corruption_check_size, PTE_SIZE);
 
 	for_each_free_mem_range(i, NUMA_NO_NODE, MEMBLOCK_NONE, &start, &end,
 				NULL) {
-		start = clamp_t(phys_addr_t, round_up(start, PAGE_SIZE),
-				PAGE_SIZE, corruption_check_size);
-		end = clamp_t(phys_addr_t, round_down(end, PAGE_SIZE),
-			      PAGE_SIZE, corruption_check_size);
+		start = clamp_t(phys_addr_t, round_up(start, PTE_SIZE),
+				PTE_SIZE, corruption_check_size);
+		end = clamp_t(phys_addr_t, round_down(end, PTE_SIZE),
+			      PTE_SIZE, corruption_check_size);
 		if (start >= end)
 			continue;
 

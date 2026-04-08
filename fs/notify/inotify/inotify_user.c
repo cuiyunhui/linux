@@ -824,7 +824,7 @@ static int __init inotify_user_setup(void)
 	 * Allow up to 1% of addressable memory to be allocated for inotify
 	 * watches (per user) limited to the range [8192, 1048576].
 	 */
-	watches_max = (((si.totalram - si.totalhigh) / 100) << PAGE_SHIFT) /
+	watches_max = (((si.totalram - si.totalhigh) / 100) << PG_SHIFT) /
 			INOTIFY_WATCH_COST;
 	watches_max = clamp(watches_max, 8192UL, 1048576UL);
 

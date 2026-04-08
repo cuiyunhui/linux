@@ -149,7 +149,7 @@ page_reporting_cycle(struct page_reporting_dev_info *prdev, struct zone *zone,
 {
 	struct free_area *area = &zone->free_area[order];
 	struct list_head *list = &area->free_list[mt];
-	unsigned int page_len = PAGE_SIZE << order;
+	unsigned int page_len = PG_SIZE << order;
 	struct page *page, *next;
 	long budget;
 	int err = 0;

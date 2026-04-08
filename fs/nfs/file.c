@@ -291,7 +291,7 @@ void nfs_truncate_last_folio(struct address_space *mapping, loff_t from,
 	if (from >= to)
 		return;
 
-	folio = filemap_lock_folio(mapping, from >> PAGE_SHIFT);
+	folio = filemap_lock_folio(mapping, from >> PG_SHIFT);
 	if (IS_ERR(folio))
 		return;
 
@@ -396,7 +396,7 @@ static int nfs_write_begin(const struct kiocb *iocb,
 	nfs_truncate_last_folio(mapping, i_size_read(mapping->host), pos);
 
 start:
-	folio = write_begin_get_folio(iocb, mapping, pos >> PAGE_SHIFT, len);
+	folio = write_begin_get_folio(iocb, mapping, pos >> PG_SHIFT, len);
 	if (IS_ERR(folio)) {
 		ret = PTR_ERR(folio);
 		goto out;

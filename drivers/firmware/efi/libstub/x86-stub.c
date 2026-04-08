@@ -634,7 +634,7 @@ setup_e820(struct boot_params *params, struct setup_data *e820ext, u32 e820ext_s
 				continue;
 			e820_type = E820_TYPE_RAM;
 			process_unaccepted_memory(d->phys_addr,
-						  d->phys_addr + PAGE_SIZE * d->num_pages);
+						  d->phys_addr + PTE_SIZE * d->num_pages);
 			break;
 		default:
 			continue;
@@ -659,7 +659,7 @@ setup_e820(struct boot_params *params, struct setup_data *e820ext, u32 e820ext_s
 		}
 
 		entry->addr = d->phys_addr;
-		entry->size = d->num_pages << PAGE_SHIFT;
+		entry->size = d->num_pages << PTE_SHIFT;
 		entry->type = e820_type;
 		prev = entry++;
 		nr_entries++;

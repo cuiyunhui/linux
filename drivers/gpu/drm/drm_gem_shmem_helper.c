@@ -119,7 +119,7 @@ __drm_gem_shmem_create(struct drm_device *dev, size_t size, bool private)
 	struct drm_gem_object *obj;
 	int ret = 0;
 
-	size = PAGE_ALIGN(size);
+	size = PG_ALIGN(size);
 
 	if (dev->driver->gem_create_object) {
 		obj = dev->driver->gem_create_object(dev, size);
@@ -233,7 +233,7 @@ static int drm_gem_shmem_get_pages_locked(struct drm_gem_shmem_object *shmem)
 	 */
 #ifdef CONFIG_X86
 	if (shmem->map_wc)
-		set_pages_array_wc(pages, obj->size >> PAGE_SHIFT);
+		set_pages_array_wc(pages, obj->size >> PG_SHIFT);
 #endif
 
 	shmem->pages = pages;
@@ -258,7 +258,7 @@ void drm_gem_shmem_put_pages_locked(struct drm_gem_shmem_object *shmem)
 	if (refcount_dec_and_test(&shmem->pages_use_count)) {
 #ifdef CONFIG_X86
 		if (shmem->map_wc)
-			set_pages_array_wb(shmem->pages, obj->size >> PAGE_SHIFT);
+			set_pages_array_wb(shmem->pages, obj->size >> PG_SHIFT);
 #endif
 
 		drm_gem_put_pages(obj, shmem->pages,
@@ -390,7 +390,7 @@ int drm_gem_shmem_vmap_locked(struct drm_gem_shmem_object *shmem,
 
 		if (shmem->map_wc)
 			prot = pgprot_writecombine(prot);
-		shmem->vaddr = vmap(shmem->pages, obj->size >> PAGE_SHIFT,
+		shmem->vaddr = vmap(shmem->pages, obj->size >> PG_SHIFT,
 				    VM_MAP, prot);
 		if (!shmem->vaddr) {
 			ret = -ENOMEM;
@@ -557,12 +557,12 @@ static vm_fault_t try_insert_pfn(struct vm_fault *vmf, unsigned int order,
 		return vmf_insert_pfn(vmf->vma, vmf->address, pfn);
 #ifdef CONFIG_ARCH_SUPPORTS_PMD_PFNMAP
 	} else if (order == PMD_ORDER) {
-		unsigned long paddr = pfn << PAGE_SHIFT;
+		unsigned long paddr = pfn << PG_SHIFT;
 		bool aligned = (vmf->address & ~PMD_MASK) == (paddr & ~PMD_MASK);
 
 		if (aligned &&
 		    folio_test_pmd_mappable(page_folio(pfn_to_page(pfn)))) {
-			pfn &= PMD_MASK >> PAGE_SHIFT;
+			pfn &= PMD_MASK >> PG_SHIFT;
 			return vmf_insert_pfn_pmd(vmf, pfn, false);
 		}
 #endif
@@ -575,7 +575,7 @@ static vm_fault_t drm_gem_shmem_any_fault(struct vm_fault *vmf, unsigned int ord
 	struct vm_area_struct *vma = vmf->vma;
 	struct drm_gem_object *obj = vma->vm_private_data;
 	struct drm_gem_shmem_object *shmem = to_drm_gem_shmem_obj(obj);
-	loff_t num_pages = obj->size >> PAGE_SHIFT;
+	loff_t num_pages = obj->size >> PG_SHIFT;
 	vm_fault_t ret;
 	struct page **pages = shmem->pages;
 	pgoff_t page_offset;
@@ -585,7 +585,7 @@ static vm_fault_t drm_gem_shmem_any_fault(struct vm_fault *vmf, unsigned int ord
 		return VM_FAULT_FALLBACK;
 
 	/* Offset to faulty address in the VMA. */
-	page_offset = vmf->pgoff - vma->vm_pgoff;
+	page_offset = vmf->pteoff - vma->vm_pteoff;
 
 	dma_resv_lock(shmem->base.resv, NULL);
 
@@ -745,7 +745,7 @@ struct sg_table *drm_gem_shmem_get_sg_table(struct drm_gem_shmem_object *shmem)
 
 	drm_WARN_ON(obj->dev, drm_gem_is_imported(obj));
 
-	return drm_prime_pages_to_sg(obj->dev, shmem->pages, obj->size >> PAGE_SHIFT);
+	return drm_prime_pages_to_sg(obj->dev, shmem->pages, obj->size >> PG_SHIFT);
 }
 EXPORT_SYMBOL_GPL(drm_gem_shmem_get_sg_table);
 
@@ -837,7 +837,7 @@ drm_gem_shmem_prime_import_sg_table(struct drm_device *dev,
 				    struct dma_buf_attachment *attach,
 				    struct sg_table *sgt)
 {
-	size_t size = PAGE_ALIGN(attach->dmabuf->size);
+	size_t size = PG_ALIGN(attach->dmabuf->size);
 	struct drm_gem_shmem_object *shmem;
 
 	shmem = __drm_gem_shmem_create(dev, size, true);
@@ -886,7 +886,7 @@ struct drm_gem_object *drm_gem_shmem_prime_import_no_map(struct drm_device *dev,
 
 	get_dma_buf(dma_buf);
 
-	size = PAGE_ALIGN(attach->dmabuf->size);
+	size = PG_ALIGN(attach->dmabuf->size);
 
 	shmem = __drm_gem_shmem_create(dev, size, true);
 	if (IS_ERR(shmem)) {

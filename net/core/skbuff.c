@@ -770,7 +770,7 @@ struct sk_buff *__netdev_alloc_skb(struct net_device *dev, unsigned int len,
 	 * we use kmalloc() for skb->head allocation.
 	 */
 	if (len <= SKB_WITH_OVERHEAD(SKB_SMALL_HEAD_CACHE_SIZE) ||
-	    len > SKB_WITH_OVERHEAD(PAGE_SIZE) ||
+	    len > SKB_WITH_OVERHEAD(PG_SIZE) ||
 	    (gfp_mask & (__GFP_DIRECT_RECLAIM | GFP_DMA))) {
 		skb = __alloc_skb(len, gfp_mask, SKB_ALLOC_RX, NUMA_NO_NODE);
 		if (!skb)
@@ -848,7 +848,7 @@ struct sk_buff *napi_alloc_skb(struct napi_struct *napi, unsigned int len)
 	 * we use kmalloc() for skb->head allocation.
 	 */
 	if (len <= SKB_WITH_OVERHEAD(SKB_SMALL_HEAD_CACHE_SIZE) ||
-	    len > SKB_WITH_OVERHEAD(PAGE_SIZE) ||
+	    len > SKB_WITH_OVERHEAD(PG_SIZE) ||
 	    (gfp_mask & (__GFP_DIRECT_RECLAIM | GFP_DMA))) {
 		skb = __alloc_skb(len, gfp_mask, SKB_ALLOC_RX | SKB_ALLOC_NAPI,
 				  NUMA_NO_NODE);
@@ -951,8 +951,8 @@ int skb_pp_cow_data(struct page_pool *pool, struct sk_buff **pskb,
 	if (skb_has_frag_list(skb))
 		return -EOPNOTSUPP;
 
-	max_head_size = SKB_WITH_OVERHEAD(PAGE_SIZE - headroom);
-	if (skb->len > max_head_size + MAX_SKB_FRAGS * PAGE_SIZE)
+	max_head_size = SKB_WITH_OVERHEAD(PG_SIZE - headroom);
+	if (skb->len > max_head_size + MAX_SKB_FRAGS * PG_SIZE)
 		return -ENOMEM;
 
 	size = min_t(u32, skb->len, max_head_size);
@@ -987,7 +987,7 @@ int skb_pp_cow_data(struct page_pool *pool, struct sk_buff **pskb,
 		struct page *page;
 		u32 page_off;
 
-		size = min_t(u32, len, PAGE_SIZE);
+		size = min_t(u32, len, PG_SIZE);
 		truesize = size;
 
 		page = page_pool_dev_alloc(pool, &page_off, &truesize);
@@ -1692,8 +1692,8 @@ int mm_account_pinned_pages(struct mmpin *mmp, size_t size)
 	if (rlim == RLIM_INFINITY)
 		return 0;
 
-	num_pg = (size >> PAGE_SHIFT) + 2;	/* worst case */
-	max_pg = rlim >> PAGE_SHIFT;
+	num_pg = (size >> PG_SHIFT) + 2;	/* worst case */
+	max_pg = rlim >> PG_SHIFT;
 	user = mmp->user ? : current_user();
 
 	old_pg = atomic_long_read(&user->locked_vm);
@@ -2015,11 +2015,11 @@ int skb_copy_ubufs(struct sk_buff *skb, gfp_t gfp_mask)
 	 * page order is needed.
 	 */
 	order = 0;
-	while ((PAGE_SIZE << order) * MAX_SKB_FRAGS < __skb_pagelen(skb))
+	while ((PG_SIZE << order) * MAX_SKB_FRAGS < __skb_pagelen(skb))
 		order++;
-	psize = (PAGE_SIZE << order);
+	psize = (PG_SIZE << order);
 
-	new_frags = (__skb_pagelen(skb) + psize - 1) >> (PAGE_SHIFT + order);
+	new_frags = (__skb_pagelen(skb) + psize - 1) >> (PG_SHIFT + order);
 	for (i = 0; i < new_frags; i++) {
 		page = alloc_pages(gfp_mask | __GFP_COMP, order);
 		if (!page) {
@@ -3206,7 +3206,7 @@ static bool __skb_splice_bits(struct sk_buff *skb, struct pipe_inode_info *pipe,
 	 * we can avoid a copy since we own the head portion of this page.
 	 */
 	if (__splice_segment(virt_to_page(skb->data),
-			     (unsigned long) skb->data & (PAGE_SIZE - 1),
+			     (unsigned long) skb->data & (PG_SIZE - 1),
 			     skb_headlen(skb),
 			     offset, len, spd,
 			     skb_head_is_locked(skb),
@@ -4464,10 +4464,10 @@ next_skb:
 		pg_sz = skb_frag_size(frag);
 
 		if (skb_frag_must_loop(skb_frag_page(frag))) {
-			pg_idx = (pg_off + st->frag_off) >> PAGE_SHIFT;
-			pg_off = offset_in_page(pg_off + st->frag_off);
+			pg_idx = (pg_off + st->frag_off) >> PG_SHIFT;
+			pg_off = offset_in_pg(pg_off + st->frag_off);
 			pg_sz = min_t(unsigned int, pg_sz - st->frag_off,
-						    PAGE_SIZE - pg_off);
+						    PG_SIZE - pg_off);
 		}
 
 		block_limit = pg_sz + st->stepped_offset;
@@ -6753,7 +6753,7 @@ struct sk_buff *alloc_skb_with_frags(unsigned long header_len,
 	int nr_frags = 0;
 
 	*errcode = -EMSGSIZE;
-	if (unlikely(data_len > MAX_SKB_FRAGS * (PAGE_SIZE << order)))
+	if (unlikely(data_len > MAX_SKB_FRAGS * (PG_SIZE << order)))
 		return NULL;
 
 	*errcode = -ENOBUFS;
@@ -6764,7 +6764,7 @@ struct sk_buff *alloc_skb_with_frags(unsigned long header_len,
 	while (data_len) {
 		if (nr_frags == MAX_SKB_FRAGS)
 			goto failure;
-		while (order && PAGE_ALIGN(data_len) < (PAGE_SIZE << order))
+		while (order && PG_ALIGN(data_len) < (PG_SIZE << order))
 			order--;
 
 		if (order) {
@@ -6782,10 +6782,10 @@ struct sk_buff *alloc_skb_with_frags(unsigned long header_len,
 				goto failure;
 		}
 		chunk = min_t(unsigned long, data_len,
-			      PAGE_SIZE << order);
+			      PG_SIZE << order);
 		skb_fill_page_desc(skb, nr_frags, page, 0, chunk);
 		nr_frags++;
-		skb->truesize += (PAGE_SIZE << order);
+		skb->truesize += (PG_SIZE << order);
 		data_len -= chunk;
 	}
 	return skb;
@@ -7371,7 +7371,7 @@ ssize_t skb_splice_from_iter(struct sk_buff *skb, struct iov_iter *iter,
 		i = 0;
 		do {
 			struct page *page = pages[i++];
-			size_t part = min_t(size_t, PAGE_SIZE - off, len);
+			size_t part = min_t(size_t, PG_SIZE - off, len);
 
 			ret = -EIO;
 			if (WARN_ON_ONCE(!sendpage_ok(page)))

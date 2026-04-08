@@ -2356,7 +2356,7 @@ trace_event_buffer_lock_reserve(struct trace_buffer **current_rb,
 		 * to discard out of the ring buffer on a failed match.
 		 */
 		if ((entry = __this_cpu_read(trace_buffered_event))) {
-			int max_len = PAGE_SIZE - struct_size(entry, array, 1);
+			int max_len = PG_SIZE - struct_size(entry, array, 1);
 
 			val = this_cpu_inc_return(trace_buffered_event_cnt);
 
@@ -6174,7 +6174,7 @@ static ssize_t tracing_splice_read_pipe(struct file *filp,
 		ret = trace_seq_to_buffer(&iter->seq,
 					  page_address(spd.pages[i]),
 					  min((size_t)trace_seq_used(&iter->seq),
-						  (size_t)PAGE_SIZE));
+						  (size_t)PG_SIZE));
 		if (ret < 0) {
 			__free_page(spd.pages[i]);
 			break;
@@ -9167,7 +9167,7 @@ buffer_subbuf_size_read(struct file *filp, char __user *ubuf, size_t cnt, loff_t
 	int r;
 
 	order = ring_buffer_subbuf_order_get(tr->array_buffer.buffer);
-	size = (PAGE_SIZE << order) / 1024;
+	size = (PG_SIZE << order) / 1024;
 
 	r = sprintf(buf, "%zd\n", size);
 
@@ -9191,7 +9191,7 @@ buffer_subbuf_size_write(struct file *filp, const char __user *ubuf,
 
 	val *= 1024; /* value passed in is in KB */
 
-	pages = DIV_ROUND_UP(val, PAGE_SIZE);
+	pages = DIV_ROUND_UP(val, PG_SIZE);
 	order = fls(pages - 1);
 
 	/* limit between 1 and 128 system pages */
@@ -10290,7 +10290,7 @@ trace_printk_seq(struct trace_seq *s)
 
 	/*
 	 * More paranoid code. Although the buffer size is set to
-	 * PAGE_SIZE, and TRACE_MAX_PRINT is 1000, this is just
+	 * PG_SIZE, and TRACE_MAX_PRINT is 1000, this is just
 	 * an extra layer of protection.
 	 */
 	if (WARN_ON_ONCE(s->seq.len >= s->seq.size))
@@ -10722,11 +10722,11 @@ __init static void enable_instances(void)
 
 		if (start) {
 			/* Start and size must be page aligned */
-			if (start & ~PAGE_MASK) {
+			if (start & ~PG_MASK) {
 				pr_warn("Tracing: mapping start addr %pa is not page aligned\n", &start);
 				continue;
 			}
-			if (size & ~PAGE_MASK) {
+			if (size & ~PG_MASK) {
 				pr_warn("Tracing: mapping size %pa is not page aligned\n", &size);
 				continue;
 			}
@@ -10837,7 +10837,7 @@ __init static int tracer_alloc_buffers(void)
 		goto out_free_cpumask;
 	/* Used for event triggers */
 	ret = -ENOMEM;
-	temp_buffer = ring_buffer_alloc(PAGE_SIZE, RB_FL_OVERWRITE);
+	temp_buffer = ring_buffer_alloc(PG_SIZE, RB_FL_OVERWRITE);
 	if (!temp_buffer)
 		goto out_rm_hp_state;
 

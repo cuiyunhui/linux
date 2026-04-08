@@ -1110,12 +1110,12 @@ int ata_scsi_dev_config(struct scsi_device *sdev, struct queue_limits *lim,
 	 * ata_pio_sectors() expects buffer for each sector to not cross
 	 * page boundary.  Enforce it by requiring buffers to be sector
 	 * aligned, which works iff sector_size is not larger than
-	 * PAGE_SIZE.  ATAPI devices also need the alignment as
+	 * PG_SIZE.  ATAPI devices also need the alignment as
 	 * IDENTIFY_PACKET is executed as ATA_PROT_PIO.
 	 */
-	if (sdev->sector_size > PAGE_SIZE)
+	if (sdev->sector_size > PG_SIZE)
 		ata_dev_warn(dev,
-			"sector_size=%u > PAGE_SIZE, PIO may malfunction\n",
+			"sector_size=%u > PG_SIZE, PIO may malfunction\n",
 			sdev->sector_size);
 
 	lim->dma_alignment = sdev->sector_size - 1;

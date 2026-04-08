@@ -4223,7 +4223,7 @@ static int tcp_send_syn_data(struct sock *sk, struct sk_buff *syn)
 	space = min_t(size_t, space, fo->size);
 
 	if (space &&
-	    !skb_page_frag_refill(min_t(size_t, space, PAGE_SIZE),
+	    !skb_page_frag_refill(min_t(size_t, space, PG_SIZE),
 				  pfrag, sk->sk_allocation))
 		goto fallback;
 	syn_data = tcp_stream_alloc_skb(sk, sk->sk_allocation, false);

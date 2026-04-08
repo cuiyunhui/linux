@@ -74,7 +74,7 @@ static inline int rsa_set_key(struct crypto_akcipher *child,
 
 	/* Find out new modulus size from rsa implementation */
 	err = crypto_akcipher_maxsize(child);
-	if (err > PAGE_SIZE)
+	if (err > PG_SIZE)
 		return -ENOTSUPP;
 
 	*key_size = err;

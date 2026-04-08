@@ -370,7 +370,7 @@ xfs_setup_dax_always(
 		goto disable_dax;
 	}
 
-	if (mp->m_super->s_blocksize != PAGE_SIZE) {
+	if (mp->m_super->s_blocksize != PG_SIZE) {
 		xfs_alert(mp,
 			"DAX not supported for blocksize. Turning off DAX.");
 		goto disable_dax;
@@ -1799,13 +1799,13 @@ xfs_fs_fill_super(
 		goto out_free_sb;
 	}
 
-	if (mp->m_sb.sb_blocksize > PAGE_SIZE) {
+	if (mp->m_sb.sb_blocksize > PG_SIZE) {
 		size_t max_folio_size = mapping_max_folio_size_supported();
 
 		if (!xfs_has_crc(mp)) {
 			xfs_warn(mp,
 "V4 Filesystem with blocksize %d bytes. Only pagesize (%ld) or less is supported.",
-				mp->m_sb.sb_blocksize, PAGE_SIZE);
+				mp->m_sb.sb_blocksize, PG_SIZE);
 			error = -ENOSYS;
 			goto out_free_sb;
 		}
@@ -1831,7 +1831,7 @@ xfs_fs_fill_super(
 	/*
 	 * XFS block mappings use 54 bits to store the logical block offset.
 	 * This should suffice to handle the maximum file size that the VFS
-	 * supports (currently 2^63 bytes on 64-bit and ULONG_MAX << PAGE_SHIFT
+	 * supports (currently 2^63 bytes on 64-bit and ULONG_MAX << PG_SHIFT
 	 * bytes on 32-bit), but as XFS and VFS have gotten the s_maxbytes
 	 * calculation wrong on 32-bit kernels in the past, we'll add a WARN_ON
 	 * to check this assertion.

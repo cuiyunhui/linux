@@ -1013,7 +1013,7 @@ static ssize_t pm_trace_dev_match_show(struct kobject *kobj,
 				       struct kobj_attribute *attr,
 				       char *buf)
 {
-	return show_trace_dev_match(buf, PAGE_SIZE);
+	return show_trace_dev_match(buf, PG_SIZE);
 }
 
 power_attr_ro(pm_trace_dev_match);

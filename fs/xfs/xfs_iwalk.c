@@ -692,7 +692,7 @@ xfs_iwalk_threaded(
  * here.
  */
 #define MAX_INOBT_WALK_PREFETCH	\
-	(PAGE_SIZE / sizeof(struct xfs_inobt_rec_incore))
+	(PG_SIZE / sizeof(struct xfs_inobt_rec_incore))
 
 /*
  * Given the number of records that the user wanted, set the number of inobt

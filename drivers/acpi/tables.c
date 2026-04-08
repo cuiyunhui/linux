@@ -416,7 +416,7 @@ static const char table_sigs[][ACPI_NAMESEG_SIZE] __nonstring_array __initconst 
 static struct cpio_data __initdata acpi_initrd_files[NR_ACPI_INITRD_TABLES];
 static DECLARE_BITMAP(acpi_initrd_installed, NR_ACPI_INITRD_TABLES);
 
-#define MAP_CHUNK_SIZE   (NR_FIX_BTMAPS << PAGE_SHIFT)
+#define MAP_CHUNK_SIZE   (NR_FIX_BTMAPS << PG_SHIFT)
 
 void __init acpi_table_upgrade(void)
 {
@@ -492,7 +492,7 @@ void __init acpi_table_upgrade(void)
 	}
 
 	acpi_tables_addr =
-		memblock_phys_alloc_range(all_tables_size, PAGE_SIZE,
+		memblock_phys_alloc_range(all_tables_size, PG_SIZE,
 					  0, ACPI_TABLE_UPGRADE_MAX_PHYS);
 	if (!acpi_tables_addr) {
 		WARN_ON(1);
@@ -527,11 +527,11 @@ void __init acpi_table_upgrade(void)
 		total_offset += size;
 
 		while (size) {
-			slop = dest_addr & ~PAGE_MASK;
+			slop = dest_addr & ~PG_MASK;
 			clen = size;
 			if (clen > MAP_CHUNK_SIZE - slop)
 				clen = MAP_CHUNK_SIZE - slop;
-			dest_p = early_memremap(dest_addr & PAGE_MASK,
+			dest_p = early_memremap(dest_addr & PG_MASK,
 						clen + slop);
 			memcpy(dest_p + slop, src_p, clen);
 			early_memunmap(dest_p, clen + slop);

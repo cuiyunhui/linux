@@ -3659,10 +3659,10 @@ static bool sd_validate_opt_xfer_size(struct scsi_disk *sdkp,
 		return false;
 	}
 
-	if (opt_xfer_bytes < PAGE_SIZE) {
+	if (opt_xfer_bytes < PG_SIZE) {
 		sd_first_printk(KERN_WARNING, sdkp,
-				"Optimal transfer size %u bytes < PAGE_SIZE (%u bytes)\n",
-				opt_xfer_bytes, (unsigned int)PAGE_SIZE);
+				"Optimal transfer size %u bytes < PG_SIZE (%u bytes)\n",
+				opt_xfer_bytes, (unsigned int)PG_SIZE);
 		return false;
 	}
 

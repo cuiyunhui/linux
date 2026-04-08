@@ -36,7 +36,7 @@
 #define VTD_PAGE_MASK		(((u64)-1) << VTD_PAGE_SHIFT)
 #define VTD_PAGE_ALIGN(addr)	(((addr) + VTD_PAGE_SIZE - 1) & VTD_PAGE_MASK)
 
-#define IOVA_PFN(addr)		((addr) >> PAGE_SHIFT)
+#define IOVA_PFN(addr)		((addr) >> PTE_SHIFT)
 
 #define VTD_STRIDE_SHIFT        (9)
 #define VTD_STRIDE_MASK         (((u64)-1) << VTD_STRIDE_SHIFT)
@@ -349,7 +349,7 @@
 #define dma_frcd_pasid_value(c) (((c) >> 8) & 0xfffff)
 #define dma_frcd_pasid_present(c) (((c) >> 31) & 1)
 /* low 64 bit */
-#define dma_frcd_page_addr(d) (d & (((u64)-1) << PAGE_SHIFT))
+#define dma_frcd_page_addr(d) (d & (((u64)-1) << PTE_SHIFT))
 
 /* PRS_REG */
 #define DMA_PRS_PPR	((u32)1)
@@ -1032,8 +1032,8 @@ static inline void context_clear_sm_pre(struct context_entry *context)
 /* Returns a number of VTD pages, but aligned to MM page size */
 static inline unsigned long aligned_nrpages(unsigned long host_addr, size_t size)
 {
-	host_addr &= ~PAGE_MASK;
-	return PAGE_ALIGN(host_addr + size) >> VTD_PAGE_SHIFT;
+	host_addr &= ~PTE_MASK;
+	return PTE_ALIGN(host_addr + size) >> VTD_PAGE_SHIFT;
 }
 
 /* Return a size from number of VTD pages. */
@@ -1125,7 +1125,7 @@ static inline void qi_desc_dev_iotlb_pasid(u16 sid, u16 pfsid, u32 pasid,
 	 * The least significant zero bit indicates the invalidation address
 	 * range. VT-d spec 6.5.2.6.
 	 * e.g. address bit 12[0] indicates 8KB, 13[0] indicates 16KB.
-	 * size order = 0 is PAGE_SIZE 4KB
+	 * size order = 0 is PTE_SIZE 4KB
 	 * Max Invs Pending (MIP) is set to 0 for now until we have DIT in
 	 * ECAP.
 	 */

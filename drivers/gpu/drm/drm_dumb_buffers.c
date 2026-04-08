@@ -74,8 +74,8 @@ static int drm_mode_align_dumb(struct drm_mode_create_dumb *args,
 		pitch = roundup(pitch, hw_pitch_align);
 
 	if (!hw_size_align)
-		hw_size_align = PAGE_SIZE;
-	else if (!IS_ALIGNED(hw_size_align, PAGE_SIZE))
+		hw_size_align = PG_SIZE;
+	else if (!IS_ALIGNED(hw_size_align, PG_SIZE))
 		return -EINVAL; /* TODO: handle this if necessary */
 
 	if (check_mul_overflow(args->height, pitch, &size))
@@ -111,7 +111,7 @@ static int drm_mode_align_dumb(struct drm_mode_create_dumb *args,
  * provided alignment should represent requirements of the graphics
  * hardware. drm_mode_size_dumb() handles GEM-related constraints
  * automatically across all drivers and hardware. For example, the
- * returned buffer size is always a multiple of PAGE_SIZE, which is
+ * returned buffer size is always a multiple of PG_SIZE, which is
  * required by mmap().
  *
  * Returns:
@@ -211,7 +211,7 @@ int drm_mode_create_dumb(struct drm_device *dev,
 
 	/* test for wrap-around */
 	size = args->height * stride;
-	if (PAGE_ALIGN(size) == 0)
+	if (PG_ALIGN(size) == 0)
 		return -EINVAL;
 
 	/*

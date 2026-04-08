@@ -40,15 +40,15 @@ static ssize_t regmap_name_read_file(struct file *file,
 	int ret;
 	char *buf;
 
-	buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	buf = kmalloc(PG_SIZE, GFP_KERNEL);
 	if (!buf)
 		return -ENOMEM;
 
 	if (map->dev && map->dev->driver)
 		name = map->dev->driver->name;
 
-	ret = snprintf(buf, PAGE_SIZE, "%s\n", name);
-	if (ret >= PAGE_SIZE) {
+	ret = snprintf(buf, PG_SIZE, "%s\n", name);
+	if (ret >= PG_SIZE) {
 		kfree(buf);
 		return ret;
 	}
@@ -226,8 +226,8 @@ static ssize_t regmap_read_debugfs(struct regmap *map, unsigned int from,
 	if (*ppos < 0 || !count)
 		return -EINVAL;
 
-	if (count > (PAGE_SIZE << MAX_PAGE_ORDER))
-		count = PAGE_SIZE << MAX_PAGE_ORDER;
+	if (count > (PG_SIZE << MAX_PAGE_ORDER))
+		count = PG_SIZE << MAX_PAGE_ORDER;
 
 	buf = kmalloc(count, GFP_KERNEL);
 	if (!buf)
@@ -373,14 +373,14 @@ static ssize_t regmap_reg_ranges_read_file(struct file *file,
 	if (*ppos < 0 || !count)
 		return -EINVAL;
 
-	if (count > (PAGE_SIZE << MAX_PAGE_ORDER))
-		count = PAGE_SIZE << MAX_PAGE_ORDER;
+	if (count > (PG_SIZE << MAX_PAGE_ORDER))
+		count = PG_SIZE << MAX_PAGE_ORDER;
 
 	buf = kmalloc(count, GFP_KERNEL);
 	if (!buf)
 		return -ENOMEM;
 
-	entry = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	entry = kmalloc(PG_SIZE, GFP_KERNEL);
 	if (!entry) {
 		kfree(buf);
 		return -ENOMEM;
@@ -399,7 +399,7 @@ static ssize_t regmap_reg_ranges_read_file(struct file *file,
 	p = 0;
 	mutex_lock(&map->cache_lock);
 	list_for_each_entry(c, &map->debugfs_off_cache, list) {
-		entry_len = snprintf(entry, PAGE_SIZE, "%x-%x\n",
+		entry_len = snprintf(entry, PG_SIZE, "%x-%x\n",
 				     c->base_reg, c->max_reg);
 		if (p >= *ppos) {
 			if (buf_pos + entry_len > count)

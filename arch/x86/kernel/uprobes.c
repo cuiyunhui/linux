@@ -646,15 +646,15 @@ static bool is_reachable_by_call(unsigned long vtramp, unsigned long vaddr)
 static unsigned long find_nearest_trampoline(unsigned long vaddr)
 {
 	struct vm_unmapped_area_info info = {
-		.length     = PAGE_SIZE,
-		.align_mask = ~PAGE_MASK,
+		.length     = PTE_SIZE,
+		.align_mask = ~PTE_MASK,
 	};
 	unsigned long low_limit, high_limit;
 	unsigned long low_tramp, high_tramp;
 	unsigned long call_end = vaddr + 5;
 
 	if (check_add_overflow(call_end, INT_MIN, &low_limit))
-		low_limit = PAGE_SIZE;
+		low_limit = PTE_SIZE;
 
 	high_limit = call_end + INT_MAX;
 
@@ -664,7 +664,7 @@ static unsigned long find_nearest_trampoline(unsigned long vaddr)
 	high_tramp = vm_unmapped_area(&info);
 
 	/* Search down from the caller address. */
-	info.low_limit = max(low_limit, PAGE_SIZE);
+	info.low_limit = max(low_limit, PTE_SIZE);
 	info.high_limit = call_end;
 	info.flags = VM_UNMAPPED_AREA_TOPDOWN;
 	low_tramp = vm_unmapped_area(&info);
@@ -701,7 +701,7 @@ static struct uprobe_trampoline *create_uprobe_trampoline(unsigned long vaddr)
 		return NULL;
 
 	tramp->vaddr = vaddr;
-	vma = _install_special_mapping(mm, tramp->vaddr, PAGE_SIZE,
+	vma = _install_special_mapping(mm, tramp->vaddr, PTE_SIZE,
 				VM_READ|VM_EXEC|VM_MAYEXEC|VM_MAYREAD|VM_DONTCOPY|VM_IO,
 				&tramp_mapping);
 	if (IS_ERR(vma)) {
@@ -716,7 +716,7 @@ static struct uprobe_trampoline *get_uprobe_trampoline(unsigned long vaddr, bool
 	struct uprobes_state *state = &current->mm->uprobes_state;
 	struct uprobe_trampoline *tramp = NULL;
 
-	if (vaddr > TASK_SIZE || vaddr < PAGE_SIZE)
+	if (vaddr > TASK_SIZE || vaddr < PTE_SIZE)
 		return NULL;
 
 	hlist_for_each_entry(tramp, &state->head_tramps, node) {
@@ -881,7 +881,7 @@ sigill:
 
 asm (
 	".pushsection .rodata\n"
-	".balign " __stringify(PAGE_SIZE) "\n"
+	".balign " __stringify(PTE_SIZE) "\n"
 	"uprobe_trampoline_entry:\n"
 	"push %rcx\n"
 	"push %r11\n"
@@ -893,7 +893,7 @@ asm (
 	"pop %rcx\n"
 	"ret\n"
 	"int3\n"
-	".balign " __stringify(PAGE_SIZE) "\n"
+	".balign " __stringify(PTE_SIZE) "\n"
 	".popsection\n"
 );
 
@@ -1167,7 +1167,7 @@ static bool can_optimize(struct insn *insn, unsigned long vaddr)
 		return false;
 
 	/* We can't do cross page atomic writes yet. */
-	return PAGE_SIZE - (vaddr & ~PAGE_MASK) >= 5;
+	return PTE_SIZE - (vaddr & ~PTE_MASK) >= 5;
 }
 #else /* 32-bit: */
 /*
@@ -1841,7 +1841,7 @@ unsigned long arch_uprobe_get_xol_area(void)
 	 */
 	if (test_thread_flag(TIF_ADDR32))
 		ti->status |= TS_COMPAT;
-	vaddr = get_unmapped_area(NULL, TASK_SIZE - PAGE_SIZE, PAGE_SIZE, 0, 0);
+	vaddr = get_unmapped_area(NULL, TASK_SIZE - PTE_SIZE, PTE_SIZE, 0, 0);
 	ti->status &= ~TS_COMPAT;
 
 	return vaddr;

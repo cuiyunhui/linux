@@ -239,6 +239,6 @@ static inline int arch_apei_report_x86_error(struct cper_ia_proc_ctx *ctx_info,
 }
 #endif
 
-#define ACPI_TABLE_UPGRADE_MAX_PHYS (max_low_pfn_mapped << PAGE_SHIFT)
+#define ACPI_TABLE_UPGRADE_MAX_PHYS (max_low_pfn_mapped << PTE_SHIFT)
 
 #endif /* _ASM_X86_ACPI_H */

@@ -585,7 +585,7 @@ struct xdp_frame *xdp_convert_zc_to_xdp_frame(struct xdp_buff *xdp)
 		   xdp->data - xdp->data_meta;
 	totsize = xdp->data_end - xdp->data + metasize;
 
-	if (sizeof(*xdpf) + totsize > PAGE_SIZE)
+	if (sizeof(*xdpf) + totsize > PG_SIZE)
 		return NULL;
 
 	page = dev_alloc_page();
@@ -604,7 +604,7 @@ struct xdp_frame *xdp_convert_zc_to_xdp_frame(struct xdp_buff *xdp)
 	xdpf->len = totsize - metasize;
 	xdpf->headroom = 0;
 	xdpf->metasize = metasize;
-	xdpf->frame_sz = PAGE_SIZE;
+	xdpf->frame_sz = PG_SIZE;
 	xdpf->mem_type = MEM_TYPE_PAGE_ORDER0;
 
 	xsk_buff_free(xdp);
@@ -871,7 +871,7 @@ struct xdp_frame *xdpf_clone(struct xdp_frame *xdpf)
 	headroom = xdpf->headroom + sizeof(*xdpf);
 	totalsize = headroom + xdpf->len;
 
-	if (unlikely(totalsize > PAGE_SIZE))
+	if (unlikely(totalsize > PG_SIZE))
 		return NULL;
 	page = dev_alloc_page();
 	if (!page)
@@ -882,7 +882,7 @@ struct xdp_frame *xdpf_clone(struct xdp_frame *xdpf)
 
 	nxdpf = addr;
 	nxdpf->data = addr + headroom;
-	nxdpf->frame_sz = PAGE_SIZE;
+	nxdpf->frame_sz = PG_SIZE;
 	nxdpf->mem_type = MEM_TYPE_PAGE_ORDER0;
 
 	return nxdpf;

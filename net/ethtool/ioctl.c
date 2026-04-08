@@ -1989,13 +1989,13 @@ static int ethtool_get_any_eeprom(struct net_device *dev, void __user *useraddr,
 	if (eeprom.offset + eeprom.len > total_len)
 		return -EINVAL;
 
-	data = kzalloc(PAGE_SIZE, GFP_USER);
+	data = kzalloc(PG_SIZE, GFP_USER);
 	if (!data)
 		return -ENOMEM;
 
 	bytes_remaining = eeprom.len;
 	while (bytes_remaining > 0) {
-		eeprom.len = min(bytes_remaining, (u32)PAGE_SIZE);
+		eeprom.len = min(bytes_remaining, (u32)PG_SIZE);
 
 		ret = getter(dev, &eeprom, data);
 		if (ret)
@@ -2058,13 +2058,13 @@ static int ethtool_set_eeprom(struct net_device *dev, void __user *useraddr)
 	if (eeprom.offset + eeprom.len > ops->get_eeprom_len(dev))
 		return -EINVAL;
 
-	data = kzalloc(PAGE_SIZE, GFP_USER);
+	data = kzalloc(PG_SIZE, GFP_USER);
 	if (!data)
 		return -ENOMEM;
 
 	bytes_remaining = eeprom.len;
 	while (bytes_remaining > 0) {
-		eeprom.len = min(bytes_remaining, (u32)PAGE_SIZE);
+		eeprom.len = min(bytes_remaining, (u32)PG_SIZE);
 
 		if (copy_from_user(data, userbuf, eeprom.len)) {
 			ret = -EFAULT;

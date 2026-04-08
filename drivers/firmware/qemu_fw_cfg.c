@@ -873,17 +873,17 @@ static int fw_cfg_cmdline_get(char *buf, const struct kernel_param *kp)
 
 	switch (fw_cfg_cmdline_dev->num_resources) {
 	case 1:
-		return snprintf(buf, PAGE_SIZE, PH_ADDR_PR_1_FMT,
+		return snprintf(buf, PG_SIZE, PH_ADDR_PR_1_FMT,
 				resource_size(&fw_cfg_cmdline_dev->resource[0]),
 				fw_cfg_cmdline_dev->resource[0].start);
 	case 3:
-		return snprintf(buf, PAGE_SIZE, PH_ADDR_PR_3_FMT,
+		return snprintf(buf, PG_SIZE, PH_ADDR_PR_3_FMT,
 				resource_size(&fw_cfg_cmdline_dev->resource[0]),
 				fw_cfg_cmdline_dev->resource[0].start,
 				fw_cfg_cmdline_dev->resource[1].start,
 				fw_cfg_cmdline_dev->resource[2].start);
 	case 4:
-		return snprintf(buf, PAGE_SIZE, PH_ADDR_PR_4_FMT,
+		return snprintf(buf, PG_SIZE, PH_ADDR_PR_4_FMT,
 				resource_size(&fw_cfg_cmdline_dev->resource[0]),
 				fw_cfg_cmdline_dev->resource[0].start,
 				fw_cfg_cmdline_dev->resource[1].start,

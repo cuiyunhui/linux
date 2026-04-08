@@ -198,7 +198,7 @@ static int __nfs3_proc_setacls(struct inode *inode, struct posix_acl *acl,
 		args.len = nfsacl_size(acl, NULL);
 
 	if (args.len > NFS_ACL_INLINE_BUFSIZE) {
-		unsigned int npages = 1 + ((args.len - 1) >> PAGE_SHIFT);
+		unsigned int npages = 1 + ((args.len - 1) >> PG_SHIFT);
 
 		status = -ENOMEM;
 		do {

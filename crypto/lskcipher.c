@@ -79,22 +79,22 @@ static int crypto_lskcipher_crypt_unaligned(
 	u8 *tiv;
 	u8 *p;
 
-	BUILD_BUG_ON(MAX_CIPHER_BLOCKSIZE > PAGE_SIZE ||
-		     MAX_CIPHER_ALIGNMASK >= PAGE_SIZE);
+	BUILD_BUG_ON(MAX_CIPHER_BLOCKSIZE > PG_SIZE ||
+		     MAX_CIPHER_ALIGNMASK >= PG_SIZE);
 
-	tiv = kmalloc(PAGE_SIZE, GFP_ATOMIC);
+	tiv = kmalloc(PG_SIZE, GFP_ATOMIC);
 	if (!tiv)
 		return -ENOMEM;
 
 	memcpy(tiv, iv, ivsize + statesize);
 
-	p = kmalloc(PAGE_SIZE, GFP_ATOMIC);
+	p = kmalloc(PG_SIZE, GFP_ATOMIC);
 	err = -ENOMEM;
 	if (!p)
 		goto out;
 
 	while (len >= bs) {
-		unsigned chunk = min((unsigned)PAGE_SIZE, len);
+		unsigned chunk = min((unsigned)PG_SIZE, len);
 		int err;
 
 		if (chunk > cs)

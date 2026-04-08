@@ -659,20 +659,20 @@ int zerocopy_fill_skb_from_iter(struct sk_buff *skb,
 
 		skb->data_len += copied;
 		skb->len += copied;
-		skb->truesize += PAGE_ALIGN(copied + start);
+		skb->truesize += PG_ALIGN(copied + start);
 
 		head = compound_head(pages[n]);
 		order = compound_order(head);
 
 		for (refs = 0; copied != 0; start = 0) {
-			int size = min_t(int, copied, PAGE_SIZE - start);
+			int size = min_t(int, copied, PG_SIZE - start);
 
 			if (pages[n] - head > (1UL << order) - 1) {
 				head = compound_head(pages[n]);
 				order = compound_order(head);
 			}
 
-			start += (pages[n] - head) << PAGE_SHIFT;
+			start += (pages[n] - head) << PG_SHIFT;
 			copied -= size;
 			n++;
 			if (frag) {
@@ -734,7 +734,7 @@ zerocopy_fill_skb_from_devmem(struct sk_buff *skb, struct iov_iter *from,
 
 		get_netmem(net_iov_to_netmem(niov));
 		skb_add_rx_frag_netmem(skb, i, net_iov_to_netmem(niov), off,
-				       size, PAGE_SIZE);
+				       size, PG_SIZE);
 		iov_iter_advance(from, size);
 		length -= size;
 		i++;

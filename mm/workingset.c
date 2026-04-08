@@ -668,7 +668,7 @@ static unsigned long count_shadow_nodes(struct shrinker *shrinker,
 	 * each, this will reclaim shadow entries when they consume
 	 * ~1.8% of available memory:
 	 *
-	 * PAGE_SIZE / xa_nodes / node_entries * 8 / PAGE_SIZE
+	 * PG_SIZE / xa_nodes / node_entries * 8 / PG_SIZE
 	 */
 #ifdef CONFIG_MEMCG
 	if (sc->memcg) {
@@ -681,9 +681,9 @@ static unsigned long count_shadow_nodes(struct shrinker *shrinker,
 			pages += lruvec_page_state_local(lruvec,
 							 NR_LRU_BASE + i);
 		pages += lruvec_page_state_local(
-			lruvec, NR_SLAB_RECLAIMABLE_B) >> PAGE_SHIFT;
+			lruvec, NR_SLAB_RECLAIMABLE_B) >> PG_SHIFT;
 		pages += lruvec_page_state_local(
-			lruvec, NR_SLAB_UNRECLAIMABLE_B) >> PAGE_SHIFT;
+			lruvec, NR_SLAB_UNRECLAIMABLE_B) >> PG_SHIFT;
 	} else
 #endif
 		pages = node_present_pages(sc->nid);

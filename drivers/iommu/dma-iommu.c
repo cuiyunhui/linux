@@ -391,7 +391,7 @@ int iommu_get_dma_cookie(struct iommu_domain *domain)
  * but would still like to take advantage of automatic MSI remapping, can use
  * this to initialise their own domain appropriately. Users should reserve a
  * contiguous IOVA region, starting at @base, large enough to accommodate the
- * number of PAGE_SIZE mappings necessary to cover every MSI doorbell address
+ * number of PTE_SIZE mappings necessary to cover every MSI doorbell address
  * used by the devices attached to @domain.
  */
 int iommu_get_msi_cookie(struct iommu_domain *domain, dma_addr_t base)
@@ -923,7 +923,7 @@ static struct page **__iommu_dma_alloc_pages(struct device *dev,
 }
 
 /*
- * If size is less than PAGE_SIZE, then a full CPU page will be allocated,
+ * If size is less than PTE_SIZE, then a full CPU page will be allocated,
  * but an IOMMU which supports smaller pages might not map the whole thing.
  */
 static struct page **__iommu_dma_alloc_noncontiguous(struct device *dev,
@@ -944,17 +944,17 @@ static struct page **__iommu_dma_alloc_noncontiguous(struct device *dev,
 		return NULL;
 
 	min_size = alloc_sizes & -alloc_sizes;
-	if (min_size < PAGE_SIZE) {
-		min_size = PAGE_SIZE;
-		alloc_sizes |= PAGE_SIZE;
+	if (min_size < PTE_SIZE) {
+		min_size = PTE_SIZE;
+		alloc_sizes |= PTE_SIZE;
 	} else {
 		size = ALIGN(size, min_size);
 	}
 	if (attrs & DMA_ATTR_ALLOC_SINGLE_PAGES)
 		alloc_sizes = min_size;
 
-	count = PAGE_ALIGN(size) >> PAGE_SHIFT;
-	pages = __iommu_dma_alloc_pages(dev, count, alloc_sizes >> PAGE_SHIFT,
+	count = PTE_ALIGN(size) >> PTE_SHIFT;
+	pages = __iommu_dma_alloc_pages(dev, count, alloc_sizes >> PTE_SHIFT,
 					gfp);
 	if (!pages)
 		return NULL;
@@ -1021,7 +1021,7 @@ static void *iommu_dma_alloc_remap(struct device *dev, size_t size,
 
 out_unmap:
 	__iommu_dma_unmap(dev, *dma_handle, size);
-	__iommu_dma_free_pages(pages, PAGE_ALIGN(size) >> PAGE_SHIFT);
+	__iommu_dma_free_pages(pages, PTE_ALIGN(size) >> PTE_SHIFT);
 	return NULL;
 }
 
@@ -1063,7 +1063,7 @@ void iommu_dma_free_noncontiguous(struct device *dev, size_t size,
 	struct dma_sgt_handle *sh = sgt_handle(sgt);
 
 	__iommu_dma_unmap(dev, sgt->sgl->dma_address, size);
-	__iommu_dma_free_pages(sh->pages, PAGE_ALIGN(size) >> PAGE_SHIFT);
+	__iommu_dma_free_pages(sh->pages, PTE_ALIGN(size) >> PTE_SHIFT);
 	sg_free_table(&sh->sgt);
 	kfree(sh);
 }
@@ -1071,7 +1071,7 @@ void iommu_dma_free_noncontiguous(struct device *dev, size_t size,
 void *iommu_dma_vmap_noncontiguous(struct device *dev, size_t size,
 		struct sg_table *sgt)
 {
-	unsigned long count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+	unsigned long count = PTE_ALIGN(size) >> PTE_SHIFT;
 
 	return vmap(sgt_handle(sgt)->pages, count, VM_MAP, PAGE_KERNEL);
 }
@@ -1079,9 +1079,9 @@ void *iommu_dma_vmap_noncontiguous(struct device *dev, size_t size,
 int iommu_dma_mmap_noncontiguous(struct device *dev, struct vm_area_struct *vma,
 		size_t size, struct sg_table *sgt)
 {
-	unsigned long count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+	unsigned long count = PTE_ALIGN(size) >> PTE_SHIFT;
 
-	if (vma->vm_pgoff >= count || vma_pages(vma) > count - vma->vm_pgoff)
+	if (vma->vm_pteoff >= count || vma_ptes(vma) > count - vma->vm_pteoff)
 		return -ENXIO;
 	return vm_map_pages(vma, sgt_handle(sgt)->pages, count);
 }
@@ -1559,8 +1559,8 @@ void iommu_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
 
 static void __iommu_dma_free(struct device *dev, size_t size, void *cpu_addr)
 {
-	size_t alloc_size = PAGE_ALIGN(size);
-	int count = alloc_size >> PAGE_SHIFT;
+	size_t alloc_size = PTE_ALIGN(size);
+	int count = alloc_size >> PTE_SHIFT;
 	struct page *page = NULL, **pages = NULL;
 
 	/* Non-coherent atomic allocation? Easy */
@@ -1599,7 +1599,7 @@ static void *iommu_dma_alloc_pages(struct device *dev, size_t size,
 		struct page **pagep, gfp_t gfp, unsigned long attrs)
 {
 	bool coherent = dev_is_dma_coherent(dev);
-	size_t alloc_size = PAGE_ALIGN(size);
+	size_t alloc_size = PTE_ALIGN(size);
 	int node = dev_to_node(dev);
 	struct page *page = NULL;
 	void *cpu_addr;
@@ -1649,7 +1649,7 @@ void *iommu_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
 
 	if (IS_ENABLED(CONFIG_DMA_DIRECT_REMAP) &&
 	    !gfpflags_allow_blocking(gfp) && !coherent)
-		page = dma_alloc_from_pool(dev, PAGE_ALIGN(size), &cpu_addr,
+		page = dma_alloc_from_pool(dev, PTE_ALIGN(size), &cpu_addr,
 					       gfp, NULL);
 	else
 		cpu_addr = iommu_dma_alloc_pages(dev, size, &page, gfp, attrs);
@@ -1670,8 +1670,8 @@ int iommu_dma_mmap(struct device *dev, struct vm_area_struct *vma,
 		void *cpu_addr, dma_addr_t dma_addr, size_t size,
 		unsigned long attrs)
 {
-	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
-	unsigned long pfn, off = vma->vm_pgoff;
+	unsigned long nr_pages = PTE_ALIGN(size) >> PTE_SHIFT;
+	unsigned long pfn, off = vma->vm_pteoff;
 	int ret;
 
 	vma->vm_page_prot = dma_pgprot(dev, vma->vm_page_prot, attrs);
@@ -1679,7 +1679,7 @@ int iommu_dma_mmap(struct device *dev, struct vm_area_struct *vma,
 	if (dma_mmap_from_dev_coherent(dev, vma, cpu_addr, size, &ret))
 		return ret;
 
-	if (off >= nr_pages || vma_pages(vma) > nr_pages - off)
+	if (off >= nr_pages || vma_ptes(vma) > nr_pages - off)
 		return -ENXIO;
 
 	if (is_vmalloc_addr(cpu_addr)) {
@@ -1709,7 +1709,7 @@ int iommu_dma_get_sgtable(struct device *dev, struct sg_table *sgt,
 
 		if (pages) {
 			return sg_alloc_table_from_pages(sgt, pages,
-					PAGE_ALIGN(size) >> PAGE_SHIFT,
+					PTE_ALIGN(size) >> PTE_SHIFT,
 					0, size, GFP_KERNEL);
 		}
 
@@ -1720,7 +1720,7 @@ int iommu_dma_get_sgtable(struct device *dev, struct sg_table *sgt,
 
 	ret = sg_alloc_table(sgt, 1, GFP_KERNEL);
 	if (!ret)
-		sg_set_page(sgt->sgl, page, PAGE_ALIGN(size), 0);
+		sg_set_page(sgt->sgl, page, PTE_ALIGN(size), 0);
 	return ret;
 }
 
@@ -1755,7 +1755,7 @@ size_t iommu_dma_max_mapping_size(struct device *dev)
  * for the given base address and size.
  *
  * Note: @phys is only used to calculate the IOVA alignment. Callers that always
- * do PAGE_SIZE aligned transfers can safely pass 0 here.
+ * do PTE_SIZE aligned transfers can safely pass 0 here.
  *
  * Returns %true if the IOVA-based DMA API can be used and IOVA space has been
  * allocated, or %false if the regular DMA API should be used.
@@ -2138,7 +2138,7 @@ static size_t cookie_msi_granule(const struct iommu_domain *domain)
 	case IOMMU_COOKIE_DMA_IOVA:
 		return domain->iova_cookie->iovad.granule;
 	case IOMMU_COOKIE_DMA_MSI:
-		return PAGE_SIZE;
+		return PTE_SIZE;
 	default:
 		BUG();
 	}

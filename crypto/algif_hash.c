@@ -72,7 +72,7 @@ static int hash_sendmsg(struct socket *sock, struct msghdr *msg,
 	int err;
 
 	max_pages = min_t(size_t, ALG_MAX_PAGES,
-			  DIV_ROUND_UP(sk->sk_sndbuf, PAGE_SIZE));
+			  DIV_ROUND_UP(sk->sk_sndbuf, PG_SIZE));
 
 	lock_sock(sk);
 	continuing = ctx->more;

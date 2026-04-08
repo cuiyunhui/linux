@@ -110,7 +110,7 @@ static int intel_gtt_map_memory(struct page **pages,
 		goto err;
 
 	for_each_sg(st->sgl, sg, num_entries, i)
-		sg_set_page(sg, pages[i], PAGE_SIZE, 0);
+		sg_set_page(sg, pages[i], PG_SIZE, 0);
 
 	if (!dma_map_sg(&intel_private.pcidev->dev, st->sgl, st->nents,
 			DMA_BIDIRECTIONAL))
@@ -224,7 +224,7 @@ static int i810_insert_dcache_entries(struct agp_memory *mem, off_t pg_start,
 		global_cache_flush();
 
 	for (i = pg_start; i < (pg_start + mem->page_count); i++) {
-		dma_addr_t addr = i << PAGE_SHIFT;
+		dma_addr_t addr = i << PG_SHIFT;
 		intel_private.driver->write_entry(addr,
 						  i, type);
 	}
@@ -305,7 +305,7 @@ static int intel_gtt_setup_scratch_page(void)
 
 	if (intel_private.needs_dmar) {
 		dma_addr = dma_map_page(&intel_private.pcidev->dev, page, 0,
-					PAGE_SIZE, DMA_BIDIRECTIONAL);
+					PG_SIZE, DMA_BIDIRECTIONAL);
 		if (dma_mapping_error(&intel_private.pcidev->dev, dma_addr)) {
 			__free_page(page);
 			return -EINVAL;
@@ -559,7 +559,7 @@ static unsigned int intel_gtt_mappable_entries(void)
 		aperture_size = pci_resource_len(intel_private.pcidev, 2);
 	}
 
-	return aperture_size >> PAGE_SHIFT;
+	return aperture_size >> PG_SHIFT;
 }
 
 static void intel_gtt_teardown_scratch_page(void)
@@ -567,7 +567,7 @@ static void intel_gtt_teardown_scratch_page(void)
 	set_pages_wb(intel_private.scratch_page, 1);
 	if (intel_private.needs_dmar)
 		dma_unmap_page(&intel_private.pcidev->dev,
-			       intel_private.scratch_page_dma, PAGE_SIZE,
+			       intel_private.scratch_page_dma, PG_SIZE,
 			       DMA_BIDIRECTIONAL);
 	__free_page(intel_private.scratch_page);
 }
@@ -691,7 +691,7 @@ static int intel_fake_agp_fetch_size(void)
 	unsigned int aper_size;
 	int i;
 
-	aper_size = (intel_private.gtt_mappable_entries << PAGE_SHIFT) / MB(1);
+	aper_size = (intel_private.gtt_mappable_entries << PG_SHIFT) / MB(1);
 
 	for (i = 0; i < num_sizes; i++) {
 		if (aper_size == intel_fake_agp_sizes[i].size) {
@@ -892,9 +892,9 @@ void intel_gmch_gtt_insert_sg_entries(struct sg_table *st,
 	/* sg may merge pages, but we have to separate
 	 * per-page addr for GTT */
 	for_each_sg(st->sgl, sg, st->nents, i) {
-		len = sg_dma_len(sg) >> PAGE_SHIFT;
+		len = sg_dma_len(sg) >> PG_SHIFT;
 		for (m = 0; m < len; m++) {
-			dma_addr_t addr = sg_dma_address(sg) + (m << PAGE_SHIFT);
+			dma_addr_t addr = sg_dma_address(sg) + (m << PG_SHIFT);
 			intel_private.driver->write_entry(addr, j, flags);
 			j++;
 		}
@@ -934,7 +934,7 @@ static int intel_fake_agp_insert_entries(struct agp_memory *mem,
 	int ret = -EINVAL;
 
 	if (intel_private.clear_fake_agp) {
-		int start = intel_private.stolen_size / PAGE_SIZE;
+		int start = intel_private.stolen_size / PG_SIZE;
 		int end = intel_private.gtt_mappable_entries;
 		intel_gmch_gtt_clear_range(start, end - start);
 		intel_private.clear_fake_agp = false;
@@ -1039,8 +1039,8 @@ static struct agp_memory *intel_fake_agp_alloc_by_type(size_t pg_count,
 static int intel_alloc_chipset_flush_resource(void)
 {
 	int ret;
-	ret = pci_bus_alloc_resource(intel_private.bridge_dev->bus, &intel_private.ifp_resource, PAGE_SIZE,
-				     PAGE_SIZE, PCIBIOS_MIN_MEM, 0,
+	ret = pci_bus_alloc_resource(intel_private.bridge_dev->bus, &intel_private.ifp_resource, PG_SIZE,
+				     PG_SIZE, PCIBIOS_MIN_MEM, 0,
 				     pcibios_align_resource, intel_private.bridge_dev);
 
 	return ret;
@@ -1061,7 +1061,7 @@ static void intel_i915_setup_chipset_flush(void)
 
 		intel_private.resource_valid = 1;
 		intel_private.ifp_resource.start = temp;
-		intel_private.ifp_resource.end = temp + PAGE_SIZE;
+		intel_private.ifp_resource.end = temp + PG_SIZE;
 		ret = request_resource(&iomem_resource, &intel_private.ifp_resource);
 		/* some BIOSes reserve this area in a pnp some don't */
 		if (ret)
@@ -1093,7 +1093,7 @@ static void intel_i965_g33_setup_chipset_flush(void)
 
 		intel_private.resource_valid = 1;
 		intel_private.ifp_resource.start = l64;
-		intel_private.ifp_resource.end = l64 + PAGE_SIZE;
+		intel_private.ifp_resource.end = l64 + PG_SIZE;
 		ret = request_resource(&iomem_resource, &intel_private.ifp_resource);
 		/* some BIOSes reserve this area in a pnp some don't */
 		if (ret)
@@ -1122,7 +1122,7 @@ static void intel_i9xx_setup_flush(void)
 	}
 
 	if (intel_private.ifp_resource.start)
-		intel_private.i9xx_flush_page = ioremap(intel_private.ifp_resource.start, PAGE_SIZE);
+		intel_private.i9xx_flush_page = ioremap(intel_private.ifp_resource.start, PG_SIZE);
 	if (!intel_private.i9xx_flush_page)
 		dev_err(&intel_private.pcidev->dev,
 			"can't ioremap flush page - no chipset flushing\n");
@@ -1487,9 +1487,9 @@ void intel_gmch_gtt_get(u64 *gtt_total,
 			phys_addr_t *mappable_base,
 			resource_size_t *mappable_end)
 {
-	*gtt_total = intel_private.gtt_total_entries << PAGE_SHIFT;
+	*gtt_total = intel_private.gtt_total_entries << PG_SHIFT;
 	*mappable_base = intel_private.gma_bus_addr;
-	*mappable_end = intel_private.gtt_mappable_entries << PAGE_SHIFT;
+	*mappable_end = intel_private.gtt_mappable_entries << PG_SHIFT;
 }
 EXPORT_SYMBOL(intel_gmch_gtt_get);
 

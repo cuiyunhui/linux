@@ -37,7 +37,7 @@
  * to a local DoS. But we have to keep to root in order to prevent
  * password sniffing from HID devices.
  */
-#define EVENT_MAX  (4*PAGE_SIZE / sizeof(struct mon_event_text))
+#define EVENT_MAX  (4*PG_SIZE / sizeof(struct mon_event_text))
 
 /*
  * Potentially unlimited number; we limit it for similar allocations.

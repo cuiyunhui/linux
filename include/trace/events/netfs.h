@@ -671,7 +671,7 @@ TRACE_EVENT(netfs_collect_folio,
 
 	    TP_printk("R=%08x ix=%05lx r=%llx-%llx t=%llx/%llx",
 		      __entry->wreq, __entry->index,
-		      (unsigned long long)__entry->index * PAGE_SIZE, __entry->fend,
+		      (unsigned long long)__entry->index * PG_SIZE, __entry->fend,
 		      __entry->cleaned_to, __entry->collected_to)
 	    );
 

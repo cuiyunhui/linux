@@ -36,8 +36,8 @@ struct msg_msgseg {
 	/* the next part of the message follows immediately */
 };
 
-#define DATALEN_MSG	((size_t)PAGE_SIZE-sizeof(struct msg_msg))
-#define DATALEN_SEG	((size_t)PAGE_SIZE-sizeof(struct msg_msgseg))
+#define DATALEN_MSG	((size_t)PG_SIZE-sizeof(struct msg_msg))
+#define DATALEN_SEG	((size_t)PG_SIZE-sizeof(struct msg_msgseg))
 
 static kmem_buckets *msg_buckets __ro_after_init;
 

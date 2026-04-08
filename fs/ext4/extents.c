@@ -5549,7 +5549,7 @@ static int ext4_collapse_range(struct file *file, loff_t offset, loff_t len)
 	 * Need to round down offset to be aligned with page size boundary
 	 * for page size > block size.
 	 */
-	start = round_down(offset, PAGE_SIZE);
+	start = round_down(offset, PG_SIZE);
 	ret = filemap_write_and_wait_range(mapping, start, offset);
 	if (!ret)
 		ret = filemap_write_and_wait_range(mapping, end, LLONG_MAX);
@@ -5647,7 +5647,7 @@ static int ext4_insert_range(struct file *file, loff_t offset, loff_t len)
 	 * Write out all dirty pages. Need to round down to align start offset
 	 * to page size boundary for page size > block size.
 	 */
-	start = round_down(offset, PAGE_SIZE);
+	start = round_down(offset, PG_SIZE);
 	ret = filemap_write_and_wait_range(mapping, start, LLONG_MAX);
 	if (ret)
 		return ret;

@@ -623,8 +623,8 @@ out:
 						   offset, endbyte);
 		if (!err)
 			invalidate_mapping_pages(iocb->ki_filp->f_mapping,
-						 offset >> PAGE_SHIFT,
-						 endbyte >> PAGE_SHIFT);
+						 offset >> PG_SHIFT,
+						 endbyte >> PG_SHIFT);
 	}
 
 	return ret;

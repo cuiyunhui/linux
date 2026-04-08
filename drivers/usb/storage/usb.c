@@ -155,7 +155,7 @@ static int delay_use_get(char *s, const struct kernel_param *kp)
 {
 	unsigned int delay_ms = *((unsigned int *)kp->arg);
 
-	return format_delay_ms(delay_ms, 3, "ms", s, PAGE_SIZE);
+	return format_delay_ms(delay_ms, 3, "ms", s, PG_SIZE);
 }
 
 static const struct kernel_param_ops delay_use_ops = {

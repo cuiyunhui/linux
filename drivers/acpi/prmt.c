@@ -75,12 +75,12 @@ struct prm_module_info {
 static u64 efi_pa_va_lookup(efi_guid_t *guid, u64 pa)
 {
 	efi_memory_desc_t *md;
-	u64 pa_offset = pa & ~PAGE_MASK;
-	u64 page = pa & PAGE_MASK;
+	u64 pa_offset = pa & ~PG_MASK;
+	u64 page = pa & PG_MASK;
 
 	for_each_efi_memory_desc(md) {
 		if ((md->attribute & EFI_MEMORY_RUNTIME) &&
-		    (md->phys_addr < pa && pa < md->phys_addr + PAGE_SIZE * md->num_pages)) {
+		    (md->phys_addr < pa && pa < md->phys_addr + PG_SIZE * md->num_pages)) {
 			return pa_offset + md->virt_addr + page - md->phys_addr;
 		}
 	}

@@ -92,7 +92,7 @@ int generic_swapfile_activate(struct swap_info_struct *sis,
 	int ret;
 
 	blkbits = inode->i_blkbits;
-	blocks_per_page = PAGE_SIZE >> blkbits;
+	blocks_per_page = PG_SIZE >> blkbits;
 
 	/*
 	 * Map all the blocks into the extent tree.  This code doesn't try
@@ -114,7 +114,7 @@ int generic_swapfile_activate(struct swap_info_struct *sis,
 			goto bad_bmap;
 
 		/*
-		 * It must be PAGE_SIZE aligned on-disk
+		 * It must be PG_SIZE aligned on-disk
 		 */
 		if (first_block & (blocks_per_page - 1)) {
 			probe_block++;
@@ -137,7 +137,7 @@ int generic_swapfile_activate(struct swap_info_struct *sis,
 			}
 		}
 
-		first_block >>= (PAGE_SHIFT - blkbits);
+		first_block >>= (PG_SHIFT - blkbits);
 		if (page_no) {	/* exclude the header page */
 			if (first_block < lowest_block)
 				lowest_block = first_block;
@@ -146,7 +146,7 @@ int generic_swapfile_activate(struct swap_info_struct *sis,
 		}
 
 		/*
-		 * We found a PAGE_SIZE-length, PAGE_SIZE-aligned run of blocks
+		 * We found a PG_SIZE-length, PG_SIZE-aligned run of blocks
 		 */
 		ret = add_swap_extent(sis, page_no, 1, first_block);
 		if (ret < 0)
@@ -177,9 +177,9 @@ static bool is_folio_zero_filled(struct folio *folio)
 	unsigned long *data;
 	unsigned int i;
 
-	last_pos = PAGE_SIZE / sizeof(*data) - 1;
+	last_pos = PG_SIZE / sizeof(*data) - 1;
 	for (i = 0; i < folio_nr_pages(folio); i++) {
-		data = kmap_local_folio(folio, i * PAGE_SIZE);
+		data = kmap_local_folio(folio, i * PG_SIZE);
 		/*
 		 * Check last word first, incase the page is zero-filled at
 		 * the start and has non-zero data at the end, which is common

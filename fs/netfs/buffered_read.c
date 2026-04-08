@@ -405,7 +405,7 @@ static int netfs_read_gaps(struct file *file, struct folio *folio)
 	unsigned int to = from + finfo->dirty_len;
 	unsigned int off = 0, i = 0;
 	size_t flen = folio_size(folio);
-	size_t nr_bvec = flen / PAGE_SIZE + 2;
+	size_t nr_bvec = flen / PG_SIZE + 2;
 	size_t part;
 	int ret;
 
@@ -447,7 +447,7 @@ static int netfs_read_gaps(struct file *file, struct folio *folio)
 		off = from;
 	}
 	while (off < to) {
-		part = min_t(size_t, to - off, PAGE_SIZE);
+		part = min_t(size_t, to - off, PG_SIZE);
 		bvec_set_folio(&bvec[i++], sink, part, 0);
 		off += part;
 	}
@@ -627,7 +627,7 @@ int netfs_write_begin(struct netfs_inode *ctx,
 {
 	struct netfs_io_request *rreq;
 	struct folio *folio;
-	pgoff_t index = pos >> PAGE_SHIFT;
+	pgoff_t index = pos >> PG_SHIFT;
 	int ret;
 
 retry:

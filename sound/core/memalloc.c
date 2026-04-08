@@ -69,7 +69,7 @@ int snd_dma_alloc_dir_pages(int type, struct device *device,
 	if (WARN_ON(!dmab))
 		return -ENXIO;
 
-	size = PAGE_ALIGN(size);
+	size = PG_ALIGN(size);
 	dmab->dev.type = type;
 	dmab->dev.dev = device;
 	dmab->dev.dir = dir;
@@ -107,10 +107,10 @@ int snd_dma_alloc_pages_fallback(int type, struct device *device, size_t size,
 	while ((err = snd_dma_alloc_pages(type, device, size, dmab)) < 0) {
 		if (err != -ENOMEM)
 			return err;
-		if (size <= PAGE_SIZE)
+		if (size <= PG_SIZE)
 			return -ENOMEM;
 		size >>= 1;
-		size = PAGE_SIZE << get_order(size);
+		size = PG_SIZE << get_order(size);
 	}
 	if (! dmab->area)
 		return -ENOMEM;
@@ -308,7 +308,7 @@ static void *do_alloc_pages(struct device *dev, size_t size, dma_addr_t *addr,
 	}
 #ifdef CONFIG_X86
 	if (wc)
-		set_memory_wc((unsigned long)(p), size >> PAGE_SHIFT);
+		set_memory_wc((unsigned long)(p), size >> PG_SHIFT);
 #endif
 	return p;
 }
@@ -317,7 +317,7 @@ static void do_free_pages(void *p, size_t size, bool wc)
 {
 #ifdef CONFIG_X86
 	if (wc)
-		set_memory_wb((unsigned long)(p), size >> PAGE_SHIFT);
+		set_memory_wb((unsigned long)(p), size >> PG_SHIFT);
 #endif
 	free_pages_exact(p, size);
 }
@@ -337,7 +337,7 @@ static int snd_dma_continuous_mmap(struct snd_dma_buffer *dmab,
 				   struct vm_area_struct *area)
 {
 	return remap_pfn_range(area, area->vm_start,
-			       dmab->addr >> PAGE_SHIFT,
+			       dmab->addr >> PG_SHIFT,
 			       area->vm_end - area->vm_start,
 			       area->vm_page_prot);
 }
@@ -373,7 +373,7 @@ static int snd_dma_vmalloc_mmap(struct snd_dma_buffer *dmab,
 static dma_addr_t snd_dma_vmalloc_get_addr(struct snd_dma_buffer *dmab,
 					   size_t offset)
 {
-	return get_vmalloc_page_addr(dmab, offset) + offset % PAGE_SIZE;
+	return get_vmalloc_page_addr(dmab, offset) + offset % PG_SIZE;
 }
 
 static struct page *snd_dma_vmalloc_get_page(struct snd_dma_buffer *dmab,
@@ -389,15 +389,15 @@ snd_dma_vmalloc_get_chunk_size(struct snd_dma_buffer *dmab,
 	unsigned int start, end;
 	unsigned long addr;
 
-	start = ALIGN_DOWN(ofs, PAGE_SIZE);
+	start = ALIGN_DOWN(ofs, PG_SIZE);
 	end = ofs + size - 1; /* the last byte address */
 	/* check page continuity */
 	addr = get_vmalloc_page_addr(dmab, start);
 	for (;;) {
-		start += PAGE_SIZE;
+		start += PG_SIZE;
 		if (start > end)
 			break;
-		addr += PAGE_SIZE;
+		addr += PG_SIZE;
 		if (get_vmalloc_page_addr(dmab, start) != addr)
 			return start - ofs;
 	}
@@ -430,7 +430,7 @@ static void *snd_dma_iram_alloc(struct snd_dma_buffer *dmab, size_t size)
 		/* Assign the pool into private_data field */
 		dmab->private_data = pool;
 
-		p = gen_pool_dma_alloc_align(pool, size, &dmab->addr, PAGE_SIZE);
+		p = gen_pool_dma_alloc_align(pool, size, &dmab->addr, PG_SIZE);
 		if (p)
 			return p;
 	}
@@ -455,7 +455,7 @@ static int snd_dma_iram_mmap(struct snd_dma_buffer *dmab,
 {
 	area->vm_page_prot = pgprot_writecombine(area->vm_page_prot);
 	return remap_pfn_range(area, area->vm_start,
-			       dmab->addr >> PAGE_SHIFT,
+			       dmab->addr >> PG_SHIFT,
 			       area->vm_end - area->vm_start,
 			       area->vm_page_prot);
 }
@@ -616,7 +616,7 @@ static inline void snd_dma_noncontig_iter_set(struct snd_dma_buffer *dmab,
 	struct sg_table *sgt = dmab->private_data;
 
 	__sg_page_iter_start(piter, sgt->sgl, sgt->orig_nents,
-			     offset >> PAGE_SHIFT);
+			     offset >> PG_SHIFT);
 }
 
 static dma_addr_t snd_dma_noncontig_get_addr(struct snd_dma_buffer *dmab,
@@ -626,7 +626,7 @@ static dma_addr_t snd_dma_noncontig_get_addr(struct snd_dma_buffer *dmab,
 
 	snd_dma_noncontig_iter_set(dmab, &iter.base, offset);
 	__sg_page_iter_dma_next(&iter);
-	return sg_page_iter_dma_address(&iter) + offset % PAGE_SIZE;
+	return sg_page_iter_dma_address(&iter) + offset % PG_SIZE;
 }
 
 static struct page *snd_dma_noncontig_get_page(struct snd_dma_buffer *dmab,
@@ -647,7 +647,7 @@ snd_dma_noncontig_get_chunk_size(struct snd_dma_buffer *dmab,
 	unsigned int start, end;
 	unsigned long addr;
 
-	start = ALIGN_DOWN(ofs, PAGE_SIZE);
+	start = ALIGN_DOWN(ofs, PG_SIZE);
 	end = ofs + size - 1; /* the last byte address */
 	snd_dma_noncontig_iter_set(dmab, &iter.base, start);
 	if (!__sg_page_iter_dma_next(&iter))
@@ -655,10 +655,10 @@ snd_dma_noncontig_get_chunk_size(struct snd_dma_buffer *dmab,
 	/* check page continuity */
 	addr = sg_page_iter_dma_address(&iter);
 	for (;;) {
-		start += PAGE_SIZE;
+		start += PG_SIZE;
 		if (start > end)
 			break;
-		addr += PAGE_SIZE;
+		addr += PG_SIZE;
 		if (!__sg_page_iter_dma_next(&iter) ||
 		    sg_page_iter_dma_address(&iter) != addr)
 			return start - ofs;
@@ -699,7 +699,7 @@ static void __snd_dma_sg_fallback_free(struct snd_dma_buffer *dmab,
 			if (!size)
 				break;
 			do_free_pages(page_address(sgbuf->pages[i]),
-				      size << PAGE_SHIFT, wc);
+				      size << PG_SHIFT, wc);
 			i += size;
 		}
 	}
@@ -722,8 +722,8 @@ static void *snd_dma_sg_fallback_alloc(struct snd_dma_buffer *dmab, size_t size)
 	sgbuf = kzalloc_obj(*sgbuf);
 	if (!sgbuf)
 		return NULL;
-	size = PAGE_ALIGN(size);
-	sgbuf->count = size >> PAGE_SHIFT;
+	size = PG_ALIGN(size);
+	sgbuf->count = size >> PG_SHIFT;
 	sgbuf->pages = kvzalloc_objs(*sgbuf->pages, sgbuf->count);
 	sgbuf->npages = kvcalloc(sgbuf->count, sizeof(*sgbuf->npages), GFP_KERNEL);
 	if (!sgbuf->pages || !sgbuf->npages)
@@ -736,16 +736,16 @@ static void *snd_dma_sg_fallback_alloc(struct snd_dma_buffer *dmab, size_t size)
 		chunk = min(size, chunk);
 		p = do_alloc_pages(dmab->dev.dev, chunk, &addr, wc);
 		if (!p) {
-			if (chunk <= PAGE_SIZE)
+			if (chunk <= PG_SIZE)
 				goto error;
 			chunk >>= 1;
-			chunk = PAGE_SIZE << get_order(chunk);
+			chunk = PG_SIZE << get_order(chunk);
 			continue;
 		}
 
 		size -= chunk;
 		/* fill pages */
-		npages = chunk >> PAGE_SHIFT;
+		npages = chunk >> PG_SHIFT;
 		sgbuf->npages[idx] = npages;
 		idx += npages;
 		curp = virt_to_page(p);
@@ -754,7 +754,7 @@ static void *snd_dma_sg_fallback_alloc(struct snd_dma_buffer *dmab, size_t size)
 	}
 
 	if (sg_alloc_table_from_pages(&sgbuf->sgt, sgbuf->pages, sgbuf->count,
-				      0, sgbuf->count << PAGE_SHIFT, GFP_KERNEL))
+				      0, sgbuf->count << PG_SHIFT, GFP_KERNEL))
 		goto error;
 
 	if (dma_map_sgtable(dmab->dev.dev, &sgbuf->sgt, DMA_BIDIRECTIONAL, 0))

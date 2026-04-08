@@ -836,7 +836,7 @@ struct uart_state {
 	struct uart_port	*uart_port;
 };
 
-#define UART_XMIT_SIZE	PAGE_SIZE
+#define UART_XMIT_SIZE	PG_SIZE
 
 
 /* number of characters left in xmit buffer before we ask for more */

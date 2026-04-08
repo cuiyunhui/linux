@@ -25,7 +25,7 @@ static ssize_t sys_dmi_field_show(struct device *dev,
 {
 	int field = to_dmi_dev_attr(attr)->field;
 	ssize_t len;
-	len = scnprintf(page, PAGE_SIZE, "%s\n", dmi_get_system_info(field));
+	len = scnprintf(page, PG_SIZE, "%s\n", dmi_get_system_info(field));
 	page[len-1] = '\n';
 	return len;
 }
@@ -136,7 +136,7 @@ static ssize_t sys_dmi_modalias_show(struct device *dev,
 				     struct device_attribute *attr, char *page)
 {
 	ssize_t r;
-	r = get_modalias(page, PAGE_SIZE-1);
+	r = get_modalias(page, PG_SIZE-1);
 	page[r] = '\n';
 	page[r+1] = 0;
 	return r+1;

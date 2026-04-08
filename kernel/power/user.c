@@ -134,7 +134,7 @@ static int snapshot_release(struct inode *inode, struct file *filp)
 static ssize_t snapshot_read(struct file *filp, char __user *buf,
                              size_t count, loff_t *offp)
 {
-	loff_t pg_offp = *offp & ~PAGE_MASK;
+	loff_t pg_offp = *offp & ~PG_MASK;
 	struct snapshot_data *data;
 	unsigned int sleep_flags;
 	ssize_t res;
@@ -151,7 +151,7 @@ static ssize_t snapshot_read(struct file *filp, char __user *buf,
 		if (res <= 0)
 			goto Unlock;
 	} else {
-		res = PAGE_SIZE - pg_offp;
+		res = PG_SIZE - pg_offp;
 	}
 
 	res = simple_read_from_buffer(buf, count, &pg_offp,
@@ -168,7 +168,7 @@ static ssize_t snapshot_read(struct file *filp, char __user *buf,
 static ssize_t snapshot_write(struct file *filp, const char __user *buf,
                               size_t count, loff_t *offp)
 {
-	loff_t pg_offp = *offp & ~PAGE_MASK;
+	loff_t pg_offp = *offp & ~PG_MASK;
 	struct snapshot_data *data;
 	unsigned long sleep_flags;
 	ssize_t res;
@@ -187,7 +187,7 @@ static ssize_t snapshot_write(struct file *filp, const char __user *buf,
 		if (res <= 0)
 			goto unlock;
 	} else {
-		res = PAGE_SIZE;
+		res = PG_SIZE;
 	}
 
 	if (!data_of(data->handle)) {
@@ -355,13 +355,13 @@ static long snapshot_ioctl(struct file *filp, unsigned int cmd,
 			break;
 		}
 		size = snapshot_get_image_size();
-		size <<= PAGE_SHIFT;
+		size <<= PG_SHIFT;
 		error = put_user(size, (loff_t __user *)arg);
 		break;
 
 	case SNAPSHOT_AVAIL_SWAP_SIZE:
 		size = count_swap_pages(data->swap, 1);
-		size <<= PAGE_SHIFT;
+		size <<= PG_SHIFT;
 		error = put_user(size, (loff_t __user *)arg);
 		break;
 
@@ -372,7 +372,7 @@ static long snapshot_ioctl(struct file *filp, unsigned int cmd,
 		}
 		offset = alloc_swapdev_block(data->swap);
 		if (offset) {
-			offset <<= PAGE_SHIFT;
+			offset <<= PG_SHIFT;
 			error = put_user(offset, (loff_t __user *)arg);
 		} else {
 			error = -ENOSPC;

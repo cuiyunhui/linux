@@ -497,7 +497,7 @@ __svc_create(struct svc_program *prog, int nprogs, struct svc_stat *stats,
 	if (bufsize > RPCSVC_MAXPAYLOAD)
 		bufsize = RPCSVC_MAXPAYLOAD;
 	serv->sv_max_payload = bufsize? bufsize : 4096;
-	serv->sv_max_mesg  = roundup(serv->sv_max_payload + PAGE_SIZE, PAGE_SIZE);
+	serv->sv_max_mesg  = roundup(serv->sv_max_payload + PG_SIZE, PG_SIZE);
 	serv->sv_threadfn = threadfn;
 	xdrsize = 0;
 	for (i = 0; i < nprogs; i++) {
@@ -1603,7 +1603,7 @@ void svc_process(struct svc_rqst *rqstp)
 	rqstp->rq_res.len = 0;
 	rqstp->rq_res.page_base = 0;
 	rqstp->rq_res.page_len = 0;
-	rqstp->rq_res.buflen = PAGE_SIZE;
+	rqstp->rq_res.buflen = PG_SIZE;
 	rqstp->rq_res.tail[0].iov_base = NULL;
 	rqstp->rq_res.tail[0].iov_len = 0;
 
@@ -1793,7 +1793,7 @@ char *svc_fill_symlink_pathname(struct svc_rqst *rqstp, struct kvec *first,
 	}
 
 	if (remaining) {
-		len = min_t(size_t, remaining, PAGE_SIZE);
+		len = min_t(size_t, remaining, PG_SIZE);
 		memcpy(dst, p, len);
 		dst += len;
 	}

@@ -6,8 +6,8 @@
 #ifndef __XFS_BUF_MEM_H__
 #define __XFS_BUF_MEM_H__
 
-#define XMBUF_BLOCKSIZE			(PAGE_SIZE)
-#define XMBUF_BLOCKSHIFT		(PAGE_SHIFT)
+#define XMBUF_BLOCKSIZE			(PG_SIZE)
+#define XMBUF_BLOCKSHIFT		(PG_SHIFT)
 
 #ifdef CONFIG_XFS_MEMORY_BUFS
 static inline bool xfs_buftarg_is_mem(const struct xfs_buftarg *btp)

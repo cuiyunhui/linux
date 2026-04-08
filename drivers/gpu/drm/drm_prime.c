@@ -755,7 +755,7 @@ EXPORT_SYMBOL(drm_gem_dmabuf_vunmap);
  *
  * This function sets up a userspace mapping for PRIME exported buffers using
  * the same codepath that is used for regular GEM buffer mapping on the DRM fd.
- * The fake GEM offset is added to vma->vm_pgoff and &drm_driver->fops->mmap is
+ * The fake GEM offset is added to vma->vm_pteoff and &drm_driver->fops->mmap is
  * called to set up the mapping.
  */
 int drm_gem_prime_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
@@ -765,7 +765,7 @@ int drm_gem_prime_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
 	int ret;
 
 	/* Add the fake offset */
-	vma->vm_pgoff += drm_vma_node_start(&obj->vma_node);
+	vma->vm_pteoff += drm_vma_node_start(&obj->vma_node);
 
 	if (obj->funcs && obj->funcs->mmap) {
 		vma->vm_ops = obj->funcs->vm_ops;
@@ -863,7 +863,7 @@ struct sg_table *drm_prime_pages_to_sg(struct drm_device *dev,
 	if (max_segment == 0)
 		max_segment = UINT_MAX;
 	err = sg_alloc_table_from_pages_segment(sg, pages, nr_pages, 0,
-						(unsigned long)nr_pages << PAGE_SHIFT,
+						(unsigned long)nr_pages << PG_SHIFT,
 						max_segment, GFP_KERNEL);
 	if (err) {
 		kfree(sg);

@@ -372,9 +372,9 @@ struct ext4_io_submit {
 
 /* Translate a block number to a page index */
 #define EXT4_LBLK_TO_PG(inode, lblk)	(EXT4_LBLK_TO_B((inode), (lblk)) >> \
-					 PAGE_SHIFT)
+					 PG_SHIFT)
 /* Translate a page index to a block number */
-#define EXT4_PG_TO_LBLK(inode, pnum)	(((loff_t)(pnum) << PAGE_SHIFT) >> \
+#define EXT4_PG_TO_LBLK(inode, pnum)	(((loff_t)(pnum) << PG_SHIFT) >> \
 					 (inode)->i_blkbits)
 /* Translate a block number to a cluster number */
 #define EXT4_B2C(sbi, blk)	((blk) >> (sbi)->s_cluster_bits)

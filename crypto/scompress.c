@@ -197,13 +197,13 @@ static int scomp_acomp_comp_decomp(struct acomp_req *req, int dir)
 		} else
 			return -ENOSYS;
 
-		dpage += doff / PAGE_SIZE;
-		doff = offset_in_page(doff);
+		dpage += doff / PG_SIZE;
+		doff = offset_in_pg(doff);
 
-		n = (dlen - 1) / PAGE_SIZE;
-		n += (offset_in_page(dlen - 1) + doff) / PAGE_SIZE;
+		n = (dlen - 1) / PG_SIZE;
+		n += (offset_in_pg(dlen - 1) + doff) / PG_SIZE;
 		if (PageHighMem(dpage + n) &&
-		    size_add(doff, dlen) > PAGE_SIZE)
+		    size_add(doff, dlen) > PG_SIZE)
 			return -ENOSYS;
 		dst = kmap_local_page(dpage) + doff;
 	}
@@ -219,13 +219,13 @@ static int scomp_acomp_comp_decomp(struct acomp_req *req, int dir)
 			} else
 				break;
 
-			spage = spage + soff / PAGE_SIZE;
-			soff = offset_in_page(soff);
+			spage = spage + soff / PG_SIZE;
+			soff = offset_in_pg(soff);
 
-			n = (slen - 1) / PAGE_SIZE;
-			n += (offset_in_page(slen - 1) + soff) / PAGE_SIZE;
+			n = (slen - 1) / PG_SIZE;
+			n += (offset_in_pg(slen - 1) + soff) / PG_SIZE;
 			if (PageHighMem(spage + n) &&
-			    size_add(soff, slen) > PAGE_SIZE)
+			    size_add(soff, slen) > PG_SIZE)
 				break;
 			src = kmap_local_page(spage) + soff;
 		} while (0);
@@ -265,9 +265,9 @@ static int scomp_acomp_comp_decomp(struct acomp_req *req, int dir)
 		dlen += doff;
 		for (;;) {
 			flush_dcache_page(dpage);
-			if (dlen <= PAGE_SIZE)
+			if (dlen <= PG_SIZE)
 				break;
-			dlen -= PAGE_SIZE;
+			dlen -= PG_SIZE;
 			dpage++;
 		}
 	}

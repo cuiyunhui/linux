@@ -47,8 +47,8 @@ struct nfs_page {
 		struct folio	*wb_folio;
 	};
 	struct nfs_lock_context	*wb_lock_context;	/* lock context info */
-	pgoff_t			wb_index;	/* Offset >> PAGE_SHIFT */
-	unsigned int		wb_offset,	/* Offset & ~PAGE_MASK */
+	pgoff_t			wb_index;	/* Offset >> PG_SHIFT */
+	unsigned int		wb_offset,	/* Offset & ~PG_MASK */
 				wb_pgbase,	/* Start of page data */
 				wb_bytes;	/* Length of request */
 	struct kref		wb_kref;	/* reference count */
@@ -192,7 +192,7 @@ static inline struct page *nfs_page_to_page(const struct nfs_page *req,
 
 	if (folio == NULL)
 		return req->wb_page;
-	return folio_page(folio, pgbase >> PAGE_SHIFT);
+	return folio_page(folio, pgbase >> PG_SHIFT);
 }
 
 /**
@@ -219,7 +219,7 @@ static inline size_t nfs_page_max_length(const struct nfs_page *req)
 	struct folio *folio = nfs_page_to_folio(req);
 
 	if (folio == NULL)
-		return PAGE_SIZE;
+		return PG_SIZE;
 	return folio_size(folio);
 }
 
@@ -274,7 +274,7 @@ nfs_list_entry(struct list_head *head)
 
 static inline loff_t req_offset(const struct nfs_page *req)
 {
-	return (((loff_t)req->wb_index) << PAGE_SHIFT) + req->wb_offset;
+	return (((loff_t)req->wb_index) << PG_SHIFT) + req->wb_offset;
 }
 
 static inline struct nfs_open_context *

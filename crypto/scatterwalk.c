@@ -119,16 +119,16 @@ void memcpy_sglist(struct scatterlist *dst, struct scatterlist *src,
 
 		if (IS_ENABLED(CONFIG_HIGHMEM)) {
 			/* HIGHMEM: we may have to actually map the pages. */
-			const unsigned int src_oip = offset_in_page(src_offset);
-			const unsigned int dst_oip = offset_in_page(dst_offset);
-			const unsigned int limit = PAGE_SIZE;
+			const unsigned int src_oip = offset_in_pg(src_offset);
+			const unsigned int dst_oip = offset_in_pg(dst_offset);
+			const unsigned int limit = PG_SIZE;
 
 			/* Further limit len to not cross a page boundary. */
 			len = min3(len, limit - src_oip, limit - dst_oip);
 
 			/* Compute the source and destination pages. */
-			src_page += src_offset / PAGE_SIZE;
-			dst_page += dst_offset / PAGE_SIZE;
+			src_page += src_offset / PG_SIZE;
+			dst_page += dst_offset / PG_SIZE;
 
 			if (src_page != dst_page) {
 				/* Copy between different pages. */

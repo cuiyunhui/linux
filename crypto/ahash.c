@@ -74,7 +74,7 @@ static int hash_walk_next(struct crypto_hash_walk *walk)
 {
 	unsigned int offset = walk->offset;
 	unsigned int nbytes = min(walk->entrylen,
-				  ((unsigned int)(PAGE_SIZE)) - offset);
+				  ((unsigned int)(PG_SIZE)) - offset);
 
 	walk->data = kmap_local_page(walk->pg);
 	walk->data += offset;
@@ -88,8 +88,8 @@ static int hash_walk_new_entry(struct crypto_hash_walk *walk)
 
 	sg = walk->sg;
 	walk->offset = sg->offset;
-	walk->pg = sg_page(walk->sg) + (walk->offset >> PAGE_SHIFT);
-	walk->offset = offset_in_page(walk->offset);
+	walk->pg = sg_page(walk->sg) + (walk->offset >> PG_SHIFT);
+	walk->offset = offset_in_pg(walk->offset);
 	walk->entrylen = sg->length;
 
 	if (walk->entrylen > walk->total)
@@ -226,10 +226,10 @@ int shash_ahash_digest(struct ahash_request *req, struct shash_desc *desc)
 	if (!IS_ENABLED(CONFIG_HIGHMEM))
 		return crypto_shash_digest(desc, data, nbytes, req->result);
 
-	page += offset >> PAGE_SHIFT;
-	offset = offset_in_page(offset);
+	page += offset >> PG_SHIFT;
+	offset = offset_in_pg(offset);
 
-	if (nbytes > (unsigned int)PAGE_SIZE - offset)
+	if (nbytes > (unsigned int)PG_SIZE - offset)
 		return crypto_shash_init(desc) ?:
 		       shash_ahash_finup(req, desc);
 

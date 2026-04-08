@@ -469,7 +469,7 @@ static ssize_t fill_async_buffer(struct debug_buffer *buf)
 	unsigned long		flags;
 
 	ohci = buf->ohci;
-	size = PAGE_SIZE;
+	size = PG_SIZE;
 
 	/* display control and bulk lists together, for simplicity */
 	spin_lock_irqsave (&ohci->lock, flags);
@@ -499,7 +499,7 @@ static ssize_t fill_periodic_buffer(struct debug_buffer *buf)
 
 	ohci = buf->ohci;
 	next = buf->page;
-	size = PAGE_SIZE;
+	size = PG_SIZE;
 
 	temp = scnprintf (next, size, "size = %d\n", NUM_INTS);
 	size -= temp;
@@ -574,7 +574,7 @@ static ssize_t fill_periodic_buffer(struct debug_buffer *buf)
 	spin_unlock_irqrestore (&ohci->lock, flags);
 	kfree (seen);
 
-	return PAGE_SIZE - size;
+	return PG_SIZE - size;
 }
 #undef DBG_SCHED_LIMIT
 
@@ -592,7 +592,7 @@ static ssize_t fill_registers_buffer(struct debug_buffer *buf)
 	hcd = ohci_to_hcd(ohci);
 	regs = ohci->regs;
 	next = buf->page;
-	size = PAGE_SIZE;
+	size = PG_SIZE;
 
 	spin_lock_irqsave (&ohci->lock, flags);
 
@@ -659,7 +659,7 @@ static ssize_t fill_registers_buffer(struct debug_buffer *buf)
 done:
 	spin_unlock_irqrestore (&ohci->lock, flags);
 
-	return PAGE_SIZE - size;
+	return PG_SIZE - size;
 }
 
 static struct debug_buffer *alloc_buffer(struct ohci_hcd *ohci,

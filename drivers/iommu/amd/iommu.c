@@ -564,7 +564,7 @@ static inline int pdev_enable_cap_ats(struct pci_dev *pdev)
 
 	if (amd_iommu_iotlb_sup &&
 	    (dev_data->flags & AMD_IOMMU_DEVICE_FLAG_ATS_SUP)) {
-		ret = pci_enable_ats(pdev, PAGE_SHIFT);
+		ret = pci_enable_ats(pdev, PTE_SHIFT);
 		if (!ret) {
 			dev_data->ats_enabled = 1;
 			dev_data->ats_qdep    = pci_ats_queue_depth(pdev);
@@ -1269,10 +1269,10 @@ static inline u64 build_inv_address(u64 address, size_t size)
 {
 	u64 pages, end, msb_diff;
 
-	pages = iommu_num_pages(address, size, PAGE_SIZE);
+	pages = iommu_num_pages(address, size, PTE_SIZE);
 
 	if (pages == 1)
-		return address & PAGE_MASK;
+		return address & PTE_MASK;
 
 	end = address + size - 1;
 
@@ -1297,7 +1297,7 @@ static inline u64 build_inv_address(u64 address, size_t size)
 	}
 
 	/* Clear bits 11:0 */
-	address &= PAGE_MASK;
+	address &= PTE_MASK;
 
 	/* Set the size bit - we flush more than one 4kb page */
 	return address | CMD_INV_IOMMU_PAGES_SIZE_MASK;
@@ -1899,7 +1899,7 @@ static void free_gcr3_tbl_level1(u64 *tbl)
 		if (!(tbl[i] & GCR3_VALID))
 			continue;
 
-		ptr = iommu_phys_to_virt(tbl[i] & PAGE_MASK);
+		ptr = iommu_phys_to_virt(tbl[i] & PTE_MASK);
 
 		iommu_free_pages(ptr);
 	}
@@ -1914,7 +1914,7 @@ static void free_gcr3_tbl_level2(u64 *tbl)
 		if (!(tbl[i] & GCR3_VALID))
 			continue;
 
-		ptr = iommu_phys_to_virt(tbl[i] & PAGE_MASK);
+		ptr = iommu_phys_to_virt(tbl[i] & PTE_MASK);
 
 		free_gcr3_tbl_level1(ptr);
 	}
@@ -2011,7 +2011,7 @@ static u64 *__get_gcr3_pte(struct gcr3_tbl_info *gcr3_info,
 			*pte = iommu_virt_to_phys(root) | GCR3_VALID;
 		}
 
-		root = iommu_phys_to_virt(*pte & PAGE_MASK);
+		root = iommu_phys_to_virt(*pte & PTE_MASK);
 
 		level -= 1;
 	}
@@ -2030,7 +2030,7 @@ static int update_gcr3(struct iommu_dev_data *dev_data,
 		return -ENOMEM;
 
 	if (set)
-		*pte = (gcr3 & PAGE_MASK) | GCR3_VALID;
+		*pte = (gcr3 & PTE_MASK) | GCR3_VALID;
 	else
 		*pte = 0;
 
@@ -2497,7 +2497,7 @@ static struct iommu_device *amd_iommu_probe_device(struct device *dev)
 		dev_data->max_irqs = MAX_IRQS_PER_TABLE_512;
 
 	if (dev_is_pci(dev))
-		pci_prepare_ats(to_pci_dev(dev), PAGE_SHIFT);
+		pci_prepare_ats(to_pci_dev(dev), PTE_SHIFT);
 
 out_err:
 	return iommu_dev;

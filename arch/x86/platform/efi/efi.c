@@ -549,7 +549,7 @@ static void *realloc_pages(void *old_memmap, int old_shift)
 	if (!old_memmap)
 		return ret;
 
-	memcpy(ret, old_memmap, PAGE_SIZE << old_shift);
+	memcpy(ret, old_memmap, PG_SIZE << old_shift);
 
 out:
 	free_pages((unsigned long)old_memmap, old_shift);
@@ -696,7 +696,7 @@ static void * __init efi_map_regions(int *count, int *pg_shift)
 			if (!new_memmap)
 				return NULL;
 
-			left += PAGE_SIZE << *pg_shift;
+			left += PG_SIZE << *pg_shift;
 			(*pg_shift)++;
 		}
 
@@ -751,8 +751,8 @@ static void __init kexec_enter_virtual_mode(void)
 		return;
 	}
 
-	num_pages = ALIGN(efi.memmap.nr_map * efi.memmap.desc_size, PAGE_SIZE);
-	num_pages >>= PAGE_SHIFT;
+	num_pages = ALIGN(efi.memmap.nr_map * efi.memmap.desc_size, PG_SIZE);
+	num_pages >>= PG_SHIFT;
 
 	if (efi_setup_page_tables(efi.memmap.phys_map, num_pages)) {
 		clear_bit(EFI_RUNTIME_SERVICES, &efi.flags);

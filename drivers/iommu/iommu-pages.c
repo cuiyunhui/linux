@@ -25,7 +25,7 @@ static_assert(sizeof(struct ioptdesc) <= sizeof(struct page));
 
 static inline size_t ioptdesc_mem_size(struct ioptdesc *desc)
 {
-	return 1UL << (folio_order(ioptdesc_folio(desc)) + PAGE_SHIFT);
+	return 1UL << (folio_order(ioptdesc_folio(desc)) + PTE_SHIFT);
 }
 
 /**

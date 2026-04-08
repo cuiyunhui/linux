@@ -63,11 +63,11 @@ static int vmemmap_split_pmd(pmd_t *pmd, struct page *head, unsigned long start,
 
 	pmd_populate_kernel(&init_mm, &__pmd, pgtable);
 
-	for (i = 0; i < PTRS_PER_PTE; i++, addr += PAGE_SIZE) {
+	for (i = 0; i < PTRS_PER_PTE; i++, addr += PG_SIZE) {
 		pte_t entry, *pte;
 		pgprot_t pgprot = PAGE_KERNEL;
 
-		entry = mk_pte(head + i, pgprot);
+		entry = mkpte(head + i, 0, pgprot);
 		pte = pte_offset_kernel(&__pmd, addr);
 		set_pte_at(&init_mm, addr, pte, entry);
 	}
@@ -164,7 +164,7 @@ static int vmemmap_remap_range(unsigned long start, unsigned long end,
 {
 	int ret;
 
-	VM_BUG_ON(!PAGE_ALIGNED(start | end));
+	VM_BUG_ON(!PG_ALIGNED(start | end));
 
 	mmap_read_lock(&init_mm);
 	ret = walk_kernel_page_table_range(start, end, &vmemmap_remap_ops,
@@ -229,7 +229,7 @@ static void vmemmap_remap_pte(pte_t *pte, unsigned long addr,
 		smp_wmb();
 	}
 
-	entry = mk_pte(walk->reuse_page, pgprot);
+	entry = mkpte(walk->reuse_page, 0, pgprot);
 	list_add(&page->lru, walk->vmemmap_pages);
 	set_pte_at(&init_mm, addr, pte, entry);
 }
@@ -249,7 +249,7 @@ static inline void reset_struct_pages(struct page *start)
 {
 	struct page *from = start + NR_RESET_STRUCT_PAGE;
 
-	BUILD_BUG_ON(NR_RESET_STRUCT_PAGE * 2 > PAGE_SIZE / sizeof(struct page));
+	BUILD_BUG_ON(NR_RESET_STRUCT_PAGE * 2 > PG_SIZE / sizeof(struct page));
 	memcpy(start, from, sizeof(*from) * NR_RESET_STRUCT_PAGE);
 }
 
@@ -273,7 +273,7 @@ static void vmemmap_restore_pte(pte_t *pte, unsigned long addr,
 	 * before the set_pte_at() write.
 	 */
 	smp_wmb();
-	set_pte_at(&init_mm, addr, pte, mk_pte(page, pgprot));
+	set_pte_at(&init_mm, addr, pte, mkpte(page, 0, pgprot));
 }
 
 /**
@@ -296,7 +296,7 @@ static int vmemmap_remap_split(unsigned long start, unsigned long end,
 	};
 
 	/* See the comment in the vmemmap_remap_free(). */
-	BUG_ON(start - reuse != PAGE_SIZE);
+	BUG_ON(start - reuse != PG_SIZE);
 
 	return vmemmap_remap_range(reuse, end, &walk);
 }
@@ -352,7 +352,7 @@ static int vmemmap_remap_free(unsigned long start, unsigned long end,
 	 * the routine of vmemmap page table walking has the following rules
 	 * (see more details from the vmemmap_pte_range()):
 	 *
-	 * - The range [@start, @end) and the range [@reuse, @reuse + PAGE_SIZE)
+	 * - The range [@start, @end) and the range [@reuse, @reuse + PG_SIZE)
 	 *   should be continuous.
 	 * - The @reuse address is part of the range [@reuse, @end) that we are
 	 *   walking which is passed to vmemmap_remap_range().
@@ -360,11 +360,11 @@ static int vmemmap_remap_free(unsigned long start, unsigned long end,
 	 *
 	 * So we need to make sure that @start and @reuse meet the above rules.
 	 */
-	BUG_ON(start - reuse != PAGE_SIZE);
+	BUG_ON(start - reuse != PG_SIZE);
 
 	ret = vmemmap_remap_range(reuse, end, &walk);
 	if (ret && walk.nr_walked) {
-		end = reuse + walk.nr_walked * PAGE_SIZE;
+		end = reuse + walk.nr_walked * PG_SIZE;
 		/*
 		 * vmemmap_pages contains pages from the previous
 		 * vmemmap_remap_range call which failed.  These
@@ -388,7 +388,7 @@ static int alloc_vmemmap_page_list(unsigned long start, unsigned long end,
 				   struct list_head *list)
 {
 	gfp_t gfp_mask = GFP_KERNEL | __GFP_RETRY_MAYFAIL;
-	unsigned long nr_pages = (end - start) >> PAGE_SHIFT;
+	unsigned long nr_pages = (end - start) >> PG_SHIFT;
 	int nid = page_to_nid((struct page *)start);
 	struct page *page, *next;
 	int i;
@@ -433,7 +433,7 @@ static int vmemmap_remap_alloc(unsigned long start, unsigned long end,
 	};
 
 	/* See the comment in the vmemmap_remap_free(). */
-	BUG_ON(start - reuse != PAGE_SIZE);
+	BUG_ON(start - reuse != PG_SIZE);
 
 	if (alloc_vmemmap_page_list(start, end, &vmemmap_pages))
 		return -ENOMEM;
@@ -775,7 +775,7 @@ static bool vmemmap_should_optimize_bootmem_page(struct huge_bootmem_page *m)
 	 * so the bootmem page must be aligned to the number
 	 * of base pages that can be mapped with one vmemmap PMD.
 	 */
-	pmd_vmemmap_size = (PMD_SIZE / (sizeof(struct page))) << PAGE_SHIFT;
+	pmd_vmemmap_size = (PMD_SIZE / (sizeof(struct page))) << PG_SHIFT;
 	if (!IS_ALIGNED(paddr, pmd_vmemmap_size) ||
 	    !IS_ALIGNED(psize, pmd_vmemmap_size))
 		return false;
@@ -804,7 +804,7 @@ void __init hugetlb_vmemmap_init_early(int nid)
 			continue;
 
 		nr_pages = pages_per_huge_page(m->hstate);
-		psize = nr_pages << PAGE_SHIFT;
+		psize = nr_pages << PG_SHIFT;
 		paddr = virt_to_phys(m);
 		pfn = PHYS_PFN(paddr);
 		map = pfn_to_page(pfn);
@@ -815,7 +815,7 @@ void __init hugetlb_vmemmap_init_early(int nid)
 					HUGETLB_VMEMMAP_RESERVE_SIZE) < 0)
 			continue;
 
-		memmap_boot_pages_add(HUGETLB_VMEMMAP_RESERVE_SIZE / PAGE_SIZE);
+		memmap_boot_pages_add(HUGETLB_VMEMMAP_RESERVE_SIZE / PG_SIZE);
 
 		pnum = pfn_to_section_nr(pfn);
 		ns = psize / section_size;
@@ -866,7 +866,7 @@ void __init hugetlb_vmemmap_init_late(int nid)
 			vmemmap_undo_hvo(start, end, nid,
 					 HUGETLB_VMEMMAP_RESERVE_SIZE);
 			nr_mmap = end - start - HUGETLB_VMEMMAP_RESERVE_SIZE;
-			memmap_boot_pages_add(DIV_ROUND_UP(nr_mmap, PAGE_SIZE));
+			memmap_boot_pages_add(DIV_ROUND_UP(nr_mmap, PG_SIZE));
 
 			memblock_phys_free(phys, huge_page_size(h));
 			continue;

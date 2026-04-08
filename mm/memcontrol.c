@@ -147,26 +147,26 @@ static void obj_cgroup_release(struct percpu_ref *ref)
 	/*
 	 * At this point all allocated objects are freed, and
 	 * objcg->nr_charged_bytes can't have an arbitrary byte value.
-	 * However, it can be PAGE_SIZE or (x * PAGE_SIZE).
+	 * However, it can be PG_SIZE or (x * PG_SIZE).
 	 *
 	 * The following sequence can lead to it:
 	 * 1) CPU0: objcg == stock->cached_objcg
 	 * 2) CPU1: we do a small allocation (e.g. 92 bytes),
-	 *          PAGE_SIZE bytes are charged
+	 *          PG_SIZE bytes are charged
 	 * 3) CPU1: a process from another memcg is allocating something,
 	 *          the stock if flushed,
-	 *          objcg->nr_charged_bytes = PAGE_SIZE - 92
+	 *          objcg->nr_charged_bytes = PG_SIZE - 92
 	 * 5) CPU0: we do release this object,
 	 *          92 bytes are added to stock->nr_bytes
 	 * 6) CPU0: stock is flushed,
 	 *          92 bytes are added to objcg->nr_charged_bytes
 	 *
-	 * In the result, nr_charged_bytes == PAGE_SIZE.
+	 * In the result, nr_charged_bytes == PG_SIZE.
 	 * This page will be uncharged in obj_cgroup_release().
 	 */
 	nr_bytes = atomic_read(&objcg->nr_charged_bytes);
-	WARN_ON_ONCE(nr_bytes & (PAGE_SIZE - 1));
-	nr_pages = nr_bytes >> PAGE_SHIFT;
+	WARN_ON_ONCE(nr_bytes & (PG_SIZE - 1));
+	nr_pages = nr_bytes >> PG_SHIFT;
 
 	if (nr_pages) {
 		struct mem_cgroup *memcg;
@@ -683,10 +683,10 @@ static int memcg_state_val_in_pages(int idx, int val)
 {
 	int unit = memcg_page_state_unit(idx);
 
-	if (!val || unit == PAGE_SIZE)
+	if (!val || unit == PG_SIZE)
 		return val;
 	else
-		return max(val * unit / PAGE_SIZE, 1UL);
+		return max(val * unit / PG_SIZE, 1UL);
 }
 
 /**
@@ -1417,7 +1417,7 @@ static int memcg_page_state_unit(int item)
 	case NR_KERNEL_STACK_KB:
 		return SZ_1K;
 	default:
-		return PAGE_SIZE;
+		return PG_SIZE;
 	}
 }
 
@@ -2454,7 +2454,7 @@ retry:
 	 * couldn't make any progress.
 	 */
 	if (mem_cgroup_oom(mem_over_limit, gfp_mask,
-			   get_order(nr_pages * PAGE_SIZE))) {
+			   get_order(nr_pages * PG_SIZE))) {
 		passed_oom = true;
 		nr_retries = MAX_RECLAIM_RETRIES;
 		goto retry;
@@ -2956,7 +2956,7 @@ static void __account_obj_stock(struct obj_cgroup *objcg,
 	bytes = (idx == NR_SLAB_RECLAIMABLE_B) ? &stock->nr_slab_reclaimable_b
 					       : &stock->nr_slab_unreclaimable_b;
 	/*
-	 * Even for large object >= PAGE_SIZE, the vmstat data will still be
+	 * Even for large object >= PG_SIZE, the vmstat data will still be
 	 * cached locally at least once before pushing it out.
 	 */
 	if (!*bytes) {
@@ -2964,7 +2964,7 @@ static void __account_obj_stock(struct obj_cgroup *objcg,
 		nr = 0;
 	} else {
 		*bytes += nr;
-		if (abs(*bytes) > PAGE_SIZE) {
+		if (abs(*bytes) > PG_SIZE) {
 			nr = *bytes;
 			*bytes = 0;
 		} else {
@@ -3006,8 +3006,8 @@ static void drain_obj_stock(struct obj_stock_pcp *stock)
 		return;
 
 	if (stock->nr_bytes) {
-		unsigned int nr_pages = stock->nr_bytes >> PAGE_SHIFT;
-		unsigned int nr_bytes = stock->nr_bytes & (PAGE_SIZE - 1);
+		unsigned int nr_pages = stock->nr_bytes >> PG_SHIFT;
+		unsigned int nr_bytes = stock->nr_bytes & (PG_SIZE - 1);
 
 		if (nr_pages) {
 			struct mem_cgroup *memcg;
@@ -3087,8 +3087,8 @@ static void refill_obj_stock(struct obj_cgroup *objcg, unsigned int nr_bytes,
 	if (!local_trylock(&obj_stock.lock)) {
 		if (pgdat)
 			mod_objcg_mlstate(objcg, pgdat, idx, nr_acct);
-		nr_pages = nr_bytes >> PAGE_SHIFT;
-		nr_bytes = nr_bytes & (PAGE_SIZE - 1);
+		nr_pages = nr_bytes >> PG_SHIFT;
+		nr_bytes = nr_bytes & (PG_SIZE - 1);
 		atomic_add(nr_bytes, &objcg->nr_charged_bytes);
 		goto out;
 	}
@@ -3108,9 +3108,9 @@ static void refill_obj_stock(struct obj_cgroup *objcg, unsigned int nr_bytes,
 	if (pgdat)
 		__account_obj_stock(objcg, stock, nr_acct, pgdat, idx);
 
-	if (allow_uncharge && (stock->nr_bytes > PAGE_SIZE)) {
-		nr_pages = stock->nr_bytes >> PAGE_SHIFT;
-		stock->nr_bytes &= (PAGE_SIZE - 1);
+	if (allow_uncharge && (stock->nr_bytes > PG_SIZE)) {
+		nr_pages = stock->nr_bytes >> PG_SHIFT;
+		stock->nr_bytes &= (PG_SIZE - 1);
 	}
 
 	local_unlock(&obj_stock.lock);
@@ -3148,18 +3148,18 @@ static int obj_cgroup_charge_account(struct obj_cgroup *objcg, gfp_t gfp, size_t
 	 * allow_uncharge flag to false when calling refill_obj_stock()
 	 * to temporarily allow the pre-charged bytes to exceed the page
 	 * size limit. The maximum reachable value of the pre-charged
-	 * bytes is (sizeof(object) + PAGE_SIZE - 2) if there is no data
+	 * bytes is (sizeof(object) + PG_SIZE - 2) if there is no data
 	 * race.
 	 */
-	nr_pages = size >> PAGE_SHIFT;
-	nr_bytes = size & (PAGE_SIZE - 1);
+	nr_pages = size >> PG_SHIFT;
+	nr_bytes = size & (PG_SIZE - 1);
 
 	if (nr_bytes)
 		nr_pages += 1;
 
 	ret = obj_cgroup_charge_pages(objcg, gfp, nr_pages);
 	if (!ret && (nr_bytes || pgdat))
-		refill_obj_stock(objcg, nr_bytes ? PAGE_SIZE - nr_bytes : 0,
+		refill_obj_stock(objcg, nr_bytes ? PG_SIZE - nr_bytes : 0,
 					 false, size, pgdat, idx);
 
 	return ret;
@@ -4237,7 +4237,7 @@ static int seq_puts_memcg_tunable(struct seq_file *m, unsigned long value)
 	if (value == PAGE_COUNTER_MAX)
 		seq_puts(m, "max\n");
 	else
-		seq_printf(m, "%llu\n", (u64)value * PAGE_SIZE);
+		seq_printf(m, "%llu\n", (u64)value * PG_SIZE);
 
 	return 0;
 }
@@ -4247,7 +4247,7 @@ static u64 memory_current_read(struct cgroup_subsys_state *css,
 {
 	struct mem_cgroup *memcg = mem_cgroup_from_css(css);
 
-	return (u64)page_counter_read(&memcg->memory) * PAGE_SIZE;
+	return (u64)page_counter_read(&memcg->memory) * PG_SIZE;
 }
 
 #define OFP_PEAK_UNSET (((-1UL)))
@@ -4263,7 +4263,7 @@ static int peak_show(struct seq_file *sf, void *v, struct page_counter *pc)
 	else
 		peak = max(fd_peak, READ_ONCE(pc->local_watermark));
 
-	seq_printf(sf, "%llu\n", peak * PAGE_SIZE);
+	seq_printf(sf, "%llu\n", peak * PG_SIZE);
 	return 0;
 }
 
@@ -5168,9 +5168,9 @@ int __init mem_cgroup_init(void)
 	 * Currently s32 type (can refer to struct batched_lruvec_stat) is
 	 * used for per-memcg-per-cpu caching of per-node statistics. In order
 	 * to work fine, we should make sure that the overfill threshold can't
-	 * exceed S32_MAX / PAGE_SIZE.
+	 * exceed S32_MAX / PG_SIZE.
 	 */
-	BUILD_BUG_ON(MEMCG_CHARGE_BATCH > S32_MAX / PAGE_SIZE);
+	BUILD_BUG_ON(MEMCG_CHARGE_BATCH > S32_MAX / PG_SIZE);
 
 	cpuhp_setup_state_nocalls(CPUHP_MM_MEMCQ_DEAD, "mm/memctrl:dead", NULL,
 				  memcg_hotplug_cpu_dead);
@@ -5328,7 +5328,7 @@ static u64 swap_current_read(struct cgroup_subsys_state *css,
 {
 	struct mem_cgroup *memcg = mem_cgroup_from_css(css);
 
-	return (u64)page_counter_read(&memcg->swap) * PAGE_SIZE;
+	return (u64)page_counter_read(&memcg->swap) * PG_SIZE;
 }
 
 static int swap_peak_show(struct seq_file *sf, void *v)
@@ -5478,7 +5478,7 @@ bool obj_cgroup_may_zswap(struct obj_cgroup *objcg)
 
 		/* Force flush to get accurate stats for charging */
 		__mem_cgroup_flush_stats(memcg, true);
-		pages = memcg_page_state(memcg, MEMCG_ZSWAP_B) / PAGE_SIZE;
+		pages = memcg_page_state(memcg, MEMCG_ZSWAP_B) / PG_SIZE;
 		if (pages < max)
 			continue;
 		ret = false;

@@ -876,12 +876,12 @@ int __init early_dbgp_init(char *s)
 	}
 
 	/*
-	 * FIXME I don't have the bar size so just guess PAGE_SIZE is more
+	 * FIXME I don't have the bar size so just guess PG_SIZE is more
 	 * than enough.  1K is the biggest I have seen.
 	 */
-	set_fixmap_nocache(FIX_DBGP_BASE, bar_val & PAGE_MASK);
+	set_fixmap_nocache(FIX_DBGP_BASE, bar_val & PG_MASK);
 	ehci_bar = (void __iomem *)__fix_to_virt(FIX_DBGP_BASE);
-	ehci_bar += bar_val & ~PAGE_MASK;
+	ehci_bar += bar_val & ~PG_MASK;
 	dbgp_printk("ehci_bar: %p\n", ehci_bar);
 
 	ehci_caps  = ehci_bar;

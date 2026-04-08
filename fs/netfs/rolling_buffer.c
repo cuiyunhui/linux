@@ -137,7 +137,7 @@ ssize_t rolling_buffer_load_from_ra(struct rolling_buffer *roll,
 		unsigned int order = folio_order(folio);
 
 		fq->orders[ix] = order;
-		size += PAGE_SIZE << order;
+		size += PG_SIZE << order;
 		trace_netfs_folio(folio, netfs_folio_trace_read);
 		if (!folio_batch_add(put_batch, folio))
 			folio_batch_release(put_batch);

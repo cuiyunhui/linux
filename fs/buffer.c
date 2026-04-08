@@ -190,7 +190,7 @@ __find_get_block_slow(struct block_device *bdev, sector_t block, bool atomic)
 	int all_mapped = 1;
 	static DEFINE_RATELIMIT_STATE(last_warned, HZ, 1);
 
-	index = ((loff_t)block << blkbits) / PAGE_SIZE;
+	index = ((loff_t)block << blkbits) / PG_SIZE;
 	folio = __filemap_get_folio(bd_mapping, index, FGP_ACCESSED, 0);
 	if (IS_ERR(folio))
 		goto out;
@@ -353,7 +353,7 @@ static void end_buffer_async_read_io(struct buffer_head *bh, int uptodate)
 	struct fsverity_info *vi = NULL;
 
 	/* needed by ext4 */
-	if (bh->b_folio->index < DIV_ROUND_UP(inode->i_size, PAGE_SIZE))
+	if (bh->b_folio->index < DIV_ROUND_UP(inode->i_size, PG_SIZE))
 		vi = fsverity_get_info(inode);
 
 	/* Decrypt (with fscrypt) and/or verify (with fsverity) if needed. */
@@ -1110,7 +1110,7 @@ static bool grow_buffers(struct block_device *bdev, sector_t block,
 	}
 
 	/* Create a folio with the proper size buffers */
-	return grow_dev_folio(bdev, block, pos / PAGE_SIZE, size, gfp);
+	return grow_dev_folio(bdev, block, pos / PG_SIZE, size, gfp);
 }
 
 static struct buffer_head *
@@ -1737,13 +1737,13 @@ void clean_bdev_aliases(struct block_device *bdev, sector_t block, sector_t len)
 	struct address_space *bd_mapping = bdev->bd_mapping;
 	const int blkbits = bd_mapping->host->i_blkbits;
 	struct folio_batch fbatch;
-	pgoff_t index = ((loff_t)block << blkbits) / PAGE_SIZE;
+	pgoff_t index = ((loff_t)block << blkbits) / PG_SIZE;
 	pgoff_t end;
 	int i, count;
 	struct buffer_head *bh;
 	struct buffer_head *head;
 
-	end = ((loff_t)(block + len - 1) << blkbits) / PAGE_SIZE;
+	end = ((loff_t)(block + len - 1) << blkbits) / PG_SIZE;
 	folio_batch_init(&fbatch);
 	while (filemap_get_folios(bd_mapping, &index, end, &fbatch)) {
 		count = folio_batch_count(&fbatch);
@@ -2241,7 +2241,7 @@ EXPORT_SYMBOL(block_commit_write);
 int block_write_begin(struct address_space *mapping, loff_t pos, unsigned len,
 		struct folio **foliop, get_block_t *get_block)
 {
-	pgoff_t index = pos >> PAGE_SHIFT;
+	pgoff_t index = pos >> PG_SHIFT;
 	struct folio *folio;
 	int status;
 
@@ -2505,16 +2505,16 @@ static int cont_expand_zero(const struct kiocb *iocb,
 	unsigned zerofrom, offset, len;
 	int err = 0;
 
-	index = pos >> PAGE_SHIFT;
-	offset = pos & ~PAGE_MASK;
+	index = pos >> PG_SHIFT;
+	offset = pos & ~PG_MASK;
 
-	while (index > (curidx = (curpos = *bytes)>>PAGE_SHIFT)) {
-		zerofrom = curpos & ~PAGE_MASK;
+	while (index > (curidx = (curpos = *bytes)>>PG_SHIFT)) {
+		zerofrom = curpos & ~PG_MASK;
 		if (zerofrom & (blocksize-1)) {
 			*bytes |= (blocksize-1);
 			(*bytes)++;
 		}
-		len = PAGE_SIZE - zerofrom;
+		len = PG_SIZE - zerofrom;
 
 		err = aops->write_begin(iocb, mapping, curpos, len,
 					    &folio, &fsdata);
@@ -2538,7 +2538,7 @@ static int cont_expand_zero(const struct kiocb *iocb,
 
 	/* page covers the boundary, find the boundary offset */
 	if (index == curidx) {
-		zerofrom = curpos & ~PAGE_MASK;
+		zerofrom = curpos & ~PG_MASK;
 		/* if we will expand the thing last block will be filled */
 		if (offset <= zerofrom) {
 			goto out;
@@ -2582,7 +2582,7 @@ int cont_write_begin(const struct kiocb *iocb, struct address_space *mapping,
 	if (err)
 		return err;
 
-	zerofrom = *bytes & ~PAGE_MASK;
+	zerofrom = *bytes & ~PG_MASK;
 	if (pos+len > *bytes && zerofrom & (blocksize-1)) {
 		*bytes |= (blocksize-1);
 		(*bytes)++;
@@ -2651,7 +2651,7 @@ EXPORT_SYMBOL(block_page_mkwrite);
 int block_truncate_page(struct address_space *mapping,
 			loff_t from, get_block_t *get_block)
 {
-	pgoff_t index = from >> PAGE_SHIFT;
+	pgoff_t index = from >> PG_SHIFT;
 	unsigned blocksize;
 	sector_t iblock;
 	size_t offset, length, pos;
@@ -2668,7 +2668,7 @@ int block_truncate_page(struct address_space *mapping,
 		return 0;
 
 	length = blocksize - length;
-	iblock = ((loff_t)index * PAGE_SIZE) >> inode->i_blkbits;
+	iblock = ((loff_t)index * PG_SIZE) >> inode->i_blkbits;
 
 	folio = filemap_grab_folio(mapping, index);
 	if (IS_ERR(folio))
@@ -3156,7 +3156,7 @@ void __init buffer_init(void)
 	 * Limit the bh occupancy to 10% of ZONE_NORMAL
 	 */
 	nrpages = (nr_free_buffer_pages() * 10) / 100;
-	max_buffer_heads = nrpages * (PAGE_SIZE / sizeof(struct buffer_head));
+	max_buffer_heads = nrpages * (PG_SIZE / sizeof(struct buffer_head));
 	ret = cpuhp_setup_state_nocalls(CPUHP_FS_BUFF_DEAD, "fs/buffer:dead",
 					NULL, buffer_exit_cpu_dead);
 	WARN_ON(ret < 0);

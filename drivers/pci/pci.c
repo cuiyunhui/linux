@@ -6369,10 +6369,10 @@ static resource_size_t pci_specified_resource_alignment(struct pci_dev *dev,
 			if (align_order > 63) {
 				pr_err("PCI: Invalid requested alignment (order %d)\n",
 				       align_order);
-				align_order = PAGE_SHIFT;
+				align_order = PG_SHIFT;
 			}
 		} else {
-			align_order = PAGE_SHIFT;
+			align_order = PG_SHIFT;
 		}
 
 		ret = pci_dev_str_match(dev, p, &p);
@@ -6536,7 +6536,7 @@ static ssize_t resource_alignment_store(const struct bus_type *bus,
 {
 	char *param, *old, *end;
 
-	if (count >= (PAGE_SIZE - 1))
+	if (count >= (PG_SIZE - 1))
 		return -EINVAL;
 
 	param = kstrndup(buf, count, GFP_KERNEL);

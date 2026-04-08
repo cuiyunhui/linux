@@ -358,8 +358,8 @@ static void iommu_write_l2(struct amd_iommu *iommu, u8 address, u32 val)
  */
 static void iommu_set_exclusion_range(struct amd_iommu *iommu)
 {
-	u64 start = iommu->exclusion_start & PAGE_MASK;
-	u64 limit = (start + iommu->exclusion_length - 1) & PAGE_MASK;
+	u64 start = iommu->exclusion_start & PTE_MASK;
+	u64 limit = (start + iommu->exclusion_length - 1) & PTE_MASK;
 	u64 entry;
 
 	if (!iommu->exclusion_start)
@@ -850,12 +850,12 @@ void *__init iommu_alloc_4k_pages(struct amd_iommu *iommu, gfp_t gfp,
 {
 	void *buf;
 
-	size = PAGE_ALIGN(size);
+	size = PTE_ALIGN(size);
 	buf = iommu_alloc_pages_sz(gfp, size);
 	if (!buf)
 		return NULL;
 	if (check_feature(FEATURE_SNP) &&
-	    set_memory_4k((unsigned long)buf, size / PAGE_SIZE)) {
+	    set_memory_4k((unsigned long)buf, size / PTE_SIZE)) {
 		iommu_free_pages(buf);
 		return NULL;
 	}
@@ -1014,7 +1014,7 @@ static int __init remap_or_alloc_cwwb_sem(struct amd_iommu *iommu)
 		 */
 		pr_info_once("Re-using CWB buffers from the previous kernel\n");
 		paddr = readq(iommu->mmio_base + MMIO_EXCL_BASE_OFFSET) & PM_ADDR_MASK;
-		iommu->cmd_sem = iommu_memremap(paddr, PAGE_SIZE);
+		iommu->cmd_sem = iommu_memremap(paddr, PTE_SIZE);
 		if (!iommu->cmd_sem)
 			return -ENOMEM;
 		iommu->cmd_sem_paddr = paddr;
@@ -1153,7 +1153,7 @@ static bool __reuse_device_table(struct amd_iommu *iommu)
 	hi = readl(iommu->mmio_base + MMIO_DEV_TABLE_OFFSET + 4);
 	entry = (((u64) hi) << 32) + lo;
 
-	old_devtb_size = ((entry & ~PAGE_MASK) + 1) << 12;
+	old_devtb_size = ((entry & ~PTE_MASK) + 1) << 12;
 	if (old_devtb_size != pci_seg->dev_table_size) {
 		pr_err("The device table size of IOMMU:%d is not expected!\n",
 			iommu->index);
@@ -1165,7 +1165,7 @@ static bool __reuse_device_table(struct amd_iommu *iommu)
 	 * memory encryption mask(sme_me_mask), we must remove the memory
 	 * encryption mask to obtain the true physical address in kdump kernel.
 	 */
-	old_devtb_phys = __sme_clr(entry) & PAGE_MASK;
+	old_devtb_phys = __sme_clr(entry) & PTE_MASK;
 
 	if (old_devtb_phys >= 0x100000000ULL) {
 		pr_err("The address of old device table is above 4G, not trustworthy!\n");
@@ -2662,8 +2662,8 @@ static int __init init_unity_map_range(struct ivmd_header *m,
 		e->devid_end = m->aux;
 		break;
 	}
-	e->address_start = PAGE_ALIGN(m->range_start);
-	e->address_end = e->address_start + PAGE_ALIGN(m->range_length);
+	e->address_start = PTE_ALIGN(m->range_start);
+	e->address_end = e->address_start + PTE_ALIGN(m->range_length);
 	e->prot = m->flags >> 1;
 
 	/*
@@ -3976,7 +3976,7 @@ static int iommu_page_make_shared(void *page)
 
 	paddr = iommu_virt_to_phys(page);
 	/* Cbit maybe set in the paddr */
-	pfn = __sme_clr(paddr) >> PAGE_SHIFT;
+	pfn = __sme_clr(paddr) >> PTE_SHIFT;
 
 	if (!(pfn % PTRS_PER_PMD)) {
 		int ret, level;
@@ -4016,7 +4016,7 @@ static int iommu_make_shared(void *va, size_t size)
 	if (!va)
 		return 0;
 
-	for (page = va; page < (va + size); page += PAGE_SIZE) {
+	for (page = va; page < (va + size); page += PTE_SIZE) {
 		ret = iommu_page_make_shared(page);
 		if (ret)
 			return ret;
@@ -4042,7 +4042,7 @@ int amd_iommu_snp_disable(void)
 		if (ret)
 			return ret;
 
-		ret = iommu_make_shared((void *)iommu->cmd_sem, PAGE_SIZE);
+		ret = iommu_make_shared((void *)iommu->cmd_sem, PTE_SIZE);
 		if (ret)
 			return ret;
 	}

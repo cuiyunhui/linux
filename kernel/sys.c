@@ -3037,7 +3037,7 @@ COMPAT_SYSCALL_DEFINE1(sysinfo, struct compat_sysinfo __user *, info)
 	if (upper_32_bits(s.totalram) || upper_32_bits(s.totalswap)) {
 		int bitcount = 0;
 
-		while (s.mem_unit < PAGE_SIZE) {
+		while (s.mem_unit < PG_SIZE) {
 			s.mem_unit <<= 1;
 			bitcount++;
 		}

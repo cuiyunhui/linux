@@ -112,8 +112,8 @@ static int set_up_temporary_mappings(void)
 
 	/* Set up the direct mapping from scratch */
 	for (i = 0; i < nr_pfn_mapped; i++) {
-		mstart = pfn_mapped[i].start << PAGE_SHIFT;
-		mend   = pfn_mapped[i].end << PAGE_SHIFT;
+		mstart = pfn_mapped[i].start << PTE_SHIFT;
+		mend   = pfn_mapped[i].end << PTE_SHIFT;
 
 		result = kernel_ident_mapping_init(&info, pgd, mstart, mend);
 		if (result)

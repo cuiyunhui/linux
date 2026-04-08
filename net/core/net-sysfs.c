@@ -975,7 +975,7 @@ static ssize_t show_rps_map(struct netdev_rx_queue *queue, char *buf)
 	rcu_read_unlock();
 	free_cpumask_var(mask);
 
-	return len < PAGE_SIZE ? len : -EINVAL;
+	return len < PG_SIZE ? len : -EINVAL;
 }
 
 static int netdev_rx_queue_set_rps_mask(struct netdev_rx_queue *queue,
@@ -1757,7 +1757,7 @@ out_no_maps:
 	len = bitmap_print_to_pagebuf(false, buf, mask, nr_ids);
 	bitmap_free(mask);
 
-	return len < PAGE_SIZE ? len : -EINVAL;
+	return len < PG_SIZE ? len : -EINVAL;
 }
 
 static ssize_t xps_cpus_show(struct kobject *kobj, struct attribute *attr,

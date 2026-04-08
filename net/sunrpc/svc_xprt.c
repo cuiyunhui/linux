@@ -675,12 +675,12 @@ static bool svc_alloc_arg(struct svc_rqst *rqstp)
 
 	/* Make arg->head point to first page and arg->pages point to rest */
 	arg->head[0].iov_base = page_address(rqstp->rq_pages[0]);
-	arg->head[0].iov_len = PAGE_SIZE;
+	arg->head[0].iov_len = PG_SIZE;
 	arg->pages = rqstp->rq_pages + 1;
 	arg->page_base = 0;
 	/* save at least one page for response */
-	arg->page_len = (pages-2)*PAGE_SIZE;
-	arg->len = (pages-1)*PAGE_SIZE;
+	arg->page_len = (pages-2)*PG_SIZE;
+	arg->len = (pages-1)*PG_SIZE;
 	arg->tail[0].iov_len = 0;
 
 	rqstp->rq_xid = xdr_zero;

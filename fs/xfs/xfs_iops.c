@@ -568,7 +568,7 @@ xfs_stat_blksize(
 			return 1U << mp->m_allocsize_log;
 	}
 
-	return max_t(uint32_t, PAGE_SIZE, mp->m_sb.sb_blocksize);
+	return max_t(uint32_t, PG_SIZE, mp->m_sb.sb_blocksize);
 }
 
 static void
@@ -1370,7 +1370,7 @@ xfs_inode_supports_dax(
 		return false;
 
 	/* Block size must match page size */
-	if (mp->m_sb.sb_blocksize != PAGE_SIZE)
+	if (mp->m_sb.sb_blocksize != PG_SIZE)
 		return false;
 
 	/* Device has to support DAX too. */

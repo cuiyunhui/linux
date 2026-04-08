@@ -290,7 +290,7 @@ static const char *nfs_readdir_copy_name(const char *name, unsigned int len)
 
 static size_t nfs_readdir_array_maxentries(void)
 {
-	return (PAGE_SIZE - sizeof(struct nfs_cache_array)) /
+	return (PG_SIZE - sizeof(struct nfs_cache_array)) /
 	       sizeof(struct nfs_cache_array_entry);
 }
 
@@ -952,7 +952,7 @@ static int nfs_readdir_xdr_to_array(struct nfs_readdir_descriptor *desc,
 	if (entry->fh == NULL || entry->fattr == NULL)
 		goto out;
 
-	array_size = (dtsize + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	array_size = (dtsize + PG_SIZE - 1) >> PG_SHIFT;
 	pages = nfs_readdir_alloc_pages(array_size);
 	if (!pages)
 		goto out;
@@ -2641,7 +2641,7 @@ int nfs_symlink(struct mnt_idmap *idmap, struct inode *dir,
 	dfprintk(VFS, "NFS: symlink(%s/%lu, %pd, %s)\n", dir->i_sb->s_id,
 		dir->i_ino, dentry, symname);
 
-	if (pathlen > PAGE_SIZE)
+	if (pathlen > PG_SIZE)
 		return -ENAMETOOLONG;
 
 	attr.ia_mode = S_IFLNK | S_IRWXUGO;
@@ -2653,8 +2653,8 @@ int nfs_symlink(struct mnt_idmap *idmap, struct inode *dir,
 
 	kaddr = folio_address(folio);
 	memcpy(kaddr, symname, pathlen);
-	if (pathlen < PAGE_SIZE)
-		memset(kaddr + pathlen, 0, PAGE_SIZE - pathlen);
+	if (pathlen < PG_SIZE)
+		memset(kaddr + pathlen, 0, PG_SIZE - pathlen);
 
 	trace_nfs_symlink_enter(dir, dentry);
 	error = NFS_PROTO(dir)->symlink(dir, dentry, folio, pathlen, &attr);

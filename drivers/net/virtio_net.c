@@ -906,9 +906,9 @@ static struct sk_buff *page_to_skb(struct virtnet_info *vi,
 		goto ok;
 	}
 
-	BUG_ON(offset >= PAGE_SIZE);
+	BUG_ON(offset >= PG_SIZE);
 	while (len) {
-		unsigned int frag_size = min((unsigned)PAGE_SIZE - offset, len);
+		unsigned int frag_size = min((unsigned)PG_SIZE - offset, len);
 		skb_add_rx_frag(skb, skb_shinfo(skb)->nr_frags, page, offset,
 				frag_size, truesize);
 		len -= frag_size;
@@ -1868,7 +1868,7 @@ static struct page *xdp_linearize_page(struct net_device *dev,
 	int tailroom = SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
 	struct page *page;
 
-	if (page_off + *len + tailroom > PAGE_SIZE)
+	if (page_off + *len + tailroom > PG_SIZE)
 		return NULL;
 
 	page = alloc_page(GFP_ATOMIC);
@@ -1902,7 +1902,7 @@ static struct page *xdp_linearize_page(struct net_device *dev,
 		/* guard against a misconfigured or uncooperative backend that
 		 * is sending packet larger than the MTU.
 		 */
-		if ((page_off + buflen + tailroom) > PAGE_SIZE) {
+		if ((page_off + buflen + tailroom) > PG_SIZE) {
 			put_page(p);
 			goto err_buf;
 		}
@@ -2102,14 +2102,14 @@ static struct sk_buff *receive_big(struct net_device *dev,
 	/* Make sure that len does not exceed the size allocated in
 	 * add_recvbuf_big.
 	 */
-	if (unlikely(len > (vi->big_packets_num_skbfrags + 1) * PAGE_SIZE)) {
+	if (unlikely(len > (vi->big_packets_num_skbfrags + 1) * PG_SIZE)) {
 		pr_debug("%s: rx error: len %u exceeds allocated size %lu\n",
 			 dev->name, len,
-			 (vi->big_packets_num_skbfrags + 1) * PAGE_SIZE);
+			 (vi->big_packets_num_skbfrags + 1) * PG_SIZE);
 		goto err;
 	}
 
-	skb = page_to_skb(vi, rq, page, 0, len, PAGE_SIZE, 0);
+	skb = page_to_skb(vi, rq, page, 0, len, PG_SIZE, 0);
 	u64_stats_add(&stats->bytes, len - vi->hdr_len);
 	if (unlikely(!skb))
 		goto err;
@@ -2145,7 +2145,7 @@ static void mergeable_buf_free(struct receive_queue *rq, int num_buf,
 }
 
 /* Why not use xdp_build_skb_from_frame() ?
- * XDP core assumes that xdp frags are PAGE_SIZE in length, while in
+ * XDP core assumes that xdp frags are PG_SIZE in length, while in
  * virtio-net there are 2 points that do not match its requirements:
  *  1. The size of the prefilled buffer is not fixed before xdp is set.
  *  2. xdp_build_skb_from_frame() does more checks that we don't need,
@@ -2301,9 +2301,9 @@ static void *mergeable_xdp_get_buf(struct virtnet_info *vi,
 	if (unlikely(hdr->hdr.flags & VIRTIO_NET_HDR_F_NEEDS_CSUM))
 		return NULL;
 
-	/* Now XDP core assumes frag size is PAGE_SIZE, but buffers
+	/* Now XDP core assumes frag size is PG_SIZE, but buffers
 	 * with headroom may add hole in truesize, which
-	 * make their length exceed PAGE_SIZE. So we disabled the
+	 * make their length exceed PG_SIZE. So we disabled the
 	 * hole mechanism for xdp. See add_recvbuf_mergeable().
 	 */
 	*frame_sz = truesize;
@@ -2332,7 +2332,7 @@ static void *mergeable_xdp_get_buf(struct virtnet_info *vi,
 	} else {
 		xdp_room = SKB_DATA_ALIGN(XDP_PACKET_HEADROOM +
 					  sizeof(struct skb_shared_info));
-		if (*len + xdp_room > PAGE_SIZE)
+		if (*len + xdp_room > PG_SIZE)
 			return NULL;
 
 		xdp_page = alloc_page(GFP_ATOMIC);
@@ -2343,7 +2343,7 @@ static void *mergeable_xdp_get_buf(struct virtnet_info *vi,
 		       page_address(*page) + offset, *len);
 	}
 
-	*frame_sz = PAGE_SIZE;
+	*frame_sz = PG_SIZE;
 
 	put_page(*page);
 
@@ -2710,7 +2710,7 @@ static int add_recvbuf_big(struct virtnet_info *vi, struct receive_queue *rq,
 				give_pages(rq, list);
 			return -ENOMEM;
 		}
-		sg_set_buf(&rq->sg[i], page_address(first), PAGE_SIZE);
+		sg_set_buf(&rq->sg[i], page_address(first), PG_SIZE);
 
 		/* chain new page in list head to match sg */
 		first->private = (unsigned long)list;
@@ -2730,7 +2730,7 @@ static int add_recvbuf_big(struct virtnet_info *vi, struct receive_queue *rq,
 
 	/* rq->sg[1] for data packet, from offset */
 	offset = sizeof(struct padded_vnet_hdr);
-	sg_set_buf(&rq->sg[1], p + offset, PAGE_SIZE - offset);
+	sg_set_buf(&rq->sg[1], p + offset, PG_SIZE - offset);
 
 	/* chain first in list head */
 	first->private = (unsigned long)list;
@@ -2751,10 +2751,10 @@ static unsigned int get_mergeable_buf_len(struct receive_queue *rq,
 	unsigned int len;
 
 	if (room)
-		return PAGE_SIZE - room;
+		return PG_SIZE - room;
 
 	len = hdr_len +	clamp_t(unsigned int, ewma_pkt_len_read(avg_pkt_len),
-				rq->min_buf_len, PAGE_SIZE - hdr_len);
+				rq->min_buf_len, PG_SIZE - hdr_len);
 
 	return ALIGN(len, L1_CACHE_BYTES);
 }
@@ -2794,7 +2794,7 @@ static int add_recvbuf_mergeable(struct virtnet_info *vi,
 		 * enough space for another buffer, add the remaining space to
 		 * the current buffer.
 		 * XDP core assumes that frame_size of xdp_buff and the length
-		 * of the frag are PAGE_SIZE, so we disable the hole mechanism.
+		 * of the frag are PG_SIZE, so we disable the hole mechanism.
 		 */
 		if (!headroom)
 			len += hole;
@@ -5969,7 +5969,7 @@ static int virtnet_xdp_set(struct net_device *dev, struct bpf_prog *prog,
 {
 	unsigned int room = SKB_DATA_ALIGN(XDP_PACKET_HEADROOM +
 					   sizeof(struct skb_shared_info));
-	unsigned int max_sz = PAGE_SIZE - room - ETH_HLEN;
+	unsigned int max_sz = PG_SIZE - room - ETH_HLEN;
 	struct virtnet_info *vi = netdev_priv(dev);
 	struct bpf_prog *old_prog;
 	u16 xdp_qp = 0, curr_qp;
@@ -6653,7 +6653,7 @@ static void virtnet_set_big_packets(struct virtnet_info *vi, const int mtu)
 	 */
 	if (mtu > ETH_DATA_LEN || guest_gso) {
 		vi->big_packets = true;
-		vi->big_packets_num_skbfrags = guest_gso ? MAX_SKB_FRAGS : DIV_ROUND_UP(mtu, PAGE_SIZE);
+		vi->big_packets_num_skbfrags = guest_gso ? MAX_SKB_FRAGS : DIV_ROUND_UP(mtu, PG_SIZE);
 	}
 }
 

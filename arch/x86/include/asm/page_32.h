@@ -25,12 +25,12 @@ extern unsigned long __phys_addr(unsigned long);
  */
 static inline void clear_page(void *page)
 {
-	memset(page, 0, PAGE_SIZE);
+	memset(page, 0, PG_SIZE);
 }
 
 static inline void copy_page(void *to, void *from)
 {
-	memcpy(to, from, PAGE_SIZE);
+	memcpy(to, from, PG_SIZE);
 }
 #endif	/* !__ASSEMBLER__ */
 

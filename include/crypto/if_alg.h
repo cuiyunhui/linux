@@ -189,7 +189,7 @@ static inline int af_alg_sndbuf(struct sock *sk)
 	struct alg_sock *ask = alg_sk(sk);
 	struct af_alg_ctx *ctx = ask->private;
 
-	return max_t(int, max_t(int, sk->sk_sndbuf & PAGE_MASK, PAGE_SIZE) -
+	return max_t(int, max_t(int, sk->sk_sndbuf & PG_MASK, PG_SIZE) -
 			  ctx->used, 0);
 }
 
@@ -201,7 +201,7 @@ static inline int af_alg_sndbuf(struct sock *sk)
  */
 static inline bool af_alg_writable(struct sock *sk)
 {
-	return PAGE_SIZE <= af_alg_sndbuf(sk);
+	return PG_SIZE <= af_alg_sndbuf(sk);
 }
 
 /**
@@ -215,7 +215,7 @@ static inline int af_alg_rcvbuf(struct sock *sk)
 	struct alg_sock *ask = alg_sk(sk);
 	struct af_alg_ctx *ctx = ask->private;
 
-	return max_t(int, max_t(int, sk->sk_rcvbuf & PAGE_MASK, PAGE_SIZE) -
+	return max_t(int, max_t(int, sk->sk_rcvbuf & PG_MASK, PG_SIZE) -
 		     atomic_read(&ctx->rcvused), 0);
 }
 
@@ -227,7 +227,7 @@ static inline int af_alg_rcvbuf(struct sock *sk)
  */
 static inline bool af_alg_readable(struct sock *sk)
 {
-	return PAGE_SIZE <= af_alg_rcvbuf(sk);
+	return PG_SIZE <= af_alg_rcvbuf(sk);
 }
 
 unsigned int af_alg_count_tsgl(struct sock *sk, size_t bytes);

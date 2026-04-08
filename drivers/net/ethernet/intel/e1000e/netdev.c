@@ -184,7 +184,7 @@ static void e1000e_dump_ps_pages(struct e1000_adapter *adapter,
 			pr_info("packet dump for ps_page %d:\n", i);
 			print_hex_dump(KERN_INFO, "", DUMP_PREFIX_ADDRESS,
 				       16, 1, page_address(ps_page->page),
-				       PAGE_SIZE, true);
+				       PG_SIZE, true);
 		}
 	}
 }
@@ -748,7 +748,7 @@ static void e1000_alloc_rx_buffers_ps(struct e1000_ring *rx_ring,
 				}
 				ps_page->dma = dma_map_page(&pdev->dev,
 							    ps_page->page,
-							    0, PAGE_SIZE,
+							    0, PG_SIZE,
 							    DMA_FROM_DEVICE);
 				if (dma_mapping_error(&pdev->dev,
 						      ps_page->dma)) {
@@ -862,7 +862,7 @@ check_page:
 		if (!buffer_info->dma) {
 			buffer_info->dma = dma_map_page(&pdev->dev,
 							buffer_info->page, 0,
-							PAGE_SIZE,
+							PG_SIZE,
 							DMA_FROM_DEVICE);
 			if (dma_mapping_error(&pdev->dev, buffer_info->dma)) {
 				adapter->alloc_rx_buff_failed++;
@@ -1399,13 +1399,13 @@ static bool e1000_clean_rx_irq_ps(struct e1000_ring *rx_ring, int *work_done,
 
 				dma_sync_single_for_cpu(&pdev->dev,
 							ps_page->dma,
-							PAGE_SIZE,
+							PG_SIZE,
 							DMA_FROM_DEVICE);
 				memcpy(skb_tail_pointer(skb),
 				       page_address(ps_page->page), l1);
 				dma_sync_single_for_device(&pdev->dev,
 							   ps_page->dma,
-							   PAGE_SIZE,
+							   PG_SIZE,
 							   DMA_FROM_DEVICE);
 
 				/* remove the CRC */
@@ -1425,14 +1425,14 @@ static bool e1000_clean_rx_irq_ps(struct e1000_ring *rx_ring, int *work_done,
 				break;
 
 			ps_page = &buffer_info->ps_pages[j];
-			dma_unmap_page(&pdev->dev, ps_page->dma, PAGE_SIZE,
+			dma_unmap_page(&pdev->dev, ps_page->dma, PG_SIZE,
 				       DMA_FROM_DEVICE);
 			ps_page->dma = 0;
 			skb_fill_page_desc(skb, j, ps_page->page, 0, length);
 			ps_page->page = NULL;
 			skb->len += length;
 			skb->data_len += length;
-			skb->truesize += PAGE_SIZE;
+			skb->truesize += PG_SIZE;
 		}
 
 		/* strip the ethernet crc, problem is we're using pages now so
@@ -1492,7 +1492,7 @@ static void e1000_consume_page(struct e1000_buffer *bi, struct sk_buff *skb,
 	bi->page = NULL;
 	skb->len += length;
 	skb->data_len += length;
-	skb->truesize += PAGE_SIZE;
+	skb->truesize += PG_SIZE;
 }
 
 /**
@@ -1545,7 +1545,7 @@ static bool e1000_clean_jumbo_rx_irq(struct e1000_ring *rx_ring, int *work_done,
 
 		cleaned = true;
 		cleaned_count++;
-		dma_unmap_page(&pdev->dev, buffer_info->dma, PAGE_SIZE,
+		dma_unmap_page(&pdev->dev, buffer_info->dma, PG_SIZE,
 			       DMA_FROM_DEVICE);
 		buffer_info->dma = 0;
 
@@ -1687,7 +1687,7 @@ static void e1000_clean_rx_ring(struct e1000_ring *rx_ring)
 						 DMA_FROM_DEVICE);
 			else if (adapter->clean_rx == e1000_clean_jumbo_rx_irq)
 				dma_unmap_page(&pdev->dev, buffer_info->dma,
-					       PAGE_SIZE, DMA_FROM_DEVICE);
+					       PG_SIZE, DMA_FROM_DEVICE);
 			else if (adapter->clean_rx == e1000_clean_rx_irq_ps)
 				dma_unmap_single(&pdev->dev, buffer_info->dma,
 						 adapter->rx_ps_bsize0,
@@ -1709,7 +1709,7 @@ static void e1000_clean_rx_ring(struct e1000_ring *rx_ring)
 			ps_page = &buffer_info->ps_pages[j];
 			if (!ps_page->page)
 				break;
-			dma_unmap_page(&pdev->dev, ps_page->dma, PAGE_SIZE,
+			dma_unmap_page(&pdev->dev, ps_page->dma, PG_SIZE,
 				       DMA_FROM_DEVICE);
 			ps_page->dma = 0;
 			put_page(ps_page->page);
@@ -3013,8 +3013,8 @@ static void e1000_configure_tx(struct e1000_adapter *adapter)
 	}
 }
 
-#define PAGE_USE_COUNT(S) (((S) >> PAGE_SHIFT) + \
-			   (((S) & (PAGE_SIZE - 1)) ? 1 : 0))
+#define PAGE_USE_COUNT(S) (((S) >> PG_SHIFT) + \
+			   (((S) & (PG_SIZE - 1)) ? 1 : 0))
 
 /**
  * e1000_setup_rctl - configure the receive control registers
@@ -3122,7 +3122,7 @@ static void e1000_setup_rctl(struct e1000_adapter *adapter)
 	 * per packet.
 	 */
 	pages = PAGE_USE_COUNT(adapter->netdev->mtu);
-	if ((pages <= 3) && (PAGE_SIZE <= 16384) && (rctl & E1000_RCTL_LPE))
+	if ((pages <= 3) && (PG_SIZE <= 16384) && (rctl & E1000_RCTL_LPE))
 		adapter->rx_ps_pages = pages;
 	else
 		adapter->rx_ps_pages = 0;
@@ -3137,13 +3137,13 @@ static void e1000_setup_rctl(struct e1000_adapter *adapter)
 
 		switch (adapter->rx_ps_pages) {
 		case 3:
-			psrctl |= PAGE_SIZE << E1000_PSRCTL_BSIZE3_SHIFT;
+			psrctl |= PG_SIZE << E1000_PSRCTL_BSIZE3_SHIFT;
 			fallthrough;
 		case 2:
-			psrctl |= PAGE_SIZE << E1000_PSRCTL_BSIZE2_SHIFT;
+			psrctl |= PG_SIZE << E1000_PSRCTL_BSIZE2_SHIFT;
 			fallthrough;
 		case 1:
-			psrctl |= PAGE_SIZE >> E1000_PSRCTL_BSIZE1_SHIFT;
+			psrctl |= PG_SIZE >> E1000_PSRCTL_BSIZE1_SHIFT;
 			break;
 		}
 
@@ -5930,7 +5930,7 @@ static netdev_tx_t e1000_xmit_frame(struct sk_buff *skb,
 		/* Make sure there is space in the ring for the next send. */
 		e1000_maybe_stop_tx(tx_ring,
 				    ((MAX_SKB_FRAGS + 1) *
-				     DIV_ROUND_UP(PAGE_SIZE,
+				     DIV_ROUND_UP(PG_SIZE,
 						  adapter->tx_fifo_limit) + 4));
 
 		if (!netdev_xmit_more() ||

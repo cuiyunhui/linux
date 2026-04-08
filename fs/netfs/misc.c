@@ -22,7 +22,7 @@ int netfs_alloc_folioq_buffer(struct address_space *mapping,
 {
 	struct folio_queue *tail = *_buffer, *p;
 
-	size = round_up(size, PAGE_SIZE);
+	size = round_up(size, PG_SIZE);
 	if (*_cur_size >= size)
 		return 0;
 
@@ -47,8 +47,8 @@ int netfs_alloc_folioq_buffer(struct address_space *mapping,
 			tail = p;
 		}
 
-		if (size - *_cur_size > PAGE_SIZE)
-			order = umin(ilog2(size - *_cur_size) - PAGE_SHIFT,
+		if (size - *_cur_size > PG_SIZE)
+			order = umin(ilog2(size - *_cur_size) - PG_SHIFT,
 				     MAX_PAGECACHE_ORDER);
 
 		folio = folio_alloc(gfp, order);
@@ -58,7 +58,7 @@ int netfs_alloc_folioq_buffer(struct address_space *mapping,
 			return -ENOMEM;
 
 		folio->mapping = mapping;
-		folio->index = *_cur_size / PAGE_SIZE;
+		folio->index = *_cur_size / PG_SIZE;
 		trace_netfs_folio(folio, netfs_folio_trace_alloc_buffer);
 		slot = folioq_append_mark(tail, folio);
 		*_cur_size += folioq_folio_size(tail, slot);

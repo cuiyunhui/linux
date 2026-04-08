@@ -1329,7 +1329,7 @@ xfs_ioc_getfsmap(
 	recs = kvzalloc_objs(struct fsmap, count);
 	if (!recs) {
 		count = min_t(unsigned int, head.fmh_count,
-				PAGE_SIZE / sizeof(struct fsmap));
+				PG_SIZE / sizeof(struct fsmap));
 		recs = kvzalloc_objs(struct fsmap, count);
 		if (!recs)
 			return -ENOMEM;

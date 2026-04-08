@@ -497,7 +497,7 @@ int acomp_walk_next_src(struct acomp_walk *walk)
 	unsigned int max = UINT_MAX;
 
 	if (!preempt_model_preemptible() && (walk->flags & ACOMP_WALK_SLEEP))
-		max = PAGE_SIZE;
+		max = PG_SIZE;
 	if ((walk->flags & ACOMP_WALK_SRC_LINEAR)) {
 		walk->in.__addr = (void *)(((u8 *)walk->in.sg) +
 					   walk->in.offset);
@@ -514,7 +514,7 @@ int acomp_walk_next_dst(struct acomp_walk *walk)
 	unsigned int max = UINT_MAX;
 
 	if (!preempt_model_preemptible() && (walk->flags & ACOMP_WALK_SLEEP))
-		max = PAGE_SIZE;
+		max = PG_SIZE;
 	if ((walk->flags & ACOMP_WALK_DST_LINEAR)) {
 		walk->out.__addr = (void *)(((u8 *)walk->out.sg) +
 					    walk->out.offset);

@@ -947,7 +947,7 @@ static bool __init kvm_msi_ext_dest_id(void)
 
 static void kvm_sev_hc_page_enc_status(unsigned long pfn, int npages, bool enc)
 {
-	kvm_sev_hypercall3(KVM_HC_MAP_GPA_RANGE, pfn << PAGE_SHIFT, npages,
+	kvm_sev_hypercall3(KVM_HC_MAP_GPA_RANGE, pfn << PTE_SHIFT, npages,
 			   KVM_MAP_GPA_RANGE_ENC_STAT(enc) | KVM_MAP_GPA_RANGE_PAGE_SZ_4K);
 }
 
@@ -991,7 +991,7 @@ static void __init kvm_init_platform(void)
 			if (entry->type != E820_TYPE_RAM)
 				continue;
 
-			nr_pages = DIV_ROUND_UP(entry->size, PAGE_SIZE);
+			nr_pages = DIV_ROUND_UP(entry->size, PTE_SIZE);
 
 			kvm_sev_hypercall3(KVM_HC_MAP_GPA_RANGE, entry->addr,
 				       nr_pages,

@@ -141,7 +141,7 @@ static struct virtqueue *setup_vq(struct virtio_pci_device *vp_dev,
 	if (q_pfn >> 32) {
 		dev_err(&vp_dev->pci_dev->dev,
 			"platform bug: legacy virtio-pci must not be used with RAM above 0x%llxGB\n",
-			0x1ULL << (32 + PAGE_SHIFT - 30));
+			0x1ULL << (32 + PG_SHIFT - 30));
 		err = -E2BIG;
 		goto out_del_vq;
 	}

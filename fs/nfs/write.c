@@ -279,7 +279,7 @@ static int wb_priority(struct writeback_control *wbc)
 
 int nfs_congestion_kb;
 
-#define NFS_CONGESTION_ON_THRESH 	(nfs_congestion_kb >> (PAGE_SHIFT-10))
+#define NFS_CONGESTION_ON_THRESH 	(nfs_congestion_kb >> (PG_SHIFT-10))
 #define NFS_CONGESTION_OFF_THRESH	\
 	(NFS_CONGESTION_ON_THRESH - (NFS_CONGESTION_ON_THRESH >> 2))
 
@@ -1312,9 +1312,9 @@ int nfs_update_folio(struct file *file, struct folio *folio,
 	if (nfs_can_extend_write(file, folio, pagelen)) {
 		unsigned int end = count + offset;
 
-		offset = round_down(offset, PAGE_SIZE);
+		offset = round_down(offset, PG_SIZE);
 		if (end < pagelen)
-			end = min(round_up(end, PAGE_SIZE), pagelen);
+			end = min(round_up(end, PG_SIZE), pagelen);
 		count = end - offset;
 	}
 
@@ -2170,7 +2170,7 @@ int __init nfs_init_writepagecache(void)
 	 * This allows larger machines to have larger/more transfers.
 	 * Limit the default to 256M
 	 */
-	nfs_congestion_kb = (16*int_sqrt(totalram_pages())) << (PAGE_SHIFT-10);
+	nfs_congestion_kb = (16*int_sqrt(totalram_pages())) << (PG_SHIFT-10);
 	if (nfs_congestion_kb > 256*1024)
 		nfs_congestion_kb = 256*1024;
 

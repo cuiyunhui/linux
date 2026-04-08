@@ -3726,7 +3726,7 @@ int security_setselfattr(unsigned int attr, struct lsm_ctx __user *uctx,
 		return -EINVAL;
 	if (size < sizeof(*lctx))
 		return -EINVAL;
-	if (size > PAGE_SIZE)
+	if (size > PG_SIZE)
 		return -E2BIG;
 
 	lctx = memdup_user(uctx, size);

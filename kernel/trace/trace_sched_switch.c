@@ -208,7 +208,7 @@ static struct saved_cmdlines_buffer *allocate_cmdlines_buffer(unsigned int val)
 	/* Figure out how much is needed to hold the given number of cmdlines */
 	orig_size = sizeof(*s) + val * SAVED_CMDLINE_MAP_ELEMENT_SIZE(s);
 	order = get_order(orig_size);
-	size = 1 << (order + PAGE_SHIFT);
+	size = 1 << (order + PG_SHIFT);
 	page = alloc_pages(GFP_KERNEL, order);
 	if (!page)
 		return NULL;

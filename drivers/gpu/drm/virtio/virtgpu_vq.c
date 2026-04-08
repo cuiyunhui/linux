@@ -309,14 +309,14 @@ static struct sg_table *vmalloc_to_sgt(char *data, uint32_t size, int *sg_ents)
 	struct scatterlist *sg;
 	struct page *pg;
 
-	if (WARN_ON(!PAGE_ALIGNED(data)))
+	if (WARN_ON(!PG_ALIGNED(data)))
 		return NULL;
 
 	sgt = kmalloc_obj(*sgt);
 	if (!sgt)
 		return NULL;
 
-	*sg_ents = DIV_ROUND_UP(size, PAGE_SIZE);
+	*sg_ents = DIV_ROUND_UP(size, PG_SIZE);
 	ret = sg_alloc_table(sgt, *sg_ents, GFP_KERNEL);
 	if (ret) {
 		kfree(sgt);
@@ -331,7 +331,7 @@ static struct sg_table *vmalloc_to_sgt(char *data, uint32_t size, int *sg_ents)
 			return NULL;
 		}
 
-		s = min_t(int, PAGE_SIZE, size);
+		s = min_t(int, PG_SIZE, size);
 		sg_set_page(sg, pg, s, 0);
 
 		size -= s;
