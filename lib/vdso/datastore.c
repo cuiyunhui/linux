@@ -44,7 +44,7 @@ static vm_fault_t vvar_fault(const struct vm_special_mapping *sm,
 	unsigned long addr, pfn;
 	vm_fault_t err;
 
-	switch (vmf->pteoff) {
+	switch ((vmf->pteoff - vma->vm_pteoff) / PTES_PER_PAGE) {
 	case VDSO_TIME_PAGE_OFFSET:
 		if (!IS_ENABLED(CONFIG_GENERIC_GETTIMEOFDAY))
 			return VM_FAULT_SIGBUS;
@@ -82,7 +82,7 @@ static vm_fault_t vvar_fault(const struct vm_special_mapping *sm,
 		if (!IS_ENABLED(CONFIG_ARCH_HAS_VDSO_ARCH_DATA))
 			return VM_FAULT_SIGBUS;
 		pfn = __phys_to_pfn(__pa_symbol(vdso_k_arch_data)) +
-			vmf->pteoff - VDSO_ARCH_PAGES_START;
+			(vmf->pteoff - vma->vm_pteoff) / PTES_PER_PAGE - VDSO_ARCH_PAGES_START;
 		break;
 	default:
 		return VM_FAULT_SIGBUS;

@@ -54,10 +54,14 @@ static vm_fault_t vdso_fault(const struct vm_special_mapping *sm,
 {
 	const struct vdso_image *image = vma->vm_mm->context.vdso_image;
 
-	if (!image || (vmf->pteoff << PTE_SHIFT) >= image->size)
-		return VM_FAULT_SIGBUS;
+	{
+		unsigned long off = (vmf->pteoff - vma->vm_pteoff) << PTE_SHIFT;
 
-	vmf->page = virt_to_page(image->data + (vmf->pteoff << PTE_SHIFT));
+		if (!image || off >= image->size)
+			return VM_FAULT_SIGBUS;
+
+		vmf->page = virt_to_page(image->data + off);
+	}
 	get_page(vmf->page);
 	return 0;
 }
@@ -87,7 +91,7 @@ static int vdso_mremap(const struct vm_special_mapping *sm,
 static vm_fault_t vvar_vclock_fault(const struct vm_special_mapping *sm,
 				    struct vm_area_struct *vma, struct vm_fault *vmf)
 {
-	switch (vmf->pteoff) {
+	switch ((vmf->pteoff - vma->vm_pteoff) / PTES_PER_PAGE) {
 #ifdef CONFIG_PARAVIRT_CLOCK
 	case VDSO_PAGE_PVCLOCK_OFFSET:
 	{
