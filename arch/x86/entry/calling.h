@@ -154,7 +154,7 @@ For 32-bit we have the following conventions - kernel is built with
  * MITIGATION_PAGE_TABLE_ISOLATION PGDs are 8k.  Flip bit 12 to switch between the two
  * halves:
  */
-#define PTI_USER_PGTABLE_BIT		PAGE_SHIFT
+#define PTI_USER_PGTABLE_BIT		PTE_SHIFT
 #define PTI_USER_PGTABLE_MASK		(1 << PTI_USER_PGTABLE_BIT)
 #define PTI_USER_PCID_BIT		X86_CR3_PTI_PCID_USER_BIT
 #define PTI_USER_PCID_MASK		(1 << PTI_USER_PCID_BIT)

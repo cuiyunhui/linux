@@ -5,7 +5,7 @@
 #include <asm/processor-flags.h>
 
 	.text
-	.align PAGE_SIZE
+	.align PTE_SIZE
 
 /*
  * asm_acpi_mp_play_dead() - Hand over control of the CPU to the BIOS

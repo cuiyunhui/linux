@@ -117,7 +117,7 @@ SYM_CODE_START_NOALIGN(relocate_kernel)
 	movq	%rcx, %r11
 
 	/* setup a new stack at the end of the physical control page */
-	lea	PAGE_SIZE(%rsi), %rsp
+	lea	PTE_SIZE(%rsi), %rsp
 
 	/* jump to identity mapped page */
 0:	addq	$identity_mapped - 0b, %rsi
@@ -261,7 +261,7 @@ SYM_CODE_START_LOCAL_NOALIGN(identity_mapped)
 
 	/* Use the swap page for the callee's stack */
 	movq	kexec_pa_swap_page(%rip), %r10
-	leaq	PAGE_SIZE(%r10), %rsp
+	leaq	PTE_SIZE(%r10), %rsp
 
 	/* push the existing entry point onto the callee's stack */
 	pushq	%rdx
@@ -279,8 +279,8 @@ SYM_CODE_START_LOCAL_NOALIGN(identity_mapped)
 	/* Find start (and end) of this physical mapping of control page */
 	leaq	(%rip), %r8
 	ANNOTATE_NOENDBR
-	andq	$PAGE_MASK, %r8
-	lea	PAGE_SIZE(%r8), %rsp
+	andq	$PTE_MASK, %r8
+	lea	PTE_SIZE(%r8), %rsp
 	/*
 	 * Ensure RELOC_KERNEL_PRESERVE_CONTEXT flag is set so that
 	 * swap_pages() can swap pages correctly.  Note all other
@@ -393,7 +393,7 @@ SYM_CODE_START_LOCAL_NOALIGN(swap_pages)
 	movl	$512, %ecx
 	rep movsq
 
-	lea	PAGE_SIZE(%rax), %rsi
+	lea	PTE_SIZE(%rax), %rsi
 	jmp	.Lloop
 .Ldone:
 	ANNOTATE_UNRET_SAFE

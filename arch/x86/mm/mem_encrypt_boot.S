@@ -24,8 +24,8 @@ SYM_FUNC_START(__pi_sme_encrypt_execute)
 	 *   RSI - virtual address for the decrypted mapping
 	 *   RDX - length to encrypt
 	 *   RCX - virtual address of the encryption workarea, including:
-	 *     - stack page (PAGE_SIZE)
-	 *     - encryption routine page (PAGE_SIZE)
+	 *     - stack page (PTE_SIZE)
+	 *     - encryption routine page (PTE_SIZE)
 	 *     - intermediate copy buffer (PMD_SIZE)
 	 *    R8 - physical address of the pagetables to use for encryption
 	 */
@@ -35,8 +35,8 @@ SYM_FUNC_START(__pi_sme_encrypt_execute)
 
 	/* Set up a one page stack in the non-encrypted memory area */
 	movq	%rcx, %rax		/* Workarea stack page */
-	leaq	PAGE_SIZE(%rax), %rsp	/* Set new stack pointer */
-	addq	$PAGE_SIZE, %rax	/* Workarea encryption routine */
+	leaq	PTE_SIZE(%rax), %rsp	/* Set new stack pointer */
+	addq	$PTE_SIZE, %rax	/* Workarea encryption routine */
 
 	push	%r12
 	movq	%rdi, %r10		/* Encrypted area */
@@ -55,7 +55,7 @@ SYM_FUNC_START(__pi_sme_encrypt_execute)
 	movq	%r8, %rdx		/* Pagetables used for encryption */
 	movq	%r12, %rcx		/* Area length */
 	movq	%rax, %r8		/* Workarea encryption routine */
-	addq	$PAGE_SIZE, %r8		/* Workarea intermediate copy buffer */
+	addq	$PTE_SIZE, %r8		/* Workarea intermediate copy buffer */
 
 	ANNOTATE_RETPOLINE_SAFE
 	call	*%rax			/* Call the encryption routine */

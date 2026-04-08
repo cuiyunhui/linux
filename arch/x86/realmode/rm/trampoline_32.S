@@ -28,7 +28,7 @@
 	.text
 	.code16
 
-	.balign	PAGE_SIZE
+	.balign	PTE_SIZE
 SYM_CODE_START(trampoline_start)
 	wbinvd			# Needed for NUMA-Q should be harmless for others
 

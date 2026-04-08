@@ -68,7 +68,7 @@ copy_loop:
 	movl	pbe_address(%edx), %esi
 	movl	pbe_orig_address(%edx), %edi
 
-	movl	$(PAGE_SIZE >> 2), %ecx
+	movl	$(PTE_SIZE >> 2), %ecx
 	rep movsl
 
 	movl	pbe_next(%edx), %edx
@@ -80,7 +80,7 @@ done:
 SYM_CODE_END(core_restore_code)
 
 	/* code below belongs to the image kernel */
-	.align PAGE_SIZE
+	.align PTE_SIZE
 SYM_FUNC_START(restore_registers)
 	/* go back to the original page tables */
 	movl	%ebp, %cr3

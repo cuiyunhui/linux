@@ -1528,7 +1528,7 @@ typedef struct pglist_data {
 
 static inline unsigned long pgdat_end_pfn(pg_data_t *pgdat)
 {
-	return pgdat->node_start_pfn + pgdat->node_spanned_pages;
+	return pgdat->node_start_pfn + pgdat->node_spanned_pages * PTES_PER_PAGE;
 }
 
 #include <linux/memory_hotplug.h>

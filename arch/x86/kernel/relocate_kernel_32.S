@@ -19,7 +19,7 @@
 
 /*
  * control_page + KEXEC_CONTROL_CODE_MAX_SIZE
- * ~ control_page + PAGE_SIZE are used as data storage and stack for
+ * ~ control_page + PTE_SIZE are used as data storage and stack for
  * jumping back
  */
 #define DATA(offset)		(KEXEC_CONTROL_CODE_MAX_SIZE+(offset))
@@ -87,7 +87,7 @@ SYM_CODE_START_NOALIGN(relocate_kernel)
 	movl	%eax, %cr3
 
 	/* setup a new stack at the end of the physical control page */
-	lea	PAGE_SIZE(%edi), %esp
+	lea	PTE_SIZE(%edi), %esp
 
 	/* jump to identity mapped page */
 	movl    %edi, %eax
@@ -169,7 +169,7 @@ SYM_CODE_START_LOCAL_NOALIGN(identity_mapped)
 1:
 	popl	%edx
 	movl	CP_PA_SWAP_PAGE(%edi), %esp
-	addl	$PAGE_SIZE, %esp
+	addl	$PTE_SIZE, %esp
 2:
 	ANNOTATE_RETPOLINE_SAFE
 	call	*%edx
@@ -181,7 +181,7 @@ SYM_CODE_START_LOCAL_NOALIGN(identity_mapped)
 	popl	%ebx
 	subl	$(1b - relocate_kernel), %ebx
 	movl	CP_VA_CONTROL_PAGE(%ebx), %edi
-	lea	PAGE_SIZE(%ebx), %esp
+	lea	PTE_SIZE(%ebx), %esp
 	movl	CP_PA_SWAP_PAGE(%ebx), %eax
 	movl	CP_PA_BACKUP_PAGES_MAP(%ebx), %edx
 	pushl	%eax
@@ -193,7 +193,7 @@ SYM_CODE_START_LOCAL_NOALIGN(identity_mapped)
 	movl	%cr0, %eax
 	orl	$X86_CR0_PG, %eax
 	movl	%eax, %cr0
-	lea	PAGE_SIZE(%edi), %esp
+	lea	PTE_SIZE(%edi), %esp
 	movl	%edi, %eax
 	addl	$(virtual_mapped - relocate_kernel), %eax
 	pushl	%eax
@@ -275,7 +275,7 @@ SYM_CODE_START_LOCAL_NOALIGN(swap_pages)
 	movl	$1024, %ecx
 	rep movsl
 
-	lea	PAGE_SIZE(%ebp), %esi
+	lea	PTE_SIZE(%ebp), %esi
 	jmp     0b
 3:
 	popl	%esi

@@ -778,7 +778,7 @@ static inline struct page *find_buddy_page_pfn(struct page *page,
 	unsigned long __buddy_pfn = __find_buddy_pfn(pfn, order);
 	struct page *buddy;
 
-	buddy = page + (__buddy_pfn - pfn)/PTES_PER_PAGE;
+	buddy = page + (long)(__buddy_pfn - pfn) / PTES_PER_PAGE;
 	if (buddy_pfn)
 		*buddy_pfn = __buddy_pfn;
 

@@ -51,7 +51,7 @@
  */
 KERNEL_PAGES = LOWMEM_PAGES
 
-INIT_MAP_SIZE = PAGE_TABLE_SIZE(KERNEL_PAGES) * PAGE_SIZE
+INIT_MAP_SIZE = PAGE_TABLE_SIZE(KERNEL_PAGES) * PTE_SIZE
 RESERVE_BRK(pagetables, INIT_MAP_SIZE)
 
 /*
@@ -413,10 +413,10 @@ __REFDATA
 SYM_DATA(initial_code,		.long i386_start_kernel)
 
 #ifdef CONFIG_MITIGATION_PAGE_TABLE_ISOLATION
-#define	PGD_ALIGN	(2 * PAGE_SIZE)
+#define	PGD_ALIGN	(2 * PTE_SIZE)
 #define PTI_USER_PGD_FILL	1024
 #else
-#define	PGD_ALIGN	(PAGE_SIZE)
+#define	PGD_ALIGN	(PTE_SIZE)
 #define PTI_USER_PGD_FILL	0
 #endif
 /*
@@ -470,7 +470,7 @@ SYM_DATA_START(initial_page_table)
 # else
 #  error "Kernel PMDs should be 1, 2 or 3"
 # endif
-	.align PAGE_SIZE		/* needs to be page-sized too */
+	.align PTE_SIZE		/* needs to be page-sized too */
 
 #ifdef CONFIG_MITIGATION_PAGE_TABLE_ISOLATION
 	/*

@@ -51,7 +51,7 @@
 
 	.section .entry.text, "ax"
 
-#define PTI_SWITCH_MASK         (1 << PAGE_SHIFT)
+#define PTI_SWITCH_MASK         (1 << PTE_SHIFT)
 
 /* Unconditionally switch to user cr3 */
 .macro SWITCH_TO_USER_CR3 scratch_reg:req

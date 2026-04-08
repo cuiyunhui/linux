@@ -934,7 +934,7 @@ buddy_merge_likely(unsigned long pfn, unsigned long buddy_pfn,
 		return false;
 
 	higher_page_pfn = buddy_pfn & pfn;
-	higher_page = page + (higher_page_pfn - pfn);
+	higher_page = page + (long)(higher_page_pfn - pfn) / PTES_PER_PAGE;
 
 	return find_buddy_page_pfn(higher_page, higher_page_pfn, order + 1,
 			NULL) != NULL;
@@ -1041,7 +1041,7 @@ static inline void __free_one_page(struct page *page,
 		}
 
 		combined_pfn = buddy_pfn & pfn;
-		page = page + (combined_pfn - pfn);
+		page = page + (long)(combined_pfn - pfn) / PTES_PER_PAGE;
 		pfn = combined_pfn;
 		order++;
 	}

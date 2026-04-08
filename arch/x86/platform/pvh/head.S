@@ -139,8 +139,8 @@ SYM_CODE_START(pvh_start_xen)
 	addl %ebx, 0x00(%edi)
 
 	leal rva(pvh_level3_kernel_pgt)(%ebp), %edi
-	addl %ebx, (PAGE_SIZE - 16)(%edi)
-	addl %ebx, (PAGE_SIZE - 8)(%edi)
+	addl %ebx, (PTE_SIZE - 16)(%edi)
+	addl %ebx, (PTE_SIZE - 8)(%edi)
 
 	/* pvh_level2_ident_pgt is fine - large pages */
 
