@@ -151,8 +151,8 @@ SYSCALL_DEFINE1(brk, unsigned long, brk)
 			      mm->end_data, mm->start_data))
 		goto out;
 
-	newbrk = PAGE_ALIGN(brk);
-	oldbrk = PAGE_ALIGN(mm->brk);
+	newbrk = PTE_ALIGN(brk);
+	oldbrk = PTE_ALIGN(mm->brk);
 	if (oldbrk == newbrk) {
 		mm->brk = brk;
 		goto success;
@@ -1211,7 +1211,7 @@ int vm_brk_flags(unsigned long addr, unsigned long request, vm_flags_t vm_flags)
 	LIST_HEAD(uf);
 	VMA_ITERATOR(vmi, mm, addr);
 
-	len = PAGE_ALIGN(request);
+	len = PTE_ALIGN(request);
 	if (len < request)
 		return -ENOMEM;
 	if (!len)
