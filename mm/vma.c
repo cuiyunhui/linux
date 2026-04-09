@@ -1290,7 +1290,7 @@ static void vms_clean_up_area(struct vma_munmap_struct *vms,
 {
 	struct vm_area_struct *vma;
 
-	if (!vms->nr_pages)
+	if (!vms->nr_pages && !vms->clear_ptes)
 		return;
 
 	vms_clear_ptes(vms, mas_detach, true);
@@ -1320,7 +1320,7 @@ static void vms_complete_munmap_vmas(struct vma_munmap_struct *vms,
 	if (vms->unlock)
 		mmap_write_downgrade(mm);
 
-	if (!vms->nr_pages)
+	if (!vms->nr_pages && !vms->clear_ptes)
 		return;
 
 	vms_clear_ptes(vms, mas_detach, !vms->unlock);
@@ -2342,7 +2342,7 @@ static void vms_abort_munmap_vmas(struct vma_munmap_struct *vms,
 {
 	struct ma_state *mas = &vms->vmi->mas;
 
-	if (!vms->nr_pages)
+	if (!vms->nr_pages && !vms->clear_ptes)
 		return;
 
 	if (vms->clear_ptes)
