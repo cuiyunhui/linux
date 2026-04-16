@@ -83,7 +83,7 @@ static __always_inline size_t real_mode_size_needed(void)
 	if (real_mode_header)
 		return 0;	/* already allocated. */
 
-	return ALIGN(real_mode_blob_end - real_mode_blob, PG_SIZE);
+	return ALIGN(real_mode_blob_end - real_mode_blob, PTE_SIZE);
 }
 
 static inline void set_real_mode_mem(phys_addr_t mem)

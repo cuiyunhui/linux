@@ -97,7 +97,7 @@ static void __init setup_real_mode(void)
 	unsigned char *base;
 	unsigned long phys_base;
 	struct trampoline_header *trampoline_header;
-	size_t size = PG_ALIGN(real_mode_blob_end - real_mode_blob);
+	size_t size = PTE_ALIGN(real_mode_blob_end - real_mode_blob);
 #ifdef CONFIG_X86_64
 	u64 *trampoline_pgd;
 	u64 efer;
@@ -188,14 +188,14 @@ static void __init setup_real_mode(void)
 static void __init set_real_mode_permissions(void)
 {
 	unsigned char *base = (unsigned char *) real_mode_header;
-	size_t size = PG_ALIGN(real_mode_blob_end - real_mode_blob);
+	size_t size = PTE_ALIGN(real_mode_blob_end - real_mode_blob);
 
 	size_t ro_size =
-		PG_ALIGN(real_mode_header->ro_end) -
+		PTE_ALIGN(real_mode_header->ro_end) -
 		__pa(base);
 
 	size_t text_size =
-		PG_ALIGN(real_mode_header->ro_end) -
+		PTE_ALIGN(real_mode_header->ro_end) -
 		real_mode_header->text_start;
 
 	unsigned long text_start =
