@@ -716,6 +716,8 @@ generic_get_unmapped_area(struct file *filp, unsigned long addr,
 	info.start_gap = stack_guard_placement(vm_flags);
 	if (filp && is_file_hugepages(filp))
 		info.align_mask = huge_page_mask_align(filp);
+	else if (PG_SIZE > PTE_SIZE)
+		info.align_mask = PG_SIZE - 1;
 	return vm_unmapped_area(&info);
 }
 
@@ -768,6 +770,8 @@ generic_get_unmapped_area_topdown(struct file *filp, unsigned long addr,
 	info.start_gap = stack_guard_placement(vm_flags);
 	if (filp && is_file_hugepages(filp))
 		info.align_mask = huge_page_mask_align(filp);
+	else if (PG_SIZE > PTE_SIZE)
+		info.align_mask = PG_SIZE - 1;
 	addr = vm_unmapped_area(&info);
 
 	/*
