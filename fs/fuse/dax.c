@@ -19,7 +19,7 @@
  */
 #define FUSE_DAX_SHIFT	21
 #define FUSE_DAX_SZ	(1 << FUSE_DAX_SHIFT)
-#define FUSE_DAX_PAGES	(FUSE_DAX_SZ / PAGE_SIZE)
+#define FUSE_DAX_PAGES	(FUSE_DAX_SZ / PG_SIZE)
 
 /* Number of ranges reclaimer will try to free in one invocation */
 #define FUSE_DAX_RECLAIM_CHUNK		(10)
@@ -410,7 +410,7 @@ static void fuse_fill_iomap(struct inode *inode, loff_t pos, loff_t length,
 		iomap->addr = dmap->window_offset + offset;
 		iomap->length = len;
 		if (flags & IOMAP_FAULT)
-			iomap->length = ALIGN(len, PAGE_SIZE);
+			iomap->length = ALIGN(len, PG_SIZE);
 		iomap->type = IOMAP_MAPPED;
 		/*
 		 * increace refcnt so that reclaim code knows this dmap is in
@@ -843,8 +843,8 @@ static int dmap_writeback_invalidate(struct inode *inode,
 	}
 
 	ret = invalidate_inode_pages2_range(inode->i_mapping,
-					    start_pos >> PAGE_SHIFT,
-					    end_pos >> PAGE_SHIFT);
+					    start_pos >> PG_SHIFT,
+					    end_pos >> PG_SHIFT);
 	if (ret)
 		pr_debug("fuse: invalidate_inode_pages2_range() failed err=%d\n",
 			 ret);

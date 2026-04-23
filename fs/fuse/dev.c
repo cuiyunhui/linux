@@ -852,7 +852,7 @@ void fuse_copy_finish(struct fuse_copy_state *cs)
 		struct pipe_buffer *buf = cs->currbuf;
 
 		if (cs->write)
-			buf->len = PAGE_SIZE - cs->len;
+			buf->len = PG_SIZE - cs->len;
 		cs->currbuf = NULL;
 	} else if (cs->pg) {
 		if (cs->write) {
@@ -908,13 +908,13 @@ static int fuse_copy_fill(struct fuse_copy_state *cs)
 			cs->currbuf = buf;
 			cs->pg = page;
 			cs->offset = 0;
-			cs->len = PAGE_SIZE;
+			cs->len = PG_SIZE;
 			cs->pipebufs++;
 			cs->nr_segs++;
 		}
 	} else {
 		size_t off;
-		err = iov_iter_get_pages2(cs->iter, &page, PAGE_SIZE, 1, &off);
+		err = iov_iter_get_pages2(cs->iter, &page, PG_SIZE, 1, &off);
 		if (err < 0)
 			return err;
 		BUG_ON(!err);
@@ -1157,8 +1157,8 @@ static int fuse_copy_folio(struct fuse_copy_state *cs, struct folio **foliop,
 			unsigned int copy = count;
 			unsigned int bytes_copied;
 
-			if (folio_test_highmem(folio) && count > PAGE_SIZE - offset_in_page(offset))
-				copy = PAGE_SIZE - offset_in_page(offset);
+			if (folio_test_highmem(folio) && count > PG_SIZE - offset_in_pg(offset))
+				copy = PG_SIZE - offset_in_pg(offset);
 
 			bytes_copied = fuse_copy_do(cs, &buf, &copy);
 			kunmap_local(mapaddr);
@@ -1790,8 +1790,8 @@ static int fuse_notify_store(struct fuse_conn *fc, unsigned int size,
 		goto out_up_killsb;
 
 	mapping = inode->i_mapping;
-	index = outarg.offset >> PAGE_SHIFT;
-	offset = outarg.offset & ~PAGE_MASK;
+	index = outarg.offset >> PG_SHIFT;
+	offset = outarg.offset & ~PG_MASK;
 	file_size = i_size_read(inode);
 	end = outarg.offset + outarg.size;
 	if (end > file_size) {
@@ -1811,9 +1811,9 @@ static int fuse_notify_store(struct fuse_conn *fc, unsigned int size,
 		if (IS_ERR(folio))
 			goto out_iput;
 
-		folio_offset = ((index - folio->index) << PAGE_SHIFT) + offset;
+		folio_offset = ((index - folio->index) << PG_SHIFT) + offset;
 		nr_bytes = min(num, folio_size(folio) - folio_offset);
-		nr_pages = (offset + nr_bytes + PAGE_SIZE - 1) >> PAGE_SHIFT;
+		nr_pages = (offset + nr_bytes + PG_SIZE - 1) >> PG_SHIFT;
 
 		err = fuse_copy_folio(cs, &folio, folio_offset, nr_bytes, 0);
 		if (!folio_test_uptodate(folio) && !err && offset == 0 &&
@@ -1873,7 +1873,7 @@ static int fuse_retrieve(struct fuse_mount *fm, struct inode *inode,
 	struct fuse_args_pages *ap;
 	struct fuse_args *args;
 
-	offset = outarg->offset & ~PAGE_MASK;
+	offset = outarg->offset & ~PG_MASK;
 	file_size = i_size_read(inode);
 
 	num = min(outarg->size, fc->max_write);
@@ -1882,9 +1882,9 @@ static int fuse_retrieve(struct fuse_mount *fm, struct inode *inode,
 	else if (outarg->offset + num > file_size)
 		num = file_size - outarg->offset;
 
-	num_pages = (num + offset + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	num_pages = (num + offset + PG_SIZE - 1) >> PG_SHIFT;
 	num_pages = min(num_pages, fc->max_pages);
-	num = min(num, num_pages << PAGE_SHIFT);
+	num = min(num, num_pages << PG_SHIFT);
 
 	args_size += num_pages * (sizeof(ap->folios[0]) + sizeof(ap->descs[0]));
 
@@ -1903,7 +1903,7 @@ static int fuse_retrieve(struct fuse_mount *fm, struct inode *inode,
 	args->in_pages = true;
 	args->end = fuse_retrieve_end;
 
-	index = outarg->offset >> PAGE_SHIFT;
+	index = outarg->offset >> PG_SHIFT;
 
 	while (num && ap->num_folios < num_pages) {
 		struct folio *folio;
@@ -1915,9 +1915,9 @@ static int fuse_retrieve(struct fuse_mount *fm, struct inode *inode,
 		if (IS_ERR(folio))
 			break;
 
-		folio_offset = ((index - folio->index) << PAGE_SHIFT) + offset;
+		folio_offset = ((index - folio->index) << PG_SHIFT) + offset;
 		nr_bytes = min(folio_size(folio) - folio_offset, num);
-		nr_pages = (offset + nr_bytes + PAGE_SIZE - 1) >> PAGE_SHIFT;
+		nr_pages = (offset + nr_bytes + PG_SIZE - 1) >> PG_SHIFT;
 
 		ap->folios[ap->num_folios] = folio;
 		ap->descs[ap->num_folios].offset = folio_offset;

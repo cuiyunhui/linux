@@ -435,7 +435,7 @@ static int cuse_send_init(struct cuse_conn *cc)
 	struct cuse_init_args *ia;
 	struct fuse_args_pages *ap;
 
-	BUILD_BUG_ON(CUSE_INIT_INFO_MAX > PAGE_SIZE);
+	BUILD_BUG_ON(CUSE_INIT_INFO_MAX > PG_SIZE);
 
 	rc = -ENOMEM;
 

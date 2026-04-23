@@ -52,10 +52,10 @@ static void fuse_add_dirent_to_cache(struct file *file,
 	}
 	version = fi->rdc.version;
 	size = fi->rdc.size;
-	offset = size & ~PAGE_MASK;
-	index = size >> PAGE_SHIFT;
+	offset = size & ~PG_MASK;
+	index = size >> PG_SHIFT;
 	/* Dirent doesn't fit in current page?  Jump to next page. */
-	if (offset + reclen > PAGE_SIZE) {
+	if (offset + reclen > PG_SIZE) {
 		index++;
 		offset = 0;
 	}
@@ -83,7 +83,7 @@ static void fuse_add_dirent_to_cache(struct file *file,
 	}
 	memcpy(addr + offset, dirent, reclen);
 	kunmap_local(addr);
-	fi->rdc.size = (index << PAGE_SHIFT) + offset + reclen;
+	fi->rdc.size = (index << PG_SHIFT) + offset + reclen;
 	fi->rdc.pos = dirent->off;
 unlock:
 	spin_unlock(&fi->rdc.lock);
@@ -104,7 +104,7 @@ static void fuse_readdir_cache_end(struct file *file, loff_t pos)
 	}
 
 	fi->rdc.cached = true;
-	end = ALIGN(fi->rdc.size, PAGE_SIZE);
+	end = ALIGN(fi->rdc.size, PG_SIZE);
 	spin_unlock(&fi->rdc.lock);
 
 	/* truncate unused tail of cache */
@@ -341,7 +341,7 @@ static int fuse_readdir_uncached(struct file *file, struct dir_context *ctx)
 	struct fuse_io_args ia = {};
 	struct fuse_args *args = &ia.ap.args;
 	void *buf;
-	size_t bufsize = clamp((unsigned int) ctx->count, PAGE_SIZE, fc->max_pages << PAGE_SHIFT);
+	size_t bufsize = clamp((unsigned int) ctx->count, PG_SIZE, fc->max_pages << PG_SHIFT);
 	u64 attr_version = 0, evict_ctr = 0;
 	bool locked;
 
@@ -392,7 +392,7 @@ static enum fuse_parse_result fuse_parse_cache(struct fuse_file *ff,
 					       void *addr, unsigned int size,
 					       struct dir_context *ctx)
 {
-	unsigned int offset = ff->readdir.cache_off & ~PAGE_MASK;
+	unsigned int offset = ff->readdir.cache_off & ~PG_MASK;
 	enum fuse_parse_result res = FOUND_NONE;
 
 	WARN_ON(offset >= size);
@@ -515,16 +515,16 @@ retry_locked:
 
 	WARN_ON(fi->rdc.size < ff->readdir.cache_off);
 
-	index = ff->readdir.cache_off >> PAGE_SHIFT;
+	index = ff->readdir.cache_off >> PG_SHIFT;
 
-	if (index == (fi->rdc.size >> PAGE_SHIFT))
-		size = fi->rdc.size & ~PAGE_MASK;
+	if (index == (fi->rdc.size >> PG_SHIFT))
+		size = fi->rdc.size & ~PG_MASK;
 	else
-		size = PAGE_SIZE;
+		size = PG_SIZE;
 	spin_unlock(&fi->rdc.lock);
 
 	/* EOF? */
-	if ((ff->readdir.cache_off & ~PAGE_MASK) == size)
+	if ((ff->readdir.cache_off & ~PG_MASK) == size)
 		return 0;
 
 	page = find_get_page_flags(file->f_mapping, index,
@@ -570,9 +570,9 @@ retry_locked:
 	if (res == FOUND_ALL)
 		return 0;
 
-	if (size == PAGE_SIZE) {
+	if (size == PG_SIZE) {
 		/* We hit end of page: skip to next page. */
-		ff->readdir.cache_off = ALIGN(ff->readdir.cache_off, PAGE_SIZE);
+		ff->readdir.cache_off = ALIGN(ff->readdir.cache_off, PG_SIZE);
 		goto retry;
 	}
 

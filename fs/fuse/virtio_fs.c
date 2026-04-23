@@ -234,7 +234,7 @@ static ssize_t cpu_list_show(struct kobject *kobj,
 	struct virtio_fs *fs = container_of(kobj->parent->parent, struct virtio_fs, kobj);
 	struct virtio_fs_vq *fsvq = virtio_fs_kobj_to_vq(fs, kobj);
 	unsigned int cpu, qid;
-	const size_t size = PAGE_SIZE - 1;
+	const size_t size = PG_SIZE - 1;
 	bool first = true;
 	int ret = 0, pos = 0;
 
@@ -1009,7 +1009,7 @@ static long virtio_fs_direct_access(struct dax_device *dax_dev, pgoff_t pgoff,
 {
 	struct virtio_fs *fs = dax_get_private(dax_dev);
 	phys_addr_t offset = PFN_PHYS(pgoff);
-	size_t max_nr_pages = fs->window_len / PAGE_SIZE - pgoff;
+	size_t max_nr_pages = fs->window_len / PG_SIZE - pgoff;
 
 	if (kaddr)
 		*kaddr = fs->window_kaddr + offset;
@@ -1029,8 +1029,8 @@ static int virtio_fs_zero_page_range(struct dax_device *dax_dev,
 	if (rc < 0)
 		return dax_mem2blk_err(rc);
 
-	memset(kaddr, 0, nr_pages << PAGE_SHIFT);
-	dax_flush(dax_dev, kaddr, nr_pages << PAGE_SHIFT);
+	memset(kaddr, 0, nr_pages << PG_SHIFT);
+	dax_flush(dax_dev, kaddr, nr_pages << PG_SHIFT);
 	return 0;
 }
 

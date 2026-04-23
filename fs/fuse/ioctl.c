@@ -75,7 +75,7 @@ static int fuse_verify_ioctl_iov(struct fuse_conn *fc, struct iovec *iov,
 				 size_t count)
 {
 	size_t n;
-	u32 max = fc->max_pages << PAGE_SHIFT;
+	u32 max = fc->max_pages << PG_SHIFT;
 
 	for (n = 0; n < count; n++, iov++) {
 		if (iov->iov_len > (size_t) max)
@@ -142,7 +142,7 @@ static int fuse_setup_enable_verity(unsigned long arg, struct iovec *iov,
 {
 	struct fsverity_enable_arg enable;
 	struct fsverity_enable_arg __user *uarg = (void __user *)arg;
-	const __u32 max_buffer_len = FUSE_VERITY_ENABLE_ARG_MAX_PAGES * PAGE_SIZE;
+	const __u32 max_buffer_len = FUSE_VERITY_ENABLE_ARG_MAX_PAGES * PG_SIZE;
 
 	if (copy_from_user(&enable, uarg, sizeof(enable)))
 		return -EFAULT;
@@ -248,7 +248,7 @@ long fuse_do_ioctl(struct file *file, unsigned int cmd, unsigned long arg,
 #endif
 
 	/* assume all the iovs returned by client always fits in a page */
-	BUILD_BUG_ON(sizeof(struct fuse_ioctl_iovec) * FUSE_IOCTL_MAX_IOV > PAGE_SIZE);
+	BUILD_BUG_ON(sizeof(struct fuse_ioctl_iovec) * FUSE_IOCTL_MAX_IOV > PG_SIZE);
 
 	err = -ENOMEM;
 	ap.folios = fuse_folios_alloc(fm->fc->max_pages, GFP_KERNEL, &ap.descs);
@@ -299,8 +299,8 @@ long fuse_do_ioctl(struct file *file, unsigned int cmd, unsigned long arg,
 	 * Out data can be used either for actual out data or iovs,
 	 * make sure there always is at least one page.
 	 */
-	out_size = max_t(size_t, out_size, PAGE_SIZE);
-	max_pages = DIV_ROUND_UP(max(in_size, out_size), PAGE_SIZE);
+	out_size = max_t(size_t, out_size, PG_SIZE);
+	max_pages = DIV_ROUND_UP(max(in_size, out_size), PG_SIZE);
 
 	/* make sure there are enough buffer pages and init request with them */
 	err = -ENOMEM;
@@ -327,8 +327,8 @@ long fuse_do_ioctl(struct file *file, unsigned int cmd, unsigned long arg,
 		err = -EFAULT;
 		iov_iter_init(&ii, ITER_SOURCE, in_iov, in_iovs, in_size);
 		for (i = 0; iov_iter_count(&ii) && !WARN_ON(i >= ap.num_folios); i++) {
-			c = copy_folio_from_iter(ap.folios[i], 0, PAGE_SIZE, &ii);
-			if (c != PAGE_SIZE && iov_iter_count(&ii))
+			c = copy_folio_from_iter(ap.folios[i], 0, PG_SIZE, &ii);
+			if (c != PG_SIZE && iov_iter_count(&ii))
 				goto out;
 		}
 	}
@@ -394,8 +394,8 @@ long fuse_do_ioctl(struct file *file, unsigned int cmd, unsigned long arg,
 	err = -EFAULT;
 	iov_iter_init(&ii, ITER_DEST, out_iov, out_iovs, transferred);
 	for (i = 0; iov_iter_count(&ii) && !WARN_ON(i >= ap.num_folios); i++) {
-		c = copy_folio_to_iter(ap.folios[i], 0, PAGE_SIZE, &ii);
-		if (c != PAGE_SIZE && iov_iter_count(&ii))
+		c = copy_folio_to_iter(ap.folios[i], 0, PG_SIZE, &ii);
+		if (c != PG_SIZE && iov_iter_count(&ii))
 			goto out;
 	}
 	err = 0;

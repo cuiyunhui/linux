@@ -1120,7 +1120,7 @@ static inline void fuse_folio_descs_length_init(struct fuse_folio_desc *descs,
 	int i;
 
 	for (i = index; i < index + nr_folios; i++)
-		descs[i].length = PAGE_SIZE - descs[i].offset;
+		descs[i].length = PG_SIZE - descs[i].offset;
 }
 
 static inline void fuse_sync_bucket_dec(struct fuse_sync_bucket *bucket)

@@ -35,10 +35,10 @@ static struct posix_acl *__fuse_get_acl(struct fuse_conn *fc,
 	else
 		return ERR_PTR(-EOPNOTSUPP);
 
-	value = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	value = kmalloc(PG_SIZE, GFP_KERNEL);
 	if (!value)
 		return ERR_PTR(-ENOMEM);
-	size = fuse_getxattr(inode, name, value, PAGE_SIZE);
+	size = fuse_getxattr(inode, name, value, PG_SIZE);
 	if (size > 0)
 		acl = posix_acl_from_xattr(fc->user_ns, value, size);
 	else if ((size == 0) || (size == -ENODATA) ||
@@ -129,7 +129,7 @@ int fuse_set_acl(struct mnt_idmap *idmap, struct dentry *dentry,
 		if (!value)
 			return -ENOMEM;
 
-		if (size > PAGE_SIZE) {
+		if (size > PG_SIZE) {
 			kfree(value);
 			return -E2BIG;
 		}

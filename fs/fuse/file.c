@@ -1242,7 +1242,7 @@ static ssize_t fuse_fill_write_pages(struct fuse_io_args *ia,
 {
 	struct fuse_args_pages *ap = &ia->ap;
 	struct fuse_conn *fc = get_fuse_conn(mapping->host);
-	unsigned offset = pos & (PAGE_SIZE - 1);
+	unsigned offset = pos & (PG_SIZE - 1);
 	size_t count = 0;
 	unsigned int num;
 	int err = 0;
@@ -1254,7 +1254,7 @@ static ssize_t fuse_fill_write_pages(struct fuse_io_args *ia,
 	while (num && ap->num_folios < max_folios) {
 		size_t tmp;
 		struct folio *folio;
-		pgoff_t index = pos >> PAGE_SHIFT;
+		pgoff_t index = pos >> PG_SHIFT;
 		unsigned int bytes;
 		unsigned int folio_offset;
 
@@ -1269,7 +1269,7 @@ static ssize_t fuse_fill_write_pages(struct fuse_io_args *ia,
 		if (mapping_writably_mapped(mapping))
 			flush_dcache_folio(folio);
 
-		folio_offset = ((index - folio->index) << PAGE_SHIFT) + offset;
+		folio_offset = ((index - folio->index) << PG_SHIFT) + offset;
 		bytes = min(folio_size(folio) - folio_offset, num);
 
 		tmp = copy_folio_from_iter_atomic(folio, folio_offset, bytes, ii);
@@ -1323,8 +1323,8 @@ static ssize_t fuse_fill_write_pages(struct fuse_io_args *ia,
 static inline unsigned int fuse_wr_pages(loff_t pos, size_t len,
 				     unsigned int max_pages)
 {
-	unsigned int pages = ((pos + len - 1) >> PAGE_SHIFT) -
-			     (pos >> PAGE_SHIFT) + 1;
+	unsigned int pages = ((pos + len - 1) >> PG_SHIFT) -
+			     (pos >> PG_SHIFT) + 1;
 
 	return min(pages, max_pages);
 }
@@ -1601,13 +1601,13 @@ static int fuse_get_user_pages(struct fuse_args_pages *ap, struct iov_iter *ii,
 
 		nbytes += ret;
 
-		nfolios = DIV_ROUND_UP(ret + start, PAGE_SIZE);
+		nfolios = DIV_ROUND_UP(ret + start, PG_SIZE);
 
 		for (i = 0; i < nfolios; i++) {
 			struct folio *folio = page_folio(pages[i]);
 			unsigned int offset = start +
-				(folio_page_idx(folio, pages[i]) << PAGE_SHIFT);
-			unsigned int len = umin(ret, PAGE_SIZE - start);
+				(folio_page_idx(folio, pages[i]) << PG_SHIFT);
+			unsigned int len = umin(ret, PG_SIZE - start);
 
 			ap->descs[ap->num_folios].offset = offset;
 			ap->descs[ap->num_folios].length = len;
@@ -1651,8 +1651,8 @@ ssize_t fuse_direct_io(struct fuse_io_priv *io, struct iov_iter *iter,
 	size_t nmax = write ? fc->max_write : fc->max_read;
 	loff_t pos = *ppos;
 	size_t count = iov_iter_count(iter);
-	pgoff_t idx_from = pos >> PAGE_SHIFT;
-	pgoff_t idx_to = (pos + count - 1) >> PAGE_SHIFT;
+	pgoff_t idx_from = pos >> PG_SHIFT;
+	pgoff_t idx_to = (pos + count - 1) >> PG_SHIFT;
 	ssize_t res = 0;
 	int err = 0;
 	struct fuse_io_args *ia;
@@ -2172,7 +2172,7 @@ static bool fuse_folios_need_send(struct fuse_conn *fc, loff_t pos,
 	WARN_ON(!ap->num_folios);
 
 	/* Reached max pages */
-	if ((bytes + PAGE_SIZE - 1) >> PAGE_SHIFT > fc->max_pages)
+	if ((bytes + PG_SIZE - 1) >> PG_SHIFT > fc->max_pages)
 		return true;
 
 	if (bytes > max_bytes)
@@ -2810,7 +2810,7 @@ static void fuse_do_truncate(struct file *file)
 
 static inline loff_t fuse_round_up(struct fuse_conn *fc, loff_t off)
 {
-	return round_up(off, fc->max_pages << PAGE_SHIFT);
+	return round_up(off, fc->max_pages << PG_SHIFT);
 }
 
 static ssize_t
@@ -3100,7 +3100,7 @@ fallback:
 		args.opcode = FUSE_COPY_FILE_RANGE;
 		args.out_args[0].size = sizeof(outarg);
 		args.out_args[0].value = &outarg;
-		inarg.len = len = min_t(size_t, len, UINT_MAX & PAGE_MASK);
+		inarg.len = len = min_t(size_t, len, UINT_MAX & PG_MASK);
 	}
 	err = fuse_simple_request(fm, &args);
 	if (err == -ENOSYS) {
@@ -3124,8 +3124,8 @@ fallback:
 	}
 
 	truncate_inode_pages_range(inode_out->i_mapping,
-				   ALIGN_DOWN(pos_out, PAGE_SIZE),
-				   ALIGN(pos_out + bytes_copied, PAGE_SIZE) - 1);
+				   ALIGN_DOWN(pos_out, PG_SIZE),
+				   ALIGN(pos_out + bytes_copied, PG_SIZE) - 1);
 
 	file_update_time(file_out);
 	fuse_write_update_attr(inode_out, pos_out + bytes_copied, bytes_copied);

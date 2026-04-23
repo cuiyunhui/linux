@@ -573,11 +573,11 @@ int fuse_reverse_inval_inode(struct fuse_conn *fc, u64 nodeid,
 	fuse_invalidate_attr(inode);
 	forget_all_cached_acls(inode);
 	if (offset >= 0) {
-		pg_start = offset >> PAGE_SHIFT;
+		pg_start = offset >> PG_SHIFT;
 		if (len <= 0)
 			pg_end = -1;
 		else
-			pg_end = (offset + len - 1) >> PAGE_SHIFT;
+			pg_end = (offset + len - 1) >> PG_SHIFT;
 		invalidate_inode_pages2_range(inode->i_mapping,
 					      pg_start, pg_end);
 	}
@@ -1236,7 +1236,7 @@ static void sanitize_global_limit(unsigned int *limit)
 	 * 1/2^13 of the total memory, assuming 392 bytes per request.
 	 */
 	if (*limit == 0)
-		*limit = ((totalram_pages() << PAGE_SHIFT) >> 13) / 392;
+		*limit = ((totalram_pages() << PG_SHIFT) >> 13) / 392;
 
 	if (*limit >= 1 << 16)
 		*limit = (1 << 16) - 1;
@@ -1338,7 +1338,7 @@ static void process_init_reply(struct fuse_mount *fm, struct fuse_args *args,
 			if (flags & FUSE_INIT_EXT)
 				flags |= (u64) arg->flags2 << 32;
 
-			ra_pages = arg->max_readahead / PAGE_SIZE;
+			ra_pages = arg->max_readahead / PG_SIZE;
 			if (flags & FUSE_ASYNC_READ)
 				fc->async_read = 1;
 			if (!(flags & FUSE_POSIX_LOCKS))
@@ -1457,7 +1457,7 @@ static void process_init_reply(struct fuse_mount *fm, struct fuse_args *args,
 			if (flags & FUSE_REQUEST_TIMEOUT)
 				timeout = arg->request_timeout;
 		} else {
-			ra_pages = fc->max_read / PAGE_SIZE;
+			ra_pages = fc->max_read / PG_SIZE;
 			fc->no_lock = 1;
 			fc->no_flock = 1;
 		}
@@ -1491,7 +1491,7 @@ static struct fuse_init_args *fuse_new_init(struct fuse_mount *fm)
 
 	ia->in.major = FUSE_KERNEL_VERSION;
 	ia->in.minor = FUSE_KERNEL_MINOR_VERSION;
-	ia->in.max_readahead = fm->sb->s_bdi->ra_pages * PAGE_SIZE;
+	ia->in.max_readahead = fm->sb->s_bdi->ra_pages * PG_SIZE;
 	flags =
 		FUSE_ASYNC_READ | FUSE_POSIX_LOCKS | FUSE_ATOMIC_O_TRUNC |
 		FUSE_EXPORT_SUPPORT | FUSE_BIG_WRITES | FUSE_DONT_MASK |
@@ -1845,8 +1845,8 @@ int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
 #endif
 		fc->sync_fs = 1;
 	} else {
-		sb->s_blocksize = PAGE_SIZE;
-		sb->s_blocksize_bits = PAGE_SHIFT;
+		sb->s_blocksize = PG_SIZE;
+		sb->s_blocksize_bits = PG_SHIFT;
 	}
 
 	sb->s_subtype = ctx->subtype;

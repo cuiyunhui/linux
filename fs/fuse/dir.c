@@ -1838,7 +1838,7 @@ static int fuse_readlink_folio(struct inode *inode, struct folio *folio)
 	if (res < 0)
 		return res;
 
-	if (WARN_ON(res >= PAGE_SIZE))
+	if (WARN_ON(res >= PG_SIZE))
 		return -EIO;
 
 	link = folio_address(folio);
