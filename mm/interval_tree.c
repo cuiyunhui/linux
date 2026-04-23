@@ -10,19 +10,19 @@
 #include <linux/rmap.h>
 #include <linux/interval_tree_generic.h>
 
-static inline unsigned long vma_start_pgoff(struct vm_area_struct *v)
+static inline unsigned long vma_start_pteoff(struct vm_area_struct *v)
 {
-	return v->vm_pgoff;
+	return v->vm_pteoff;
 }
 
-static inline unsigned long vma_last_pgoff(struct vm_area_struct *v)
+static inline unsigned long vma_last_pteoff(struct vm_area_struct *v)
 {
-	return v->vm_pgoff + vma_pages(v) - 1;
+	return v->vm_pteoff + vma_ptes(v) - 1;
 }
 
 INTERVAL_TREE_DEFINE(struct vm_area_struct, shared.rb,
 		     unsigned long, shared.rb_subtree_last,
-		     vma_start_pgoff, vma_last_pgoff, /* empty */, vma_interval_tree)
+		     vma_start_pteoff, vma_last_pteoff, /* empty */, vma_interval_tree)
 
 /* Insert node immediately after prev in the interval tree */
 void vma_interval_tree_insert_after(struct vm_area_struct *node,
@@ -31,9 +31,9 @@ void vma_interval_tree_insert_after(struct vm_area_struct *node,
 {
 	struct rb_node **link;
 	struct vm_area_struct *parent;
-	unsigned long last = vma_last_pgoff(node);
+	unsigned long last = vma_last_pteoff(node);
 
-	VM_BUG_ON_VMA(vma_start_pgoff(node) != vma_start_pgoff(prev), node);
+	VM_BUG_ON_VMA(vma_start_pteoff(node) != vma_start_pteoff(prev), node);
 
 	if (!prev->shared.rb.rb_right) {
 		parent = prev;
@@ -58,26 +58,26 @@ void vma_interval_tree_insert_after(struct vm_area_struct *node,
 			    &vma_interval_tree_augment);
 }
 
-static inline unsigned long avc_start_pgoff(struct anon_vma_chain *avc)
+static inline unsigned long avc_start_pteoff(struct anon_vma_chain *avc)
 {
-	return vma_start_pgoff(avc->vma);
+	return vma_start_pteoff(avc->vma);
 }
 
-static inline unsigned long avc_last_pgoff(struct anon_vma_chain *avc)
+static inline unsigned long avc_last_pteoff(struct anon_vma_chain *avc)
 {
-	return vma_last_pgoff(avc->vma);
+	return vma_last_pteoff(avc->vma);
 }
 
 INTERVAL_TREE_DEFINE(struct anon_vma_chain, rb, unsigned long, rb_subtree_last,
-		     avc_start_pgoff, avc_last_pgoff,
+		     avc_start_pteoff, avc_last_pteoff,
 		     static inline, __anon_vma_interval_tree)
 
 void anon_vma_interval_tree_insert(struct anon_vma_chain *node,
 				   struct rb_root_cached *root)
 {
 #ifdef CONFIG_DEBUG_VM_RB
-	node->cached_vma_start = avc_start_pgoff(node);
-	node->cached_vma_last = avc_last_pgoff(node);
+	node->cached_vma_start = avc_start_pteoff(node);
+	node->cached_vma_last = avc_last_pteoff(node);
 #endif
 	__anon_vma_interval_tree_insert(node, root);
 }
@@ -105,7 +105,7 @@ anon_vma_interval_tree_iter_next(struct anon_vma_chain *node,
 #ifdef CONFIG_DEBUG_VM_RB
 void anon_vma_interval_tree_verify(struct anon_vma_chain *node)
 {
-	WARN_ON_ONCE(node->cached_vma_start != avc_start_pgoff(node));
-	WARN_ON_ONCE(node->cached_vma_last != avc_last_pgoff(node));
+	WARN_ON_ONCE(node->cached_vma_start != avc_start_pteoff(node));
+	WARN_ON_ONCE(node->cached_vma_last != avc_last_pteoff(node));
 }
 #endif
