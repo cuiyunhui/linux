@@ -158,6 +158,8 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr, unsigned long len,
 	if (filp) {
 		info.align_mask = get_align_mask(filp);
 		info.align_offset += get_align_bits();
+	} else if (PG_SIZE > PTE_SIZE) {
+		info.align_mask = PG_SIZE - 1;
 	}
 
 	return vm_unmapped_area(&info);
@@ -223,6 +225,8 @@ get_unmapped_area:
 	if (filp) {
 		info.align_mask = get_align_mask(filp);
 		info.align_offset += get_align_bits();
+	} else if (PG_SIZE > PTE_SIZE) {
+		info.align_mask = PG_SIZE - 1;
 	}
 	addr = vm_unmapped_area(&info);
 	if (!(addr & ~PTE_MASK))
