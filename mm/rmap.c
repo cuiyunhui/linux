@@ -75,6 +75,7 @@
 #include <linux/userfaultfd_k.h>
 #include <linux/mm_inline.h>
 #include <linux/oom.h>
+#include <vdso/page.h>
 
 #include <asm/tlb.h>
 
@@ -931,7 +932,7 @@ static bool folio_referenced_one(struct folio *folio,
 			pra->mapcount--;
 
 			/* Only mlock fully mapped pages */
-			if (pvmw.pte && ptes != pvmw.nr_pages)
+			if (pvmw.pte && ptes != pvmw.nr_ptes)
 				continue;
 
 			/*
@@ -971,7 +972,7 @@ static bool folio_referenced_one(struct folio *folio,
 		} else if (pvmw.pte) {
 			if (folio_test_large(folio)) {
 				unsigned long end_addr = pmd_addr_end(address, vma->vm_end);
-				unsigned int max_nr = (end_addr - address) >> PAGE_SHIFT;
+				unsigned int max_nr = (end_addr - address) >> PTE_SHIFT;
 				pte_t pteval = ptep_get(pvmw.pte);
 
 				nr = folio_pte_batch(folio, pvmw.pte,
@@ -983,7 +984,7 @@ static bool folio_referenced_one(struct folio *folio,
 				referenced++;
 			/* Skip the batched PTEs */
 			pvmw.pte += nr - 1;
-			pvmw.address += (nr - 1) * PAGE_SIZE;
+			pvmw.address += (nr - 1) * PTE_SIZE;
 		} else if (IS_ENABLED(CONFIG_TRANSPARENT_HUGEPAGE)) {
 			if (pmdp_clear_flush_young_notify(vma, address,
 						pvmw.pmd))
@@ -998,7 +999,7 @@ static bool folio_referenced_one(struct folio *folio,
 		 * If we are sure that we batched the entire folio,
 		 * we can just optimize and stop right here.
 		 */
-		if (ptes == pvmw.nr_pages) {
+		if (ptes == pvmw.nr_ptes) {
 			page_vma_mapped_walk_done(&pvmw);
 			break;
 		}
@@ -1219,7 +1220,7 @@ struct wrprotect_file_state {
 	int cleaned;
 	pgoff_t pgoff;
 	unsigned long pfn;
-	unsigned long nr_pages;
+	unsigned long nr_ptes;
 };
 
 static bool mapping_wrprotect_range_one(struct folio *folio,
@@ -1228,8 +1229,8 @@ static bool mapping_wrprotect_range_one(struct folio *folio,
 	struct wrprotect_file_state *state = (struct wrprotect_file_state *)arg;
 	struct page_vma_mapped_walk pvmw = {
 		.pfn		= state->pfn,
-		.nr_pages	= state->nr_pages,
-		.pgoff		= state->pgoff,
+		.nr_ptes	= state->nr_ptes,
+		.pteoff		= state->pgoff * PTES_PER_PAGE,
 		.vma		= vma,
 		.address	= address,
 		.flags		= PVMW_SYNC,
@@ -1241,7 +1242,7 @@ static bool mapping_wrprotect_range_one(struct folio *folio,
 }
 
 static void __rmap_walk_file(struct folio *folio, struct address_space *mapping,
-			     pgoff_t pgoff_start, unsigned long nr_pages,
+			     pgoff_t pgoff_start, unsigned long nr_ptes,
 			     struct rmap_walk_control *rwc, bool locked);
 
 /**
@@ -1250,7 +1251,7 @@ static void __rmap_walk_file(struct folio *folio, struct address_space *mapping,
  * @mapping:	The mapping whose reverse mapping should be traversed.
  * @pgoff:	The page offset at which @pfn is mapped within @mapping.
  * @pfn:	The PFN of the page mapped in @mapping at @pgoff.
- * @nr_pages:	The number of physically contiguous base pages spanned.
+ * @nr_ptes:	The number of PTEs spanned.
  *
  * Traverses the reverse mapping, finding all VMAs which contain a shared
  * mapping of the pages in the specified range in @mapping, and write-protects
@@ -1265,13 +1266,13 @@ static void __rmap_walk_file(struct folio *folio, struct address_space *mapping,
  * Return: the number of write-protected PTEs, or an error.
  */
 int mapping_wrprotect_range(struct address_space *mapping, pgoff_t pgoff,
-		unsigned long pfn, unsigned long nr_pages)
+		unsigned long pfn, unsigned long nr_ptes)
 {
 	struct wrprotect_file_state state = {
 		.cleaned = 0,
 		.pgoff = pgoff,
 		.pfn = pfn,
-		.nr_pages = nr_pages,
+		.nr_ptes = nr_ptes,
 	};
 	struct rmap_walk_control rwc = {
 		.arg = (void *)&state,
@@ -1282,7 +1283,7 @@ int mapping_wrprotect_range(struct address_space *mapping, pgoff_t pgoff,
 	if (!mapping)
 		return 0;
 
-	__rmap_walk_file(/* folio = */NULL, mapping, pgoff, nr_pages, &rwc,
+	__rmap_walk_file(/* folio = */NULL, mapping, pgoff, nr_ptes, &rwc,
 			 /* locked = */false);
 
 	return state.cleaned;
@@ -1301,13 +1302,13 @@ EXPORT_SYMBOL_GPL(mapping_wrprotect_range);
  *
  * Returns the number of cleaned PTEs (including PMDs).
  */
-int pfn_mkclean_range(unsigned long pfn, unsigned long nr_pages, pgoff_t pgoff,
+int pfn_mkclean_range(unsigned long pfn, unsigned long nr_ptes, pgoff_t pgoff,
 		      struct vm_area_struct *vma)
 {
 	struct page_vma_mapped_walk pvmw = {
 		.pfn		= pfn,
-		.nr_pages	= nr_pages,
-		.pgoff		= pgoff,
+		.nr_ptes	= nr_ptes,
+		.pteoff		= pgoff * PTES_PER_PAGE,
 		.vma		= vma,
 		.flags		= PVMW_SYNC,
 	};
@@ -1315,7 +1316,7 @@ int pfn_mkclean_range(unsigned long pfn, unsigned long nr_pages, pgoff_t pgoff,
 	if (invalid_mkclean_vma(vma, NULL))
 		return 0;
 
-	pvmw.address = vma_address(vma, pgoff, nr_pages);
+	pvmw.address = vma_address(vma, pgoff, nr_ptes);
 	VM_BUG_ON_VMA(pvmw.address == -EFAULT, vma);
 
 	return page_vma_mkclean_one(&pvmw);
@@ -1344,25 +1345,26 @@ static void __folio_mod_stat(struct folio *folio, int nr, int nr_pmdmapped)
 }
 
 static __always_inline void __folio_add_rmap(struct folio *folio,
-		struct page *page, int nr_pages, struct vm_area_struct *vma,
+		struct page *page, int nr_ptes, struct vm_area_struct *vma,
 		enum pgtable_level level)
 {
 	atomic_t *mapped = &folio->_nr_pages_mapped;
-	const int orig_nr_pages = nr_pages;
+	const int orig_nr_ptes = nr_ptes;
 	int first = 0, nr = 0, nr_pmdmapped = 0;
 
-	__folio_rmap_sanity_checks(folio, page, nr_pages, level);
+	__folio_rmap_sanity_checks(folio, page, nr_ptes, level);
 
 	switch (level) {
 	case PGTABLE_LEVEL_PTE:
 		if (!folio_test_large(folio)) {
-			nr = atomic_inc_and_test(&folio->_mapcount);
+			if (atomic_add_return(nr_ptes, &folio->_mapcount) < nr_ptes)
+				nr = 1;
 			break;
 		}
 
 		if (IS_ENABLED(CONFIG_NO_PAGE_MAPCOUNT)) {
-			nr = folio_add_return_large_mapcount(folio, orig_nr_pages, vma);
-			if (nr == orig_nr_pages)
+			nr = folio_add_return_large_mapcount(folio, orig_nr_ptes, vma);
+			if (nr == orig_nr_ptes)
 				/* Was completely unmapped. */
 				nr = folio_large_nr_pages(folio);
 			else
@@ -1371,14 +1373,19 @@ static __always_inline void __folio_add_rmap(struct folio *folio,
 		}
 
 		do {
-			first += atomic_inc_and_test(&page->_mapcount);
-		} while (page++, --nr_pages > 0);
+			int pfn = page_to_pfn(page);
+			int ptes = min_t(int, nr_ptes, PTES_PER_PAGE - (pfn % PTES_PER_PAGE));
+
+			if (atomic_add_return(ptes, &page->_mapcount) < ptes)
+				first++;
+			nr_ptes -= ptes;
+		} while (page++, nr_ptes > 0);
 
 		if (first &&
 		    atomic_add_return_relaxed(first, mapped) < ENTIRELY_MAPPED)
 			nr = first;
 
-		folio_add_large_mapcount(folio, orig_nr_pages, vma);
+		folio_add_large_mapcount(folio, orig_nr_ptes, vma);
 		break;
 	case PGTABLE_LEVEL_PMD:
 	case PGTABLE_LEVEL_PUD:
@@ -1398,14 +1405,14 @@ static __always_inline void __folio_add_rmap(struct folio *folio,
 		if (first) {
 			nr = atomic_add_return_relaxed(ENTIRELY_MAPPED, mapped);
 			if (likely(nr < ENTIRELY_MAPPED + ENTIRELY_MAPPED)) {
-				nr_pages = folio_large_nr_pages(folio);
+				nr_ptes = folio_large_nr_pages(folio);
 				/*
 				 * We only track PMD mappings of PMD-sized
 				 * folios separately.
 				 */
 				if (level == PGTABLE_LEVEL_PMD)
-					nr_pmdmapped = nr_pages;
-				nr = nr_pages - (nr & FOLIO_PAGES_MAPPED);
+					nr_pmdmapped = nr_ptes;
+				nr = nr_ptes - (nr & FOLIO_PAGES_MAPPED);
 				/* Raced ahead of a remove and another add? */
 				if (unlikely(nr < 0))
 					nr = 0;
@@ -1476,7 +1483,7 @@ static void __folio_set_anon(struct folio *folio, struct vm_area_struct *vma,
 	 */
 	anon_vma = (void *) anon_vma + FOLIO_MAPPING_ANON;
 	WRITE_ONCE(folio->mapping, (struct address_space *) anon_vma);
-	folio->index = linear_page_index(vma, address);
+	folio->index = linear_pte_index(vma, address) / PTES_PER_PAGE;
 }
 
 /**
@@ -1487,8 +1494,7 @@ static void __folio_set_anon(struct folio *folio, struct vm_area_struct *vma,
  * @address:	the user virtual address mapped
  */
 static void __page_check_anon_rmap(const struct folio *folio,
-		const struct page *page, struct vm_area_struct *vma,
-		unsigned long address)
+		const struct page *page, struct vm_area_struct *vma)
 {
 	/*
 	 * The page's anon-rmap details (mapping and index) are guaranteed to
@@ -1503,27 +1509,25 @@ static void __page_check_anon_rmap(const struct folio *folio,
 	 */
 	VM_BUG_ON_FOLIO(folio_anon_vma(folio)->root != vma->anon_vma->root,
 			folio);
-	VM_BUG_ON_PAGE(page_pgoff(folio, page) != linear_page_index(vma, address),
-		       page);
 }
 
 static __always_inline void __folio_add_anon_rmap(struct folio *folio,
-		struct page *page, int nr_pages, struct vm_area_struct *vma,
-		unsigned long address, rmap_t flags, enum pgtable_level level)
+		struct page *page, int nr_ptes, struct vm_area_struct *vma,
+		rmap_t flags, enum pgtable_level level)
 {
 	int i;
 
 	VM_WARN_ON_FOLIO(!folio_test_anon(folio), folio);
 
-	__folio_add_rmap(folio, page, nr_pages, vma, level);
+	__folio_add_rmap(folio, page, nr_ptes, vma, level);
 
 	if (likely(!folio_test_ksm(folio)))
-		__page_check_anon_rmap(folio, page, vma, address);
+		__page_check_anon_rmap(folio, page, vma);
 
 	if (flags & RMAP_EXCLUSIVE) {
 		switch (level) {
 		case PGTABLE_LEVEL_PTE:
-			for (i = 0; i < nr_pages; i++)
+			for (i = 0; i < nr_ptes; i++)
 				SetPageAnonExclusive(page + i);
 			break;
 		case PGTABLE_LEVEL_PMD:
@@ -1543,7 +1547,8 @@ static __always_inline void __folio_add_anon_rmap(struct folio *folio,
 
 	VM_WARN_ON_FOLIO(!folio_test_large(folio) && PageAnonExclusive(page) &&
 			 atomic_read(&folio->_mapcount) > 0, folio);
-	for (i = 0; i < nr_pages; i++) {
+	for (i = 0; i < nr_ptes; i++) {
+		/* FIXME */
 		struct page *cur_page = page + i;
 
 		VM_WARN_ON_FOLIO(folio_test_large(folio) &&
@@ -1566,7 +1571,7 @@ static __always_inline void __folio_add_anon_rmap(struct folio *folio,
 	 * Partially mapped folios can be split on reclaim and part outside
 	 * of mlocked VMA can be evicted or freed.
 	 */
-	if (folio_nr_pages(folio) == nr_pages)
+	if (folio_nr_ptes(folio) == nr_ptes)
 		mlock_vma_folio(folio, vma);
 }
 
@@ -1587,10 +1592,9 @@ static __always_inline void __folio_add_anon_rmap(struct folio *folio,
  * (but KSM folios are never downgraded).
  */
 void folio_add_anon_rmap_ptes(struct folio *folio, struct page *page,
-		int nr_pages, struct vm_area_struct *vma, unsigned long address,
-		rmap_t flags)
+		int nr_ptes, struct vm_area_struct *vma, rmap_t flags)
 {
-	__folio_add_anon_rmap(folio, page, nr_pages, vma, address, flags,
+	__folio_add_anon_rmap(folio, page, nr_ptes, vma, flags,
 			      PGTABLE_LEVEL_PTE);
 }
 
@@ -1608,10 +1612,10 @@ void folio_add_anon_rmap_ptes(struct folio *folio, struct page *page,
  * the anon_vma case: to serialize mapping,index checking after setting.
  */
 void folio_add_anon_rmap_pmd(struct folio *folio, struct page *page,
-		struct vm_area_struct *vma, unsigned long address, rmap_t flags)
+		struct vm_area_struct *vma, rmap_t flags)
 {
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
-	__folio_add_anon_rmap(folio, page, HPAGE_PMD_NR, vma, address, flags,
+	__folio_add_anon_rmap(folio, page, HPAGE_PMD_NR, vma, flags,
 			      PGTABLE_LEVEL_PMD);
 #else
 	WARN_ON_ONCE(true);
@@ -1685,19 +1689,19 @@ void folio_add_new_anon_rmap(struct folio *folio, struct vm_area_struct *vma,
 	}
 
 	VM_WARN_ON_ONCE(address < vma->vm_start ||
-			address + (nr << PAGE_SHIFT) > vma->vm_end);
+			address + (nr << PTE_SHIFT) > vma->vm_end);
 
 	__folio_mod_stat(folio, nr, nr_pmdmapped);
 	mod_mthp_stat(folio_order(folio), MTHP_STAT_NR_ANON, 1);
 }
 
 static __always_inline void __folio_add_file_rmap(struct folio *folio,
-		struct page *page, int nr_pages, struct vm_area_struct *vma,
+		struct page *page, int nr_ptes, struct vm_area_struct *vma,
 		enum pgtable_level level)
 {
 	VM_WARN_ON_FOLIO(folio_test_anon(folio), folio);
 
-	__folio_add_rmap(folio, page, nr_pages, vma, level);
+	__folio_add_rmap(folio, page, nr_ptes, vma, level);
 
 	/*
 	 * Only mlock it if the folio is fully mapped to the VMA.
@@ -1705,7 +1709,7 @@ static __always_inline void __folio_add_file_rmap(struct folio *folio,
 	 * Partially mapped folios can be split on reclaim and part outside
 	 * of mlocked VMA can be evicted or freed.
 	 */
-	if (folio_nr_pages(folio) == nr_pages)
+	if (folio_nr_ptes(folio) == nr_ptes)
 		mlock_vma_folio(folio, vma);
 }
 
@@ -1713,17 +1717,17 @@ static __always_inline void __folio_add_file_rmap(struct folio *folio,
  * folio_add_file_rmap_ptes - add PTE mappings to a page range of a folio
  * @folio:	The folio to add the mappings to
  * @page:	The first page to add
- * @nr_pages:	The number of pages that will be mapped using PTEs
+ * @nr_ptes:	The number of pages that will be mapped using PTEs
  * @vma:	The vm area in which the mappings are added
  *
- * The page range of the folio is defined by [page, page + nr_pages)
+ * The page range of the folio is defined by [page, page + nr_ptes)
  *
  * The caller needs to hold the page table lock.
  */
 void folio_add_file_rmap_ptes(struct folio *folio, struct page *page,
-		int nr_pages, struct vm_area_struct *vma)
+		int nr_ptes, struct vm_area_struct *vma)
 {
-	__folio_add_file_rmap(folio, page, nr_pages, vma, PGTABLE_LEVEL_PTE);
+	__folio_add_file_rmap(folio, page, nr_ptes, vma, PGTABLE_LEVEL_PTE);
 }
 
 /**
@@ -1740,7 +1744,8 @@ void folio_add_file_rmap_pmd(struct folio *folio, struct page *page,
 		struct vm_area_struct *vma)
 {
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
-	__folio_add_file_rmap(folio, page, HPAGE_PMD_NR, vma, PGTABLE_LEVEL_PMD);
+	__folio_add_file_rmap(folio, page, PAGES_TO_PTES(HPAGE_PMD_NR),
+			      vma, PGTABLE_LEVEL_PMD);
 #else
 	WARN_ON_ONCE(true);
 #endif
@@ -1761,46 +1766,52 @@ void folio_add_file_rmap_pud(struct folio *folio, struct page *page,
 {
 #if defined(CONFIG_TRANSPARENT_HUGEPAGE) && \
 	defined(CONFIG_HAVE_ARCH_TRANSPARENT_HUGEPAGE_PUD)
-	__folio_add_file_rmap(folio, page, HPAGE_PUD_NR, vma, PGTABLE_LEVEL_PUD);
+	__folio_add_file_rmap(folio, page, PAGES_TO_PTES(HPAGE_PUD_NR),
+			      vma, PGTABLE_LEVEL_PUD);
 #else
 	WARN_ON_ONCE(true);
 #endif
 }
 
 static __always_inline void __folio_remove_rmap(struct folio *folio,
-		struct page *page, int nr_pages, struct vm_area_struct *vma,
+		struct page *page, int nr_ptes, struct vm_area_struct *vma,
 		enum pgtable_level level)
 {
 	atomic_t *mapped = &folio->_nr_pages_mapped;
 	int last = 0, nr = 0, nr_pmdmapped = 0;
 	bool partially_mapped = false;
+	int nr_pages;
 
-	__folio_rmap_sanity_checks(folio, page, nr_pages, level);
+	__folio_rmap_sanity_checks(folio, page, nr_ptes, level);
 
 	switch (level) {
 	case PGTABLE_LEVEL_PTE:
 		if (!folio_test_large(folio)) {
-			nr = atomic_add_negative(-1, &folio->_mapcount);
+			nr = atomic_add_negative(-nr_ptes, &folio->_mapcount);
 			break;
 		}
 
 		if (IS_ENABLED(CONFIG_NO_PAGE_MAPCOUNT)) {
-			nr = folio_sub_return_large_mapcount(folio, nr_pages, vma);
+			nr = folio_sub_return_large_mapcount(folio, nr_ptes, vma);
 			if (!nr) {
 				/* Now completely unmapped. */
 				nr = folio_large_nr_pages(folio);
 			} else {
-				partially_mapped = nr < folio_large_nr_pages(folio) &&
+				partially_mapped = nr < folio_nr_ptes(folio) &&
 						   !folio_entire_mapcount(folio);
 				nr = 0;
 			}
 			break;
 		}
 
-		folio_sub_large_mapcount(folio, nr_pages, vma);
+		folio_sub_large_mapcount(folio, nr_ptes, vma);
 		do {
-			last += atomic_add_negative(-1, &page->_mapcount);
-		} while (page++, --nr_pages > 0);
+			int pfn = page_to_pfn(page);
+			int ptes = min_t(int, nr_ptes, PTES_PER_PAGE - (pfn % PTES_PER_PAGE));
+
+			last += atomic_add_negative(-ptes, &page->_mapcount);
+			nr_ptes -= ptes;
+		} while (page++, nr_ptes > 0);
 
 		if (last &&
 		    atomic_sub_return_relaxed(last, mapped) < ENTIRELY_MAPPED)
@@ -1889,9 +1900,9 @@ static __always_inline void __folio_remove_rmap(struct folio *folio,
  * The caller needs to hold the page table lock.
  */
 void folio_remove_rmap_ptes(struct folio *folio, struct page *page,
-		int nr_pages, struct vm_area_struct *vma)
+		int nr_ptes, struct vm_area_struct *vma)
 {
-	__folio_remove_rmap(folio, page, nr_pages, vma, PGTABLE_LEVEL_PTE);
+	__folio_remove_rmap(folio, page, nr_ptes, vma, PGTABLE_LEVEL_PTE);
 }
 
 /**
@@ -1908,7 +1919,8 @@ void folio_remove_rmap_pmd(struct folio *folio, struct page *page,
 		struct vm_area_struct *vma)
 {
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
-	__folio_remove_rmap(folio, page, HPAGE_PMD_NR, vma, PGTABLE_LEVEL_PMD);
+	__folio_remove_rmap(folio, page, PAGES_TO_PTES(HPAGE_PMD_NR),
+			    vma, PGTABLE_LEVEL_PMD);
 #else
 	WARN_ON_ONCE(true);
 #endif
@@ -1919,6 +1931,7 @@ void folio_remove_rmap_pmd(struct folio *folio, struct page *page,
  * @folio:	The folio to remove the mapping from
  * @page:	The first page to remove
  * @vma:	The vm area from which the mapping is removed
+ * @address:	The user virtual address of the first page to map
  *
  * The page range of the folio is defined by [page, page + HPAGE_PUD_NR)
  *
@@ -1929,7 +1942,8 @@ void folio_remove_rmap_pud(struct folio *folio, struct page *page,
 {
 #if defined(CONFIG_TRANSPARENT_HUGEPAGE) && \
 	defined(CONFIG_HAVE_ARCH_TRANSPARENT_HUGEPAGE_PUD)
-	__folio_remove_rmap(folio, page, HPAGE_PUD_NR, vma, PGTABLE_LEVEL_PUD);
+	__folio_remove_rmap(folio, page, PAGES_TO_PTES(HPAGE_PUD_NR),
+			    vma, PGTABLE_LEVEL_PUD);
 #else
 	WARN_ON_ONCE(true);
 #endif
@@ -1950,7 +1964,7 @@ static inline unsigned int folio_unmap_pte_batch(struct folio *folio,
 
 	/* We may only batch within a single VMA and a single page table. */
 	end_addr = pmd_addr_end(addr, vma->vm_end);
-	max_nr = (end_addr - addr) >> PAGE_SHIFT;
+	max_nr = (end_addr - addr) >> PTE_SHIFT;
 
 	/* We only support lazyfree or file folios batching for now ... */
 	if (folio_test_anon(folio) && folio_test_swapbacked(folio))
@@ -2041,7 +2055,7 @@ static bool try_to_unmap_one(struct folio *folio, struct vm_area_struct *vma,
 			ret = false;
 
 			/* Only mlock fully mapped pages */
-			if (pvmw.pte && ptes != pvmw.nr_pages)
+			if (pvmw.pte && ptes != pvmw.nr_ptes)
 				continue;
 
 			/*
@@ -2159,7 +2173,7 @@ static bool try_to_unmap_one(struct folio *folio, struct vm_area_struct *vma,
 				folio_mark_dirty(folio);
 		} else if (likely(pte_present(pteval))) {
 			nr_pages = folio_unmap_pte_batch(folio, &pvmw, flags, pteval);
-			end_addr = address + nr_pages * PAGE_SIZE;
+			end_addr = address + nr_pages * PTE_SIZE;
 			flush_cache_range(vma, address, end_addr);
 
 			/* Nuke the page table entry. */
@@ -2347,7 +2361,7 @@ discard:
 		 * If we are sure that we batched the entire folio and cleared
 		 * all PTEs, we can just optimize and stop right here.
 		 */
-		if (nr_pages == folio_nr_pages(folio))
+		if (nr_pages == folio_nr_ptes(folio))
 			goto walk_done;
 		continue;
 walk_abort:
@@ -2578,7 +2592,7 @@ static bool try_to_migrate_one(struct folio *folio, struct vm_area_struct *vma,
 				 */
 				pteval = ptep_get_and_clear(mm, address, pvmw.pte);
 
-				set_tlb_ubc_flush_pending(mm, pteval, address, address + PAGE_SIZE);
+				set_tlb_ubc_flush_pending(mm, pteval, address, address + PTE_SIZE);
 			} else {
 				pteval = ptep_clear_flush(vma, address, pvmw.pte);
 			}
@@ -2854,7 +2868,7 @@ retry:
 	 * caller must filter this event out to prevent livelocks.
 	 */
 	mmu_notifier_range_init_owner(&range, MMU_NOTIFY_EXCLUSIVE, 0,
-				      mm, addr, addr + PAGE_SIZE, owner);
+				      mm, addr, addr + PG_SIZE, owner);
 	mmu_notifier_invalidate_range_start(&range);
 
 	/*
@@ -3021,15 +3035,16 @@ static void rmap_walk_anon(struct folio *folio,
  *			lock.
  */
 static void __rmap_walk_file(struct folio *folio, struct address_space *mapping,
-			     pgoff_t pgoff_start, unsigned long nr_pages,
+			     pgoff_t pgoff_start, unsigned long nr_ptes,
 			     struct rmap_walk_control *rwc, bool locked)
 {
-	pgoff_t pgoff_end = pgoff_start + nr_pages - 1;
+	unsigned long pteoff_start = pgoff_start * PTES_PER_PAGE;
+	unsigned long pteoff_end = pteoff_start + nr_ptes - 1;
 	struct vm_area_struct *vma;
 
 	VM_WARN_ON_FOLIO(folio && mapping != folio_mapping(folio), folio);
 	VM_WARN_ON_FOLIO(folio && pgoff_start != folio_pgoff(folio), folio);
-	VM_WARN_ON_FOLIO(folio && nr_pages != folio_nr_pages(folio), folio);
+	VM_WARN_ON_FOLIO(folio && nr_ptes != folio_nr_ptes(folio), folio);
 
 	if (!locked) {
 		if (i_mmap_trylock_read(mapping))
@@ -3044,8 +3059,8 @@ static void __rmap_walk_file(struct folio *folio, struct address_space *mapping,
 	}
 lookup:
 	vma_interval_tree_foreach(vma, &mapping->i_mmap,
-			pgoff_start, pgoff_end) {
-		unsigned long address = vma_address(vma, pgoff_start, nr_pages);
+			pteoff_start, pteoff_end) {
+		unsigned long address = vma_address(vma, pgoff_start, nr_ptes);
 
 		VM_BUG_ON_VMA(address == -EFAULT, vma);
 		cond_resched();
@@ -3087,7 +3102,7 @@ static void rmap_walk_file(struct folio *folio,
 		return;
 
 	__rmap_walk_file(folio, folio->mapping, folio->index,
-			 folio_nr_pages(folio), rwc, locked);
+			 folio_nr_ptes(folio), rwc, locked);
 }
 
 void rmap_walk(struct folio *folio, struct rmap_walk_control *rwc)
