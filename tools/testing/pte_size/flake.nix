@@ -49,7 +49,7 @@
         src = ./tests/test_dynamic_helper.c;
         dontUnpack = true;
         buildPhase = ''
-          $CC -O2 -Wall -o test_dynamic_helper $src -I ${./tests}
+          $CC -O2 -Wall -o test_dynamic_helper $src -I ${./tests} -lm
         '';
         installPhase = ''
           mkdir -p $out/bin

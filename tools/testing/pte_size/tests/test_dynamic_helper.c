@@ -1,14 +1,20 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
- * Minimal dynamic-linked helper. Just exits with a fixed code via a
- * raw syscall, avoiding libc beyond what the runtime linker itself
- * pulls in. If this crashes, the bug is in ld-linux.so startup, not
- * in anything this program does.
+ * Minimal dynamically linked helper for test_dynamic.  Linked with
+ * libm so that ld-linux must load a second DSO beyond libc, which is
+ * what triggers the MAP_PRIVATE fault-around batching bug on
+ * PG_SIZE > PTE_SIZE kernels.
  */
+#include <math.h>
+
 int main(int argc, char *argv[])
 {
-	register long rax __asm__("rax") = 231;	/* __NR_exit_group */
-	register long rdi __asm__("rdi") = 42;
-	__asm__ volatile("syscall" :: "r"(rax), "r"(rdi) : "rcx", "r11", "memory");
-	return 99;
+	volatile double x = 1.0;
+
+	/* Pull in libm so the loader actually maps and relocates it. */
+	x = sqrt(x) + cos(x);
+	if (x < 0.0)
+		return 1;
+
+	return 42;
 }
