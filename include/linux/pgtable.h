@@ -1932,7 +1932,12 @@ static inline int is_zero_pfn(unsigned long pfn)
 static inline int is_zero_pfn(unsigned long pfn)
 {
 	extern unsigned long zero_pfn;
-	return pfn == zero_pfn;
+	/*
+	 * empty_zero_page is PG_SIZE-sized, so zero_pfn..zero_pfn+PTES_PER_PAGE-1
+	 * all point to zeroed sub-pages of the same allocation and must be
+	 * treated as the zero page.
+	 */
+	return pfn - zero_pfn < PTES_PER_PAGE;
 }
 
 static inline unsigned long my_zero_pfn(unsigned long addr)
