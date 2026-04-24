@@ -1814,13 +1814,22 @@ long populate_vma_page_range(struct vm_area_struct *vma,
 		unsigned long start, unsigned long end, int *locked)
 {
 	struct mm_struct *mm = vma->vm_mm;
-	unsigned long nr_pages = (end - start) / PAGE_SIZE;
+	/*
+	 * Round up: with PG_SIZE > PTE_SIZE, a VMA may be only PTE-aligned
+	 * (see mm/mmap.c len = PTE_ALIGN(len)), so (end - start) can be a
+	 * sub-PG value.  Integer division would yield nr_pages == 0 and
+	 * __get_user_pages() would return 0 — causing __mm_populate()'s
+	 * nend = nstart + ret * PG_SIZE advance to be a no-op and loop
+	 * forever. Rounding up lets GUP fault the single PG that covers
+	 * the sub-PG tail; the outer loop's VMA-end check terminates.
+	 */
+	unsigned long nr_pages = DIV_ROUND_UP(end - start, PG_SIZE);
 	int local_locked = 1;
 	int gup_flags;
 	long ret;
 
-	VM_WARN_ON_ONCE(!PAGE_ALIGNED(start));
-	VM_WARN_ON_ONCE(!PAGE_ALIGNED(end));
+	VM_WARN_ON_ONCE(!PTE_ALIGNED(start));
+	VM_WARN_ON_ONCE(!PTE_ALIGNED(end));
 	VM_WARN_ON_ONCE_VMA(start < vma->vm_start, vma);
 	VM_WARN_ON_ONCE_VMA(end   > vma->vm_end, vma);
 	mmap_assert_locked(mm);
