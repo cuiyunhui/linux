@@ -220,7 +220,7 @@ static bool pcpu_addr_in_chunk(struct pcpu_chunk *chunk, void *addr)
 		return false;
 
 	start_addr = chunk->base_addr + chunk->start_offset;
-	end_addr = chunk->base_addr + chunk->nr_pages * PAGE_SIZE -
+	end_addr = chunk->base_addr + chunk->nr_pages * PG_SIZE -
 		   chunk->end_offset;
 
 	return addr >= start_addr && addr < end_addr;
@@ -269,7 +269,7 @@ static int __maybe_unused pcpu_page_idx(unsigned int cpu, int page_idx)
 
 static unsigned long pcpu_unit_page_offset(unsigned int cpu, int page_idx)
 {
-	return pcpu_unit_offsets[cpu] + (page_idx << PAGE_SHIFT);
+	return pcpu_unit_offsets[cpu] + (page_idx << PG_SHIFT);
 }
 
 static unsigned long pcpu_chunk_addr(struct pcpu_chunk *chunk,
@@ -308,7 +308,7 @@ static unsigned long pcpu_block_off_to_off(int index, int off)
  * pcpu_check_block_hint - check against the contig hint
  * @block: block of interest
  * @bits: size of allocation
- * @align: alignment of area (max PAGE_SIZE)
+ * @align: alignment of area (max PG_SIZE)
  *
  * Check to see if the allocation can fit in the block's contig hint.
  * Note, a chunk uses the same hints as a block so this can also check against
@@ -407,7 +407,7 @@ static void pcpu_next_md_free_region(struct pcpu_chunk *chunk, int *bit_off,
  * pcpu_next_fit_region - finds fit areas for a given allocation request
  * @chunk: chunk of interest
  * @alloc_bits: size of allocation
- * @align: alignment of area (max PAGE_SIZE)
+ * @align: alignment of area (max PG_SIZE)
  * @bit_off: chunk offset
  * @bits: size of free area
  *
@@ -493,7 +493,7 @@ static void pcpu_next_fit_region(struct pcpu_chunk *chunk, int alloc_bits,
  * @size: bytes to allocate
  * @gfp: allocation flags
  *
- * Allocate @size bytes.  If @size is smaller than PAGE_SIZE,
+ * Allocate @size bytes.  If @size is smaller than PG_SIZE,
  * kzalloc() is used; otherwise, the equivalent of vzalloc() is used.
  * This is to facilitate passing through whitelisted flags.  The
  * returned memory is always zeroed.
@@ -506,7 +506,7 @@ static void *pcpu_mem_zalloc(size_t size, gfp_t gfp)
 	if (WARN_ON_ONCE(!slab_is_available()))
 		return NULL;
 
-	if (size <= PAGE_SIZE)
+	if (size <= PG_SIZE)
 		return kzalloc(size, gfp);
 	else
 		return __vmalloc(size, gfp | __GFP_ZERO);
@@ -1075,8 +1075,8 @@ static bool pcpu_is_populated(struct pcpu_chunk *chunk, int bit_off, int bits,
 {
 	unsigned int start, end;
 
-	start = PFN_DOWN(bit_off * PCPU_MIN_ALLOC_SIZE);
-	end = PFN_UP((bit_off + bits) * PCPU_MIN_ALLOC_SIZE);
+	start = (bit_off * PCPU_MIN_ALLOC_SIZE) >> PG_SHIFT;
+	end = ((bit_off + bits) * PCPU_MIN_ALLOC_SIZE + PG_SIZE - 1) >> PG_SHIFT;
 
 	start = find_next_zero_bit(chunk->populated, end, start);
 	if (start >= end)
@@ -1084,7 +1084,7 @@ static bool pcpu_is_populated(struct pcpu_chunk *chunk, int bit_off, int bits,
 
 	end = find_next_bit(chunk->populated, end, start + 1);
 
-	*next_off = end * PAGE_SIZE / PCPU_MIN_ALLOC_SIZE;
+	*next_off = end * PG_SIZE / PCPU_MIN_ALLOC_SIZE;
 	return false;
 }
 
@@ -1092,7 +1092,7 @@ static bool pcpu_is_populated(struct pcpu_chunk *chunk, int bit_off, int bits,
  * pcpu_find_block_fit - finds the block index to start searching
  * @chunk: chunk of interest
  * @alloc_bits: size of request in allocation units
- * @align: alignment of area (max PAGE_SIZE bytes)
+ * @align: alignment of area (max PG_SIZE bytes)
  * @pop_only: use populated regions only
  *
  * Given a chunk and an allocation spec, find the offset to begin searching
@@ -1198,7 +1198,7 @@ again:
  * pcpu_alloc_area - allocates an area from a pcpu_chunk
  * @chunk: chunk of interest
  * @alloc_bits: size of request in allocation units
- * @align: alignment of area (max PAGE_SIZE)
+ * @align: alignment of area (max PG_SIZE)
  * @start: bit_off to start searching
  *
  * This function takes in a @start offset to begin searching to fit an
@@ -1357,14 +1357,14 @@ static struct pcpu_chunk * __init pcpu_alloc_first_chunk(unsigned long tmp_addr,
 	size_t alloc_size;
 
 	/* region calculations */
-	aligned_addr = tmp_addr & PAGE_MASK;
+	aligned_addr = tmp_addr & PG_MASK;
 
 	start_offset = tmp_addr - aligned_addr;
-	region_size = ALIGN(start_offset + map_size, PAGE_SIZE);
+	region_size = ALIGN(start_offset + map_size, PG_SIZE);
 
 	/* allocate chunk */
 	alloc_size = struct_size(chunk, populated,
-				 BITS_TO_LONGS(region_size >> PAGE_SHIFT));
+				 BITS_TO_LONGS(region_size >> PG_SHIFT));
 	chunk = memblock_alloc_or_panic(alloc_size, SMP_CACHE_BYTES);
 
 	INIT_LIST_HEAD(&chunk->list);
@@ -1373,7 +1373,7 @@ static struct pcpu_chunk * __init pcpu_alloc_first_chunk(unsigned long tmp_addr,
 	chunk->start_offset = start_offset;
 	chunk->end_offset = region_size - chunk->start_offset - map_size;
 
-	chunk->nr_pages = region_size >> PAGE_SHIFT;
+	chunk->nr_pages = region_size >> PG_SHIFT;
 	region_bits = pcpu_chunk_map_bits(chunk);
 
 	alloc_size = BITS_TO_LONGS(region_bits) * sizeof(chunk->alloc_map[0]);
@@ -1469,7 +1469,7 @@ static struct pcpu_chunk *pcpu_alloc_chunk(gfp_t gfp)
 	pcpu_init_md_blocks(chunk);
 
 	/* init metadata */
-	chunk->free_bytes = chunk->nr_pages * PAGE_SIZE;
+	chunk->free_bytes = chunk->nr_pages * PG_SIZE;
 
 	return chunk;
 
@@ -1721,7 +1721,7 @@ static void pcpu_alloc_tag_free_hook(struct pcpu_chunk *chunk, int off, size_t s
 /**
  * pcpu_alloc - the percpu allocator
  * @size: size of area to allocate in bytes
- * @align: alignment of area (max PAGE_SIZE)
+ * @align: alignment of area (max PG_SIZE)
  * @reserved: allocate from the reserved chunk if available
  * @gfp: allocation flags
  *
@@ -1767,7 +1767,7 @@ void __percpu *pcpu_alloc_noprof(size_t size, size_t align, bool reserved,
 	bits = size >> PCPU_MIN_ALLOC_SHIFT;
 	bit_align = align >> PCPU_MIN_ALLOC_SHIFT;
 
-	if (unlikely(!size || size > PCPU_MIN_UNIT_SIZE || align > PAGE_SIZE ||
+	if (unlikely(!size || size > PCPU_MIN_UNIT_SIZE || align > PG_SIZE ||
 		     !is_power_of_2(align))) {
 		WARN(do_warn, "illegal size (%zu) or align (%zu) for percpu allocation\n",
 		     size, align);
@@ -1867,8 +1867,8 @@ area_found:
 	if (!is_atomic) {
 		unsigned int page_end, rs, re;
 
-		rs = PFN_DOWN(off);
-		page_end = PFN_UP(off + size);
+		rs = off >> PG_SHIFT;
+		page_end = (off + size + PG_SIZE - 1) >> PG_SHIFT;
 
 		for_each_clear_bitrange_from(rs, re, chunk->populated, page_end) {
 			WARN_ON(chunk->immutable);
@@ -2016,7 +2016,7 @@ static void pcpu_balance_populated(void)
 	 * atomic allocs.  Fill up from the most packed so that atomic
 	 * allocs don't increase fragmentation.  If atomic allocation
 	 * failed previously, always populate the maximum amount.  This
-	 * should prevent atomic allocs larger than PAGE_SIZE from keeping
+	 * should prevent atomic allocs larger than PG_SIZE from keeping
 	 * failing indefinitely; however, large atomic allocs are not
 	 * something we support properly and can be highly unreliable and
 	 * inefficient.
@@ -2032,7 +2032,7 @@ retry_pop:
 				  0, PCPU_EMPTY_POP_PAGES_HIGH);
 	}
 
-	for (slot = pcpu_size_to_slot(PAGE_SIZE); slot <= pcpu_free_slot; slot++) {
+	for (slot = pcpu_size_to_slot(PG_SIZE); slot <= pcpu_free_slot; slot++) {
 		unsigned int nr_unpop = 0, rs, re;
 
 		if (!nr_to_pop)
@@ -2389,10 +2389,10 @@ phys_addr_t per_cpu_ptr_to_phys(void *addr)
 			return __pa(addr);
 		else
 			return page_to_phys(vmalloc_to_page(addr)) +
-			       offset_in_page(addr);
+			       offset_in_pg(addr);
 	} else
 		return page_to_phys(pcpu_addr_to_page(addr)) +
-		       offset_in_page(addr);
+		       offset_in_pg(addr);
 }
 
 /**
@@ -2422,7 +2422,7 @@ struct pcpu_alloc_info * __init pcpu_alloc_alloc_info(int nr_groups,
 			  __alignof__(ai->groups[0].cpu_map[0]));
 	ai_size = base_size + nr_units * sizeof(ai->groups[0].cpu_map[0]);
 
-	ptr = memblock_alloc(PFN_ALIGN(ai_size), PAGE_SIZE);
+	ptr = memblock_alloc(PG_ALIGN(ai_size), PG_SIZE);
 	if (!ptr)
 		return NULL;
 	ai = ptr;
@@ -2434,7 +2434,7 @@ struct pcpu_alloc_info * __init pcpu_alloc_alloc_info(int nr_groups,
 		ai->groups[0].cpu_map[unit] = NR_CPUS;
 
 	ai->nr_groups = nr_groups;
-	ai->__ai_size = PFN_ALIGN(ai_size);
+	ai->__ai_size = PG_ALIGN(ai_size);
 
 	return ai;
 }
@@ -2533,7 +2533,7 @@ static void pcpu_dump_alloc_info(const char *lvl,
  * allocation in the first chunk.  The area between @ai->static_size +
  * @ai->reserved_size + @ai->dyn_size and @ai->unit_size is unused.
  *
- * @ai->unit_size specifies unit size and must be aligned to PAGE_SIZE
+ * @ai->unit_size specifies unit size and must be aligned to PG_SIZE
  * and equal to or larger than @ai->static_size + @ai->reserved_size +
  * @ai->dyn_size.
  *
@@ -2589,18 +2589,18 @@ void __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 	PCPU_SETUP_BUG_ON(ai->nr_groups <= 0);
 #ifdef CONFIG_SMP
 	PCPU_SETUP_BUG_ON(!ai->static_size);
-	PCPU_SETUP_BUG_ON(offset_in_page(__per_cpu_start));
+	PCPU_SETUP_BUG_ON(offset_in_pg(__per_cpu_start));
 #endif
 	PCPU_SETUP_BUG_ON(!base_addr);
-	PCPU_SETUP_BUG_ON(offset_in_page(base_addr));
+	PCPU_SETUP_BUG_ON(offset_in_pg(base_addr));
 	PCPU_SETUP_BUG_ON(ai->unit_size < size_sum);
-	PCPU_SETUP_BUG_ON(offset_in_page(ai->unit_size));
+	PCPU_SETUP_BUG_ON(offset_in_pg(ai->unit_size));
 	PCPU_SETUP_BUG_ON(ai->unit_size < PCPU_MIN_UNIT_SIZE);
 	PCPU_SETUP_BUG_ON(!IS_ALIGNED(ai->unit_size, PCPU_BITMAP_BLOCK_SIZE));
 	PCPU_SETUP_BUG_ON(ai->dyn_size < PERCPU_DYNAMIC_EARLY_SIZE);
 	PCPU_SETUP_BUG_ON(!IS_ALIGNED(ai->reserved_size, PCPU_MIN_ALLOC_SIZE));
-	PCPU_SETUP_BUG_ON(!(IS_ALIGNED(PCPU_BITMAP_BLOCK_SIZE, PAGE_SIZE) ||
-			    IS_ALIGNED(PAGE_SIZE, PCPU_BITMAP_BLOCK_SIZE)));
+	PCPU_SETUP_BUG_ON(!(IS_ALIGNED(PCPU_BITMAP_BLOCK_SIZE, PG_SIZE) ||
+			    IS_ALIGNED(PG_SIZE, PCPU_BITMAP_BLOCK_SIZE)));
 	PCPU_SETUP_BUG_ON(pcpu_verify_alloc_info(ai) < 0);
 
 	/* process group information and build config tables accordingly */
@@ -2665,8 +2665,8 @@ void __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 	pcpu_unit_offsets = unit_off;
 
 	/* determine basic parameters */
-	pcpu_unit_pages = ai->unit_size >> PAGE_SHIFT;
-	pcpu_unit_size = pcpu_unit_pages << PAGE_SHIFT;
+	pcpu_unit_pages = ai->unit_size >> PG_SHIFT;
+	pcpu_unit_size = pcpu_unit_pages << PG_SHIFT;
 	pcpu_atom_size = ai->atom_size;
 	pcpu_chunk_struct_size = struct_size((struct pcpu_chunk *)0, populated,
 					     BITS_TO_LONGS(pcpu_unit_pages));
@@ -2723,7 +2723,7 @@ void __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 	pcpu_chunk_relocate(pcpu_first_chunk, -1);
 
 	/* include all regions of the first chunk */
-	pcpu_nr_populated += PFN_DOWN(size_sum);
+	pcpu_nr_populated += size_sum >> PG_SHIFT;
 
 	pcpu_stats_chunk_alloc();
 	trace_percpu_create_chunk(base_addr);
@@ -2825,7 +2825,7 @@ static struct pcpu_alloc_info * __init __flatten pcpu_build_alloc_info(
 	cpumask_clear(&mask);
 
 	/* calculate size_sum and ensure dyn_size is enough for early alloc */
-	size_sum = PFN_ALIGN(static_size + reserved_size +
+	size_sum = PG_ALIGN(static_size + reserved_size +
 			    max_t(size_t, dyn_size, PERCPU_DYNAMIC_EARLY_SIZE));
 	dyn_size = size_sum - static_size - reserved_size;
 
@@ -2840,7 +2840,7 @@ static struct pcpu_alloc_info * __init __flatten pcpu_build_alloc_info(
 	/* determine the maximum # of units that can fit in an allocation */
 	alloc_size = roundup(min_unit_size, atom_size);
 	upa = alloc_size / min_unit_size;
-	while (alloc_size % upa || (offset_in_page(alloc_size / upa)))
+	while (alloc_size % upa || (offset_in_pg(alloc_size / upa)))
 		upa--;
 	max_upa = upa;
 
@@ -2876,7 +2876,7 @@ static struct pcpu_alloc_info * __init __flatten pcpu_build_alloc_info(
 	for (upa = max_upa; upa; upa--) {
 		int allocs = 0, wasted = 0;
 
-		if (alloc_size % upa || (offset_in_page(alloc_size / upa)))
+		if (alloc_size % upa || (offset_in_pg(alloc_size / upa)))
 			continue;
 
 		for (group = 0; group < nr_groups; group++) {
@@ -3031,7 +3031,7 @@ int __init pcpu_embed_first_chunk(size_t reserved_size, size_t dyn_size,
 		return PTR_ERR(ai);
 
 	size_sum = ai->static_size + ai->reserved_size + ai->dyn_size;
-	areas_size = PFN_ALIGN(ai->nr_groups * sizeof(void *));
+	areas_size = PG_ALIGN(ai->nr_groups * sizeof(void *));
 
 	areas = memblock_alloc(areas_size, SMP_CACHE_BYTES);
 	if (!areas) {
@@ -3105,7 +3105,7 @@ int __init pcpu_embed_first_chunk(size_t reserved_size, size_t dyn_size,
 	}
 
 	pr_info("Embedded %zu pages/cpu s%zu r%zu d%zu u%zu\n",
-		PFN_DOWN(size_sum), ai->static_size, ai->reserved_size,
+		size_sum >> PG_SHIFT, ai->static_size, ai->reserved_size,
 		ai->dyn_size, ai->unit_size);
 
 	pcpu_setup_first_chunk(ai, base);
@@ -3128,19 +3128,19 @@ out_free:
 #include <linux/pgalloc.h>
 
 #ifndef P4D_TABLE_SIZE
-#define P4D_TABLE_SIZE PAGE_SIZE
+#define P4D_TABLE_SIZE PTE_SIZE
 #endif
 
 #ifndef PUD_TABLE_SIZE
-#define PUD_TABLE_SIZE PAGE_SIZE
+#define PUD_TABLE_SIZE PTE_SIZE
 #endif
 
 #ifndef PMD_TABLE_SIZE
-#define PMD_TABLE_SIZE PAGE_SIZE
+#define PMD_TABLE_SIZE PTE_SIZE
 #endif
 
 #ifndef PTE_TABLE_SIZE
-#define PTE_TABLE_SIZE PAGE_SIZE
+#define PTE_TABLE_SIZE PTE_SIZE
 #endif
 void __init __weak pcpu_populate_pte(unsigned long addr)
 {
@@ -3178,7 +3178,7 @@ void __init __weak pcpu_populate_pte(unsigned long addr)
 }
 
 /**
- * pcpu_page_first_chunk - map the first chunk using PAGE_SIZE pages
+ * pcpu_page_first_chunk - map the first chunk using PG_SIZE pages
  * @reserved_size: the size of reserved percpu area in bytes
  * @cpu_to_nd_fn: callback to convert cpu to it's node, optional
  *
@@ -3203,9 +3203,9 @@ int __init pcpu_page_first_chunk(size_t reserved_size, pcpu_fc_cpu_to_node_fn_t 
 	int upa;
 	int nr_g0_units;
 
-	snprintf(psize_str, sizeof(psize_str), "%luK", PAGE_SIZE >> 10);
+	snprintf(psize_str, sizeof(psize_str), "%luK", PG_SIZE >> 10);
 
-	ai = pcpu_build_alloc_info(reserved_size, 0, PAGE_SIZE, NULL);
+	ai = pcpu_build_alloc_info(reserved_size, 0, PG_SIZE, NULL);
 	if (IS_ERR(ai))
 		return PTR_ERR(ai);
 	BUG_ON(ai->nr_groups != 1);
@@ -3216,10 +3216,10 @@ int __init pcpu_page_first_chunk(size_t reserved_size, pcpu_fc_cpu_to_node_fn_t 
 		return -EINVAL;
 	}
 
-	unit_pages = ai->unit_size >> PAGE_SHIFT;
+	unit_pages = ai->unit_size >> PG_SHIFT;
 
 	/* unaligned allocations can't be freed, round up to page size */
-	pages_size = PFN_ALIGN(unit_pages * num_possible_cpus() *
+	pages_size = PG_ALIGN(unit_pages * num_possible_cpus() *
 			       sizeof(pages[0]));
 	pages = memblock_alloc_or_panic(pages_size, SMP_CACHE_BYTES);
 
@@ -3230,7 +3230,7 @@ int __init pcpu_page_first_chunk(size_t reserved_size, pcpu_fc_cpu_to_node_fn_t 
 		for (i = 0; i < unit_pages; i++) {
 			void *ptr;
 
-			ptr = pcpu_fc_alloc(cpu, PAGE_SIZE, PAGE_SIZE, cpu_to_nd_fn);
+			ptr = pcpu_fc_alloc(cpu, PG_SIZE, PG_SIZE, cpu_to_nd_fn);
 			if (!ptr) {
 				pr_warn("failed to allocate %s page for cpu%u\n",
 						psize_str, cpu);
@@ -3245,14 +3245,14 @@ int __init pcpu_page_first_chunk(size_t reserved_size, pcpu_fc_cpu_to_node_fn_t 
 	/* allocate vm area, map the pages and copy static data */
 	vm.flags = VM_ALLOC;
 	vm.size = num_possible_cpus() * ai->unit_size;
-	vm_area_register_early(&vm, PAGE_SIZE);
+	vm_area_register_early(&vm, PG_SIZE);
 
 	for (unit = 0; unit < num_possible_cpus(); unit++) {
 		unsigned long unit_addr =
 			(unsigned long)vm.addr + unit * ai->unit_size;
 
 		for (i = 0; i < unit_pages; i++)
-			pcpu_populate_pte(unit_addr + (i << PAGE_SHIFT));
+			pcpu_populate_pte(unit_addr + (i << PG_SHIFT));
 
 		/* pte already populated, the following shouldn't fail */
 		rc = __pcpu_map_pages(unit_addr, &pages[unit * unit_pages],
@@ -3276,7 +3276,7 @@ int __init pcpu_page_first_chunk(size_t reserved_size, pcpu_fc_cpu_to_node_fn_t 
 
 enomem:
 	while (--j >= 0)
-		pcpu_fc_free(page_address(pages[j]), PAGE_SIZE);
+		pcpu_fc_free(page_address(pages[j]), PG_SIZE);
 	rc = -ENOMEM;
 out_free_ar:
 	memblock_free(pages, pages_size);
@@ -3312,7 +3312,7 @@ void __init setup_per_cpu_areas(void)
 	 * what the legacy allocator did.
 	 */
 	rc = pcpu_embed_first_chunk(PERCPU_MODULE_RESERVE, PERCPU_DYNAMIC_RESERVE,
-				    PAGE_SIZE, NULL, NULL);
+				    PG_SIZE, NULL, NULL);
 	if (rc < 0)
 		panic("Failed to initialize percpu areas.");
 
@@ -3340,7 +3340,7 @@ void __init setup_per_cpu_areas(void)
 	void *fc;
 
 	ai = pcpu_alloc_alloc_info(1, 1);
-	fc = memblock_alloc_from(unit_size, PAGE_SIZE, __pa(MAX_DMA_ADDRESS));
+	fc = memblock_alloc_from(unit_size, PG_SIZE, __pa(MAX_DMA_ADDRESS));
 	if (!ai || !fc)
 		panic("Failed to allocate memory for percpu areas.");
 	/* kmemleak tracks the percpu allocations separately */
