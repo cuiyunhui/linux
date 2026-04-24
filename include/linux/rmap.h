@@ -145,8 +145,8 @@ static inline void __folio_large_mapcount_sanity_checks(const struct folio *foli
 	 * a check on 32bit, where we currently reduce the size of the per-MM
 	 * mapcount to a short.
 	 */
-	VM_WARN_ON_ONCE(diff > folio_large_nr_pages(folio));
-	VM_WARN_ON_ONCE(folio_large_nr_pages(folio) - 1 > MM_ID_MAPCOUNT_MAX);
+	VM_WARN_ON_ONCE(diff > folio_nr_ptes(folio));
+	VM_WARN_ON_ONCE(folio_nr_ptes(folio) - 1 > MM_ID_MAPCOUNT_MAX);
 
 	VM_WARN_ON_ONCE(folio_mm_id(folio, 0) == MM_ID_DUMMY &&
 			folio->_mm_id_mapcount[0] != -1);
