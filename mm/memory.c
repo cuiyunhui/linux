@@ -5594,7 +5594,7 @@ fallback:
 		struct address_space *mapping = vma->vm_file->f_mapping;
 		pgoff_t file_end;
 
-		file_end = DIV_ROUND_UP(i_size_read(mapping->host), PAGE_SIZE);
+		file_end = DIV_ROUND_UP(i_size_read(mapping->host), PG_SIZE);
 
 		/*
 		 * Do not allow to map with PTEs beyond i_size and with PMD
