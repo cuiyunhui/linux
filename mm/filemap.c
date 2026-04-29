@@ -3307,7 +3307,7 @@ static struct file *do_sync_mmap_readahead(struct vm_fault *vmf)
 	struct file *file = vmf->vma->vm_file;
 	struct file_ra_state *ra = &file->f_ra;
 	struct address_space *mapping = file->f_mapping;
-	DEFINE_READAHEAD(ractl, file, ra, mapping, vmf->pgoff);
+	DEFINE_READAHEAD(ractl, file, ra, mapping, PTES_TO_PAGES(vmf->pteoff));
 	struct file *fpin = NULL;
 	vm_flags_t vm_flags = vmf->vma->vm_flags;
 	bool force_thp_readahead = false;
@@ -3379,12 +3379,12 @@ static struct file *do_sync_mmap_readahead(struct vm_fault *vmf)
 		 * of memory.
 		 */
 		struct vm_area_struct *vma = vmf->vma;
-		unsigned long start = vma->vm_pgoff;
+		unsigned long start = PTES_TO_PAGES(vma->vm_pteoff);
 		unsigned long end = start + vma_pages(vma);
 		unsigned long ra_end;
 
 		ra->order = exec_folio_order();
-		ra->start = round_down(vmf->pgoff, 1UL << ra->order);
+		ra->start = round_down(PTES_TO_PAGES(vmf->pteoff), 1UL << ra->order);
 		ra->start = max(ra->start, start);
 		ra_end = round_up(ra->start + ra->ra_pages, 1UL << ra->order);
 		ra_end = min(ra_end, end);
@@ -3394,7 +3394,7 @@ static struct file *do_sync_mmap_readahead(struct vm_fault *vmf)
 		/*
 		 * mmap read-around
 		 */
-		ra->start = max_t(long, 0, vmf->pgoff - ra->ra_pages / 2);
+		ra->start = max_t(long, 0, PTES_TO_PAGES(vmf->pteoff) - ra->ra_pages / 2);
 		ra->size = ra->ra_pages;
 		ra->async_size = ra->ra_pages / 4;
 		ra->order = 0;
@@ -3416,7 +3416,7 @@ static struct file *do_async_mmap_readahead(struct vm_fault *vmf,
 {
 	struct file *file = vmf->vma->vm_file;
 	struct file_ra_state *ra = &file->f_ra;
-	DEFINE_READAHEAD(ractl, file, ra, file->f_mapping, vmf->pgoff);
+	DEFINE_READAHEAD(ractl, file, ra, file->f_mapping, PTES_TO_PAGES(vmf->pteoff));
 	struct file *fpin = NULL;
 	unsigned short mmap_miss;
 
@@ -3516,7 +3516,7 @@ vm_fault_t filemap_fault(struct vm_fault *vmf)
 	struct file *fpin = NULL;
 	struct address_space *mapping = file->f_mapping;
 	struct inode *inode = mapping->host;
-	pgoff_t max_idx, index = vmf->pgoff;
+	pgoff_t max_idx, index = PTES_TO_PAGES(vmf->pteoff);
 	struct folio *folio;
 	vm_fault_t ret = 0;
 	bool mapping_locked = false;
