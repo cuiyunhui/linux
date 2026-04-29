@@ -4396,8 +4396,8 @@ static vm_fault_t remove_device_exclusive_entry(struct vm_fault *vmf)
 		return ret;
 	}
 	mmu_notifier_range_init_owner(&range, MMU_NOTIFY_CLEAR, 0,
-				vma->vm_mm, vmf->address & PAGE_MASK,
-				(vmf->address & PAGE_MASK) + PAGE_SIZE, NULL);
+				vma->vm_mm, vmf->address & PTE_MASK,
+				(vmf->address & PTE_MASK) + PTE_SIZE, NULL);
 	mmu_notifier_invalidate_range_start(&range);
 
 	vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd, vmf->address,
