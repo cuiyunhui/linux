@@ -3726,7 +3726,7 @@ static struct folio *next_uptodate_folio(struct xa_state *xas,
 			goto unlock;
 		if (!folio_test_uptodate(folio))
 			goto unlock;
-		max_idx = DIV_ROUND_UP(i_size_read(mapping->host), PAGE_SIZE);
+		max_idx = DIV_ROUND_UP(i_size_read(mapping->host), PG_SIZE);
 		if (xas->xa_index >= max_idx)
 			goto unlock;
 		return folio;
@@ -3765,7 +3765,7 @@ static vm_fault_t filemap_map_folio_range(struct vm_fault *vmf,
 	 *  - The folio doesn't cross VMA boundary;
 	 *  - The folio doesn't cross page table boundary;
 	 */
-	addr0 = addr - start * PAGE_SIZE;
+	addr0 = addr - start * PG_SIZE;
 	if ((file_end >= folio_next_index(folio) || shmem_mapping(mapping)) &&
 	    folio_within_vma(folio, vmf->vma) &&
 	    (addr0 & PMD_MASK) == ((addr0 + folio_size(folio) - 1) & PMD_MASK)) {
@@ -3805,14 +3805,14 @@ skip:
 			*rss += count;
 			folio_ref_add(folio, count - ref_from_caller);
 			ref_from_caller = 0;
-			if (in_range(vmf->address, addr, count * PAGE_SIZE))
+			if (in_range(vmf->address, addr, count * PG_SIZE))
 				ret = VM_FAULT_NOPAGE;
 		}
 
 		count++;
 		page += count;
 		vmf->pte += count;
-		addr += count * PAGE_SIZE;
+		addr += count * PG_SIZE;
 		count = 0;
 	} while (--nr_pages > 0);
 
@@ -3909,7 +3909,7 @@ vm_fault_t filemap_map_pages(struct vm_fault *vmf,
 		goto out;
 	}
 
-	addr = vma->vm_start + ((start_pgoff - vma->vm_pgoff) << PAGE_SHIFT);
+	addr = vma->vm_start + ((start_pgoff - vma->vm_pgoff) << PG_SHIFT);
 	vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd, addr, &vmf->ptl);
 	if (!vmf->pte) {
 		folio_unlock(folio);
@@ -3921,7 +3921,7 @@ vm_fault_t filemap_map_pages(struct vm_fault *vmf,
 	do {
 		unsigned long end;
 
-		addr += (xas.xa_index - last_pgoff) << PAGE_SHIFT;
+		addr += (xas.xa_index - last_pgoff) << PG_SHIFT;
 		vmf->pte += xas.xa_index - last_pgoff;
 		last_pgoff = xas.xa_index;
 		end = folio_next_index(folio) - 1;
