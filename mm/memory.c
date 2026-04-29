@@ -5169,7 +5169,7 @@ static struct folio *alloc_anon_folio(struct vm_fault *vmf)
 	 */
 	order = highest_order(orders);
 	while (orders) {
-		addr = ALIGN_DOWN(vmf->address, PAGE_SIZE << order);
+		addr = ALIGN_DOWN(vmf->address, PG_SIZE << order);
 		if (pte_range_none(pte + pte_index(addr), 1 << order))
 			break;
 		order = next_order(&orders, order);
@@ -5183,7 +5183,7 @@ static struct folio *alloc_anon_folio(struct vm_fault *vmf)
 	/* Try allocating the highest of the remaining orders. */
 	gfp = vma_thp_gfp_mask(vma);
 	while (orders) {
-		addr = ALIGN_DOWN(vmf->address, PAGE_SIZE << order);
+		addr = ALIGN_DOWN(vmf->address, PG_SIZE << order);
 		folio = vma_alloc_folio(gfp, order, vma, addr);
 		if (folio) {
 			if (mem_cgroup_charge(folio, vma->vm_mm, gfp)) {
