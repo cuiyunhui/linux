@@ -5680,12 +5680,12 @@ unlock:
 }
 
 static unsigned long fault_around_pages __read_mostly =
-	65536 >> PAGE_SHIFT;
+	65536 >> PG_SHIFT;
 
 #ifdef CONFIG_DEBUG_FS
 static int fault_around_bytes_get(void *data, u64 *val)
 {
-	*val = fault_around_pages << PAGE_SHIFT;
+	*val = fault_around_pages << PG_SHIFT;
 	return 0;
 }
 
@@ -5695,15 +5695,19 @@ static int fault_around_bytes_get(void *data, u64 *val)
  */
 static int fault_around_bytes_set(void *data, u64 val)
 {
-	if (val / PAGE_SIZE > PTRS_PER_PTE)
+	/*
+	 * The fault-around region must fit within a single PMD's PTEs:
+	 * its size in PTE-sized units cannot exceed PTRS_PER_PTE.
+	 */
+	if (val / PTE_SIZE > PTRS_PER_PTE)
 		return -EINVAL;
 
 	/*
-	 * The minimum value is 1 page, however this results in no fault-around
-	 * at all. See should_fault_around().
+	 * The minimum value is 1 PG_SIZE; below that there is no fault-around
+	 * at all.  See should_fault_around().
 	 */
-	val = max(val, PAGE_SIZE);
-	fault_around_pages = rounddown_pow_of_two(val) >> PAGE_SHIFT;
+	val = max(val, PG_SIZE);
+	fault_around_pages = rounddown_pow_of_two(val) >> PG_SHIFT;
 
 	return 0;
 }
@@ -5735,7 +5739,7 @@ late_initcall(fault_around_debugfs);
  * to PTRS_PER_PTE.
  *
  * The virtual address of the area that we map is naturally aligned to
- * fault_around_pages * PAGE_SIZE rounded down to the machine page size
+ * fault_around_pages * PG_SIZE rounded down to the machine page size
  * (and therefore to page order).  This way it's easier to guarantee
  * that we don't cross page table boundaries.
  */
