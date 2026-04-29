@@ -6025,7 +6025,7 @@ static void numa_rebuild_large_mapping(struct vm_fault *vmf, struct vm_area_stru
 {
 	int nr = pte_pfn(fault_pte) - folio_pfn(folio);
 	unsigned long start, end, addr = vmf->address;
-	unsigned long addr_start = addr - (nr << PAGE_SHIFT);
+	unsigned long addr_start = addr - (nr << PTE_SHIFT);
 	unsigned long pt_start = ALIGN_DOWN(addr, PMD_SIZE);
 	pte_t *start_ptep;
 
@@ -6033,10 +6033,10 @@ static void numa_rebuild_large_mapping(struct vm_fault *vmf, struct vm_area_stru
 	start = max3(addr_start, pt_start, vma->vm_start);
 	end = min3(addr_start + folio_size(folio), pt_start + PMD_SIZE,
 		   vma->vm_end);
-	start_ptep = vmf->pte - ((addr - start) >> PAGE_SHIFT);
+	start_ptep = vmf->pte - ((addr - start) >> PTE_SHIFT);
 
 	/* Restore all PTEs' mapping of the large folio */
-	for (addr = start; addr != end; start_ptep++, addr += PAGE_SIZE) {
+	for (addr = start; addr != end; start_ptep++, addr += PTE_SIZE) {
 		pte_t ptent = ptep_get(start_ptep);
 		bool writable = false;
 
