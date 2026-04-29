@@ -5543,6 +5543,31 @@ static bool vmf_pte_changed(struct vm_fault *vmf)
 	return !pte_none(ptep_get(vmf->pte));
 }
 
+/*
+ * folio_extends_past_i_size - would installing @folio expose data beyond EOF?
+ *
+ * Only meaningful for non-COW file-backed faults: the folio's ->index is
+ * read and compared against the mapping's i_size rounded up to PG_SIZE.
+ * Returns false for COW (folio is a fresh anon whose ->index is garbage),
+ * for non-file VMAs, and for shmem/tmpfs (which historically allow PMD
+ * mappings across i_size).
+ */
+static bool folio_extends_past_i_size(struct vm_fault *vmf, struct folio *folio,
+				      bool is_cow)
+{
+	struct address_space *mapping;
+	pgoff_t file_end;
+
+	if (is_cow || !vmf->vma->vm_file)
+		return false;
+	mapping = vmf->vma->vm_file->f_mapping;
+	if (shmem_mapping(mapping))
+		return false;
+
+	file_end = DIV_ROUND_UP(i_size_read(mapping->host), PG_SIZE);
+	return file_end < folio_next_index(folio);
+}
+
 /**
  * finish_fault - finish page fault once we have prepared the page to fault
  *
@@ -5590,22 +5615,13 @@ fallback:
 			return ret;
 	}
 
-	if (!needs_fallback && vma->vm_file) {
-		struct address_space *mapping = vma->vm_file->f_mapping;
-		pgoff_t file_end;
-
-		file_end = DIV_ROUND_UP(i_size_read(mapping->host), PG_SIZE);
-
-		/*
-		 * Do not allow to map with PTEs beyond i_size and with PMD
-		 * across i_size to preserve SIGBUS semantics.
-		 *
-		 * Make an exception for shmem/tmpfs that for long time
-		 * intentionally mapped with PMDs across i_size.
-		 */
-		needs_fallback = !shmem_mapping(mapping) &&
-			file_end < folio_next_index(folio);
-	}
+	/*
+	 * Do not allow to map with PTEs beyond i_size and with PMD across
+	 * i_size to preserve SIGBUS semantics. Only applies to non-COW
+	 * file-backed faults; see folio_extends_past_i_size().
+	 */
+	if (folio_extends_past_i_size(vmf, folio, is_cow))
+		needs_fallback = true;
 
 	if (pmd_none(*vmf->pmd)) {
 		if (!needs_fallback && folio_test_pmd_mappable(folio)) {
