@@ -4547,19 +4547,20 @@ static struct folio *__alloc_swap_folio(struct vm_fault *vmf)
  */
 static bool can_swapin_thp(struct vm_fault *vmf, pte_t *ptep, int nr_pages)
 {
+	int nr_ptes = PAGES_TO_PTES(nr_pages);
 	unsigned long addr;
 	softleaf_t entry;
 	int idx;
 	pte_t pte;
 
-	addr = ALIGN_DOWN(vmf->address, nr_pages * PAGE_SIZE);
-	idx = (vmf->address - addr) / PAGE_SIZE;
+	addr = ALIGN_DOWN(vmf->address, nr_pages * PG_SIZE);
+	idx = (vmf->address - addr) / PTE_SIZE;
 	pte = ptep_get(ptep);
 
 	if (!pte_same(pte, pte_move_swp_offset(vmf->orig_pte, -idx)))
 		return false;
 	entry = softleaf_from_pte(pte);
-	if (swap_pte_batch(ptep, nr_pages, pte) != nr_pages)
+	if (swap_pte_batch(ptep, nr_ptes, pte) != nr_ptes)
 		return false;
 
 	/*
@@ -4567,9 +4568,9 @@ static bool can_swapin_thp(struct vm_fault *vmf, pte_t *ptep, int nr_pages)
 	 * from different backends. And they are likely corner cases. Similar
 	 * things might be added once zswap support large folios.
 	 */
-	if (unlikely(swap_zeromap_batch(entry, nr_pages, NULL) != nr_pages))
+	if (unlikely(swap_zeromap_batch(entry, nr_ptes, NULL) != nr_ptes))
 		return false;
-	if (unlikely(non_swapcache_batch(entry, nr_pages) != nr_pages))
+	if (unlikely(non_swapcache_batch(entry, nr_ptes) != nr_ptes))
 		return false;
 
 	return true;
@@ -4585,12 +4586,13 @@ static inline unsigned long thp_swap_suitable_orders(pgoff_t swp_offset,
 
 	/*
 	 * To swap in a THP with nr pages, we require that its first swap_offset
-	 * is aligned with that number, as it was when the THP was swapped out.
-	 * This helps filter out most invalid entries.
+	 * is aligned with that number of hardware PTE entries, as it was when
+	 * the THP was swapped out (one swap offset per PTE_SIZE chunk).  This
+	 * helps filter out most invalid entries.
 	 */
 	while (orders) {
-		nr = 1 << order;
-		if ((addr >> PAGE_SHIFT) % nr == swp_offset % nr)
+		nr = PAGES_TO_PTES(1 << order);
+		if ((addr >> PTE_SHIFT) % nr == swp_offset % nr)
 			break;
 		order = next_order(&orders, order);
 	}
@@ -4650,7 +4652,7 @@ static struct folio *alloc_swap_folio(struct vm_fault *vmf)
 	 */
 	order = highest_order(orders);
 	while (orders) {
-		addr = ALIGN_DOWN(vmf->address, PAGE_SIZE << order);
+		addr = ALIGN_DOWN(vmf->address, PG_SIZE << order);
 		if (can_swapin_thp(vmf, pte + pte_index(addr), 1 << order))
 			break;
 		order = next_order(&orders, order);
@@ -4661,7 +4663,7 @@ static struct folio *alloc_swap_folio(struct vm_fault *vmf)
 	/* Try allocating the highest of the remaining orders. */
 	gfp = vma_thp_gfp_mask(vma);
 	while (orders) {
-		addr = ALIGN_DOWN(vmf->address, PAGE_SIZE << order);
+		addr = ALIGN_DOWN(vmf->address, PG_SIZE << order);
 		folio = vma_alloc_folio(gfp, order, vma, addr);
 		if (folio) {
 			if (!mem_cgroup_swapin_charge_folio(folio, vma->vm_mm,
@@ -4894,9 +4896,11 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 	ptep = vmf->pte;
 	if (folio_test_large(folio) && folio_test_swapcache(folio)) {
 		int nr = folio_nr_pages(folio);
+		int nr_ptes = PAGES_TO_PTES(nr);
 		unsigned long idx = folio_page_idx(folio, page);
-		unsigned long folio_start = address - idx * PAGE_SIZE;
-		unsigned long folio_end = folio_start + nr * PAGE_SIZE;
+		unsigned long folio_start = (address & PG_MASK) - idx * PG_SIZE;
+		unsigned long folio_end = folio_start + nr * PG_SIZE;
+		unsigned long pte_idx = (address - folio_start) >> PTE_SHIFT;
 		pte_t *folio_ptep;
 		pte_t folio_pte;
 
@@ -4905,10 +4909,10 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 		if (unlikely(folio_end > pmd_addr_end(address, vma->vm_end)))
 			goto check_folio;
 
-		folio_ptep = vmf->pte - idx;
+		folio_ptep = vmf->pte - pte_idx;
 		folio_pte = ptep_get(folio_ptep);
-		if (!pte_same(folio_pte, pte_move_swp_offset(vmf->orig_pte, -idx)) ||
-		    swap_pte_batch(folio_ptep, nr, folio_pte) != nr)
+		if (!pte_same(folio_pte, pte_move_swp_offset(vmf->orig_pte, -pte_idx)) ||
+		    swap_pte_batch(folio_ptep, nr_ptes, folio_pte) != nr_ptes)
 			goto check_folio;
 
 		page_idx = idx;
