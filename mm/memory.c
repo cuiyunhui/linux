@@ -3481,7 +3481,7 @@ static inline int __wp_page_copy_user(struct page *dst, struct page *src,
 	 */
 	kaddr = kmap_local_page(dst);
 	pagefault_disable();
-	uaddr = (void __user *)(addr & PAGE_MASK);
+	uaddr = (void __user *)(addr & PG_MASK);
 
 	/*
 	 * On architectures with software "accessed" bits, we would
@@ -3514,7 +3514,7 @@ static inline int __wp_page_copy_user(struct page *dst, struct page *src,
 	 * in which case we just give up and fill the result with
 	 * zeroes.
 	 */
-	if (__copy_from_user_inatomic(kaddr, uaddr, PAGE_SIZE)) {
+	if (__copy_from_user_inatomic(kaddr, uaddr, PG_SIZE)) {
 		if (vmf->pte)
 			goto warn;
 
@@ -3532,7 +3532,7 @@ static inline int __wp_page_copy_user(struct page *dst, struct page *src,
 		 * The same page can be mapped back since last copy attempt.
 		 * Try to copy again under PTL.
 		 */
-		if (__copy_from_user_inatomic(kaddr, uaddr, PAGE_SIZE)) {
+		if (__copy_from_user_inatomic(kaddr, uaddr, PG_SIZE)) {
 			/*
 			 * Give a warn in case there can be some obscure
 			 * use-case
@@ -3806,8 +3806,8 @@ static vm_fault_t wp_page_copy(struct vm_fault *vmf)
 	__folio_mark_uptodate(new_folio);
 
 	mmu_notifier_range_init(&range, MMU_NOTIFY_CLEAR, 0, mm,
-				vmf->address & PAGE_MASK,
-				(vmf->address & PAGE_MASK) + PAGE_SIZE);
+				vmf->address & PG_MASK,
+				(vmf->address & PG_MASK) + PG_SIZE);
 	mmu_notifier_invalidate_range_start(&range);
 
 	/*
