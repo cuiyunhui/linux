@@ -5568,6 +5568,53 @@ static bool folio_extends_past_i_size(struct vm_fault *vmf, struct folio *folio,
 	return file_end < folio_next_index(folio);
 }
 
+/*
+ * finish_fault_install - install nr_ptes PTEs for a prepared folio under PTL.
+ *
+ * The clamp (addr, nr_ptes, page) is the caller's; this helper acquires the
+ * PTL, handles the race re-check, and calls set_pte_range() to install the
+ * batch.
+ *
+ * Return values:
+ *   0			success
+ *   VM_FAULT_NOPAGE	someone else installed the PTE in the meantime
+ *   -EAGAIN		multi-PTE install would clobber a sibling; caller
+ *			should retry with nr_ptes == 1 at the original fault
+ *			address
+ */
+static int finish_fault_install(struct vm_fault *vmf, struct folio *folio,
+				struct page *page, int nr_ptes,
+				unsigned long addr, bool is_cow)
+{
+	struct vm_area_struct *vma = vmf->vma;
+	int type, ret = 0;
+
+	vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd, addr, &vmf->ptl);
+	if (!vmf->pte)
+		return VM_FAULT_NOPAGE;
+
+	/* Re-check under PTL */
+	if (nr_ptes == 1) {
+		if (unlikely(vmf_pte_changed(vmf))) {
+			update_mmu_tlb(vma, addr, vmf->pte);
+			ret = VM_FAULT_NOPAGE;
+			goto unlock;
+		}
+	} else if (!pte_range_none(vmf->pte, nr_ptes)) {
+		ret = -EAGAIN;
+		goto unlock;
+	}
+
+	folio_ref_add(folio, nr_ptes - 1);
+	set_pte_range(vmf, folio, page, nr_ptes, addr);
+	type = is_cow ? MM_ANONPAGES : mm_counter_file(folio);
+	add_mm_counter(vma->vm_mm, type, nr_ptes);
+
+unlock:
+	pte_unmap_unlock(vmf->pte, vmf->ptl);
+	return ret;
+}
+
 /**
  * finish_fault - finish page fault once we have prepared the page to fault
  *
@@ -5591,12 +5638,9 @@ vm_fault_t finish_fault(struct vm_fault *vmf)
 	vm_fault_t ret;
 	bool is_cow = (vmf->flags & FAULT_FLAG_WRITE) &&
 		      !(vma->vm_flags & VM_SHARED);
-	int type, nr_ptes;
-	unsigned long addr;
-	bool needs_fallback = false;
-
-fallback:
-	addr = vmf->address;
+	int nr_ptes;
+	unsigned long addr = vmf->address;
+	bool past_eof;
 
 	/* Did we COW the page? */
 	if (is_cow)
@@ -5620,11 +5664,10 @@ fallback:
 	 * i_size to preserve SIGBUS semantics. Only applies to non-COW
 	 * file-backed faults; see folio_extends_past_i_size().
 	 */
-	if (folio_extends_past_i_size(vmf, folio, is_cow))
-		needs_fallback = true;
+	past_eof = folio_extends_past_i_size(vmf, folio, is_cow);
 
 	if (pmd_none(*vmf->pmd)) {
-		if (!needs_fallback && folio_test_pmd_mappable(folio)) {
+		if (!past_eof && folio_test_pmd_mappable(folio)) {
 			ret = do_set_pmd(vmf, folio, page);
 			if (ret != VM_FAULT_FALLBACK)
 				return ret;
@@ -5643,7 +5686,7 @@ fallback:
 	 * approach also applies to non shmem/tmpfs faults to avoid
 	 * inflating the RSS of the process.
 	 */
-	if (unlikely(userfaultfd_armed(vma)) || unlikely(needs_fallback)) {
+	if (unlikely(userfaultfd_armed(vma)) || unlikely(past_eof)) {
 		nr_ptes = 1;
 	} else if (nr_ptes > 1) {
 		unsigned long idx = folio_page_idx(folio, page) * PTES_PER_PAGE + (vmf->pteoff % PTES_PER_PAGE);
@@ -5668,31 +5711,20 @@ fallback:
 		}
 	}
 
-	vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd,
-				       addr, &vmf->ptl);
-	if (!vmf->pte)
-		return VM_FAULT_NOPAGE;
-
-	/* Re-check under ptl */
-	if (nr_ptes == 1 && unlikely(vmf_pte_changed(vmf))) {
-		update_mmu_tlb(vma, addr, vmf->pte);
-		ret = VM_FAULT_NOPAGE;
-		goto unlock;
-	} else if (nr_ptes > 1 && !pte_range_none(vmf->pte, nr_ptes)) {
-		needs_fallback = true;
-		pte_unmap_unlock(vmf->pte, vmf->ptl);
-		goto fallback;
+	/*
+	 * Multi-PTE install first; on -EAGAIN (a sibling already populated
+	 * the range under us), fall through to a single-PTE install at the
+	 * original fault address.
+	 */
+	if (nr_ptes > 1) {
+		ret = finish_fault_install(vmf, folio, page, nr_ptes, addr,
+					   is_cow);
+		if (ret != -EAGAIN)
+			return ret;
 	}
 
-	folio_ref_add(folio, nr_ptes - 1);
-	set_pte_range(vmf, folio, page, nr_ptes, addr);
-	type = is_cow ? MM_ANONPAGES : mm_counter_file(folio);
-	add_mm_counter(vma->vm_mm, type, nr_ptes);
-	ret = 0;
-
-unlock:
-	pte_unmap_unlock(vmf->pte, vmf->ptl);
-	return ret;
+	page = is_cow ? vmf->cow_page : vmf->page;
+	return finish_fault_install(vmf, folio, page, 1, vmf->address, is_cow);
 }
 
 static unsigned long fault_around_pages __read_mostly =
