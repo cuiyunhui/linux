@@ -5274,7 +5274,7 @@ static vm_fault_t do_anonymous_page(struct vm_fault *vmf)
 		goto oom;
 
 	nr_pages = folio_nr_pages(folio);
-	addr = ALIGN_DOWN(vmf->address, nr_pages * PAGE_SIZE);
+	addr = ALIGN_DOWN(vmf->address, nr_pages * PG_SIZE);
 
 	/*
 	 * The memory barrier inside __folio_mark_uptodate makes sure that
