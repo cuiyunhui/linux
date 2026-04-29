@@ -3741,21 +3741,30 @@ skip:
 
 /*
  * Map page range [start_page, start_page + nr_pages) of folio.
- * start_page is gotten from start by folio_page(folio, start)
+ * start_page is gotten from start by folio_page(folio, start).
+ * Only PTEs within [start_pteoff, end_pteoff] are mapped.
  */
 static vm_fault_t filemap_map_folio_range(struct vm_fault *vmf,
 			struct folio *folio, unsigned long start,
 			unsigned long addr, unsigned int nr_pages,
 			unsigned long *rss, unsigned short *mmap_miss,
-			pgoff_t file_end)
+			pgoff_t file_end,
+			unsigned long start_pteoff, unsigned long end_pteoff)
 {
 	struct address_space *mapping = folio->mapping;
 	unsigned int ref_from_caller = 1;
 	vm_fault_t ret = 0;
 	struct page *page = folio_page(folio, start);
-	unsigned int count = 0;
 	pte_t *old_ptep = vmf->pte;
 	unsigned long addr0;
+	unsigned long cur_pgidx = folio->index + start;
+	unsigned int i;
+
+	/* Batch state: accumulate consecutive mappable PTEs */
+	struct page *batch_page = page;
+	pte_t *batch_pte = vmf->pte;
+	unsigned long batch_addr = addr;
+	unsigned int batch_nr = 0;
 
 	/*
 	 * Map the large folio fully where possible:
@@ -3769,15 +3778,34 @@ static vm_fault_t filemap_map_folio_range(struct vm_fault *vmf,
 	if ((file_end >= folio_next_index(folio) || shmem_mapping(mapping)) &&
 	    folio_within_vma(folio, vmf->vma) &&
 	    (addr0 & PMD_MASK) == ((addr0 + folio_size(folio) - 1) & PMD_MASK)) {
-		vmf->pte -= start;
+		vmf->pte -= PAGES_TO_PTES(start);
 		page -= start;
 		addr = addr0;
 		nr_pages = folio_nr_pages(folio);
+		cur_pgidx = folio->index;
+		batch_page = page;
+		batch_pte = vmf->pte;
+		batch_addr = addr;
 	}
 
 	do {
-		if (PageHWPoison(page + count))
+		unsigned long pg_start = PAGES_TO_PTES(cur_pgidx);
+		unsigned long pg_end = pg_start + PTES_PER_PAGE;
+		unsigned long map_start = max(pg_start, start_pteoff);
+		unsigned long map_end = min(pg_end, end_pteoff + 1);
+
+		unsigned int n, sub_off;
+		pte_t *ptep;
+
+		if (PTES_PER_PAGE > 1 && !(vmf->vma->vm_flags & VM_SHARED))
+			map_end = min(map_end, map_start + 1);
+
+		if (map_start >= map_end || PageHWPoison(page))
 			goto skip;
+
+		n = map_end - map_start;
+		sub_off = map_start - pg_start;
+		ptep = vmf->pte + sub_off;
 
 		/*
 		 * If there are too many folios that are recently evicted
@@ -3791,37 +3819,81 @@ static vm_fault_t filemap_map_folio_range(struct vm_fault *vmf,
 
 		/*
 		 * NOTE: If there're PTE markers, we'll leave them to be
-		 * handled in the specific fault path, and it'll prohibit the
-		 * fault-around logic.
+		 * handled in the specific fault path, and it'll prohibit
+		 * the fault-around logic.
 		 */
-		if (!pte_none(ptep_get(&vmf->pte[count])))
-			goto skip;
-
-		count++;
-		continue;
-skip:
-		if (count) {
-			set_pte_range(vmf, folio, page, count, addr);
-			*rss += count;
-			folio_ref_add(folio, count - ref_from_caller);
-			ref_from_caller = 0;
-			if (in_range(vmf->address, addr, count * PG_SIZE))
-				ret = VM_FAULT_NOPAGE;
+		for (i = 0; i < n; i++) {
+			if (!pte_none(ptep_get(ptep + i)))
+				goto skip;
 		}
 
-		count++;
-		page += count;
-		vmf->pte += count;
-		addr += count * PG_SIZE;
-		count = 0;
+		if (!batch_nr) {
+			batch_page = page;
+			batch_pte = ptep;
+			batch_addr = addr + sub_off * PTE_SIZE;
+		}
+		batch_nr += n;
+
+		/*
+		 * When PTES_PER_PAGE > 1 and the VMA is MAP_PRIVATE we install
+		 * at most one PTE per folio-page (see the map_end clamp
+		 * above).  The next PG's PTE sits PTES_PER_PAGE entries away
+		 * in memory, so it can't be batched with the current one —
+		 * set_ptes() would install consecutive PTEs at the wrong
+		 * slots.  Flush the batch every iteration in this case.
+		 */
+		if (PTES_PER_PAGE > 1 && !(vmf->vma->vm_flags & VM_SHARED)) {
+			pte_t *saved_pte = vmf->pte;
+
+			vmf->pte = batch_pte;
+			set_pte_range(vmf, folio, batch_page, batch_nr,
+				      batch_addr);
+			*rss += batch_nr;
+			folio_ref_add(folio, batch_nr - ref_from_caller);
+			ref_from_caller = 0;
+			if (in_range(vmf->address, batch_addr,
+				     batch_nr * PTE_SIZE))
+				ret = VM_FAULT_NOPAGE;
+			batch_nr = 0;
+			vmf->pte = saved_pte;
+		}
+
+		vmf->pte += PTES_PER_PAGE;
+		addr += PG_SIZE;
+		page++;
+		cur_pgidx++;
+		continue;
+skip:
+		if (batch_nr) {
+			pte_t *saved_pte = vmf->pte;
+
+			vmf->pte = batch_pte;
+			set_pte_range(vmf, folio, batch_page, batch_nr,
+				      batch_addr);
+			*rss += batch_nr;
+			folio_ref_add(folio, batch_nr - ref_from_caller);
+			ref_from_caller = 0;
+			if (in_range(vmf->address, batch_addr,
+				     batch_nr * PTE_SIZE))
+				ret = VM_FAULT_NOPAGE;
+			batch_nr = 0;
+			vmf->pte = saved_pte;
+		}
+
+		vmf->pte += PTES_PER_PAGE;
+		addr += PG_SIZE;
+		page++;
+		cur_pgidx++;
 	} while (--nr_pages > 0);
 
-	if (count) {
-		set_pte_range(vmf, folio, page, count, addr);
-		*rss += count;
-		folio_ref_add(folio, count - ref_from_caller);
+	if (batch_nr) {
+		vmf->pte = batch_pte;
+		set_pte_range(vmf, folio, batch_page, batch_nr,
+			      batch_addr);
+		*rss += batch_nr;
+		folio_ref_add(folio, batch_nr - ref_from_caller);
 		ref_from_caller = 0;
-		if (in_range(vmf->address, addr, count * PAGE_SIZE))
+		if (in_range(vmf->address, batch_addr, batch_nr * PTE_SIZE))
 			ret = VM_FAULT_NOPAGE;
 	}
 
@@ -3833,50 +3905,17 @@ skip:
 	return ret;
 }
 
-static vm_fault_t filemap_map_order0_folio(struct vm_fault *vmf,
-		struct folio *folio, unsigned long addr,
-		unsigned long *rss, unsigned short *mmap_miss)
-{
-	vm_fault_t ret = 0;
-	struct page *page = &folio->page;
-
-	if (PageHWPoison(page))
-		goto out;
-
-	/* See comment of filemap_map_folio_range() */
-	if (!folio_test_workingset(folio))
-		(*mmap_miss)++;
-
-	/*
-	 * NOTE: If there're PTE markers, we'll leave them to be
-	 * handled in the specific fault path, and it'll prohibit
-	 * the fault-around logic.
-	 */
-	if (!pte_none(ptep_get(vmf->pte)))
-		goto out;
-
-	if (vmf->address == addr)
-		ret = VM_FAULT_NOPAGE;
-
-	set_pte_range(vmf, folio, page, 1, addr);
-	(*rss)++;
-	return ret;
-
-out:
-	/* Locked folios cannot get truncated. */
-	folio_ref_dec(folio);
-	return ret;
-}
-
 vm_fault_t filemap_map_pages(struct vm_fault *vmf,
-			     pgoff_t start_pgoff, pgoff_t end_pgoff)
+			     unsigned long start_pteoff,
+			     unsigned long end_pteoff)
 {
 	struct vm_area_struct *vma = vmf->vma;
 	struct file *file = vma->vm_file;
 	struct address_space *mapping = file->f_mapping;
-	pgoff_t file_end, last_pgoff = start_pgoff;
-	unsigned long addr;
-	XA_STATE(xas, &mapping->i_pages, start_pgoff);
+	unsigned long file_end, end_pgidx;
+	unsigned long addr, initial_addr;
+	pte_t *initial_pte;
+	XA_STATE(xas, &mapping->i_pages, PTES_TO_PAGES(start_pteoff));
 	struct folio *folio;
 	vm_fault_t ret = 0;
 	unsigned long rss = 0;
@@ -3884,15 +3923,15 @@ vm_fault_t filemap_map_pages(struct vm_fault *vmf,
 	unsigned short mmap_miss = 0, mmap_miss_saved;
 
 	/*
-	 * Recalculate end_pgoff based on file_end before calling
+	 * Recalculate end_pgidx based on file_end before calling
 	 * next_uptodate_folio() to avoid races with concurrent
 	 * truncation.
 	 */
-	file_end = DIV_ROUND_UP(i_size_read(mapping->host), PAGE_SIZE) - 1;
-	end_pgoff = min(end_pgoff, file_end);
+	file_end = DIV_ROUND_UP(i_size_read(mapping->host), PG_SIZE) - 1;
+	end_pgidx = min(PTES_TO_PAGES(end_pteoff), file_end);
 
 	rcu_read_lock();
-	folio = next_uptodate_folio(&xas, mapping, end_pgoff);
+	folio = next_uptodate_folio(&xas, mapping, end_pgidx);
 	if (!folio)
 		goto out;
 
@@ -3904,42 +3943,42 @@ vm_fault_t filemap_map_pages(struct vm_fault *vmf,
 	 * intentionally mapped with PMDs across i_size.
 	 */
 	if ((file_end >= folio_next_index(folio) || shmem_mapping(mapping)) &&
-	    filemap_map_pmd(vmf, folio, start_pgoff)) {
+	    filemap_map_pmd(vmf, folio, PTES_TO_PAGES(start_pteoff))) {
 		ret = VM_FAULT_NOPAGE;
 		goto out;
 	}
 
-	addr = vma->vm_start + ((start_pgoff - vma->vm_pgoff) << PG_SHIFT);
+	addr = vma->vm_start + ((start_pteoff - vma->vm_pteoff) << PTE_SHIFT);
 	vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd, addr, &vmf->ptl);
 	if (!vmf->pte) {
 		folio_unlock(folio);
 		folio_put(folio);
 		goto out;
 	}
+	initial_pte = vmf->pte;
+	initial_addr = addr;
 
 	folio_type = mm_counter_file(folio);
 	do {
 		unsigned long end;
+		long pte_delta = (long)PAGES_TO_PTES(xas.xa_index) -
+				 (long)start_pteoff;
 
-		addr += (xas.xa_index - last_pgoff) << PG_SHIFT;
-		vmf->pte += xas.xa_index - last_pgoff;
-		last_pgoff = xas.xa_index;
+		vmf->pte = initial_pte + pte_delta;
+		addr = initial_addr + (pte_delta << PTE_SHIFT);
 		end = folio_next_index(folio) - 1;
-		nr_pages = min(end, end_pgoff) - xas.xa_index + 1;
+		nr_pages = min(end, end_pgidx) - xas.xa_index + 1;
 
-		if (!folio_test_large(folio))
-			ret |= filemap_map_order0_folio(vmf,
-					folio, addr, &rss, &mmap_miss);
-		else
-			ret |= filemap_map_folio_range(vmf, folio,
-					xas.xa_index - folio->index, addr,
-					nr_pages, &rss, &mmap_miss, file_end);
+		ret |= filemap_map_folio_range(vmf, folio,
+				xas.xa_index - folio->index, addr,
+				nr_pages, &rss, &mmap_miss, file_end,
+				start_pteoff, end_pteoff);
 
 		folio_unlock(folio);
-	} while ((folio = next_uptodate_folio(&xas, mapping, end_pgoff)) != NULL);
+	} while ((folio = next_uptodate_folio(&xas, mapping, end_pgidx)) != NULL);
 	add_mm_counter(vma->vm_mm, folio_type, rss);
 	pte_unmap_unlock(vmf->pte, vmf->ptl);
-	trace_mm_filemap_map_pages(mapping, start_pgoff, end_pgoff);
+	trace_mm_filemap_map_pages(mapping, start_pteoff, end_pteoff);
 out:
 	rcu_read_unlock();
 
