@@ -5667,25 +5667,27 @@ static bool folio_extends_past_i_size(struct vm_fault *vmf, struct folio *folio,
 }
 
 /*
- * finish_fault_install - install nr_ptes PTEs for a prepared folio under PTL.
+ * finish_fault_install - install nr_ptes PTEs for a prepared COW/file
+ * folio under PTL.
  *
- * The clamp (addr, nr_ptes, page) is the caller's; this helper acquires the
- * PTL, handles the race re-check, and calls set_pte_range() to install the
- * batch.
+ * The clamp (addr, pteoff, nr_ptes, page) is the caller's — this helper
+ * just acquires the PTL, handles the race re-check, tears down any
+ * stale file PTEs in the range, then calls set_pte_range() to install
+ * the batch.
  *
  * Return values:
  *   0			success
  *   VM_FAULT_NOPAGE	someone else installed the PTE in the meantime
- *   -EAGAIN		multi-PTE install would clobber a sibling; caller
- *			should retry with nr_ptes == 1 at the original fault
- *			address
+ *   -EAGAIN		multi-PTE install would overwrite sibling anon data
+ *			(caller should retry with nr_ptes == 1 at the
+ *			 original fault address)
  */
 static int finish_fault_install(struct vm_fault *vmf, struct folio *folio,
 				struct page *page, int nr_ptes,
 				unsigned long addr, bool is_cow)
 {
 	struct vm_area_struct *vma = vmf->vma;
-	int type, ret = 0;
+	int type, i, ret = 0;
 
 	vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd, addr, &vmf->ptl);
 	if (!vmf->pte)
@@ -5699,8 +5701,51 @@ static int finish_fault_install(struct vm_fault *vmf, struct folio *folio,
 			goto unlock;
 		}
 	} else if (!pte_range_none(vmf->pte, nr_ptes)) {
-		ret = -EAGAIN;
-		goto unlock;
+		/*
+		 * Some PTEs in the range are already populated. A multi-PTE
+		 * install on top is only safe when is_cow && vma->vm_file,
+		 * where we replace any stale file-backed siblings in place.
+		 * Any other shape (or a present anon sibling — see pre-scan
+		 * below) signals the caller to retry with nr_ptes == 1.
+		 */
+		if (!is_cow || !vma->vm_file) {
+			ret = -EAGAIN;
+			goto unlock;
+		}
+
+		/*
+		 * Pre-scan first: if any sibling already holds an anon COW
+		 * page, merging would lose its data. Checking up-front avoids
+		 * leaving a partially torn-down range of file PTEs if we bail
+		 * in the middle of the cleanup loop.
+		 */
+		for (i = 0; i < nr_ptes; i++) {
+			pte_t pte = ptep_get(vmf->pte + i);
+
+			if (!pte_none(pte) && pte_present(pte) &&
+			    folio_test_anon(page_folio(pte_page(pte)))) {
+				ret = -EAGAIN;
+				goto unlock;
+			}
+		}
+
+		/* Safe to tear down stale file-backed siblings. */
+		for (i = 0; i < nr_ptes; i++) {
+			pte_t pte = ptep_get(vmf->pte + i);
+			struct page *pg;
+			struct folio *f;
+
+			if (pte_none(pte) || !pte_present(pte))
+				continue;
+			pg = pte_page(pte);
+			f = page_folio(pg);
+			ptep_clear_flush(vma, addr + i * PTE_SIZE,
+					 vmf->pte + i);
+			folio_remove_rmap_pte(f, pg, vma);
+			add_mm_counter(vma->vm_mm,
+				       mm_counter_file(f), -1);
+			folio_put(f);
+		}
 	}
 
 	folio_ref_add(folio, nr_ptes - 1);
@@ -5777,7 +5822,12 @@ vm_fault_t finish_fault(struct vm_fault *vmf)
 			return VM_FAULT_OOM;
 	}
 
-	nr_ptes = folio_nr_ptes(folio);
+	if (is_cow && PTES_PER_PAGE > 1 && vma->vm_file)
+		nr_ptes = PTES_PER_PAGE;
+	else if (is_cow)
+		nr_ptes = 1;
+	else
+		nr_ptes = folio_nr_ptes(folio);
 
 	/*
 	 * Using per-page fault to maintain the uffd semantics, and same
@@ -5787,42 +5837,37 @@ vm_fault_t finish_fault(struct vm_fault *vmf)
 	if (unlikely(userfaultfd_armed(vma)) || unlikely(past_eof)) {
 		nr_ptes = 1;
 	} else if (nr_ptes > 1) {
-		unsigned long idx = folio_page_idx(folio, page) * PTES_PER_PAGE + (vmf->pteoff % PTES_PER_PAGE);
-		/* The page offset of vmf->address within the VMA. */
-		unsigned long vma_off = vmf->pteoff - vmf->vma->vm_pteoff;
-		/* The index of the entry in the pagetable for fault page. */
-		unsigned long pte_off = pte_index(vmf->address);
+		unsigned long pg_sub = vmf->pteoff % PTES_PER_PAGE;
+		unsigned long fault_idx = is_cow ? pg_sub :
+			PAGES_TO_PTES(folio_page_idx(folio, page)) + pg_sub;
+		struct pte_install_clamp clamp =
+			pte_install_clamp(vmf, fault_idx, nr_ptes);
 
-		/*
-		 * Fallback to per-page fault in case the folio size in page
-		 * cache beyond the VMA limits and PMD pagetable limits.
-		 */
-		if (unlikely(vma_off < idx ||
-			    vma_off + (nr_ptes - idx) > vma_ptes(vma) ||
-			    pte_off < idx ||
-			    pte_off + (nr_ptes - idx) > PTRS_PER_PTE)) {
-			nr_ptes = 1;
-		} else {
-			/* Now we can set mappings for the whole large folio. */
-			addr = vmf->address - idx * PTE_SIZE;
-			page = &folio->page;
+		nr_ptes = clamp.left + clamp.right;
+
+		if (nr_ptes > 1) {
+			addr = vmf->address - clamp.left * PTE_SIZE;
+			page = folio_page(folio,
+					  PTES_TO_PAGES(fault_idx - clamp.left));
 		}
 	}
 
 	/*
-	 * Multi-PTE install first; on -EAGAIN (a sibling already populated
-	 * the range under us), fall through to a single-PTE install at the
-	 * original fault address.
+	 * Multi-PTE install first; if the helper signals -EAGAIN (an anon
+	 * sibling would be clobbered, or a present non-is_cow/!vm_file
+	 * range), fall through to a single-PTE install at the original
+	 * fault address.
 	 */
 	if (nr_ptes > 1) {
-		ret = finish_fault_install(vmf, folio, page, nr_ptes, addr,
-					   is_cow);
+		ret = finish_fault_install(vmf, folio, page, nr_ptes,
+					   addr, is_cow);
 		if (ret != -EAGAIN)
 			return ret;
 	}
 
 	page = is_cow ? vmf->cow_page : vmf->page;
-	return finish_fault_install(vmf, folio, page, 1, vmf->address, is_cow);
+	return finish_fault_install(vmf, folio, page, 1,
+				    vmf->address, is_cow);
 }
 
 static unsigned long fault_around_pages __read_mostly =
