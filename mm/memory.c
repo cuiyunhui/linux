@@ -357,10 +357,10 @@ void free_pgd_range(struct mmu_gather *tlb,
 	if (addr > end - 1)
 		return;
 	/*
-	 * We add page table cache pages with PAGE_SIZE,
+	 * We add page table cache pages with PG_SIZE,
 	 * (see pte_free_tlb()), flush the tlb if we need
 	 */
-	tlb_change_page_size(tlb, PAGE_SIZE);
+	tlb_change_page_size(tlb, PG_SIZE);
 	pgd = pgd_offset(tlb->mm, addr);
 	do {
 		next = pgd_addr_end(addr, end);
@@ -601,13 +601,13 @@ static void print_bad_page_map(struct vm_area_struct *vma,
 		enum pgtable_level level)
 {
 	struct address_space *mapping;
-	pgoff_t index;
+	unsigned long index;
 
 	if (is_bad_page_map_ratelimited())
 		return;
 
 	mapping = vma->vm_file ? vma->vm_file->f_mapping : NULL;
-	index = linear_page_index(vma, addr);
+	index = linear_pte_index(vma, addr);
 
 	pr_alert("BUG: Bad page map in process %s  %s:%08llx", current->comm,
 		 pgtable_level_to_str(level), entry);
@@ -665,10 +665,10 @@ static void print_bad_page_map(struct vm_area_struct *vma,
  *
  * The way we recognize COWed pages within VM_PFNMAP mappings is through the
  * rules set up by "remap_pfn_range()": the vma will have the VM_PFNMAP bit
- * set, and the vm_pgoff will point to the first PFN mapped: thus every special
+ * set, and the vm_pteoff will point to the first PFN mapped: thus every special
  * mapping will always honor the rule
  *
- *	pfn_of_page == vma->vm_pgoff + ((addr - vma->vm_start) >> PAGE_SHIFT)
+ *	pfn_of_page == vma->vm_pteoff + ((addr - vma->vm_start) >> PTE_SHIFT)
  *
  * And for normal mappings this is false.
  *
@@ -722,10 +722,10 @@ static inline struct page *__vm_normal_page(struct vm_area_struct *vma,
 				if (!pfn_valid(pfn))
 					return NULL;
 			} else {
-				unsigned long off = (addr - vma->vm_start) >> PAGE_SHIFT;
+				unsigned long off = (addr - vma->vm_start) >> PTE_SHIFT;
 
 				/* Only CoW'ed anon folios are "normal". */
-				if (pfn == vma->vm_pgoff + off)
+				if (pfn == vma->vm_pteoff + off)
 					return NULL;
 				if (!is_cow_mapping(vma->vm_flags))
 					return NULL;
@@ -882,11 +882,12 @@ static void restore_exclusive_pte(struct vm_area_struct *vma,
 		struct folio *folio, struct page *page, unsigned long address,
 		pte_t *ptep, pte_t orig_pte)
 {
+	unsigned long pteoff = linear_pte_index(vma, address);
 	pte_t pte;
 
 	VM_WARN_ON_FOLIO(!folio_test_locked(folio), folio);
 
-	pte = pte_mkold(mk_pte(page, READ_ONCE(vma->vm_page_prot)));
+	pte = pte_mkold(mkpte(page, pteoff, READ_ONCE(vma->vm_page_prot)));
 	if (pte_swp_soft_dirty(orig_pte))
 		pte = pte_mksoft_dirty(pte);
 
@@ -1061,6 +1062,7 @@ copy_present_page(struct vm_area_struct *dst_vma, struct vm_area_struct *src_vma
 		  pte_t *dst_pte, pte_t *src_pte, unsigned long addr, int *rss,
 		  struct folio **prealloc, struct page *page)
 {
+	unsigned long pteoff = linear_pte_index(dst_vma, addr);
 	struct folio *new_folio;
 	pte_t pte;
 
@@ -1083,7 +1085,7 @@ copy_present_page(struct vm_area_struct *dst_vma, struct vm_area_struct *src_vma
 	rss[MM_ANONPAGES]++;
 
 	/* All done, just insert the new page copy in the child */
-	pte = folio_mk_pte(new_folio, dst_vma->vm_page_prot);
+	pte = folio_mkpte(new_folio, pteoff, dst_vma->vm_page_prot);
 	pte = maybe_mkwrite(pte_mkdirty(pte), dst_vma);
 	if (userfaultfd_pte_wp(dst_vma, ptep_get(src_pte)))
 		/* Uffd-wp needs to be delivered to dest pte as well */
@@ -1313,7 +1315,7 @@ again:
 			WARN_ON_ONCE(ret != -ENOENT);
 		}
 		/* copy_present_ptes() will clear `*prealloc' if consumed */
-		max_nr = (end - addr) / PAGE_SIZE;
+		max_nr = (end - addr) / PTE_SIZE;
 		ret = copy_present_ptes(dst_vma, src_vma, dst_pte, src_pte,
 					ptent, addr, max_nr, rss, &prealloc);
 		/*
@@ -1335,7 +1337,7 @@ again:
 		}
 		nr = ret;
 		progress += 8 * nr;
-	} while (dst_pte += nr, src_pte += nr, addr += PAGE_SIZE * nr,
+	} while (dst_pte += nr, src_pte += nr, addr += PTE_SIZE * nr,
 		 addr != end);
 
 	lazy_mmu_mode_disable();
@@ -1624,7 +1626,7 @@ zap_install_uffd_wp_if_needed(struct vm_area_struct *vma,
 		if (--nr == 0)
 			break;
 		pte++;
-		addr += PAGE_SIZE;
+		addr += PTE_SIZE;
 	}
 
 	return was_installed;
@@ -1666,8 +1668,9 @@ static __always_inline void zap_present_folio_ptes(struct mmu_gather *tlb,
 	if (!delay_rmap) {
 		folio_remove_rmap_ptes(folio, page, nr, vma);
 
-		if (unlikely(folio_mapcount(folio) < 0))
+		if (unlikely(folio_mapcount(folio) < 0)) {
 			print_bad_pte(vma, addr, ptent, page);
+		}
 	}
 	if (unlikely(__tlb_remove_folio_pages(tlb, page, nr, delay_rmap))) {
 		*force_flush = true;
@@ -1715,7 +1718,7 @@ static inline int zap_present_ptes(struct mmu_gather *tlb,
 	 * Make sure that the common "small folio" case is as fast as possible
 	 * by keeping the batching logic separate.
 	 */
-	if (unlikely(folio_test_large(folio) && max_nr != 1)) {
+	if (unlikely(folio_nr_ptes(folio) > 1 && max_nr != 1)) {
 		nr = folio_pte_batch(folio, pte, ptent, max_nr);
 		zap_present_folio_ptes(tlb, vma, folio, page, pte, ptent, nr,
 				       addr, details, rss, force_flush,
@@ -1806,7 +1809,7 @@ static inline int do_zap_pte_range(struct mmu_gather *tlb,
 				   bool *any_skipped)
 {
 	pte_t ptent = ptep_get(pte);
-	int max_nr = (end - addr) / PAGE_SIZE;
+	int max_nr = (end - addr) / PTE_SIZE;
 	int nr = 0;
 
 	/* Skip all consecutive none ptes */
@@ -1820,7 +1823,7 @@ static inline int do_zap_pte_range(struct mmu_gather *tlb,
 		if (!max_nr)
 			return nr;
 		pte += nr;
-		addr += nr * PAGE_SIZE;
+		addr += nr * PTE_SIZE;
 	}
 
 	if (pte_present(ptent))
@@ -1910,7 +1913,7 @@ static unsigned long zap_pte_range(struct mmu_gather *tlb,
 	int nr;
 
 retry:
-	tlb_change_page_size(tlb, PAGE_SIZE);
+	tlb_change_page_size(tlb, PTE_SIZE);
 	init_rss_vec(rss);
 	start_pte = pte = pte_offset_map_lock(mm, pmd, addr, &ptl);
 	if (!pte)
@@ -1931,11 +1934,11 @@ retry:
 		if (any_skipped)
 			can_reclaim_pt = false;
 		if (unlikely(force_break)) {
-			addr += nr * PAGE_SIZE;
+			addr += nr * PTE_SIZE;
 			direct_reclaim = false;
 			break;
 		}
-	} while (pte += nr, addr += PAGE_SIZE * nr, addr != end);
+	} while (pte += nr, addr += PTE_SIZE * nr, addr != end);
 
 	/*
 	 * Fast path: try to hold the pmd lock and unmap the PTE page.
@@ -2342,6 +2345,7 @@ static int insert_page_into_pte_locked(struct vm_area_struct *vma, pte_t *pte,
 				unsigned long addr, struct page *page,
 				pgprot_t prot, bool mkwrite)
 {
+	unsigned long pteoff = linear_pte_index(vma, addr);
 	struct folio *folio = page_folio(page);
 	pte_t pteval = ptep_get(pte);
 
@@ -2362,12 +2366,12 @@ static int insert_page_into_pte_locked(struct vm_area_struct *vma, pte_t *pte,
 	}
 
 	/* Ok, finally just insert the thing.. */
-	pteval = mk_pte(page, prot);
+	pteval = mkpte(page, pteoff, prot);
 	if (unlikely(is_zero_folio(folio))) {
 		pteval = pte_mkspecial(pteval);
 	} else {
 		folio_get(folio);
-		pteval = mk_pte(page, prot);
+		pteval = mkpte(page, pteoff, prot);
 		if (mkwrite) {
 			pteval = pte_mkyoung(pteval);
 			pteval = maybe_mkwrite(pte_mkdirty(pteval), vma);
@@ -2457,7 +2461,7 @@ more:
 				remaining_pages_total -= pte_idx;
 				goto out;
 			}
-			addr += PAGE_SIZE;
+			addr += PTE_SIZE;
 			++curr_page_idx;
 		}
 		pte_unmap_unlock(start_pte, pte_lock);
@@ -2490,7 +2494,7 @@ out:
 int vm_insert_pages(struct vm_area_struct *vma, unsigned long addr,
 			struct page **pages, unsigned long *num)
 {
-	const unsigned long end_addr = addr + (*num * PAGE_SIZE) - 1;
+	const unsigned long end_addr = addr + (*num * PG_SIZE) - 1;
 
 	if (addr < vma->vm_start || end_addr >= vma->vm_end)
 		return -EFAULT;
@@ -2553,7 +2557,7 @@ EXPORT_SYMBOL(vm_insert_page);
  * @vma: user vma to map to
  * @pages: pointer to array of source kernel pages
  * @num: number of pages in page array
- * @offset: user's requested vm_pgoff
+ * @offset: user's requested vm_pteoff
  *
  * This allows drivers to map range of kernel pages into a user vma.
  * The zeropage is supported in some VMAs, see
@@ -2585,7 +2589,7 @@ static int __vm_map_pages(struct vm_area_struct *vma, struct page **pages,
  * @num: number of pages in page array
  *
  * Maps an object consisting of @num pages, catering for the user's
- * requested vm_pgoff
+ * requested vm_pteoff
  *
  * If we fail to insert any page into the vma, the function will return
  * immediately leaving any previously inserted pages present.  Callers
@@ -2599,7 +2603,7 @@ static int __vm_map_pages(struct vm_area_struct *vma, struct page **pages,
 int vm_map_pages(struct vm_area_struct *vma, struct page **pages,
 				unsigned long num)
 {
-	return __vm_map_pages(vma, pages, num, vma->vm_pgoff);
+	return __vm_map_pages(vma, pages, num, vma->vm_pteoff);
 }
 EXPORT_SYMBOL(vm_map_pages);
 
@@ -2611,7 +2615,7 @@ EXPORT_SYMBOL(vm_map_pages);
  *
  * Similar to vm_map_pages(), except that it explicitly sets the offset
  * to 0. This function is intended for the drivers that did not consider
- * vm_pgoff.
+ * vm_pteoff.
  *
  * Context: Process context. Called by mmap handlers.
  * Return: 0 on success and error code otherwise.
@@ -2884,7 +2888,7 @@ static int remap_pte_range(struct mm_struct *mm, pmd_t *pmd,
 		}
 		set_pte_at(mm, addr, pte, pte_mkspecial(pfn_pte(pfn, prot)));
 		pfn++;
-	} while (pte++, addr += PAGE_SIZE, addr != end);
+	} while (pte++, addr += PTE_SIZE, addr != end);
 	lazy_mmu_mode_disable();
 	pte_unmap_unlock(mapped_pte, ptl);
 	return err;
@@ -2898,7 +2902,7 @@ static inline int remap_pmd_range(struct mm_struct *mm, pud_t *pud,
 	unsigned long next;
 	int err;
 
-	pfn -= addr >> PAGE_SHIFT;
+	pfn -= addr >> PTE_SHIFT;
 	pmd = pmd_alloc(mm, pud, addr);
 	if (!pmd)
 		return -ENOMEM;
@@ -2906,7 +2910,7 @@ static inline int remap_pmd_range(struct mm_struct *mm, pud_t *pud,
 	do {
 		next = pmd_addr_end(addr, end);
 		err = remap_pte_range(mm, pmd, addr, next,
-				pfn + (addr >> PAGE_SHIFT), prot);
+				pfn + (addr >> PTE_SHIFT), prot);
 		if (err)
 			return err;
 	} while (pmd++, addr = next, addr != end);
@@ -2921,14 +2925,14 @@ static inline int remap_pud_range(struct mm_struct *mm, p4d_t *p4d,
 	unsigned long next;
 	int err;
 
-	pfn -= addr >> PAGE_SHIFT;
+	pfn -= addr >> PTE_SHIFT;
 	pud = pud_alloc(mm, p4d, addr);
 	if (!pud)
 		return -ENOMEM;
 	do {
 		next = pud_addr_end(addr, end);
 		err = remap_pmd_range(mm, pud, addr, next,
-				pfn + (addr >> PAGE_SHIFT), prot);
+				pfn + (addr >> PTE_SHIFT), prot);
 		if (err)
 			return err;
 	} while (pud++, addr = next, addr != end);
@@ -2943,14 +2947,14 @@ static inline int remap_p4d_range(struct mm_struct *mm, pgd_t *pgd,
 	unsigned long next;
 	int err;
 
-	pfn -= addr >> PAGE_SHIFT;
+	pfn -= addr >> PTE_SHIFT;
 	p4d = p4d_alloc(mm, pgd, addr);
 	if (!p4d)
 		return -ENOMEM;
 	do {
 		next = p4d_addr_end(addr, end);
 		err = remap_pud_range(mm, p4d, addr, next,
-				pfn + (addr >> PAGE_SHIFT), prot);
+				pfn + (addr >> PTE_SHIFT), prot);
 		if (err)
 			return err;
 	} while (p4d++, addr = next, addr != end);
@@ -2981,23 +2985,23 @@ static int remap_pfn_range_internal(struct vm_area_struct *vma, unsigned long ad
 {
 	pgd_t *pgd;
 	unsigned long next;
-	unsigned long end = addr + PAGE_ALIGN(size);
+	unsigned long end = addr + PTE_ALIGN(size);
 	struct mm_struct *mm = vma->vm_mm;
 	int err;
 
-	if (WARN_ON_ONCE(!PAGE_ALIGNED(addr)))
+	if (WARN_ON_ONCE(!PTE_ALIGNED(addr)))
 		return -EINVAL;
 
 	VM_WARN_ON_ONCE(!vma_test_all_flags_mask(vma, VMA_REMAP_FLAGS));
 
 	BUG_ON(addr >= end);
-	pfn -= addr >> PAGE_SHIFT;
+	pfn -= addr >> PTE_SHIFT;
 	pgd = pgd_offset(mm, addr);
 	flush_cache_range(vma, addr, end);
 	do {
 		next = pgd_addr_end(addr, end);
 		err = remap_p4d_range(mm, pgd, addr, next,
-				pfn + (addr >> PAGE_SHIFT), prot);
+				pfn + (addr >> PTE_SHIFT), prot);
 		if (err)
 			return err;
 	} while (pgd++, addr = next, addr != end);
@@ -3061,7 +3065,7 @@ static int remap_pfn_range_track(struct vm_area_struct *vma, unsigned long addr,
 	struct pfnmap_track_ctx *ctx = NULL;
 	int err;
 
-	size = PAGE_ALIGN(size);
+	size = PTE_ALIGN(size);
 
 	/*
 	 * If we cover the full VMA, we'll perform actual tracking, and
@@ -3113,18 +3117,18 @@ void remap_pfn_range_prepare(struct vm_area_desc *desc, unsigned long pfn)
 	 * invalid.
 	 */
 	get_remap_pgoff(vma_desc_is_cow_mapping(desc), desc->start, desc->end,
-			desc->start, desc->end, pfn, &desc->pgoff);
+			desc->start, desc->end, pfn, &desc->pteoff);
 	vma_desc_set_flags_mask(desc, VMA_REMAP_FLAGS);
 }
 
 static int remap_pfn_range_prepare_vma(struct vm_area_struct *vma, unsigned long addr,
 		unsigned long pfn, unsigned long size)
 {
-	unsigned long end = addr + PAGE_ALIGN(size);
+	unsigned long end = addr + PTE_ALIGN(size);
 	int err;
 
 	err = get_remap_pgoff(is_cow_mapping(vma->vm_flags), addr, end,
-			      vma->vm_start, vma->vm_end, pfn, &vma->vm_pgoff);
+			      vma->vm_start, vma->vm_end, pfn, &vma->vm_pteoff);
 	if (err)
 		return err;
 
@@ -3180,7 +3184,7 @@ int remap_pfn_range_complete(struct vm_area_struct *vma, unsigned long addr,
  */
 int vm_iomap_memory(struct vm_area_struct *vma, phys_addr_t start, unsigned long len)
 {
-	unsigned long vm_len, pfn, pages;
+	unsigned long vm_len, pfn, ptes;
 
 	/* Check that the physical memory area passed in looks valid */
 	if (start + len < start)
@@ -3190,21 +3194,21 @@ int vm_iomap_memory(struct vm_area_struct *vma, phys_addr_t start, unsigned long
 	 * but we've historically allowed it because IO memory might
 	 * just have smaller alignment.
 	 */
-	len += start & ~PAGE_MASK;
-	pfn = start >> PAGE_SHIFT;
-	pages = (len + ~PAGE_MASK) >> PAGE_SHIFT;
-	if (pfn + pages < pfn)
+	len += start & ~PG_MASK;
+	pfn = start >> PG_SHIFT;
+	ptes = (len + ~PTE_MASK) >> PTE_SHIFT;
+	if (pfn + ptes < pfn)
 		return -EINVAL;
 
-	/* We start the mapping 'vm_pgoff' pages into the area */
-	if (vma->vm_pgoff > pages)
+	/* We start the mapping 'vm_pteoff' pages into the area */
+	if (vma->vm_pteoff > ptes)
 		return -EINVAL;
-	pfn += vma->vm_pgoff;
-	pages -= vma->vm_pgoff;
+	pfn += vma->vm_pteoff;
+	ptes -= vma->vm_pteoff;
 
 	/* Can we fit all of the mapping? */
 	vm_len = vma->vm_end - vma->vm_start;
-	if (vm_len >> PAGE_SHIFT > pages)
+	if (vm_len >> PTE_SHIFT > ptes)
 		return -EINVAL;
 
 	/* Ok, let it rip */
@@ -3244,7 +3248,7 @@ static int apply_to_pte_range(struct mm_struct *mm, pmd_t *pmd,
 				if (err)
 					break;
 			}
-		} while (pte++, addr += PAGE_SIZE, addr != end);
+		} while (pte++, addr += PTE_SIZE, addr != end);
 	}
 	*mask |= PGTBL_PTE_MODIFIED;
 
@@ -4352,17 +4356,19 @@ static inline void unmap_mapping_range_tree(struct rb_root_cached *root,
 					    struct zap_details *details)
 {
 	struct vm_area_struct *vma;
-	pgoff_t vba, vea, zba, zea;
+	unsigned long vba, vea, zba, zea;
+	unsigned long first_pte = PAGES_TO_PTES(first_index);
+	unsigned long last_pte  = PAGES_TO_PTES(last_index + 1) - 1;
 
-	vma_interval_tree_foreach(vma, root, first_index, last_index) {
-		vba = vma->vm_pgoff;
-		vea = vba + vma_pages(vma) - 1;
-		zba = max(first_index, vba);
-		zea = min(last_index, vea);
+	vma_interval_tree_foreach(vma, root, first_pte, last_pte) {
+		vba = vma->vm_pteoff;
+		vea = vba + vma_ptes(vma) - 1;
+		zba = max(first_pte, vba);
+		zea = min(last_pte,  vea);
 
 		unmap_mapping_range_vma(vma,
-			((zba - vba) << PAGE_SHIFT) + vma->vm_start,
-			((zea - vba + 1) << PAGE_SHIFT) + vma->vm_start,
+			((zba - vba) << PTE_SHIFT) + vma->vm_start,
+			((zea - vba + 1) << PTE_SHIFT) + vma->vm_start,
 				details);
 	}
 }
@@ -4439,12 +4445,12 @@ EXPORT_SYMBOL_GPL(unmap_mapping_pages);
  *
  * @mapping: the address space containing mmaps to be unmapped.
  * @holebegin: byte in first page to unmap, relative to the start of
- * the underlying file.  This will be rounded down to a PAGE_SIZE
+ * the underlying file.  This will be rounded down to a PG_SIZE
  * boundary.  Note that this is different from truncate_pagecache(), which
  * must keep the partial page.  In contrast, we must get rid of
  * partial pages.
  * @holelen: size of prospective hole in bytes.  This will be rounded
- * up to a PAGE_SIZE boundary.  A holelen of zero truncates to the
+ * up to a PG_SIZE boundary.  A holelen of zero truncates to the
  * end of the file.
  * @even_cows: 1 when truncating a file, unmap even private COWed pages;
  * but 0 when invalidating pagecache, don't throw away private data.
@@ -4452,13 +4458,13 @@ EXPORT_SYMBOL_GPL(unmap_mapping_pages);
 void unmap_mapping_range(struct address_space *mapping,
 		loff_t const holebegin, loff_t const holelen, int even_cows)
 {
-	pgoff_t hba = (pgoff_t)(holebegin) >> PAGE_SHIFT;
-	pgoff_t hlen = ((pgoff_t)(holelen) + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	pgoff_t hba = (pgoff_t)(holebegin) >> PG_SHIFT;
+	pgoff_t hlen = ((pgoff_t)(holelen) + PG_SIZE - 1) >> PG_SHIFT;
 
 	/* Check for overflow. */
 	if (sizeof(holelen) > sizeof(hlen)) {
 		long long holeend =
-			(holebegin + holelen + PAGE_SIZE - 1) >> PAGE_SHIFT;
+			(holebegin + holelen + PG_SIZE - 1) >> PG_SHIFT;
 		if (holeend & ~(long long)ULONG_MAX)
 			hlen = ULONG_MAX - hba + 1;
 	}
@@ -4863,8 +4869,7 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 				unlock_page(vmf->page);
 				put_page(vmf->page);
 			} else {
-				pte_unmap(vmf->pte);
-				softleaf_entry_wait_on_locked(entry, vmf->ptl);
+				pte_unmap_unlock(vmf->pte, vmf->ptl);
 			}
 		} else if (softleaf_is_hwpoison(entry)) {
 			ret = VM_FAULT_HWPOISON;
@@ -5103,7 +5108,7 @@ check_folio:
 
 	add_mm_counter(vma->vm_mm, MM_ANONPAGES, nr_pages);
 	add_mm_counter(vma->vm_mm, MM_SWAPENTS, -nr_pages);
-	pte = mk_pte(page, vma->vm_page_prot);
+	pte = mkpte(page, vmf->pteoff, vma->vm_page_prot);
 	if (pte_swp_soft_dirty(vmf->orig_pte))
 		pte = pte_mksoft_dirty(pte);
 	if (pte_swp_uffd_wp(vmf->orig_pte))
@@ -5147,8 +5152,7 @@ check_folio:
 		folio_put_swap(folio, NULL);
 	} else {
 		VM_WARN_ON_ONCE(nr_pages != 1 && nr_pages != folio_nr_pages(folio));
-		folio_add_anon_rmap_ptes(folio, page, nr_pages, vma, address,
-					 rmap_flags);
+		folio_add_anon_rmap_ptes(folio, page, nr_pages, vma, rmap_flags);
 		folio_put_swap(folio, nr_pages == 1 ? page : NULL);
 	}
 
@@ -6027,20 +6031,20 @@ late_initcall(fault_around_debugfs);
  */
 static vm_fault_t do_fault_around(struct vm_fault *vmf)
 {
-	pgoff_t nr_pages = READ_ONCE(fault_around_pages);
-	pgoff_t pte_off = pte_index(vmf->address);
+	unsigned long nr_ptes = PAGES_TO_PTES(READ_ONCE(fault_around_pages));
+	unsigned long pte_off = pte_index(vmf->address);
 	/* The page offset of vmf->address within the VMA. */
-	pgoff_t vma_off = vmf->pgoff - vmf->vma->vm_pgoff;
+	unsigned long vma_off = vmf->pteoff - vmf->vma->vm_pteoff;
 	pgoff_t from_pte, to_pte;
 	vm_fault_t ret;
 
 	/* The PTE offset of the start address, clamped to the VMA. */
-	from_pte = max(ALIGN_DOWN(pte_off, nr_pages),
+	from_pte = max(ALIGN_DOWN(pte_off, nr_ptes),
 		       pte_off - min(pte_off, vma_off));
 
 	/* The PTE offset of the end address, clamped to the VMA and PTE. */
-	to_pte = min3(from_pte + nr_pages, (pgoff_t)PTRS_PER_PTE,
-		      pte_off + vma_pages(vmf->vma) - vma_off) - 1;
+	to_pte = min3(from_pte + nr_ptes, (pgoff_t)PTRS_PER_PTE,
+		      pte_off + vma_ptes(vmf->vma) - vma_off) - 1;
 
 	if (pmd_none(*vmf->pmd)) {
 		vmf->prealloc_pte = pte_alloc_one(vmf->vma->vm_mm);
@@ -6307,7 +6311,7 @@ static void numa_rebuild_large_mapping(struct vm_fault *vmf, struct vm_area_stru
 {
 	int nr = pte_pfn(fault_pte) - folio_pfn(folio);
 	unsigned long start, end, addr = vmf->address;
-	unsigned long addr_start = addr - (nr << PTE_SHIFT);
+	unsigned long addr_start = addr - (nr << PG_SHIFT);
 	unsigned long pt_start = ALIGN_DOWN(addr, PMD_SIZE);
 	pte_t *start_ptep;
 
@@ -6315,7 +6319,7 @@ static void numa_rebuild_large_mapping(struct vm_fault *vmf, struct vm_area_stru
 	start = max3(addr_start, pt_start, vma->vm_start);
 	end = min3(addr_start + folio_size(folio), pt_start + PMD_SIZE,
 		   vma->vm_end);
-	start_ptep = vmf->pte - ((addr - start) >> PTE_SHIFT);
+	start_ptep = vmf->pte - ((addr - start) >> PG_SHIFT);
 
 	/* Restore all PTEs' mapping of the large folio */
 	for (addr = start; addr != end; start_ptep++, addr += PTE_SIZE) {
@@ -6655,7 +6659,7 @@ static vm_fault_t __handle_mm_fault(struct vm_area_struct *vma,
 		.address = address & PTE_MASK,
 		.real_address = address,
 		.flags = flags,
-		.pgoff = linear_page_index(vma, address),
+		.pteoff = linear_pte_index(vma, address),
 		.gfp_mask = __get_fault_gfp_mask(vma),
 	};
 	struct mm_struct *mm = vma->vm_mm;
@@ -7027,7 +7031,7 @@ static inline void pfnmap_args_setup(struct follow_pfnmap_args *args,
 {
 	args->lock = lock;
 	args->ptep = ptep;
-	args->pfn = pfn_base + ((args->address & ~addr_mask) >> PAGE_SHIFT);
+	args->pfn = pfn_base + ((args->address & ~addr_mask) >> PG_SHIFT);
 	args->addr_mask = addr_mask;
 	args->pgprot = pgprot;
 	args->writable = writable;
@@ -7115,7 +7119,6 @@ retry:
 	if (pud_leaf(pud)) {
 		lock = pud_lock(mm, pudp);
 		pud = pudp_get(pudp);
-
 		if (unlikely(!pud_present(pud))) {
 			spin_unlock(lock);
 			goto out;
@@ -7136,7 +7139,6 @@ retry:
 	if (pmd_leaf(pmd)) {
 		lock = pmd_lock(mm, pmdp);
 		pmd = pmdp_get(pmdp);
-
 		if (unlikely(!pmd_present(pmd))) {
 			spin_unlock(lock);
 			goto out;
@@ -7157,7 +7159,7 @@ retry:
 	if (!pte_present(pte))
 		goto unlock;
 	pfnmap_args_setup(args, lock, ptep, pte_pgprot(pte),
-			  pte_pfn(pte), PAGE_MASK, pte_write(pte),
+			  pte_pfn(pte), PG_MASK, pte_write(pte),
 			  pte_special(pte));
 	return 0;
 unlock:
@@ -7202,7 +7204,7 @@ int generic_access_phys(struct vm_area_struct *vma, unsigned long addr,
 	resource_size_t phys_addr;
 	pgprot_t prot = __pgprot(0);
 	void __iomem *maddr;
-	int offset = offset_in_page(addr);
+	int offset = offset_in_pg(addr);
 	int ret = -EINVAL;
 	bool writable;
 	struct follow_pfnmap_args args = { .vma = vma, .address = addr };
@@ -7211,14 +7213,14 @@ retry:
 	if (follow_pfnmap_start(&args))
 		return -EINVAL;
 	prot = args.pgprot;
-	phys_addr = (resource_size_t)args.pfn << PAGE_SHIFT;
+	phys_addr = (resource_size_t)args.pfn << PTE_SHIFT;
 	writable = args.writable;
 	follow_pfnmap_end(&args);
 
 	if ((write & FOLL_WRITE) && !writable)
 		return -EINVAL;
 
-	maddr = ioremap_prot(phys_addr, PAGE_ALIGN(len + offset), prot);
+	maddr = ioremap_prot(phys_addr, PTE_ALIGN(len + offset), prot);
 	if (!maddr)
 		return -ENOMEM;
 
@@ -7226,7 +7228,7 @@ retry:
 		goto out_unmap;
 
 	if ((pgprot_val(prot) != pgprot_val(args.pgprot)) ||
-	    (phys_addr != (args.pfn << PAGE_SHIFT)) ||
+	    (phys_addr != (args.pfn << PTE_SHIFT)) ||
 	    (writable != args.writable)) {
 		follow_pfnmap_end(&args);
 		iounmap(maddr);
@@ -7304,11 +7306,11 @@ static int __access_remote_vm(struct mm_struct *mm, unsigned long addr,
 		} else {
 			folio = page_folio(page);
 			bytes = len;
-			offset = addr & (PAGE_SIZE-1);
-			if (bytes > PAGE_SIZE-offset)
-				bytes = PAGE_SIZE-offset;
+			offset = addr & (PG_SIZE-1);
+			if (bytes > PG_SIZE-offset)
+				bytes = PG_SIZE-offset;
 
-			maddr = kmap_local_folio(folio, folio_page_idx(folio, page) * PAGE_SIZE);
+			maddr = kmap_local_folio(folio, folio_page_idx(folio, page) * PG_SIZE);
 			if (write) {
 				copy_to_user_page(vma, page, addr,
 						  maddr + offset, buf, bytes);
@@ -7414,11 +7416,11 @@ static int __copy_remote_vm_str(struct mm_struct *mm, unsigned long addr,
 
 		folio = page_folio(page);
 		bytes = len;
-		offset = addr & (PAGE_SIZE - 1);
-		if (bytes > PAGE_SIZE - offset)
-			bytes = PAGE_SIZE - offset;
+		offset = addr & (PG_SIZE - 1);
+		if (bytes > PG_SIZE - offset)
+			bytes = PG_SIZE - offset;
 
-		maddr = kmap_local_folio(folio, folio_page_idx(folio, page) * PAGE_SIZE);
+		maddr = kmap_local_folio(folio, folio_page_idx(folio, page) * PG_SIZE);
 		retval = strscpy(buf, maddr + offset, bytes);
 		if (retval >= 0) {
 			/* Found the end of the string */
@@ -7435,7 +7437,7 @@ static int __copy_remote_vm_str(struct mm_struct *mm, unsigned long addr,
 		 */
 		if (bytes != len) {
 			addr += bytes - 1;
-			copy_from_user_page(vma, page, addr, buf, maddr + (PAGE_SIZE - 1), 1);
+			copy_from_user_page(vma, page, addr, buf, maddr + (PG_SIZE - 1), 1);
 			buf += 1;
 			addr += 1;
 		}
@@ -7507,7 +7509,7 @@ void print_vma_addr(char *prefix, unsigned long ip)
 	if (vma && vma->vm_file) {
 		struct file *f = vma->vm_file;
 		ip -= vma->vm_start;
-		ip += vma->vm_pgoff << PAGE_SHIFT;
+		ip += vma->vm_pteoff << PTE_SHIFT;
 		printk("%s%pD[%lx,%lx+%lx]", prefix, f, ip,
 				vma->vm_start,
 				vma->vm_end - vma->vm_start);
@@ -7540,11 +7542,11 @@ static inline int process_huge_page(
 {
 	int i, n, base, l, ret;
 	unsigned long addr = addr_hint &
-		~(((unsigned long)nr_pages << PAGE_SHIFT) - 1);
+		~(((unsigned long)nr_pages << PG_SHIFT) - 1);
 
 	/* Process target subpage last to keep its cache lines hot */
 	might_sleep();
-	n = (addr_hint - addr) / PAGE_SIZE;
+	n = (addr_hint - addr) / PG_SIZE;
 	if (2 * n <= nr_pages) {
 		/* If target subpage in first half of huge page */
 		base = 0;
@@ -7552,7 +7554,7 @@ static inline int process_huge_page(
 		/* Process subpages at the end of huge page */
 		for (i = nr_pages - 1; i >= 2 * n; i--) {
 			cond_resched();
-			ret = process_subpage(addr + i * PAGE_SIZE, i, arg);
+			ret = process_subpage(addr + i * PG_SIZE, i, arg);
 			if (ret)
 				return ret;
 		}
@@ -7563,7 +7565,7 @@ static inline int process_huge_page(
 		/* Process subpages at the begin of huge page */
 		for (i = 0; i < base; i++) {
 			cond_resched();
-			ret = process_subpage(addr + i * PAGE_SIZE, i, arg);
+			ret = process_subpage(addr + i * PG_SIZE, i, arg);
 			if (ret)
 				return ret;
 		}
@@ -7577,11 +7579,11 @@ static inline int process_huge_page(
 		int right_idx = base + 2 * l - 1 - i;
 
 		cond_resched();
-		ret = process_subpage(addr + left_idx * PAGE_SIZE, left_idx, arg);
+		ret = process_subpage(addr + left_idx * PG_SIZE, left_idx, arg);
 		if (ret)
 			return ret;
 		cond_resched();
-		ret = process_subpage(addr + right_idx * PAGE_SIZE, right_idx, arg);
+		ret = process_subpage(addr + right_idx * PG_SIZE, right_idx, arg);
 		if (ret)
 			return ret;
 	}
@@ -7609,7 +7611,7 @@ static void clear_contig_highpages(struct page *page, unsigned long addr,
 		cond_resched();
 
 		count = min(unit, nr_pages - i);
-		clear_user_highpages(page + i, addr + i * PAGE_SIZE, count);
+		clear_user_highpages(page + i, addr + i * PTE_SIZE, count);
 	}
 }
 
@@ -7630,7 +7632,7 @@ static void clear_contig_highpages(struct page *page, unsigned long addr,
 void folio_zero_user(struct folio *folio, unsigned long addr_hint)
 {
 	const unsigned long base_addr = ALIGN_DOWN(addr_hint, folio_size(folio));
-	const long fault_idx = (addr_hint - base_addr) / PAGE_SIZE;
+	const long fault_idx = (addr_hint - base_addr) / PG_SIZE;
 	const struct range pg = DEFINE_RANGE(0, folio_nr_pages(folio) - 1);
 	const long radius = FOLIO_ZERO_LOCALITY_RADIUS;
 	struct range r[3];
@@ -7651,7 +7653,7 @@ void folio_zero_user(struct folio *folio, unsigned long addr_hint)
 	r[0] = DEFINE_RANGE(r[2].end + 1, pg.end);
 
 	for (i = 0; i < ARRAY_SIZE(r); i++) {
-		const unsigned long addr = base_addr + r[i].start * PAGE_SIZE;
+		const unsigned long addr = base_addr + r[i].start * PG_SIZE;
 		const long nr_pages = (long)range_len(&r[i]);
 		struct page *page = folio_page(folio, r[i].start);
 
@@ -7676,7 +7678,7 @@ static int copy_user_gigantic_page(struct folio *dst, struct folio *src,
 
 		cond_resched();
 		if (copy_mc_user_highpage(dst_page, src_page,
-					  addr + i*PAGE_SIZE, vma))
+					  addr + i*PG_SIZE, vma))
 			return -EHWPOISON;
 	}
 	return 0;
@@ -7722,7 +7724,7 @@ long copy_folio_from_user(struct folio *dst_folio,
 	void *kaddr;
 	unsigned long i, rc = 0;
 	unsigned int nr_pages = folio_nr_pages(dst_folio);
-	unsigned long ret_val = nr_pages * PAGE_SIZE;
+	unsigned long ret_val = nr_pages * PG_SIZE;
 	struct page *subpage;
 
 	for (i = 0; i < nr_pages; i++) {
@@ -7730,12 +7732,12 @@ long copy_folio_from_user(struct folio *dst_folio,
 		kaddr = kmap_local_page(subpage);
 		if (!allow_pagefault)
 			pagefault_disable();
-		rc = copy_from_user(kaddr, usr_src + i * PAGE_SIZE, PAGE_SIZE);
+		rc = copy_from_user(kaddr, usr_src + i * PG_SIZE, PG_SIZE);
 		if (!allow_pagefault)
 			pagefault_enable();
 		kunmap_local(kaddr);
 
-		ret_val -= (PAGE_SIZE - rc);
+		ret_val -= (PG_SIZE - rc);
 		if (rc)
 			break;
 
