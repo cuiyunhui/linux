@@ -3789,6 +3789,79 @@ pte_install_clamp(struct vm_fault *vmf, unsigned long fault_idx, unsigned long m
  *   held to the old page, as well as updating the rmap.
  * - In any case, unlock the PTL and drop the reference we took to the old page.
  */
+/*
+ * install_cow_siblings - map sibling PTEs in a PG to a freshly-COW'd folio
+ *
+ * After a COW fault installs the primary PTE, this replaces the remaining
+ * sibling PTEs in the same PG (the intersection of one PG, one folio, one
+ * VMA, one PT page) with mappings into @new_folio.  Handles pte_none
+ * entries (not yet faulted) and file-backed entries (read-fault mapped,
+ * torn down with counter moved).  Swap entries and anon entries (a
+ * prior CoW that did not extend across this slot — typically because
+ * the VMA was sub-PG at the time and was later resized) are left
+ * alone: the new_folio's slot for those PTEs stays unused, and the
+ * existing entry keeps mapping its current data.
+ *
+ * Called with PTL held.  Returns the number of sibling PTEs installed
+ * (the primary PTE is the caller's responsibility).
+ */
+static int install_cow_siblings(struct vm_fault *vmf,
+				struct folio *new_folio, bool unshare)
+{
+	struct vm_area_struct *vma = vmf->vma;
+	struct mm_struct *mm = vma->vm_mm;
+	unsigned long pg_sub = vmf->pteoff % PTES_PER_PAGE;
+	struct pte_install_clamp clamp = pte_install_clamp(vmf, pg_sub,
+							   PTES_PER_PAGE);
+	int extra = 0;
+	long i;
+
+	for (i = -(long)clamp.left; i < (long)clamp.right; i++) {
+		pte_t *ptep, old_pte, sibling;
+		struct page *old_pg;
+		struct folio *old_f;
+		unsigned long addr_i = vmf->address + i * PTE_SIZE;
+
+		if (i == 0)
+			continue;
+
+		ptep = vmf->pte + i;
+		old_pte = ptep_get(ptep);
+
+		sibling = folio_mkpte(new_folio, vmf->pteoff + i,
+				      vma->vm_page_prot);
+		sibling = pte_sw_mkyoung(sibling);
+		if (!unshare)
+			sibling = maybe_mkwrite(pte_mkdirty(sibling), vma);
+
+		if (pte_none(old_pte)) {
+			set_pte_at(mm, addr_i, ptep, sibling);
+			inc_mm_counter(mm, MM_ANONPAGES);
+			extra++;
+			continue;
+		}
+
+		if (!pte_present(old_pte))
+			continue; /* swap entry — leave alone */
+
+		old_pg = pte_page(old_pte);
+		old_f = page_folio(old_pg);
+
+		if (folio_test_anon(old_f))
+			continue; /* prior CoW — leave alone */
+
+		ptep_clear_flush(vma, addr_i, ptep);
+		folio_remove_rmap_pte(old_f, old_pg, vma);
+		dec_mm_counter(mm, mm_counter_file(old_f));
+		inc_mm_counter(mm, MM_ANONPAGES);
+		folio_put(old_f);
+
+		set_pte_at(mm, addr_i, ptep, sibling);
+		extra++;
+	}
+	return extra;
+}
+
 static vm_fault_t wp_page_copy(struct vm_fault *vmf)
 {
 	const bool unshare = vmf->flags & FAULT_FLAG_UNSHARE;
@@ -3816,9 +3889,8 @@ static vm_fault_t wp_page_copy(struct vm_fault *vmf)
 		goto oom;
 
 	if (!pfn_is_zero) {
-		int err;
+		int err = __wp_page_copy_user(&new_folio->page, vmf->page, vmf);
 
-		err = __wp_page_copy_user(&new_folio->page, vmf->page, vmf);
 		if (err) {
 			/*
 			 * COW failed, if the fault was solved by other,
@@ -3859,7 +3931,7 @@ static vm_fault_t wp_page_copy(struct vm_fault *vmf)
 			inc_mm_counter(mm, MM_ANONPAGES);
 		}
 		flush_cache_page(vma, vmf->address, pte_pfn(vmf->orig_pte));
-		entry = folio_mk_pte(new_folio, vma->vm_page_prot);
+		entry = folio_mkpte(new_folio, vmf->pteoff, vma->vm_page_prot);
 		entry = pte_sw_mkyoung(entry);
 		if (unlikely(unshare)) {
 			if (pte_soft_dirty(vmf->orig_pte))
@@ -3884,29 +3956,21 @@ static vm_fault_t wp_page_copy(struct vm_fault *vmf)
 		set_pte_at(mm, vmf->address, vmf->pte, entry);
 		update_mmu_cache_range(vmf, vma, vmf->address, vmf->pte, 1);
 		if (old_folio) {
-			/*
-			 * Only after switching the pte to the new page may
-			 * we remove the mapcount here. Otherwise another
-			 * process may come and find the rmap count decremented
-			 * before the pte is switched to the new page, and
-			 * "reuse" the old page writing into it while our pte
-			 * here still points into it and can be read by other
-			 * threads.
-			 *
-			 * The critical issue is to order this
-			 * folio_remove_rmap_pte() with the ptp_clear_flush
-			 * above. Those stores are ordered by (if nothing else,)
-			 * the barrier present in the atomic_add_negative
-			 * in folio_remove_rmap_pte();
-			 *
-			 * Then the TLB flush in ptep_clear_flush ensures that
-			 * no process can access the old page before the
-			 * decremented mapcount is visible. And the old page
-			 * cannot be reused until after the decremented
-			 * mapcount is visible. So transitively, TLBs to
-			 * old page will be flushed before it can be reused.
-			 */
 			folio_remove_rmap_pte(old_folio, vmf->page, vma);
+		}
+
+		/*
+		 * When PG_SIZE > PTE_SIZE, map all sibling PTEs in the
+		 * same PG_SIZE range to the new COW page.  This ensures
+		 * writes to different sub-pages accumulate on one copy.
+		 */
+		if (PTES_PER_PAGE > 1 && old_folio && vma->vm_file) {
+			int extra = install_cow_siblings(vmf, new_folio,
+							 unshare);
+			if (extra) {
+				folio_ref_add(new_folio, extra);
+				atomic_add(extra, &new_folio->_mapcount);
+			}
 		}
 
 		/* Free the old page.. */
