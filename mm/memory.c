@@ -5322,8 +5322,11 @@ static vm_fault_t do_anonymous_page(struct vm_fault *vmf)
 	unsigned long addr = vmf->address;
 	struct folio *folio;
 	vm_fault_t ret = 0;
-	int nr_pages = 1;
+	int nr_ptes = 1;
 	pte_t entry;
+	unsigned long pteoff = vmf->pteoff;
+	unsigned long sub;
+	unsigned long left, right;
 
 	/* File mapping without ->vm_ops ? */
 	if (vma->vm_flags & VM_SHARED)
@@ -5341,12 +5344,39 @@ static vm_fault_t do_anonymous_page(struct vm_fault *vmf)
 			!mm_forbids_zeropage(vma->vm_mm)) {
 		entry = pte_mkspecial(pfn_pte(my_zero_pfn(vmf->address),
 						vma->vm_page_prot));
+
+		/*
+		 * Map all sibling PTEs within the PG_SIZE range, clamped
+		 * to VMA and page table.  userfaultfd needs per-PTE
+		 * fidelity.
+		 */
+		if (unlikely(userfaultfd_armed(vma))) {
+			nr_ptes = 1;
+			addr = vmf->address;
+		} else {
+			struct pte_install_clamp clamp;
+
+			sub = pteoff % PTES_PER_PAGE;
+			clamp = pte_install_clamp(vmf, sub, PTES_PER_PAGE);
+			left = clamp.left;
+			right = clamp.right;
+			nr_ptes = left + right;
+			addr = vmf->address - left * PTE_SIZE;
+		}
+
 		vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd,
-				vmf->address, &vmf->ptl);
+				addr, &vmf->ptl);
 		if (!vmf->pte)
 			goto unlock;
-		if (vmf_pte_changed(vmf)) {
-			update_mmu_tlb(vma, vmf->address, vmf->pte);
+
+		if (nr_ptes > 1 && !pte_range_none(vmf->pte, nr_ptes)) {
+			vmf->pte += left;
+			addr = vmf->address;
+			nr_ptes = 1;
+		}
+
+		if (nr_ptes == 1 && vmf_pte_changed(vmf)) {
+			update_mmu_tlb(vma, addr, vmf->pte);
 			goto unlock;
 		}
 		ret = check_stable_address_space(vma->vm_mm);
@@ -5371,8 +5401,22 @@ static vm_fault_t do_anonymous_page(struct vm_fault *vmf)
 	if (!folio)
 		goto oom;
 
-	nr_pages = folio_nr_pages(folio);
-	addr = ALIGN_DOWN(vmf->address, nr_pages * PG_SIZE);
+	/*
+	 * Map as many PTEs as possible. Clamp the folio's natural range
+	 * to the VMA and the page table so we can never overrun any of
+	 * those boundaries. The PT clamp also implies PMD alignment.
+	 */
+	sub = pteoff % folio_nr_ptes(folio);
+	{
+		struct pte_install_clamp clamp =
+			pte_install_clamp(vmf, sub, folio_nr_ptes(folio));
+		left = clamp.left;
+		right = clamp.right;
+	}
+
+	nr_ptes = left + right;
+	addr = vmf->address - left * PTE_SIZE;
+	pteoff -= left;
 
 	/*
 	 * The memory barrier inside __folio_mark_uptodate makes sure that
@@ -5381,7 +5425,7 @@ static vm_fault_t do_anonymous_page(struct vm_fault *vmf)
 	 */
 	__folio_mark_uptodate(folio);
 
-	entry = folio_mk_pte(folio, vma->vm_page_prot);
+	entry = folio_mkpte(folio, pteoff, vma->vm_page_prot);
 	entry = pte_sw_mkyoung(entry);
 	if (vma->vm_flags & VM_WRITE)
 		entry = pte_mkwrite(pte_mkdirty(entry), vma);
@@ -5389,11 +5433,50 @@ static vm_fault_t do_anonymous_page(struct vm_fault *vmf)
 	vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd, addr, &vmf->ptl);
 	if (!vmf->pte)
 		goto release;
-	if (nr_pages == 1 && vmf_pte_changed(vmf)) {
+
+	if (nr_ptes > 1 && !pte_range_none(vmf->pte, nr_ptes)) {
+		/*
+		 * Some sibling slot in the would-be install range is
+		 * populated.  If the faulting PTE itself is taken, drop to
+		 * nr_ptes=1 and let vmf_pte_changed() bail below.
+		 *
+		 * Otherwise shrink to the largest pte_none() run around the
+		 * fault and install the folio's matching slots into it.
+		 * Falling back all the way to a single PTE leaves the rest
+		 * of this PG-sized folio unused, and forces every neighbour
+		 * slot to allocate its own folio on the next fault -- a
+		 * waste that compounds as more siblings fault in.
+		 */
+		if (!pte_none(ptep_get(vmf->pte + left))) {
+			vmf->pte += left;
+			addr = vmf->address;
+			pteoff = vmf->pteoff;
+			nr_ptes = 1;
+		} else {
+			unsigned long lo = left, hi = left + 1;
+
+			while (lo > 0 &&
+			       pte_none(ptep_get(vmf->pte + lo - 1)))
+				lo--;
+			while (hi < nr_ptes &&
+			       pte_none(ptep_get(vmf->pte + hi)))
+				hi++;
+
+			vmf->pte += lo;
+			addr += lo * PTE_SIZE;
+			pteoff += lo;
+			left -= lo;
+			nr_ptes = hi - lo;
+		}
+
+		entry = folio_mkpte(folio, pteoff, vma->vm_page_prot);
+		entry = pte_sw_mkyoung(entry);
+		if (vma->vm_flags & VM_WRITE)
+			entry = pte_mkwrite(pte_mkdirty(entry), vma);
+	}
+
+	if (nr_ptes == 1 && vmf_pte_changed(vmf)) {
 		update_mmu_tlb(vma, addr, vmf->pte);
-		goto release;
-	} else if (nr_pages > 1 && !pte_range_none(vmf->pte, nr_pages)) {
-		update_mmu_tlb_range(vma, addr, vmf->pte, nr_pages);
 		goto release;
 	}
 
@@ -5408,18 +5491,25 @@ static vm_fault_t do_anonymous_page(struct vm_fault *vmf)
 		return handle_userfault(vmf, VM_UFFD_MISSING);
 	}
 
-	folio_ref_add(folio, nr_pages - 1);
-	add_mm_counter(vma->vm_mm, MM_ANONPAGES, nr_pages);
+	folio_ref_add(folio, nr_ptes - 1);
+	add_mm_counter(vma->vm_mm, MM_ANONPAGES, nr_ptes);
 	count_mthp_stat(folio_order(folio), MTHP_STAT_ANON_FAULT_ALLOC);
 	folio_add_new_anon_rmap(folio, vma, addr, RMAP_EXCLUSIVE);
+	/*
+	 * folio_add_new_anon_rmap sets mapcount to 1 for non-large folios,
+	 * but we're mapping nr_ptes PTEs. Adjust mapcount to match so that
+	 * folio_remove_rmap_ptes(nr_ptes) during unmap doesn't go negative.
+	 */
+	if (nr_ptes > 1 && !folio_test_large(folio))
+		atomic_add(nr_ptes - 1, &folio->_mapcount);
 	folio_add_lru_vma(folio, vma);
 setpte:
 	if (vmf_orig_pte_uffd_wp(vmf))
 		entry = pte_mkuffd_wp(entry);
-	set_ptes(vma->vm_mm, addr, vmf->pte, entry, nr_pages);
+	set_ptes(vma->vm_mm, addr, vmf->pte, entry, nr_ptes);
 
 	/* No need to invalidate - it was non-present before */
-	update_mmu_cache_range(vmf, vma, addr, vmf->pte, nr_pages);
+	update_mmu_cache_range(vmf, vma, addr, vmf->pte, nr_ptes);
 unlock:
 	if (vmf->pte)
 		pte_unmap_unlock(vmf->pte, vmf->ptl);
@@ -5621,9 +5711,10 @@ void set_pte_range(struct vm_fault *vmf, struct folio *folio,
 		entry = pte_mkuffd_wp(entry);
 	/* copy-on-write page */
 	if (write && !(vma->vm_flags & VM_SHARED)) {
-		VM_BUG_ON_FOLIO(nr != 1, folio);
 		folio_add_new_anon_rmap(folio, vma, addr, RMAP_EXCLUSIVE);
 		folio_add_lru_vma(folio, vma);
+		if (nr > 1)
+			atomic_add(nr - 1, &folio->_mapcount);
 	} else {
 		folio_add_file_rmap_ptes(folio, page, nr, vma);
 	}
