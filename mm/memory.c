@@ -3739,6 +3739,40 @@ vm_fault_t __vmf_anon_prepare(struct vm_fault *vmf)
 }
 
 /*
+ * Bounds for a multi-PTE install around the faulted PTE.  Both fields
+ * are in PTE units; the install range is
+ * [fault_idx - left, fault_idx + right) within the install container
+ * (a folio or a PG, whatever the caller picks via @max).
+ */
+struct pte_install_clamp {
+	unsigned long left;
+	unsigned long right;
+};
+
+/*
+ * pte_install_clamp - how many PTEs we can install around the faulted PTE
+ * without crossing the install container, the VMA, or the PT page.
+ *
+ * @fault_idx: position of the faulted PTE inside the container.
+ * @max:       container size in PTE units (PTES_PER_PAGE for a single PG,
+ *             folio_nr_ptes(folio) for a whole folio, etc).
+ */
+static struct pte_install_clamp
+pte_install_clamp(struct vm_fault *vmf, unsigned long fault_idx, unsigned long max)
+{
+	struct vm_area_struct *vma = vmf->vma;
+	unsigned long vma_before = vmf->pteoff - vma->vm_pteoff;
+	unsigned long pt_before = pte_index(vmf->address);
+	unsigned long vma_after = vma_ptes(vma) - vma_before;
+	unsigned long pt_after = PTRS_PER_PTE - pt_before;
+
+	return (struct pte_install_clamp){
+		.left  = min3(fault_idx, vma_before, pt_before),
+		.right = min3(max - fault_idx, vma_after, pt_after),
+	};
+}
+
+/*
  * Handle the case of a page which we actually need to copy to a new page,
  * either due to COW or unsharing.
  *
