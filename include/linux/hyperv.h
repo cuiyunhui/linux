@@ -155,7 +155,7 @@ struct hv_ring_buffer {
 	} feature_bits;
 
 	/* Pad it to PAGE_SIZE so that data starts on page boundary */
-	u8	reserved2[PAGE_SIZE - 68];
+	u8	reserved2[PG_SIZE - 68];
 
 	/*
 	 * Ring data starts here + RingDataStartOffset
@@ -185,7 +185,7 @@ struct hv_ring_buffer {
 	0 : sizeof(struct hv_ring_buffer))
 
 /* Calculate the proper size of a ringbuffer, it must be page-aligned */
-#define VMBUS_RING_SIZE(payload_sz) PAGE_ALIGN(VMBUS_HEADER_ADJ(payload_sz) + \
+#define VMBUS_RING_SIZE(payload_sz) PG_ALIGN(VMBUS_HEADER_ADJ(payload_sz) + \
 					       (payload_sz))
 
 struct hv_ring_buffer_info {
@@ -1754,14 +1754,14 @@ static inline unsigned long virt_to_hvpfn(void *addr)
 
 	if (is_vmalloc_addr(addr))
 		paddr = page_to_phys(vmalloc_to_page(addr)) +
-				     offset_in_page(addr);
+				     offset_in_pg(addr);
 	else
 		paddr = __pa(addr);
 
 	return  paddr >> HV_HYP_PAGE_SHIFT;
 }
 
-#define NR_HV_HYP_PAGES_IN_PAGE	(PAGE_SIZE / HV_HYP_PAGE_SIZE)
+#define NR_HV_HYP_PAGES_IN_PAGE	(PG_SIZE / HV_HYP_PAGE_SIZE)
 #define offset_in_hvpage(ptr)	((unsigned long)(ptr) & ~HV_HYP_PAGE_MASK)
 #define HVPFN_UP(x)	(((x) + HV_HYP_PAGE_SIZE-1) >> HV_HYP_PAGE_SHIFT)
 #define HVPFN_DOWN(x)	((x) >> HV_HYP_PAGE_SHIFT)

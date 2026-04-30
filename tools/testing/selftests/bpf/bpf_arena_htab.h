@@ -96,5 +96,5 @@ void htab_init(htab_t *htab)
 
 	cast_user(buckets);
 	htab->buckets = buckets;
-	htab->n_buckets = 2 * PAGE_SIZE / sizeof(struct htab_bucket);
+	htab->n_buckets = 2 * PG_SIZE / sizeof(struct htab_bucket);
 }

@@ -357,11 +357,11 @@ static int affs_fill_super(struct super_block *sb, struct fs_context *fc)
 	size = bdev_nr_sectors(sb->s_bdev);
 	pr_debug("initial blocksize=%d, #blocks=%d\n", 512, size);
 
-	affs_set_blocksize(sb, PAGE_SIZE);
+	affs_set_blocksize(sb, PG_SIZE);
 	/* Try to find root block. Its location depends on the block size. */
 
 	i = bdev_logical_block_size(sb->s_bdev);
-	j = PAGE_SIZE;
+	j = PG_SIZE;
 	blocksize = ctx->blocksize;
 	if (blocksize > 0) {
 		i = j = blocksize;

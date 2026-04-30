@@ -177,8 +177,8 @@ void saa7146_setgpio(struct saa7146_dev *dev, int port, u32 data);
 int saa7146_wait_for_debi_done(struct saa7146_dev *dev, int nobusyloop);
 
 /* some memory sizes */
-#define SAA7146_I2C_MEM		( 1*PAGE_SIZE)
-#define SAA7146_RPS_MEM		( 1*PAGE_SIZE)
+#define SAA7146_I2C_MEM		( 1*PG_SIZE)
+#define SAA7146_RPS_MEM		( 1*PG_SIZE)
 
 /* some i2c constants */
 #define SAA7146_I2C_TIMEOUT	100	/* i2c-timeout-value in ms */

@@ -6,7 +6,7 @@
 bool fail_prealloc;
 unsigned long mmap_min_addr = CONFIG_DEFAULT_MMAP_MIN_ADDR;
 unsigned long dac_mmap_min_addr = CONFIG_DEFAULT_MMAP_MIN_ADDR;
-unsigned long stack_guard_gap = 256UL<<PAGE_SHIFT;
+unsigned long stack_guard_gap = 256UL<<PG_SHIFT;
 
 const struct vm_operations_struct vma_dummy_vm_ops;
 struct anon_vma dummy_anon_vma;

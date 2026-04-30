@@ -41,7 +41,7 @@ struct value_lock_type {
 };
 
 struct large_data {
-	__u8 one_page[PAGE_SIZE];
+	__u8 one_page[PG_SIZE];
 	int a;
 };
 

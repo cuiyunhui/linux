@@ -2784,8 +2784,8 @@ static int relocate_one_folio(struct reloc_control *rc,
 	struct btrfs_fs_info *fs_info = inode_to_fs_info(inode);
 	const u64 orig_file_offset = *file_offset_ret;
 	u64 offset = BTRFS_I(inode)->reloc_block_group_start;
-	const pgoff_t last_index = (cluster->end - offset) >> PAGE_SHIFT;
-	const pgoff_t index = orig_file_offset >> PAGE_SHIFT;
+	const pgoff_t last_index = (cluster->end - offset) >> PG_SHIFT;
+	const pgoff_t index = orig_file_offset >> PG_SHIFT;
 	gfp_t mask = btrfs_alloc_write_mask(inode->i_mapping);
 	struct folio *folio;
 	u64 folio_start;
@@ -4005,7 +4005,7 @@ static int copy_remapped_data_io(struct btrfs_fs_info *fs_info,
 
 	i = 0;
 	do {
-		size_t bytes = min_t(u64, length, PAGE_SIZE);
+		size_t bytes = min_t(u64, length, PG_SIZE);
 
 		if (bio_add_page(&bbio->bio, pages[i], bytes, 0) < bytes) {
 			refcount_inc(&priv->pending_refs);
@@ -4040,7 +4040,7 @@ static int copy_remapped_data(struct btrfs_fs_info *fs_info, u64 old_addr,
 	u64 copy_len = min_t(u64, length, SZ_1M);
 	struct page **pages;
 	struct reloc_io_private priv;
-	unsigned int nr_pages = DIV_ROUND_UP(length, PAGE_SIZE);
+	unsigned int nr_pages = DIV_ROUND_UP(length, PG_SIZE);
 
 	pages = kzalloc_objs(struct page *, nr_pages, GFP_NOFS);
 	if (!pages)
@@ -4057,7 +4057,7 @@ static int copy_remapped_data(struct btrfs_fs_info *fs_info, u64 old_addr,
 		u64 to_copy = min_t(u64, length, copy_len);
 
 		/* Limit to one bio. */
-		to_copy = min_t(u64, to_copy, BIO_MAX_VECS << PAGE_SHIFT);
+		to_copy = min_t(u64, to_copy, BIO_MAX_VECS << PG_SHIFT);
 
 		ret = copy_remapped_data_io(fs_info, &priv, pages, old_addr,
 					    to_copy, REQ_OP_READ);

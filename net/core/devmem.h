@@ -119,7 +119,7 @@ static inline unsigned long net_iov_virtual_addr(const struct net_iov *niov)
 	struct net_iov_area *owner = net_iov_owner(niov);
 
 	return owner->base_virtual +
-	       ((unsigned long)net_iov_idx(niov) << PAGE_SHIFT);
+	       ((unsigned long)net_iov_idx(niov) << PG_SHIFT);
 }
 
 static inline bool

@@ -24,13 +24,13 @@
 #define __get_ptb_entry(emu, page) \
 	(le32_to_cpu(((__le32 *)(emu)->ptb_pages.area)[page]))
 
-#define UNIT_PAGES		(PAGE_SIZE / EMUPAGESIZE)
+#define UNIT_PAGES		(PG_SIZE / EMUPAGESIZE)
 #define MAX_ALIGN_PAGES0		(MAXPAGES0 / UNIT_PAGES)
 #define MAX_ALIGN_PAGES1		(MAXPAGES1 / UNIT_PAGES)
 /* get aligned page from offset address */
-#define get_aligned_page(offset)	((offset) >> PAGE_SHIFT)
+#define get_aligned_page(offset)	((offset) >> PG_SHIFT)
 /* get offset address from aligned page */
-#define aligned_page_offset(page)	((page) << PAGE_SHIFT)
+#define aligned_page_offset(page)	((page) << PG_SHIFT)
 
 #if PAGE_SIZE == EMUPAGESIZE && !IS_ENABLED(CONFIG_DYNAMIC_DEBUG)
 /* fill PTB entrie(s) corresponding to page with addr */
@@ -209,7 +209,7 @@ search_empty(struct snd_emu10k1 *emu, int size)
 	struct snd_emu10k1_memblk *blk;
 	int page, psize;
 
-	psize = get_aligned_page(size + PAGE_SIZE -1);
+	psize = get_aligned_page(size + PG_SIZE -1);
 	page = 0;
 	list_for_each(p, &emu->memhdr->block) {
 		blk = get_emu10k1_memblk(p, mem.list);
@@ -222,7 +222,9 @@ search_empty(struct snd_emu10k1 *emu, int size)
 
 __found_pages:
 	/* create a new memory block */
-	blk = (struct snd_emu10k1_memblk *)__snd_util_memblk_new(emu->memhdr, psize << PAGE_SHIFT, p->prev);
+	blk = (struct snd_emu10k1_memblk *)__snd_util_memblk_new(emu->memhdr,
+								 psize << PG_SHIFT,
+								 p->prev);
 	if (blk == NULL)
 		return NULL;
 	blk->mem.offset = aligned_page_offset(page); /* set aligned offset */
@@ -321,7 +323,7 @@ snd_emu10k1_alloc_pages(struct snd_emu10k1 *emu, struct snd_pcm_substream *subst
 	 */
 	idx = 0;
 	for (page = blk->first_page; page <= blk->last_page; page++, idx++) {
-		unsigned long ofs = idx << PAGE_SHIFT;
+		unsigned long ofs = idx << PG_SHIFT;
 		dma_addr_t addr;
 		if (ofs >= runtime->dma_bytes)
 			addr = emu->silent_page.addr;
@@ -370,15 +372,15 @@ int snd_emu10k1_alloc_pages_maybe_wider(struct snd_emu10k1 *emu, size_t size,
 					struct snd_dma_buffer *dmab)
 {
 	if (emu->iommu_workaround) {
-		size_t npages = DIV_ROUND_UP(size, PAGE_SIZE);
-		size_t size_real = npages * PAGE_SIZE;
+		size_t npages = DIV_ROUND_UP(size, PG_SIZE);
+		size_t size_real = npages * PG_SIZE;
 
 		/*
 		 * The device has been observed to accesses up to 256 extra
 		 * bytes, but use 1k to be safe.
 		 */
 		if (size_real < size + 1024)
-			size += PAGE_SIZE;
+			size += PG_SIZE;
 	}
 
 	return snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV,
@@ -480,7 +482,7 @@ static void __synth_free_pages(struct snd_emu10k1 *emu, int first_page,
 		 * please keep me in sync with logic in
 		 * snd_emu10k1_alloc_pages_maybe_wider()
 		 */
-		dmab.bytes = PAGE_SIZE;
+		dmab.bytes = PG_SIZE;
 		if (emu->iommu_workaround)
 			dmab.bytes *= 2;
 
@@ -502,7 +504,7 @@ static int synth_alloc_pages(struct snd_emu10k1 *emu, struct snd_emu10k1_memblk 
 	get_single_page_range(emu->memhdr, blk, &first_page, &last_page);
 	/* allocate kernel pages */
 	for (page = first_page; page <= last_page; page++) {
-		if (snd_emu10k1_alloc_pages_maybe_wider(emu, PAGE_SIZE,
+		if (snd_emu10k1_alloc_pages_maybe_wider(emu, PG_SIZE,
 							&dmab) < 0)
 			goto __fail;
 		if (!is_valid_page(emu, dmab.addr)) {
@@ -546,7 +548,7 @@ static inline void *offset_ptr(struct snd_emu10k1 *emu, int page, int offset)
 			"access to NULL ptr: page = %d\n", page);
 		return NULL;
 	}
-	ptr += offset & (PAGE_SIZE - 1);
+	ptr += offset & (PG_SIZE - 1);
 	return (void*)ptr;
 }
 
@@ -563,7 +565,7 @@ int snd_emu10k1_synth_memset(struct snd_emu10k1 *emu, struct snd_util_memblk *bl
 	if (snd_BUG_ON(offset + size > p->mem.size))
 		return -EFAULT;
 
-	offset += blk->offset & (PAGE_SIZE - 1);
+	offset += blk->offset & (PG_SIZE - 1);
 	end_offset = offset + size;
 	page = get_aligned_page(offset);
 	do {

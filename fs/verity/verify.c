@@ -238,7 +238,7 @@ static bool verify_data_block(struct fsverity_info *vi,
 
 		/* Byte offset of the hash block within the page */
 		hblock_offset_in_page =
-			(hblock_idx << params->log_blocksize) & ~PAGE_MASK;
+			(hblock_idx << params->log_blocksize) & ~PG_MASK;
 
 		/* Byte offset of the hash within the block */
 		hoffset = (hidx << params->log_digestsize) &
@@ -381,7 +381,7 @@ static bool fsverity_add_data_blocks(struct fsverity_verification_context *ctx,
 	struct fsverity_info *vi = ctx->vi;
 	const struct merkle_tree_params *params = &vi->tree_params;
 	const unsigned int block_size = params->block_size;
-	u64 pos = (u64)data_folio->index << PAGE_SHIFT;
+	u64 pos = (u64)data_folio->index << PG_SHIFT;
 
 	if (WARN_ON_ONCE(len <= 0 || !IS_ALIGNED(len | offset, block_size)))
 		return false;

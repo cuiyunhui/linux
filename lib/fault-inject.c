@@ -274,22 +274,22 @@ EXPORT_SYMBOL_GPL(fault_create_debugfs_attr);
 
 static ssize_t fault_uint_attr_show(unsigned int val, char *page)
 {
-	return snprintf(page, PAGE_SIZE, "%u\n", val);
+	return snprintf(page, PG_SIZE, "%u\n", val);
 }
 
 static ssize_t fault_ulong_attr_show(unsigned long val, char *page)
 {
-	return snprintf(page, PAGE_SIZE, "%lu\n", val);
+	return snprintf(page, PG_SIZE, "%lu\n", val);
 }
 
 static ssize_t fault_bool_attr_show(bool val, char *page)
 {
-	return snprintf(page, PAGE_SIZE, "%u\n", val);
+	return snprintf(page, PG_SIZE, "%u\n", val);
 }
 
 static ssize_t fault_atomic_t_attr_show(atomic_t val, char *page)
 {
-	return snprintf(page, PAGE_SIZE, "%d\n", atomic_read(&val));
+	return snprintf(page, PG_SIZE, "%d\n", atomic_read(&val));
 }
 
 static ssize_t fault_uint_attr_store(unsigned int *val, const char *page, size_t count)
@@ -411,7 +411,7 @@ CONFIGFS_ATTR_NAMED(fault_, stacktrace_depth, "stacktrace-depth");
 
 static ssize_t fault_xul_attr_show(unsigned long val, char *page)
 {
-	return snprintf(page, PAGE_SIZE,
+	return snprintf(page, PG_SIZE,
 			sizeof(val) == sizeof(u32) ? "0x%08lx\n" : "0x%016lx\n", val);
 }
 

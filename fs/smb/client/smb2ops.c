@@ -4782,8 +4782,8 @@ handle_read_data(struct TCP_Server_Info *server, struct mid_q_entry *mid,
 
 	if (buf_len <= data_offset) {
 		/* read response payload is in pages */
-		cur_page_idx = pad_len / PAGE_SIZE;
-		cur_off = pad_len % PAGE_SIZE;
+		cur_page_idx = pad_len / PG_SIZE;
+		cur_off = pad_len % PG_SIZE;
 
 		if (cur_page_idx != 0) {
 			/* data offset is beyond the 1st page of response */
@@ -4946,7 +4946,7 @@ receive_encrypted_read(struct TCP_Server_Info *server, struct mid_q_entry **mid,
 	len = le32_to_cpu(tr_hdr->OriginalMessageSize) -
 		server->vals->read_rsp_size;
 	dw->len = len;
-	len = round_up(dw->len, PAGE_SIZE);
+	len = round_up(dw->len, PG_SIZE);
 
 	size_t cur_size = 0;
 	rc = netfs_alloc_folioq_buffer(NULL, &dw->buffer, &cur_size, len, GFP_NOFS);

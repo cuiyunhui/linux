@@ -415,8 +415,8 @@ repeat:
 
 static int vm_module_tags_populate(void)
 {
-	unsigned long phys_end = ALIGN_DOWN(module_tags.start_addr, PAGE_SIZE) +
-				 (vm_module_tags->nr_pages << PAGE_SHIFT);
+	unsigned long phys_end = ALIGN_DOWN(module_tags.start_addr, PG_SIZE) +
+				 (vm_module_tags->nr_pages << PG_SHIFT);
 	unsigned long new_end = module_tags.start_addr + module_tags.size;
 
 	if (phys_end < new_end) {
@@ -426,7 +426,7 @@ static int vm_module_tags_populate(void)
 		unsigned long more_pages;
 		unsigned long nr = 0;
 
-		more_pages = ALIGN(new_end - phys_end, PAGE_SIZE) >> PAGE_SHIFT;
+		more_pages = ALIGN(new_end - phys_end, PG_SIZE) >> PG_SHIFT;
 		while (nr < more_pages) {
 			unsigned long allocated;
 
@@ -439,8 +439,8 @@ static int vm_module_tags_populate(void)
 		}
 
 		if (nr < more_pages ||
-		    vmap_pages_range(phys_end, phys_end + (nr << PAGE_SHIFT), PAGE_KERNEL,
-				     next_page, PAGE_SHIFT) < 0) {
+		    vmap_pages_range(phys_end, phys_end + (nr << PG_SHIFT), PAGE_KERNEL,
+				     next_page, PG_SHIFT) < 0) {
 			release_pages_arg arg = { .pages = next_page };
 
 			/* Clean up and error out */
@@ -670,7 +670,7 @@ static int __init alloc_mod_tags_mem(void)
 	}
 
 	vm_module_tags->pages = kmalloc_objs(struct page *,
-					     get_vm_area_size(vm_module_tags) >> PAGE_SHIFT,
+					     get_vm_area_size(vm_module_tags) >> PG_SHIFT,
 					     GFP_KERNEL | __GFP_ZERO);
 	if (!vm_module_tags->pages) {
 		free_vm_area(vm_module_tags);

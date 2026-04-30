@@ -25,7 +25,7 @@ phys_addr_t dax_pgoff_to_phys(struct dev_dax *dev_dax, pgoff_t pgoff,
 			if (get_nfit_res(addr)) {
 				struct page *page;
 
-				if (dev_dax->region->align > PAGE_SIZE)
+				if (dev_dax->region->align > PG_SIZE)
 					return -1;
 
 				page = vmalloc_to_page((void *)addr);

@@ -173,8 +173,8 @@ struct fscache_write_request {
 void __fscache_clear_page_bits(struct address_space *mapping,
 			       loff_t start, size_t len)
 {
-	pgoff_t first = start / PAGE_SIZE;
-	pgoff_t last = (start + len - 1) / PAGE_SIZE;
+	pgoff_t first = start / PG_SIZE;
+	pgoff_t last = (start + len - 1) / PG_SIZE;
 	struct page *page;
 
 	if (len) {

@@ -1496,7 +1496,7 @@ int __init ip_vs_conn_init(void)
 	int min = 8;
 	int idx;
 
-	max_avail = order_base_2(totalram_pages()) + PAGE_SHIFT;
+	max_avail = order_base_2(totalram_pages()) + PG_SHIFT;
 	max_avail -= 2;		/* ~4 in hash row */
 	max_avail -= 1;		/* IPVS up to 1/2 of mem */
 	max_avail -= order_base_2(sizeof(struct ip_vs_conn));

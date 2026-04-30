@@ -346,7 +346,7 @@ static int setup_corb_rirb(struct lola *chip)
 	unsigned long end_time;
 
 	chip->rb = snd_devm_alloc_pages(&chip->pci->dev, SNDRV_DMA_TYPE_DEV,
-					PAGE_SIZE);
+					PG_SIZE);
 	if (!chip->rb)
 		return -ENOMEM;
 

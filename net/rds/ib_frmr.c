@@ -132,7 +132,7 @@ static int rds_ib_post_reg_frmr(struct rds_ib_mr *ibmr)
 	}
 
 	ret = ib_map_mr_sg_zbva(frmr->mr, ibmr->sg, ibmr->sg_dma_len,
-				&off, PAGE_SIZE);
+				&off, PG_SIZE);
 	if (unlikely(ret != ibmr->sg_dma_len)) {
 		ret = ret < 0 ? ret : -EINVAL;
 		goto out_inc;
@@ -226,14 +226,14 @@ static int rds_ib_map_frmr(struct rds_ib_device *rds_ibdev,
 		u64 dma_addr = sg_dma_address(&ibmr->sg[i]);
 
 		frmr->sg_byte_len += dma_len;
-		if (dma_addr & ~PAGE_MASK) {
+		if (dma_addr & ~PG_MASK) {
 			if (i > 0)
 				goto out_unmap;
 			else
 				++frmr->dma_npages;
 		}
 
-		if ((dma_addr + dma_len) & ~PAGE_MASK) {
+		if ((dma_addr + dma_len) & ~PG_MASK) {
 			if (i < ibmr->sg_dma_len - 1)
 				goto out_unmap;
 			else
@@ -242,7 +242,7 @@ static int rds_ib_map_frmr(struct rds_ib_device *rds_ibdev,
 
 		len += dma_len;
 	}
-	frmr->dma_npages += len >> PAGE_SHIFT;
+	frmr->dma_npages += len >> PG_SHIFT;
 
 	if (frmr->dma_npages > ibmr->pool->max_pages) {
 		ret = -EMSGSIZE;

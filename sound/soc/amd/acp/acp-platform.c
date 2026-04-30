@@ -133,7 +133,7 @@ void config_acp_dma(struct acp_chip_info *chip, struct acp_stream *stream, int s
 	struct snd_pcm_substream *substream = stream->substream;
 	struct acp_resource *rsrc = chip->rsrc;
 	dma_addr_t addr = substream->dma_buffer.addr;
-	int num_pages = (PAGE_ALIGN(size) >> PAGE_SHIFT);
+	int num_pages = (PG_ALIGN(size) >> PG_SHIFT);
 	u32 low, high, val;
 	u16 page_idx;
 
@@ -183,7 +183,7 @@ void config_acp_dma(struct acp_chip_info *chip, struct acp_stream *stream, int s
 
 		/* Move to next physically contiguous page */
 		val += 8;
-		addr += PAGE_SIZE;
+		addr += PG_SIZE;
 	}
 }
 EXPORT_SYMBOL_NS_GPL(config_acp_dma, "SND_SOC_ACP_COMMON");

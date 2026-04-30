@@ -158,9 +158,9 @@ int kmsan_ioremap_page_range(unsigned long start, unsigned long end,
 	if (!kmsan_enabled || kmsan_in_runtime())
 		return 0;
 
-	nr = (end - start) / PAGE_SIZE;
+	nr = (end - start) / PG_SIZE;
 	kmsan_enter_runtime();
-	for (int i = 0; i < nr; i++, off += PAGE_SIZE, clean = i) {
+	for (int i = 0; i < nr; i++, off += PG_SIZE, clean = i) {
 		shadow = alloc_pages(gfp_mask, 1);
 		origin = alloc_pages(gfp_mask, 1);
 		if (!shadow || !origin) {
@@ -169,8 +169,8 @@ int kmsan_ioremap_page_range(unsigned long start, unsigned long end,
 		}
 		mapped = __vmap_pages_range_noflush(
 			vmalloc_shadow(start + off),
-			vmalloc_shadow(start + off + PAGE_SIZE), prot, &shadow,
-			PAGE_SHIFT);
+			vmalloc_shadow(start + off + PG_SIZE), prot, &shadow,
+			PG_SHIFT);
 		if (mapped) {
 			err = mapped;
 			goto ret;
@@ -178,12 +178,12 @@ int kmsan_ioremap_page_range(unsigned long start, unsigned long end,
 		shadow = NULL;
 		mapped = __vmap_pages_range_noflush(
 			vmalloc_origin(start + off),
-			vmalloc_origin(start + off + PAGE_SIZE), prot, &origin,
-			PAGE_SHIFT);
+			vmalloc_origin(start + off + PG_SIZE), prot, &origin,
+			PG_SHIFT);
 		if (mapped) {
 			__vunmap_range_noflush(
 				vmalloc_shadow(start + off),
-				vmalloc_shadow(start + off + PAGE_SIZE));
+				vmalloc_shadow(start + off + PG_SIZE));
 			err = mapped;
 			goto ret;
 		}
@@ -205,10 +205,10 @@ ret:
 			__free_pages(origin, 1);
 		__vunmap_range_noflush(
 			vmalloc_shadow(start),
-			vmalloc_shadow(start + clean * PAGE_SIZE));
+			vmalloc_shadow(start + clean * PG_SIZE));
 		__vunmap_range_noflush(
 			vmalloc_origin(start),
-			vmalloc_origin(start + clean * PAGE_SIZE));
+			vmalloc_origin(start + clean * PG_SIZE));
 	}
 	flush_cache_vmap(vmalloc_shadow(start), vmalloc_shadow(end));
 	flush_cache_vmap(vmalloc_origin(start), vmalloc_origin(end));
@@ -225,12 +225,12 @@ void kmsan_iounmap_page_range(unsigned long start, unsigned long end)
 	if (!kmsan_enabled || kmsan_in_runtime())
 		return;
 
-	nr = (end - start) / PAGE_SIZE;
+	nr = (end - start) / PG_SIZE;
 	kmsan_enter_runtime();
 	v_shadow = (unsigned long)vmalloc_shadow(start);
 	v_origin = (unsigned long)vmalloc_origin(start);
 	for (int i = 0; i < nr;
-	     i++, v_shadow += PAGE_SIZE, v_origin += PAGE_SIZE) {
+	     i++, v_shadow += PG_SIZE, v_origin += PG_SIZE) {
 		shadow = kmsan_vmalloc_to_page_or_null((void *)v_shadow);
 		origin = kmsan_vmalloc_to_page_or_null((void *)v_origin);
 		__vunmap_range_noflush(v_shadow, vmalloc_shadow(end));
@@ -353,8 +353,8 @@ void kmsan_handle_dma(phys_addr_t phys, size_t size,
 	 * internal KMSAN checks.
 	 */
 	while (size > 0) {
-		page_offset = offset_in_page(addr);
-		to_go = min(PAGE_SIZE - page_offset, (u64)size);
+		page_offset = offset_in_pg(addr);
+		to_go = min(PG_SIZE - page_offset, (u64)size);
 		kmsan_handle_dma_page((void *)addr, to_go, dir);
 		addr += to_go;
 		size -= to_go;

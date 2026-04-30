@@ -27,7 +27,7 @@ struct sigpool_entry {
 				reserved:15;
 };
 
-#define CPOOL_SIZE (PAGE_SIZE / sizeof(struct sigpool_entry))
+#define CPOOL_SIZE (PG_SIZE / sizeof(struct sigpool_entry))
 static struct sigpool_entry cpool[CPOOL_SIZE];
 static unsigned int cpool_populated;
 static DEFINE_MUTEX(cpool_mutex);
@@ -347,8 +347,8 @@ int tcp_sigpool_hash_skb_data(struct tcp_sigpool *hp,
 		unsigned int offset = skb_frag_off(f);
 		struct page *page;
 
-		page = skb_frag_page(f) + (offset >> PAGE_SHIFT);
-		sg_set_page(&sg, page, skb_frag_size(f), offset_in_page(offset));
+		page = skb_frag_page(f) + (offset >> PG_SHIFT);
+		sg_set_page(&sg, page, skb_frag_size(f), offset_in_pg(offset));
 		ahash_request_set_crypt(req, &sg, NULL, skb_frag_size(f));
 		if (crypto_ahash_update(req))
 			return 1;

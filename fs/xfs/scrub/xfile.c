@@ -127,8 +127,8 @@ xfile_load(
 		unsigned int	len;
 		unsigned int	offset;
 
-		if (shmem_get_folio(inode, pos >> PAGE_SHIFT, 0, &folio,
-				SGP_READ) < 0)
+		if (shmem_get_folio(inode, pos >> PG_SHIFT, 0, &folio,
+				    SGP_READ) < 0)
 			break;
 		if (!folio) {
 			/*
@@ -136,7 +136,7 @@ xfile_load(
 			 * buffer until the next page boundary.
 			 */
 			len = min_t(ssize_t, count,
-				PAGE_SIZE - offset_in_page(pos));
+				PG_SIZE - offset_in_pg(pos));
 			memset(buf, 0, len);
 		} else {
 			if (filemap_check_wb_err(inode->i_mapping, 0)) {
@@ -197,8 +197,8 @@ xfile_store(
 		unsigned int	len;
 		unsigned int	offset;
 
-		if (shmem_get_folio(inode, pos >> PAGE_SHIFT, 0, &folio,
-				SGP_CACHE) < 0)
+		if (shmem_get_folio(inode, pos >> PG_SHIFT, 0, &folio,
+				    SGP_CACHE) < 0)
 			break;
 		if (filemap_check_wb_err(inode->i_mapping, 0)) {
 			folio_unlock(folio);
@@ -268,8 +268,8 @@ xfile_get_folio(
 		i_size_write(inode, pos + len);
 
 	pflags = memalloc_nofs_save();
-	error = shmem_get_folio(inode, pos >> PAGE_SHIFT, 0, &folio,
-			(flags & XFILE_ALLOC) ? SGP_CACHE : SGP_READ);
+	error = shmem_get_folio(inode, pos >> PG_SHIFT, 0, &folio,
+				(flags & XFILE_ALLOC) ? SGP_CACHE : SGP_READ);
 	memalloc_nofs_restore(pflags);
 	if (error)
 		return ERR_PTR(error);

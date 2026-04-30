@@ -82,7 +82,7 @@ enum {
 int __init extent_buffer_init_cachep(void);
 void __cold extent_buffer_free_cachep(void);
 
-#define INLINE_EXTENT_BUFFER_PAGES     (BTRFS_MAX_METADATA_BLOCKSIZE / PAGE_SIZE)
+#define INLINE_EXTENT_BUFFER_PAGES     (BTRFS_MAX_METADATA_BLOCKSIZE / PG_SIZE)
 struct extent_buffer {
 	u64 start;
 	u32 len;
@@ -277,7 +277,7 @@ static inline int __pure num_extent_pages(const struct extent_buffer *eb)
 	 * For sectorsize < PAGE_SIZE case, we could have nodesize < PAGE_SIZE,
 	 * thus have to ensure we get at least one page.
 	 */
-	return (eb->len >> PAGE_SHIFT) ?: 1;
+	return (eb->len >> PG_SHIFT) ?: 1;
 }
 
 /*

@@ -497,7 +497,7 @@ static void test_add_private_memory_region(void)
 	kvm_vm_free(vm2);
 
 	memfd = vm_create_guest_memfd(vm, MEM_REGION_SIZE, 0);
-	for (i = 1; i < PAGE_SIZE; i++)
+	for (i = 1; i < PG_SIZE; i++)
 		test_invalid_guest_memfd(vm, memfd, i, "Unaligned offset should fail");
 
 	vm_set_user_memory_region2(vm, MEM_REGION_SLOT, KVM_MEM_GUEST_MEMFD,

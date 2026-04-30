@@ -25,7 +25,7 @@
 
 #define NUM_TILES			8
 #define TILE_SIZE			1024
-#define XSAVE_SIZE			((NUM_TILES * TILE_SIZE) + PAGE_SIZE)
+#define XSAVE_SIZE			((NUM_TILES * TILE_SIZE) + PG_SIZE)
 
 /* Tile configuration associated: */
 #define PALETTE_TABLE_INDEX		1
@@ -271,8 +271,9 @@ int main(int argc, char *argv[])
 	memset(addr_gva2hva(vm, tiledata), rand() | 1, 2 * getpagesize());
 
 	/* XSAVE state for guest_code */
-	xstate = vm_vaddr_alloc_pages(vm, DIV_ROUND_UP(XSAVE_SIZE, PAGE_SIZE));
-	memset(addr_gva2hva(vm, xstate), 0, PAGE_SIZE * DIV_ROUND_UP(XSAVE_SIZE, PAGE_SIZE));
+	xstate = vm_vaddr_alloc_pages(vm, DIV_ROUND_UP(XSAVE_SIZE, PG_SIZE));
+	memset(addr_gva2hva(vm, xstate), 0,
+	       PG_SIZE * DIV_ROUND_UP(XSAVE_SIZE, PG_SIZE));
 	vcpu_args_set(vcpu, 3, amx_cfg, tiledata, xstate);
 
 	int iter = 0;

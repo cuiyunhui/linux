@@ -2836,14 +2836,14 @@ static void pktgen_finalize_skb(struct pktgen_dev *pkt_dev, struct sk_buff *skb,
 
 		if (frags > MAX_SKB_FRAGS)
 			frags = MAX_SKB_FRAGS;
-		len = datalen - frags * PAGE_SIZE;
+		len = datalen - frags * PG_SIZE;
 		if (len > 0) {
 			skb_put_zero(skb, len);
-			datalen = frags * PAGE_SIZE;
+			datalen = frags * PG_SIZE;
 		}
 
 		i = 0;
-		frag_len = min_t(int, datalen / frags, PAGE_SIZE);
+		frag_len = min_t(int, datalen / frags, PG_SIZE);
 		while (datalen > 0) {
 			if (unlikely(!pkt_dev->page)) {
 				int node = numa_node_id();
@@ -2860,7 +2860,7 @@ static void pktgen_finalize_skb(struct pktgen_dev *pkt_dev, struct sk_buff *skb,
 			if (i == (frags - 1))
 				skb_frag_fill_page_desc(&skb_shinfo(skb)->frags[i],
 							pkt_dev->page, 0,
-							min(datalen, PAGE_SIZE));
+							min(datalen, PG_SIZE));
 			else
 				skb_frag_fill_page_desc(&skb_shinfo(skb)->frags[i],
 							pkt_dev->page, 0, frag_len);

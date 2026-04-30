@@ -928,7 +928,7 @@ static inline void mlx5_init_fbc_offset(struct mlx5_buf_list *frags,
 	fbc->log_stride = log_stride;
 	fbc->log_sz     = log_sz;
 	fbc->sz_m1	= (1 << fbc->log_sz) - 1;
-	fbc->log_frag_strides = PAGE_SHIFT - fbc->log_stride;
+	fbc->log_frag_strides = PG_SHIFT - fbc->log_stride;
 	fbc->frag_sz_m1	= (1 << fbc->log_frag_strides) - 1;
 	fbc->strides_offset = strides_offset;
 }

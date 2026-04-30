@@ -184,11 +184,11 @@ static void btrfs_end_repair_bio(struct btrfs_bio *repair_bbio,
 	 * utilized by repair_bbio again.
 	 */
 	struct bvec_iter saved_iter = repair_bbio->saved_iter;
-	const u32 step = min(fs_info->sectorsize, PAGE_SIZE);
+	const u32 step = min(fs_info->sectorsize, PG_SIZE);
 	const u64 logical = repair_bbio->saved_iter.bi_sector << SECTOR_SHIFT;
 	const u32 nr_steps = repair_bbio->saved_iter.bi_size / step;
 	int mirror = repair_bbio->mirror_num;
-	phys_addr_t paddrs[BTRFS_MAX_BLOCKSIZE / PAGE_SIZE];
+	phys_addr_t paddrs[BTRFS_MAX_BLOCKSIZE / PG_SIZE];
 	phys_addr_t paddr;
 	unsigned int slot = 0;
 
@@ -244,7 +244,7 @@ static struct btrfs_failed_bio *repair_one_sector(struct btrfs_bio *failed_bbio,
 	struct btrfs_inode *inode = failed_bbio->inode;
 	struct btrfs_fs_info *fs_info = inode->root->fs_info;
 	const u32 sectorsize = fs_info->sectorsize;
-	const u32 step = min(fs_info->sectorsize, PAGE_SIZE);
+	const u32 step = min(fs_info->sectorsize, PG_SIZE);
 	const u32 nr_steps = sectorsize / step;
 	/*
 	 * For bs > ps cases, the saved_iter can be partially moved forward.
@@ -282,10 +282,10 @@ static struct btrfs_failed_bio *repair_one_sector(struct btrfs_bio *failed_bbio,
 	for (int i = 0; i < nr_steps; i++) {
 		int ret;
 
-		ASSERT(offset_in_page(paddrs[i]) + step <= PAGE_SIZE);
+		ASSERT(offset_in_pg(paddrs[i]) + step <= PG_SIZE);
 
 		ret = bio_add_page(repair_bio, phys_to_page(paddrs[i]), step,
-				   offset_in_page(paddrs[i]));
+				   offset_in_pg(paddrs[i]));
 		ASSERT(ret == step);
 	}
 
@@ -304,12 +304,12 @@ static void btrfs_check_read_bio(struct btrfs_bio *bbio, struct btrfs_device *de
 	struct btrfs_inode *inode = bbio->inode;
 	struct btrfs_fs_info *fs_info = inode->root->fs_info;
 	const u32 sectorsize = fs_info->sectorsize;
-	const u32 step = min(sectorsize, PAGE_SIZE);
+	const u32 step = min(sectorsize, PG_SIZE);
 	const u32 nr_steps = sectorsize / step;
 	struct bvec_iter *iter = &bbio->saved_iter;
 	blk_status_t status = bbio->bio.bi_status;
 	struct btrfs_failed_bio *fbio = NULL;
-	phys_addr_t paddrs[BTRFS_MAX_BLOCKSIZE / PAGE_SIZE];
+	phys_addr_t paddrs[BTRFS_MAX_BLOCKSIZE / PG_SIZE];
 	phys_addr_t paddr;
 	u32 offset = 0;
 
@@ -876,7 +876,7 @@ static void assert_bbio_alignment(struct btrfs_bio *bbio)
 	struct bio_vec bvec;
 	struct bvec_iter iter;
 	const u32 blocksize = fs_info->sectorsize;
-	const u32 alignment = min(blocksize, PAGE_SIZE);
+	const u32 alignment = min(blocksize, PG_SIZE);
 	const u64 logical = bbio->bio.bi_iter.bi_sector << SECTOR_SHIFT;
 	const u32 length = bbio->bio.bi_iter.bi_size;
 
@@ -974,7 +974,8 @@ int btrfs_repair_io_failure(struct btrfs_fs_info *fs_info, u64 ino, u64 fileoff,
 	bio = bio_alloc(smap.dev->bdev, nr_steps, REQ_OP_WRITE | REQ_SYNC, GFP_NOFS);
 	bio->bi_iter.bi_sector = smap.physical >> SECTOR_SHIFT;
 	for (int i = 0; i < nr_steps; i++) {
-		ret = bio_add_page(bio, phys_to_page(paddrs[i]), step, offset_in_page(paddrs[i]));
+		ret = bio_add_page(bio, phys_to_page(paddrs[i]), step,
+				   offset_in_pg(paddrs[i]));
 		/* We should have allocated enough slots to contain all the different pages. */
 		ASSERT(ret == step);
 	}

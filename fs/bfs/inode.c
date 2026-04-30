@@ -312,7 +312,7 @@ void bfs_dump_imap(const char *prefix, struct super_block *s)
 	if (!tmpbuf)
 		return;
 	for (i = BFS_SB(s)->si_lasti; i >= 0; i--) {
-		if (i > PAGE_SIZE - 100) break;
+		if (i > PG_SIZE - 100) break;
 		if (test_bit(i, BFS_SB(s)->si_imap))
 			strcat(tmpbuf, "1");
 		else

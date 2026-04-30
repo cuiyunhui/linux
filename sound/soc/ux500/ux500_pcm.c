@@ -23,10 +23,10 @@
 #include "ux500_pcm.h"
 
 #define UX500_PLATFORM_PERIODS_BYTES_MIN	128
-#define UX500_PLATFORM_PERIODS_BYTES_MAX	(64 * PAGE_SIZE)
+#define UX500_PLATFORM_PERIODS_BYTES_MAX	(64 * PG_SIZE)
 #define UX500_PLATFORM_PERIODS_MIN		2
 #define UX500_PLATFORM_PERIODS_MAX		48
-#define UX500_PLATFORM_BUFFER_BYTES_MAX		(2048 * PAGE_SIZE)
+#define UX500_PLATFORM_BUFFER_BYTES_MAX		(2048 * PG_SIZE)
 
 static int ux500_pcm_prepare_slave_config(struct snd_pcm_substream *substream,
 		struct snd_pcm_hw_params *params,

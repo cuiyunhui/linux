@@ -201,12 +201,12 @@ bool encl_load(const char *path, struct encl *encl, unsigned long heap_size)
 		goto err;
 	}
 
-	ptr = mmap(NULL, PAGE_SIZE, PROT_READ, MAP_SHARED, fd, 0);
+	ptr = mmap(NULL, PG_SIZE, PROT_READ, MAP_SHARED, fd, 0);
 	if (ptr == (void *)-1) {
 		perror("mmap for read");
 		goto err;
 	}
-	munmap(ptr, PAGE_SIZE);
+	munmap(ptr, PG_SIZE);
 
 #define ERR_MSG \
 "mmap() succeeded for PROT_READ, but failed for PROT_EXEC.\n" \
@@ -214,12 +214,12 @@ bool encl_load(const char *path, struct encl *encl, unsigned long heap_size)
 " \tmount | grep \"/dev .*noexec\"\n" \
 " If so, remount it executable: mount -o remount,exec /dev\n\n"
 
-	ptr = mmap(NULL, PAGE_SIZE, PROT_EXEC, MAP_SHARED, fd, 0);
+	ptr = mmap(NULL, PG_SIZE, PROT_EXEC, MAP_SHARED, fd, 0);
 	if (ptr == (void *)-1) {
 		fprintf(stderr, ERR_MSG);
 		goto err;
 	}
-	munmap(ptr, PAGE_SIZE);
+	munmap(ptr, PG_SIZE);
 
 	encl->fd = fd;
 
@@ -267,7 +267,7 @@ bool encl_load(const char *path, struct encl *encl, unsigned long heap_size)
 		}
 
 		if (j == 0) {
-			src_offset = phdr->p_offset & PAGE_MASK;
+			src_offset = phdr->p_offset & PG_MASK;
 			encl->src = encl->bin + src_offset;
 
 			seg->prot = PROT_READ | PROT_WRITE;
@@ -279,8 +279,8 @@ bool encl_load(const char *path, struct encl *encl, unsigned long heap_size)
 			seg->flags = (SGX_PAGE_TYPE_REG << 8) | seg->prot;
 		}
 
-		seg->offset = (phdr->p_offset & PAGE_MASK) - src_offset;
-		seg->size = (phdr->p_filesz + PAGE_SIZE - 1) & PAGE_MASK;
+		seg->offset = (phdr->p_offset & PG_MASK) - src_offset;
+		seg->size = (phdr->p_filesz + PG_SIZE - 1) & PG_MASK;
 		seg->src = encl->src + seg->offset;
 		seg->measure = true;
 

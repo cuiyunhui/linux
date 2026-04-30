@@ -82,7 +82,7 @@ static int copy_inline_to_page(struct btrfs_inode *inode,
 	if (ret)
 		goto out;
 
-	folio = __filemap_get_folio(mapping, file_offset >> PAGE_SHIFT,
+	folio = __filemap_get_folio(mapping, file_offset >> PG_SHIFT,
 					FGP_LOCK | FGP_ACCESSED | FGP_CREAT,
 					btrfs_alloc_write_mask(mapping));
 	if (IS_ERR(folio)) {

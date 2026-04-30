@@ -465,33 +465,33 @@ static ssize_t config_show(struct device *dev,
 
 	mutex_lock(&test_dev->config_mutex);
 
-	len += snprintf(buf, PAGE_SIZE,
+	len += snprintf(buf, PG_SIZE,
 			"Custom trigger configuration for: %s\n",
 			dev_name(dev));
 
-	len += snprintf(buf+len, PAGE_SIZE - len,
+	len += snprintf(buf+len, PG_SIZE - len,
 			"Number of threads:\t%u\n",
 			config->num_threads);
 
-	len += snprintf(buf+len, PAGE_SIZE - len,
+	len += snprintf(buf+len, PG_SIZE - len,
 			"Test_case:\t%s (%u)\n",
 			test_case_str(config->test_case),
 			config->test_case);
 
 	if (config->test_driver)
-		len += snprintf(buf+len, PAGE_SIZE - len,
+		len += snprintf(buf+len, PG_SIZE - len,
 				"driver:\t%s\n",
 				config->test_driver);
 	else
-		len += snprintf(buf+len, PAGE_SIZE - len,
+		len += snprintf(buf+len, PG_SIZE - len,
 				"driver:\tEMPTY\n");
 
 	if (config->test_fs)
-		len += snprintf(buf+len, PAGE_SIZE - len,
+		len += snprintf(buf+len, PG_SIZE - len,
 				"fs:\t%s\n",
 				config->test_fs);
 	else
-		len += snprintf(buf+len, PAGE_SIZE - len,
+		len += snprintf(buf+len, PG_SIZE - len,
 				"fs:\tEMPTY\n");
 
 	mutex_unlock(&test_dev->config_mutex);
@@ -682,7 +682,7 @@ static ssize_t config_test_show_str(struct mutex *config_mutex,
 	int len;
 
 	mutex_lock(config_mutex);
-	len = snprintf(dst, PAGE_SIZE, "%s\n", src);
+	len = snprintf(dst, PG_SIZE, "%s\n", src);
 	mutex_unlock(config_mutex);
 
 	return len;
@@ -955,7 +955,7 @@ static ssize_t test_dev_config_show_int(struct kmod_test_device *test_dev,
 	val = config;
 	mutex_unlock(&test_dev->config_mutex);
 
-	return snprintf(buf, PAGE_SIZE, "%d\n", val);
+	return snprintf(buf, PG_SIZE, "%d\n", val);
 }
 
 static ssize_t test_dev_config_show_uint(struct kmod_test_device *test_dev,
@@ -968,7 +968,7 @@ static ssize_t test_dev_config_show_uint(struct kmod_test_device *test_dev,
 	val = config;
 	mutex_unlock(&test_dev->config_mutex);
 
-	return snprintf(buf, PAGE_SIZE, "%u\n", val);
+	return snprintf(buf, PG_SIZE, "%u\n", val);
 }
 
 static ssize_t test_result_store(struct device *dev,

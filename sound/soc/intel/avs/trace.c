@@ -12,7 +12,7 @@
 #include "trace.h"
 
 #define BYTES_PER_LINE 16
-#define MAX_CHUNK_SIZE ((PAGE_SIZE - 150) /* Place for trace header */	\
+#define MAX_CHUNK_SIZE ((PG_SIZE - 150) /* Place for trace header */	\
 			/ (2 * BYTES_PER_LINE + 4) /* chars per line */	\
 			* BYTES_PER_LINE)
 

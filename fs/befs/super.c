@@ -81,10 +81,10 @@ befs_check_sb(struct super_block *sb)
 		return BEFS_ERR;
 	}
 
-	if (befs_sb->block_size > PAGE_SIZE) {
+	if (befs_sb->block_size > PG_SIZE) {
 		befs_error(sb, "blocksize(%u) cannot be larger "
 			   "than system pagesize(%lu)", befs_sb->block_size,
-			   PAGE_SIZE);
+			   PG_SIZE);
 		return BEFS_ERR;
 	}
 

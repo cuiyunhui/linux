@@ -366,15 +366,15 @@ static inline unsigned int x86_model(unsigned int eax)
 #define PHYSICAL_PAGE_MASK      GENMASK_ULL(51, 12)
 
 #define PAGE_SHIFT		12
-#define PAGE_SIZE		(1ULL << PAGE_SHIFT)
-#define PAGE_MASK		(~(PAGE_SIZE-1) & PHYSICAL_PAGE_MASK)
+#define PAGE_SIZE		(1ULL << PG_SHIFT)
+#define PAGE_MASK		(~(PG_SIZE-1) & PHYSICAL_PAGE_MASK)
 
-#define HUGEPAGE_SHIFT(x)	(PAGE_SHIFT + (((x) - 1) * 9))
+#define HUGEPAGE_SHIFT(x)	(PG_SHIFT + (((x) - 1) * 9))
 #define HUGEPAGE_SIZE(x)	(1UL << HUGEPAGE_SHIFT(x))
 #define HUGEPAGE_MASK(x)	(~(HUGEPAGE_SIZE(x) - 1) & PHYSICAL_PAGE_MASK)
 
 #define PTE_GET_PA(pte)		((pte) & PHYSICAL_PAGE_MASK)
-#define PTE_GET_PFN(pte)        (PTE_GET_PA(pte) >> PAGE_SHIFT)
+#define PTE_GET_PFN(pte)        (PTE_GET_PA(pte) >> PG_SHIFT)
 
 /* General Registers in 64-Bit Mode */
 struct gpr64_regs {
@@ -1393,7 +1393,8 @@ void xen_hypercall(uint64_t nr, uint64_t a0, void *a1);
 static inline uint64_t __kvm_hypercall_map_gpa_range(uint64_t gpa,
 						     uint64_t size, uint64_t flags)
 {
-	return kvm_hypercall(KVM_HC_MAP_GPA_RANGE, gpa, size >> PAGE_SHIFT, flags, 0);
+	return kvm_hypercall(KVM_HC_MAP_GPA_RANGE, gpa, size >> PG_SHIFT,
+			     flags, 0);
 }
 
 static inline void kvm_hypercall_map_gpa_range(uint64_t gpa, uint64_t size,

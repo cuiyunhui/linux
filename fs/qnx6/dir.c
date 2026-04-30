@@ -39,9 +39,9 @@ static void *qnx6_get_folio(struct inode *dir, unsigned long n,
 static unsigned last_entry(struct inode *inode, unsigned long page_nr)
 {
 	unsigned long last_byte = inode->i_size;
-	last_byte -= page_nr << PAGE_SHIFT;
-	if (last_byte > PAGE_SIZE)
-		last_byte = PAGE_SIZE;
+	last_byte -= page_nr << PG_SHIFT;
+	if (last_byte > PG_SIZE)
+		last_byte = PG_SIZE;
 	return last_byte / QNX6_DIR_ENTRY_SIZE;
 }
 
@@ -51,7 +51,7 @@ static struct qnx6_long_filename *qnx6_longname(struct super_block *sb,
 {
 	struct qnx6_sb_info *sbi = QNX6_SB(sb);
 	u32 s = fs32_to_cpu(sbi, de->de_long_inode); /* in block units */
-	u32 n = s >> (PAGE_SHIFT - sb->s_blocksize_bits); /* in pages */
+	u32 n = s >> (PG_SHIFT - sb->s_blocksize_bits); /* in pages */
 	u32 offs;
 	struct address_space *mapping = sbi->longfile->i_mapping;
 	struct folio *folio = read_mapping_folio(mapping, n, NULL);
@@ -120,8 +120,8 @@ static int qnx6_readdir(struct file *file, struct dir_context *ctx)
 	struct qnx6_sb_info *sbi = QNX6_SB(s);
 	loff_t pos = ctx->pos & ~(QNX6_DIR_ENTRY_SIZE - 1);
 	unsigned long npages = dir_pages(inode);
-	unsigned long n = pos >> PAGE_SHIFT;
-	unsigned offset = (pos & ~PAGE_MASK) / QNX6_DIR_ENTRY_SIZE;
+	unsigned long n = pos >> PG_SHIFT;
+	unsigned offset = (pos & ~PG_MASK) / QNX6_DIR_ENTRY_SIZE;
 	bool done = false;
 
 	ctx->pos = pos;
@@ -136,7 +136,7 @@ static int qnx6_readdir(struct file *file, struct dir_context *ctx)
 
 		if (IS_ERR(kaddr)) {
 			pr_err("%s(): read failed\n", __func__);
-			ctx->pos = (n + 1) << PAGE_SHIFT;
+			ctx->pos = (n + 1) << PG_SHIFT;
 			return PTR_ERR(kaddr);
 		}
 		de = (struct qnx6_dir_entry *)(kaddr + offset);

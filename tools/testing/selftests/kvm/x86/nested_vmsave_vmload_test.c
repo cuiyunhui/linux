@@ -21,7 +21,7 @@
 #define TEST_MEM_PAGES			2
 #define TEST_MEM_BASE			0xc0000000
 
-#define TEST_GUEST_ADDR(idx)		(TEST_MEM_BASE + (idx) * PAGE_SIZE)
+#define TEST_GUEST_ADDR(idx)		(TEST_MEM_BASE + (idx) * PG_SIZE)
 
 #define TEST_VMCB_L1_GPA(idx)		TEST_GUEST_ADDR(idx)
 #define TEST_VMCB_GVA(idx)		TEST_GUEST_ADDR(idx)
@@ -161,7 +161,7 @@ int main(int argc, char *argv[])
 	 * the NPT.
 	 */
 	TEST_ASSERT_EQ(TEST_VMCB_L2_GPA, TEST_VMCB_L1_GPA(0));
-	tdp_map(vm, TEST_VMCB_L2_GPA, TEST_VMCB_L1_GPA(1), PAGE_SIZE);
+	tdp_map(vm, TEST_VMCB_L2_GPA, TEST_VMCB_L1_GPA(1), PG_SIZE);
 
 	for (;;) {
 		struct ucall uc;

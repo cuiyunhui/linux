@@ -772,17 +772,17 @@ static struct sk_buff *xsk_build_skb_zerocopy(struct xdp_sock *xs,
 	len = desc->len;
 	ts = pool->unaligned ? len : pool->chunk_size;
 
-	offset = offset_in_page(buffer);
+	offset = offset_in_pg(buffer);
 	addr = buffer - pool->addrs;
 
 	for (copied = 0, i = skb_shinfo(skb)->nr_frags; copied < len; i++) {
 		if (unlikely(i >= MAX_SKB_FRAGS))
 			return ERR_PTR(-EOVERFLOW);
 
-		page = pool->umem->pgs[addr >> PAGE_SHIFT];
+		page = pool->umem->pgs[addr >> PG_SHIFT];
 		get_page(page);
 
-		copy = min_t(u32, PAGE_SIZE - offset, len - copied);
+		copy = min_t(u32, PG_SIZE - offset, len - copied);
 		skb_fill_page_desc(skb, i, page, offset, copy);
 
 		copied += copy;
@@ -877,8 +877,8 @@ static struct sk_buff *xsk_build_skb(struct xdp_sock *xs,
 			memcpy(vaddr, buffer, len);
 			kunmap_local(vaddr);
 
-			skb_add_rx_frag(skb, nr_frags, page, 0, len, PAGE_SIZE);
-			refcount_add(PAGE_SIZE, &xs->sk.sk_wmem_alloc);
+			skb_add_rx_frag(skb, nr_frags, page, 0, len, PG_SIZE);
+			refcount_add(PG_SIZE, &xs->sk.sk_wmem_alloc);
 
 			xsk_addr->addrs[xsk_addr->num_descs] = desc->addr;
 		}
@@ -1749,7 +1749,7 @@ static int xsk_getsockopt(struct socket *sock, int level, int optname,
 static int xsk_mmap(struct file *file, struct socket *sock,
 		    struct vm_area_struct *vma)
 {
-	loff_t offset = (loff_t)vma->vm_pgoff << PAGE_SHIFT;
+	loff_t offset = (loff_t)vma->vm_pgoff << PG_SHIFT;
 	unsigned long size = vma->vm_end - vma->vm_start;
 	struct xdp_sock *xs = xdp_sk(sock->sk);
 	int state = READ_ONCE(xs->state);

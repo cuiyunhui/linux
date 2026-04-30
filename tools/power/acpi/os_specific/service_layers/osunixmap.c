@@ -41,7 +41,7 @@ static acpi_size acpi_os_get_page_size(void)
 {
 
 #ifdef PAGE_SIZE
-	return PAGE_SIZE;
+	return PG_SIZE;
 #else
 	return sysconf(_SC_PAGESIZE);
 #endif

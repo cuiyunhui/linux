@@ -625,7 +625,7 @@ static int break_ksm_pmd_entry(pmd_t *pmdp, unsigned long addr, unsigned long en
 	if (!start_ptep)
 		return 0;
 
-	for (ptep = start_ptep; addr < end; ptep++, addr += PAGE_SIZE) {
+	for (ptep = start_ptep; addr < end; ptep++, addr += PG_SIZE) {
 		pte_t pte = ptep_get(ptep);
 		struct folio *folio = NULL;
 
@@ -788,7 +788,7 @@ static void break_cow(struct ksm_rmap_item *rmap_item)
 	mmap_read_lock(mm);
 	vma = find_mergeable_vma(mm, addr);
 	if (vma)
-		break_ksm(vma, addr, addr + PAGE_SIZE, false);
+		break_ksm(vma, addr, addr + PG_SIZE, false);
 	mmap_read_unlock(mm);
 }
 
@@ -896,7 +896,7 @@ static void remove_node_from_stable_tree(struct ksm_stable_node *stable_node)
 		VM_BUG_ON(stable_node->rmap_hlist_len <= 0);
 		stable_node->rmap_hlist_len--;
 		put_anon_vma(rmap_item->anon_vma);
-		rmap_item->address &= PAGE_MASK;
+		rmap_item->address &= PG_MASK;
 		cond_resched();
 	}
 
@@ -1050,7 +1050,7 @@ static void remove_rmap_item_from_tree(struct ksm_rmap_item *rmap_item)
 
 		put_anon_vma(rmap_item->anon_vma);
 		rmap_item->head = NULL;
-		rmap_item->address &= PAGE_MASK;
+		rmap_item->address &= PG_MASK;
 
 	} else if (rmap_item->address & UNSTABLE_FLAG) {
 		unsigned char age;
@@ -1067,7 +1067,7 @@ static void remove_rmap_item_from_tree(struct ksm_rmap_item *rmap_item)
 			rb_erase(&rmap_item->node,
 				 root_unstable_tree + NUMA(rmap_item->nid));
 		ksm_pages_unshared--;
-		rmap_item->address &= PAGE_MASK;
+		rmap_item->address &= PG_MASK;
 	}
 out:
 	cond_resched();		/* we're called from many long loops */
@@ -1264,7 +1264,7 @@ static u32 calc_checksum(struct page *page)
 {
 	u32 checksum;
 	void *addr = kmap_local_page(page);
-	checksum = xxhash(addr, PAGE_SIZE, 0);
+	checksum = xxhash(addr, PG_SIZE, 0);
 	kunmap_local(addr);
 	return checksum;
 }
@@ -1288,7 +1288,7 @@ static int write_protect_page(struct vm_area_struct *vma, struct folio *folio,
 		goto out;
 
 	mmu_notifier_range_init(&range, MMU_NOTIFY_CLEAR, 0, mm, pvmw.address,
-				pvmw.address + PAGE_SIZE);
+				pvmw.address + PG_SIZE);
 	mmu_notifier_invalidate_range_start(&range);
 
 	if (!page_vma_mapped_walk(&pvmw))
@@ -1401,7 +1401,7 @@ static int replace_page(struct vm_area_struct *vma, struct page *page,
 		goto out;
 
 	mmu_notifier_range_init(&range, MMU_NOTIFY_CLEAR, 0, mm, addr,
-				addr + PAGE_SIZE);
+				addr + PG_SIZE);
 	mmu_notifier_invalidate_range_start(&range);
 
 	ptep = pte_offset_map_lock(mm, pmd, addr, &ptl);
@@ -2393,7 +2393,7 @@ static struct ksm_rmap_item *get_next_rmap_item(struct ksm_mm_slot *mm_slot,
 
 	while (*rmap_list) {
 		rmap_item = *rmap_list;
-		if ((rmap_item->address & PAGE_MASK) == addr)
+		if ((rmap_item->address & PG_MASK) == addr)
 			return rmap_item;
 		if (rmap_item->address > addr)
 			break;
@@ -2524,7 +2524,7 @@ static int ksm_next_page_pmd_entry(pmd_t *pmdp, unsigned long addr, unsigned lon
 			if (folio_is_zone_device(folio) || !folio_test_anon(folio))
 				goto not_found_unlock;
 
-			page += ((addr & (PMD_SIZE - 1)) >> PAGE_SHIFT);
+			page += ((addr & (PMD_SIZE - 1)) >> PG_SHIFT);
 			goto found_unlock;
 		}
 		spin_unlock(ptl);
@@ -2534,7 +2534,7 @@ static int ksm_next_page_pmd_entry(pmd_t *pmdp, unsigned long addr, unsigned lon
 	if (!start_ptep)
 		return 0;
 
-	for (ptep = start_ptep; addr < end; ptep++, addr += PAGE_SIZE) {
+	for (ptep = start_ptep; addr < end; ptep++, addr += PG_SIZE) {
 		pte = ptep_get(ptep);
 
 		if (!pte_present(pte))
@@ -2678,7 +2678,7 @@ next_mm:
 				ksm_scan.address = ksm_next_page_arg.addr;
 			} else {
 				VM_WARN_ON_ONCE(found < 0);
-				ksm_scan.address = vma->vm_end - PAGE_SIZE;
+				ksm_scan.address = vma->vm_end - PG_SIZE;
 			}
 
 			if (tmp_page) {
@@ -2695,7 +2695,7 @@ next_mm:
 						goto next_page;
 					}
 
-					ksm_scan.address += PAGE_SIZE;
+					ksm_scan.address += PG_SIZE;
 					*page = tmp_page;
 				} else {
 					folio_put(folio);
@@ -2704,7 +2704,7 @@ next_mm:
 				return rmap_item;
 			}
 next_page:
-			ksm_scan.address += PAGE_SIZE;
+			ksm_scan.address += PG_SIZE;
 			cond_resched();
 		}
 	}
@@ -3188,7 +3188,7 @@ again:
 			vma = vmac->vma;
 
 			/* Ignore the stable/unstable/sqnr flags */
-			addr = rmap_item->address & PAGE_MASK;
+			addr = rmap_item->address & PG_MASK;
 
 			if (addr < vma->vm_start || addr >= vma->vm_end)
 				continue;
@@ -3251,7 +3251,7 @@ void collect_procs_ksm(const struct folio *folio, const struct page *page,
 			{
 				vma = vmac->vma;
 				if (vma->vm_mm == t->mm) {
-					addr = rmap_item->address & PAGE_MASK;
+					addr = rmap_item->address & PG_MASK;
 					add_to_kill_ksm(t, page, vma, to_kill,
 							addr);
 				}
@@ -3439,7 +3439,7 @@ bool ksm_process_mergeable(struct mm_struct *mm)
 
 long ksm_process_profit(struct mm_struct *mm)
 {
-	return (long)(mm->ksm_merging_pages + mm_ksm_zero_pages(mm)) * PAGE_SIZE -
+	return (long)(mm->ksm_merging_pages + mm_ksm_zero_pages(mm)) * PG_SIZE -
 		mm->ksm_rmap_items * sizeof(struct ksm_rmap_item);
 }
 #endif /* CONFIG_PROC_FS */
@@ -3736,7 +3736,7 @@ static ssize_t general_profit_show(struct kobject *kobj,
 {
 	long general_profit;
 
-	general_profit = (ksm_pages_sharing + atomic_long_read(&ksm_zero_pages)) * PAGE_SIZE -
+	general_profit = (ksm_pages_sharing + atomic_long_read(&ksm_zero_pages)) * PG_SIZE -
 				ksm_rmap_items * sizeof(struct ksm_rmap_item);
 
 	return sysfs_emit(buf, "%ld\n", general_profit);

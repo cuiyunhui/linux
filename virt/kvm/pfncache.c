@@ -60,14 +60,14 @@ void gfn_to_pfn_cache_invalidate_start(struct kvm *kvm, unsigned long start,
 static bool kvm_gpc_is_valid_len(gpa_t gpa, unsigned long uhva,
 				 unsigned long len)
 {
-	unsigned long offset = kvm_is_error_gpa(gpa) ? offset_in_page(uhva) :
-						       offset_in_page(gpa);
+	unsigned long offset = kvm_is_error_gpa(gpa) ? offset_in_pg(uhva) :
+						       offset_in_pg(gpa);
 
 	/*
 	 * The cached access must fit within a single page. The 'len' argument
 	 * to activate() and refresh() exists only to enforce that.
 	 */
-	return offset + len <= PAGE_SIZE;
+	return offset + len <= PG_SIZE;
 }
 
 bool kvm_gpc_check(struct gfn_to_pfn_cache *gpc, unsigned long len)
@@ -102,7 +102,7 @@ static void *gpc_map(kvm_pfn_t pfn)
 		return kmap(pfn_to_page(pfn));
 
 #ifdef CONFIG_HAS_IOMEM
-	return memremap(pfn_to_hpa(pfn), PAGE_SIZE, MEMREMAP_WB);
+	return memremap(pfn_to_hpa(pfn), PG_SIZE, MEMREMAP_WB);
 #else
 	return NULL;
 #endif
@@ -155,7 +155,7 @@ static inline bool mmu_notifier_retry_cache(struct kvm *kvm, unsigned long mmu_s
 static kvm_pfn_t hva_to_pfn_retry(struct gfn_to_pfn_cache *gpc)
 {
 	/* Note, the new page offset may be different than the old! */
-	void *old_khva = (void *)PAGE_ALIGN_DOWN((uintptr_t)gpc->khva);
+	void *old_khva = (void *) PG_ALIGN_DOWN((uintptr_t)gpc->khva);
 	kvm_pfn_t new_pfn = KVM_PFN_ERR_FAULT;
 	void *new_khva = NULL;
 	unsigned long mmu_seq;
@@ -236,7 +236,7 @@ static kvm_pfn_t hva_to_pfn_retry(struct gfn_to_pfn_cache *gpc)
 
 	gpc->valid = true;
 	gpc->pfn = new_pfn;
-	gpc->khva = new_khva + offset_in_page(gpc->uhva);
+	gpc->khva = new_khva + offset_in_pg(gpc->uhva);
 
 	/*
 	 * Put the reference to the _new_ page.  The page is now tracked by the
@@ -277,22 +277,22 @@ static int __kvm_gpc_refresh(struct gfn_to_pfn_cache *gpc, gpa_t gpa, unsigned l
 	}
 
 	old_pfn = gpc->pfn;
-	old_khva = (void *)PAGE_ALIGN_DOWN((uintptr_t)gpc->khva);
-	old_uhva = PAGE_ALIGN_DOWN(gpc->uhva);
+	old_khva = (void *) PG_ALIGN_DOWN((uintptr_t)gpc->khva);
+	old_uhva = PG_ALIGN_DOWN(gpc->uhva);
 
 	if (kvm_is_error_gpa(gpa)) {
-		page_offset = offset_in_page(uhva);
+		page_offset = offset_in_pg(uhva);
 
 		gpc->gpa = INVALID_GPA;
 		gpc->memslot = NULL;
-		gpc->uhva = PAGE_ALIGN_DOWN(uhva);
+		gpc->uhva = PG_ALIGN_DOWN(uhva);
 
 		if (gpc->uhva != old_uhva)
 			hva_change = true;
 	} else {
 		struct kvm_memslots *slots = kvm_memslots(gpc->kvm);
 
-		page_offset = offset_in_page(gpa);
+		page_offset = offset_in_pg(gpa);
 
 		if (gpc->gpa != gpa || gpc->generation != slots->generation ||
 		    kvm_is_error_hva(gpc->uhva)) {
@@ -468,7 +468,7 @@ void kvm_gpc_deactivate(struct gfn_to_pfn_cache *gpc)
 		 * time as mmu_notifier protection is lost when the cache is
 		 * removed from the VM's gpc_list.
 		 */
-		old_khva = gpc->khva - offset_in_page(gpc->khva);
+		old_khva = gpc->khva - offset_in_pg(gpc->khva);
 		gpc->khva = NULL;
 
 		old_pfn = gpc->pfn;

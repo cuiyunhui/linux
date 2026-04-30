@@ -77,7 +77,7 @@ static unsigned int min_slot_table_size = RPCRDMA_MIN_SLOT_TABLE;
 static unsigned int max_slot_table_size = RPCRDMA_MAX_SLOT_TABLE;
 static unsigned int min_inline_size = RPCRDMA_MIN_INLINE;
 static unsigned int max_inline_size = RPCRDMA_MAX_INLINE;
-static unsigned int max_padding = PAGE_SIZE;
+static unsigned int max_padding = PG_SIZE;
 static unsigned int min_memreg = RPCRDMA_BOUNCEBUFFERS;
 static unsigned int max_memreg = RPCRDMA_LAST - 1;
 static unsigned int dummy;
@@ -357,7 +357,7 @@ xprt_setup_rdma(struct xprt_create *args)
 	INIT_DELAYED_WORK(&new_xprt->rx_connect_worker,
 			  xprt_rdma_connect_worker);
 
-	xprt->max_payload = RPCRDMA_MAX_DATA_SEGS << PAGE_SHIFT;
+	xprt->max_payload = RPCRDMA_MAX_DATA_SEGS << PG_SHIFT;
 
 	return xprt;
 }

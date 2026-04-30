@@ -341,7 +341,7 @@ enum {
  */
 #define VM_SPECIAL (VM_IO | VM_DONTEXPAND | VM_PFNMAP | VM_MIXEDMAP)
 
-#define DEFAULT_MAP_WINDOW	((1UL << 47) - PAGE_SIZE)
+#define DEFAULT_MAP_WINDOW	((1UL << 47) - PG_SIZE)
 #define TASK_SIZE_LOW		DEFAULT_MAP_WINDOW
 #define TASK_SIZE_MAX		DEFAULT_MAP_WINDOW
 #define STACK_TOP		TASK_SIZE_LOW
@@ -376,9 +376,9 @@ enum {
 #define for_each_vma_range(__vmi, __vma, __end)				\
 	while (((__vma) = vma_find(&(__vmi), (__end))) != NULL)
 
-#define offset_in_page(p)	((unsigned long)(p) & ~PAGE_MASK)
+#define offset_in_page(p)	((unsigned long)(p) & ~PG_MASK)
 
-#define PHYS_PFN(x)	((unsigned long)((x) >> PAGE_SHIFT))
+#define PHYS_PFN(x)	((unsigned long)((x) >> PG_SHIFT))
 
 #define test_and_set_bit(nr, addr) __test_and_set_bit(nr, addr)
 #define test_and_clear_bit(nr, addr) __test_and_clear_bit(nr, addr)
@@ -1113,7 +1113,7 @@ static inline void vma_iter_init(struct vma_iterator *vmi,
 
 static inline unsigned long vma_pages(struct vm_area_struct *vma)
 {
-	return (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
+	return (vma->vm_end - vma->vm_start) >> PG_SHIFT;
 }
 
 static inline void mmap_assert_locked(struct mm_struct *);
@@ -1206,7 +1206,7 @@ static inline unsigned long stack_guard_start_gap(struct vm_area_struct *vma)
 
 	/* See reasoning around the VM_SHADOW_STACK definition */
 	if (vma->vm_flags & VM_SHADOW_STACK)
-		return PAGE_SIZE;
+		return PG_SIZE;
 
 	return 0;
 }
@@ -1229,7 +1229,7 @@ static inline unsigned long vm_end_gap(struct vm_area_struct *vma)
 	if (vma->vm_flags & VM_GROWSUP) {
 		vm_end += stack_guard_gap;
 		if (vm_end < vma->vm_end)
-			vm_end = -PAGE_SIZE;
+			vm_end = -PG_SIZE;
 	}
 	return vm_end;
 }
@@ -1247,11 +1247,11 @@ static inline bool mlock_future_ok(const struct mm_struct *mm,
 	if (!(vm_flags & VM_LOCKED) || capable(CAP_IPC_LOCK))
 		return true;
 
-	locked_pages = bytes >> PAGE_SHIFT;
+	locked_pages = bytes >> PG_SHIFT;
 	locked_pages += mm->locked_vm;
 
 	limit_pages = rlimit(RLIMIT_MEMLOCK);
-	limit_pages >>= PAGE_SHIFT;
+	limit_pages >>= PG_SHIFT;
 
 	return locked_pages <= limit_pages;
 }

@@ -441,13 +441,13 @@ static int shbuf_setup_backstore(struct xen_snd_front_pcm_stream_info *stream,
 		return -ENOMEM;
 
 	stream->buffer_sz = buffer_sz;
-	stream->num_pages = DIV_ROUND_UP(stream->buffer_sz, PAGE_SIZE);
+	stream->num_pages = DIV_ROUND_UP(stream->buffer_sz, PG_SIZE);
 	stream->pages = kzalloc_objs(struct page *, stream->num_pages);
 	if (!stream->pages)
 		return -ENOMEM;
 
 	for (i = 0; i < stream->num_pages; i++)
-		stream->pages[i] = virt_to_page(stream->buffer + i * PAGE_SIZE);
+		stream->pages[i] = virt_to_page(stream->buffer + i * PG_SIZE);
 
 	return 0;
 }

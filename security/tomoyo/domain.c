@@ -913,7 +913,7 @@ bool tomoyo_dump_page(struct linux_binprm *bprm, unsigned long pos,
 
 	/* dump->data is released by tomoyo_find_next_domain(). */
 	if (!dump->data) {
-		dump->data = kzalloc(PAGE_SIZE, GFP_NOFS);
+		dump->data = kzalloc(PG_SIZE, GFP_NOFS);
 		if (!dump->data)
 			return false;
 	}
@@ -931,15 +931,15 @@ bool tomoyo_dump_page(struct linux_binprm *bprm, unsigned long pos,
 	if (ret <= 0)
 		return false;
 #else
-	page = bprm->page[pos / PAGE_SIZE];
+	page = bprm->page[pos / PG_SIZE];
 #endif
 	if (page != dump->page) {
-		const unsigned int offset = pos % PAGE_SIZE;
+		const unsigned int offset = pos % PG_SIZE;
 		char *kaddr = kmap_local_page(page);
 
 		dump->page = page;
 		memcpy(dump->data + offset, kaddr + offset,
-		       PAGE_SIZE - offset);
+		       PG_SIZE - offset);
 		kunmap_local(kaddr);
 	}
 	/* Same with put_arg_page(page) in fs/exec.c */

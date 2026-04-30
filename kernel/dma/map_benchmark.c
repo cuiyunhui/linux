@@ -37,7 +37,7 @@ static int map_benchmark_thread(void *data)
 	dma_addr_t dma_addr;
 	struct map_benchmark_data *map = data;
 	int npages = map->bparam.granule;
-	u64 size = npages * PAGE_SIZE;
+	u64 size = npages * PG_SIZE;
 	int ret = 0;
 
 	buf = alloc_pages_exact(size, GFP_KERNEL);

@@ -120,11 +120,11 @@ static ssize_t module_gzip_decompress(struct load_info *info,
 		}
 
 		s.next_out = kmap_local_page(page);
-		s.avail_out = PAGE_SIZE;
+		s.avail_out = PG_SIZE;
 		rc = zlib_inflate(&s, 0);
 		kunmap_local(s.next_out);
 
-		new_size += PAGE_SIZE - s.avail_out;
+		new_size += PG_SIZE - s.avail_out;
 	} while (rc == Z_OK);
 
 	if (rc != Z_STREAM_END) {
@@ -180,12 +180,12 @@ static ssize_t module_xz_decompress(struct load_info *info,
 
 		xz_buf.out = kmap_local_page(page);
 		xz_buf.out_pos = 0;
-		xz_buf.out_size = PAGE_SIZE;
+		xz_buf.out_size = PG_SIZE;
 		xz_ret = xz_dec_run(xz_dec, &xz_buf);
 		kunmap_local(xz_buf.out);
 
 		new_size += xz_buf.out_pos;
-	} while (xz_buf.out_pos == PAGE_SIZE && xz_ret == XZ_OK);
+	} while (xz_buf.out_pos == PG_SIZE && xz_ret == XZ_OK);
 
 	if (xz_ret != XZ_STREAM_END) {
 		pr_err("decompression failed with status %d\n", xz_ret);
@@ -264,7 +264,7 @@ static ssize_t module_zstd_decompress(struct load_info *info,
 
 		zstd_dec.dst = kmap_local_page(page);
 		zstd_dec.pos = 0;
-		zstd_dec.size = PAGE_SIZE;
+		zstd_dec.size = PG_SIZE;
 
 		ret = zstd_decompress_stream(dstream, &zstd_dec, &zstd_buf);
 		kunmap_local(zstd_dec.dst);
@@ -273,7 +273,7 @@ static ssize_t module_zstd_decompress(struct load_info *info,
 			break;
 
 		new_size += zstd_dec.pos;
-	} while (zstd_dec.pos == PAGE_SIZE && ret != 0);
+	} while (zstd_dec.pos == PG_SIZE && ret != 0);
 
 	if (retval) {
 		pr_err("ZSTD-decompression failed with status %d\n", retval);
@@ -305,7 +305,7 @@ int module_decompress(struct load_info *info, const void *buf, size_t size)
 	 * Start with number of pages twice as big as needed for
 	 * compressed data.
 	 */
-	n_pages = DIV_ROUND_UP(size, PAGE_SIZE) * 2;
+	n_pages = DIV_ROUND_UP(size, PG_SIZE) * 2;
 	error = module_extend_max_pages(info, n_pages);
 
 	data_size = MODULE_DECOMPRESS_FN(info, buf, size);

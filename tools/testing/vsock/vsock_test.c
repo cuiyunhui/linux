@@ -1753,7 +1753,7 @@ static void test_stream_msgzcopy_leak_zcskb_client(const struct test_opts *opts)
 	enable_so_zerocopy_check(fd);
 
 	ctl_len = optmem_max - 1;
-	if (ctl_len > PAGE_SIZE << MAX_PAGE_ORDER) {
+	if (ctl_len > PG_SIZE << MAX_PAGE_ORDER) {
 		fprintf(stderr, "Try with net.core.optmem_max = 100000\n");
 		exit(EXIT_FAILURE);
 	}

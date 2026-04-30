@@ -78,7 +78,7 @@ static int hash_suite_init(struct kunit_suite *suite)
 	 * so that it is immediately followed by a guard page.  This allows
 	 * buffer overreads to be detected, even in assembly code.
 	 */
-	size_t alloc_len = round_up(TEST_BUF_LEN, PAGE_SIZE);
+	size_t alloc_len = round_up(TEST_BUF_LEN, PG_SIZE);
 
 	orig_test_buf = vmalloc(alloc_len);
 	if (!orig_test_buf)

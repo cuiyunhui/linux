@@ -246,18 +246,18 @@ static bool alloc_covered_contains(u32 alloc_stack_hash)
 
 static bool kfence_protect(unsigned long addr)
 {
-	return !KFENCE_WARN_ON(!kfence_protect_page(ALIGN_DOWN(addr, PAGE_SIZE), true));
+	return !KFENCE_WARN_ON(!kfence_protect_page(ALIGN_DOWN(addr, PG_SIZE), true));
 }
 
 static bool kfence_unprotect(unsigned long addr)
 {
-	return !KFENCE_WARN_ON(!kfence_protect_page(ALIGN_DOWN(addr, PAGE_SIZE), false));
+	return !KFENCE_WARN_ON(!kfence_protect_page(ALIGN_DOWN(addr, PG_SIZE), false));
 }
 
 static inline unsigned long metadata_to_pageaddr(const struct kfence_metadata *meta)
 	__must_hold(&meta->lock)
 {
-	unsigned long offset = (meta - kfence_metadata + 1) * PAGE_SIZE * 2;
+	unsigned long offset = (meta - kfence_metadata + 1) * PG_SIZE * 2;
 	unsigned long pageaddr = (unsigned long)&__kfence_pool[offset];
 
 	/* The checks do not affect performance; only called from slow-paths. */
@@ -271,7 +271,7 @@ static inline unsigned long metadata_to_pageaddr(const struct kfence_metadata *m
 	 * This metadata object only ever maps to 1 page; verify that the stored
 	 * address is in the expected range.
 	 */
-	if (KFENCE_WARN_ON(ALIGN_DOWN(meta->addr, PAGE_SIZE) != pageaddr))
+	if (KFENCE_WARN_ON(ALIGN_DOWN(meta->addr, PG_SIZE) != pageaddr))
 		return 0;
 
 	return pageaddr;
@@ -353,7 +353,7 @@ static check_canary_attributes bool check_canary_byte(u8 *addr)
 
 static inline void set_canary(const struct kfence_metadata *meta)
 {
-	const unsigned long pageaddr = ALIGN_DOWN(meta->addr, PAGE_SIZE);
+	const unsigned long pageaddr = ALIGN_DOWN(meta->addr, PG_SIZE);
 	unsigned long addr = pageaddr;
 
 	/*
@@ -364,14 +364,14 @@ static inline void set_canary(const struct kfence_metadata *meta)
 		*((u64 *)addr) = KFENCE_CANARY_PATTERN_U64;
 
 	addr = ALIGN_DOWN(meta->addr + meta->size, sizeof(u64));
-	for (; addr - pageaddr < PAGE_SIZE; addr += sizeof(u64))
+	for (; addr - pageaddr < PG_SIZE; addr += sizeof(u64))
 		*((u64 *)addr) = KFENCE_CANARY_PATTERN_U64;
 }
 
 static check_canary_attributes void
 check_canary(const struct kfence_metadata *meta)
 {
-	const unsigned long pageaddr = ALIGN_DOWN(meta->addr, PAGE_SIZE);
+	const unsigned long pageaddr = ALIGN_DOWN(meta->addr, PG_SIZE);
 	unsigned long addr = pageaddr;
 
 	/*
@@ -404,10 +404,10 @@ check_canary(const struct kfence_metadata *meta)
 		if (unlikely(!check_canary_byte((u8 *)addr)))
 			return;
 	}
-	for (; addr - pageaddr < PAGE_SIZE; addr += sizeof(u64)) {
+	for (; addr - pageaddr < PG_SIZE; addr += sizeof(u64)) {
 		if (unlikely(*((u64 *)addr) != KFENCE_CANARY_PATTERN_U64)) {
 
-			for (; addr - pageaddr < PAGE_SIZE; addr++) {
+			for (; addr - pageaddr < PG_SIZE; addr++) {
 				if (!check_canary_byte((u8 *)addr))
 					return;
 			}
@@ -472,7 +472,7 @@ static void *kfence_guarded_alloc(struct kmem_cache *cache, size_t size, gfp_t g
 	 */
 	if (random_right_allocate) {
 		/* Allocate on the "right" side, re-calculate address. */
-		meta->addr += PAGE_SIZE - size;
+		meta->addr += PG_SIZE - size;
 		meta->addr = ALIGN_DOWN(meta->addr, cache->align);
 	}
 
@@ -534,7 +534,8 @@ static void kfence_guarded_free(void *addr, struct kfence_metadata *meta, bool z
 	}
 
 	/* Detect racy use-after-free, or incorrect reallocation of this page by KFENCE. */
-	kcsan_begin_scoped_access((void *)ALIGN_DOWN((unsigned long)addr, PAGE_SIZE), PAGE_SIZE,
+	kcsan_begin_scoped_access((void *)ALIGN_DOWN((unsigned long)addr, PG_SIZE),
+				  PG_SIZE,
 				  KCSAN_ACCESS_SCOPED | KCSAN_ACCESS_WRITE | KCSAN_ACCESS_ASSERT,
 				  &assert_page_exclusive);
 
@@ -543,7 +544,8 @@ static void kfence_guarded_free(void *addr, struct kfence_metadata *meta, bool z
 
 	/* Restore page protection if there was an OOB access. */
 	if (meta->unprotected_page) {
-		memzero_explicit((void *)ALIGN_DOWN(meta->unprotected_page, PAGE_SIZE), PAGE_SIZE);
+		memzero_explicit((void *)ALIGN_DOWN(meta->unprotected_page, PG_SIZE),
+				 PG_SIZE);
 		kfence_protect(meta->unprotected_page);
 		meta->unprotected_page = 0;
 	}
@@ -936,7 +938,7 @@ void __init kfence_alloc_pool_and_metadata(void)
 	 * re-allocate the memory pool.
 	 */
 	if (!__kfence_pool)
-		__kfence_pool = memblock_alloc(KFENCE_POOL_SIZE, PAGE_SIZE);
+		__kfence_pool = memblock_alloc(KFENCE_POOL_SIZE, PG_SIZE);
 
 	if (!__kfence_pool) {
 		pr_err("failed to allocate pool\n");
@@ -944,7 +946,7 @@ void __init kfence_alloc_pool_and_metadata(void)
 	}
 
 	/* The memory allocated by memblock has been zeroed out. */
-	kfence_metadata_init = memblock_alloc(KFENCE_METADATA_SIZE, PAGE_SIZE);
+	kfence_metadata_init = memblock_alloc(KFENCE_METADATA_SIZE, PG_SIZE);
 	if (!kfence_metadata_init) {
 		pr_err("failed to allocate metadata\n");
 		memblock_free(__kfence_pool, KFENCE_POOL_SIZE);
@@ -1146,7 +1148,7 @@ void *__kfence_alloc(struct kmem_cache *s, size_t size, gfp_t flags)
 	 * Perform size check before switching kfence_allocation_gate, so that
 	 * we don't disable KFENCE without making an allocation.
 	 */
-	if (size > PAGE_SIZE) {
+	if (size > PG_SIZE) {
 		atomic_long_inc(&counters[KFENCE_COUNTER_SKIP_INCOMPAT]);
 		return NULL;
 	}
@@ -1262,7 +1264,7 @@ void __kfence_free(void *addr)
 
 bool kfence_handle_page_fault(unsigned long addr, bool is_write, struct pt_regs *regs)
 {
-	const int page_index = (addr - (unsigned long)__kfence_pool) / PAGE_SIZE;
+	const int page_index = (addr - (unsigned long)__kfence_pool) / PG_SIZE;
 	struct kfence_metadata *to_report = NULL;
 	unsigned long unprotected_page = 0;
 	enum kfence_error_type error_type;
@@ -1281,14 +1283,14 @@ bool kfence_handle_page_fault(unsigned long addr, bool is_write, struct pt_regs 
 		struct kfence_metadata *meta;
 		int distance = 0;
 
-		meta = addr_to_metadata(addr - PAGE_SIZE);
+		meta = addr_to_metadata(addr - PG_SIZE);
 		if (meta && kfence_obj_allocated(meta)) {
 			to_report = meta;
 			/* Data race ok; distance calculation approximate. */
 			distance = addr - data_race(meta->addr + meta->size);
 		}
 
-		meta = addr_to_metadata(addr + PAGE_SIZE);
+		meta = addr_to_metadata(addr + PG_SIZE);
 		if (meta && kfence_obj_allocated(meta)) {
 			/* Data race ok; distance calculation approximate. */
 			if (!to_report || distance > data_race(meta->addr) - addr)

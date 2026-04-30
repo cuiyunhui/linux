@@ -220,7 +220,7 @@ static int __meminit kasan_mem_notifier(struct notifier_block *nb,
 	nr_shadow_pages = mem_data->nr_pages >> KASAN_SHADOW_SCALE_SHIFT;
 	start_kaddr = (unsigned long)pfn_to_kaddr(mem_data->start_pfn);
 	shadow_start = (unsigned long)kasan_mem_to_shadow((void *)start_kaddr);
-	shadow_size = nr_shadow_pages << PAGE_SHIFT;
+	shadow_size = nr_shadow_pages << PG_SHIFT;
 	shadow_end = shadow_start + shadow_size;
 
 	if (WARN_ON(mem_data->nr_pages % KASAN_GRANULE_SIZE) ||
@@ -239,11 +239,11 @@ static int __meminit kasan_mem_notifier(struct notifier_block *nb,
 		if (shadow_mapped(shadow_start))
 			return NOTIFY_OK;
 
-		ret = __vmalloc_node_range(shadow_size, PAGE_SIZE, shadow_start,
-					shadow_end, GFP_KERNEL,
-					PAGE_KERNEL, VM_NO_GUARD,
-					pfn_to_nid(mem_data->start_pfn),
-					__builtin_return_address(0));
+		ret = __vmalloc_node_range(shadow_size, PG_SIZE, shadow_start,
+					   shadow_end, GFP_KERNEL,
+					   PAGE_KERNEL, VM_NO_GUARD,
+					   pfn_to_nid(mem_data->start_pfn),
+					   __builtin_return_address(0));
 		if (!ret)
 			return NOTIFY_BAD;
 
@@ -309,7 +309,7 @@ static int kasan_populate_vmalloc_pte(pte_t *ptep, unsigned long addr,
 
 	index = PFN_DOWN(addr - data->start);
 	page = data->pages[index];
-	__memset(page_to_virt(page), KASAN_VMALLOC_INVALID, PAGE_SIZE);
+	__memset(page_to_virt(page), KASAN_VMALLOC_INVALID, PG_SIZE);
 	pte = pfn_pte(page_to_pfn(page), PAGE_KERNEL);
 
 	spin_lock(&init_mm.page_table_lock);
@@ -366,7 +366,7 @@ static int __kasan_populate_vmalloc_do(unsigned long start, unsigned long end, g
 		return -ENOMEM;
 
 	while (nr_total) {
-		nr_pages = min(nr_total, PAGE_SIZE / sizeof(data.pages[0]));
+		nr_pages = min(nr_total, PG_SIZE / sizeof(data.pages[0]));
 		ret = ___alloc_pages_bulk(data.pages, nr_pages, gfp_mask);
 		if (ret)
 			break;
@@ -378,7 +378,7 @@ static int __kasan_populate_vmalloc_do(unsigned long start, unsigned long end, g
 		 * by the scope API
 		 */
 		flags = memalloc_apply_gfp_scope(gfp_mask);
-		ret = apply_to_page_range(&init_mm, start, nr_pages * PAGE_SIZE,
+		ret = apply_to_page_range(&init_mm, start, nr_pages * PG_SIZE,
 					  kasan_populate_vmalloc_pte, &data);
 		memalloc_restore_scope(flags);
 
@@ -386,7 +386,7 @@ static int __kasan_populate_vmalloc_do(unsigned long start, unsigned long end, g
 		if (ret)
 			break;
 
-		start += nr_pages * PAGE_SIZE;
+		start += nr_pages * PG_SIZE;
 		nr_total -= nr_pages;
 	}
 
@@ -418,8 +418,8 @@ int __kasan_populate_vmalloc(unsigned long addr, unsigned long size, gfp_t gfp_m
 		return 0;
 	}
 
-	shadow_start = PAGE_ALIGN_DOWN(shadow_start);
-	shadow_end = PAGE_ALIGN(shadow_end);
+	shadow_start = PG_ALIGN_DOWN(shadow_start);
+	shadow_end = PG_ALIGN(shadow_end);
 
 	ret = __kasan_populate_vmalloc_do(shadow_start, shadow_end, gfp_mask);
 	if (ret)
@@ -663,9 +663,9 @@ int kasan_alloc_module_shadow(void *addr, size_t size, gfp_t gfp_mask)
 	shadow_start = (unsigned long)kasan_mem_to_shadow(addr);
 	scaled_size = (size + KASAN_GRANULE_SIZE - 1) >>
 				KASAN_SHADOW_SCALE_SHIFT;
-	shadow_size = round_up(scaled_size, PAGE_SIZE);
+	shadow_size = round_up(scaled_size, PG_SIZE);
 
-	if (WARN_ON(!PAGE_ALIGNED(shadow_start)))
+	if (WARN_ON(!PG_ALIGNED(shadow_start)))
 		return -EINVAL;
 
 	if (IS_ENABLED(CONFIG_UML)) {

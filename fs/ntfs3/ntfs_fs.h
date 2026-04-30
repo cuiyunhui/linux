@@ -125,7 +125,7 @@ struct runs_tree {
 struct ntfs_buffers {
 	/* Biggest MFT / smallest cluster = 4096 / 512 = 8 */
 	/* Biggest index / smallest cluster = 4096 / 512 = 8 */
-	struct buffer_head *bh[PAGE_SIZE >> SECTOR_SHIFT];
+	struct buffer_head *bh[PG_SIZE >> SECTOR_SHIFT];
 	u32 bytes;
 	u32 nbufs;
 	u32 off;

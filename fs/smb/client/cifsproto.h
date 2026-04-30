@@ -556,8 +556,8 @@ static inline int cifs_get_num_sgs(const struct smb_rqst *rqst,
 			addr = (unsigned long)iov->iov_base + skip;
 			if (is_vmalloc_or_module_addr((void *)addr)) {
 				len = iov->iov_len - skip;
-				nents += DIV_ROUND_UP(offset_in_page(addr) + len,
-						      PAGE_SIZE);
+				nents += DIV_ROUND_UP(offset_in_pg(addr) + len,
+						      PG_SIZE);
 			} else {
 				nents++;
 			}
@@ -566,7 +566,8 @@ static inline int cifs_get_num_sgs(const struct smb_rqst *rqst,
 		if (data_size)
 			nents += iov_iter_npages(&rqst[i].rq_iter, INT_MAX);
 	}
-	nents += DIV_ROUND_UP(offset_in_page(sig) + SMB2_SIGNATURE_SIZE, PAGE_SIZE);
+	nents += DIV_ROUND_UP(offset_in_pg(sig) + SMB2_SIGNATURE_SIZE,
+			      PG_SIZE);
 	return nents;
 }
 
@@ -578,18 +579,19 @@ static inline void cifs_sg_set_buf(struct sg_table *sgtable,
 				   unsigned int buflen)
 {
 	unsigned long addr = (unsigned long)buf;
-	unsigned int off = offset_in_page(addr);
+	unsigned int off = offset_in_pg(addr);
 
-	addr &= PAGE_MASK;
+	addr &= PG_MASK;
 	if (is_vmalloc_or_module_addr((void *)addr)) {
 		do {
-			unsigned int len = min_t(unsigned int, buflen, PAGE_SIZE - off);
+			unsigned int len = min_t(unsigned int, buflen,
+						 PG_SIZE - off);
 
 			sg_set_page(&sgtable->sgl[sgtable->nents++],
 				    vmalloc_to_page((void *)addr), len, off);
 
 			off = 0;
-			addr += PAGE_SIZE;
+			addr += PG_SIZE;
 			buflen -= len;
 		} while (buflen);
 	} else {

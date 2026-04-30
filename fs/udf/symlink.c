@@ -124,7 +124,7 @@ static int udf_symlink_filler(struct file *file, struct folio *folio)
 		symlink = bh->b_data;
 	}
 
-	err = udf_pc_to_char(inode->i_sb, symlink, inode->i_size, p, PAGE_SIZE);
+	err = udf_pc_to_char(inode->i_sb, symlink, inode->i_size, p, PG_SIZE);
 	brelse(bh);
 out:
 	folio_end_read(folio, err == 0);

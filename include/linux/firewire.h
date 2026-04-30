@@ -580,7 +580,8 @@ static inline struct fw_iso_context *fw_iso_context_create(struct fw_card *card,
 {
 	union fw_iso_callback cb = { .sc = callback };
 
-	return __fw_iso_context_create(card, type, channel, speed, header_size, PAGE_SIZE, cb,
+	return __fw_iso_context_create(card, type, channel, speed, header_size,
+				       PG_SIZE, cb,
 				       callback_data);
 }
 

@@ -190,7 +190,7 @@ int aix_partition(struct parsed_partitions *state)
 				" unsupported AIX LVM version %d found\n",
 				lvm_version);
 		}
-		strlcat(state->pp_buf, tmp, PAGE_SIZE);
+		strlcat(state->pp_buf, tmp, PG_SIZE);
 		put_dev_sector(sect);
 	}
 	if (vgda_sector && (d = read_part_sector(state, vgda_sector, &sect))) {
@@ -258,7 +258,7 @@ int aix_partition(struct parsed_partitions *state)
 				  lvip[lv_ix].pps_per_lv * pp_blocks_size);
 				snprintf(tmp, sizeof(tmp), " <%s>\n",
 					 n[lv_ix].name);
-				strlcat(state->pp_buf, tmp, PAGE_SIZE);
+				strlcat(state->pp_buf, tmp, PG_SIZE);
 				lvip[lv_ix].lv_is_contiguous = 1;
 				ret = 1;
 				next_lp_ix = 1;

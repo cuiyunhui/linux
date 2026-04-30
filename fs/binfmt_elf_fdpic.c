@@ -404,13 +404,13 @@ static int load_elf_fdpic_binary(struct linux_binprm *bprm)
 		current->mm->start_brk = current->mm->end_data;
 
 	current->mm->brk = current->mm->start_brk =
-		PAGE_ALIGN(current->mm->start_brk);
+		PG_ALIGN(current->mm->start_brk);
 
 #else
 	/* create a stack area and zero-size brk area */
-	stack_size = (stack_size + PAGE_SIZE - 1) & PAGE_MASK;
-	if (stack_size < PAGE_SIZE * 2)
-		stack_size = PAGE_SIZE * 2;
+	stack_size = (stack_size + PG_SIZE - 1) & PG_MASK;
+	if (stack_size < PG_SIZE * 2)
+		stack_size = PG_SIZE * 2;
 
 	stack_prot = PROT_READ | PROT_WRITE;
 	if (executable_stack == EXSTACK_ENABLE_X ||
@@ -639,7 +639,7 @@ static int create_elf_fdpic_tables(struct linux_binprm *bprm,
 #ifdef ELF_HWCAP4
 	NEW_AUX_ENT(AT_HWCAP4,	ELF_HWCAP4);
 #endif
-	NEW_AUX_ENT(AT_PAGESZ,	PAGE_SIZE);
+	NEW_AUX_ENT(AT_PAGESZ,	PG_SIZE);
 	NEW_AUX_ENT(AT_CLKTCK,	CLOCKS_PER_SEC);
 	NEW_AUX_ENT(AT_PHDR,	exec_params->ph_addr);
 	NEW_AUX_ENT(AT_PHENT,	sizeof(struct elf_phdr));
@@ -697,7 +697,7 @@ static int create_elf_fdpic_tables(struct linux_binprm *bprm,
 	current->mm->arg_start = bprm->p;
 #else
 	current->mm->arg_start = current->mm->start_stack -
-		(MAX_ARG_PAGES * PAGE_SIZE - bprm->p);
+		(MAX_ARG_PAGES * PG_SIZE - bprm->p);
 #endif
 
 	p = (char __user *) current->mm->arg_start;
@@ -882,12 +882,12 @@ static int elf_fdpic_map_file(struct elf_fdpic_params *params,
 	for (loop = 1; loop < nloads; loop++) {
 		/* see if we have a candidate for merging */
 		if (seg->p_vaddr - mseg->p_vaddr == seg->addr - mseg->addr) {
-			load_addr = PAGE_ALIGN(mseg->addr + mseg->p_memsz);
-			if (load_addr == (seg->addr & PAGE_MASK)) {
+			load_addr = PG_ALIGN(mseg->addr + mseg->p_memsz);
+			if (load_addr == (seg->addr & PG_MASK)) {
 				mseg->p_memsz +=
 					load_addr -
 					(mseg->addr + mseg->p_memsz);
-				mseg->p_memsz += seg->addr & ~PAGE_MASK;
+				mseg->p_memsz += seg->addr & ~PG_MASK;
 				mseg->p_memsz += seg->p_memsz;
 				loadmap->nsegs--;
 				continue;
@@ -960,7 +960,7 @@ static int elf_fdpic_map_file_constdisp_on_uclinux(
 		return (int) maddr;
 
 	if (load_addr != 0)
-		load_addr += PAGE_ALIGN(top - base);
+		load_addr += PG_ALIGN(top - base);
 
 	/* and then load the file segments into it */
 	phdr = params->phdrs;
@@ -1084,10 +1084,10 @@ static int elf_fdpic_map_file_by_direct_mmap(struct elf_fdpic_params *params,
 			BUG();
 		}
 
-		maddr &= PAGE_MASK;
+		maddr &= PG_MASK;
 
 		/* create the mapping */
-		disp = phdr->p_vaddr & ~PAGE_MASK;
+		disp = phdr->p_vaddr & ~PG_MASK;
 		maddr = vm_mmap(file, maddr, phdr->p_memsz + disp, prot, flags,
 				phdr->p_offset - disp);
 
@@ -1101,7 +1101,7 @@ static int elf_fdpic_map_file_by_direct_mmap(struct elf_fdpic_params *params,
 
 		if ((params->flags & ELF_FDPIC_FLAG_ARRANGEMENT) ==
 		    ELF_FDPIC_FLAG_CONTIGUOUS)
-			load_addr += PAGE_ALIGN(phdr->p_memsz + disp);
+			load_addr += PG_ALIGN(phdr->p_memsz + disp);
 
 		seg->addr = maddr + disp;
 		seg->p_vaddr = phdr->p_vaddr;
@@ -1129,7 +1129,7 @@ static int elf_fdpic_map_file_by_direct_mmap(struct elf_fdpic_params *params,
 
 #ifdef CONFIG_MMU
 		unsigned long excess1
-			= PAGE_SIZE - ((maddr + phdr->p_filesz) & ~PAGE_MASK);
+			= PG_SIZE - ((maddr + phdr->p_filesz) & ~PG_MASK);
 		if (excess > excess1) {
 			unsigned long xaddr = maddr + phdr->p_filesz + excess1;
 			unsigned long xmaddr;

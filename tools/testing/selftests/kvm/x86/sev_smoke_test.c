@@ -115,7 +115,7 @@ static void test_sync_vmsa(uint32_t type, uint64_t policy)
 	struct kvm_xsave __attribute__((aligned(64))) xsave = { 0 };
 
 	vm = vm_sev_create_with_one_vcpu(type, guest_code_xsave, &vcpu);
-	gva = vm_vaddr_alloc_shared(vm, PAGE_SIZE, KVM_UTIL_MIN_VADDR,
+	gva = vm_vaddr_alloc_shared(vm, PG_SIZE, KVM_UTIL_MIN_VADDR,
 				    MEM_REGION_TEST_DATA);
 	hva = addr_gva2hva(vm, gva);
 
@@ -134,7 +134,7 @@ static void test_sync_vmsa(uint32_t type, uint64_t policy)
 	vm_sev_launch(vm, policy, NULL);
 
 	/* This page is shared, so make it decrypted.  */
-	memset(hva, 0, PAGE_SIZE);
+	memset(hva, 0, PG_SIZE);
 
 	vcpu_run(vcpu);
 

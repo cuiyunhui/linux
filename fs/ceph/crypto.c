@@ -479,8 +479,8 @@ int ceph_fscrypt_decrypt_pages(struct inode *inode, struct page **page,
 	/* Decrypt each block */
 	for (i = 0; i < num_blocks; ++i) {
 		int blkoff = i << CEPH_FSCRYPT_BLOCK_SHIFT;
-		int pgidx = blkoff >> PAGE_SHIFT;
-		unsigned int pgoffs = offset_in_page(blkoff);
+		int pgidx = blkoff >> PG_SHIFT;
+		unsigned int pgoffs = offset_in_pg(blkoff);
 		int fret;
 
 		fret = ceph_fscrypt_decrypt_block_inplace(inode, page[pgidx],
@@ -531,7 +531,7 @@ int ceph_fscrypt_decrypt_extents(struct inode *inode, struct page **page,
 	for (i = 0; i < ext_cnt; ++i) {
 		struct ceph_sparse_extent *ext = &map[i];
 		int pgsoff = ext->off - objoff;
-		int pgidx = pgsoff >> PAGE_SHIFT;
+		int pgidx = pgsoff >> PG_SHIFT;
 		int fret;
 
 		if ((ext->off | ext->len) & ~CEPH_FSCRYPT_BLOCK_MASK) {
@@ -587,8 +587,8 @@ int ceph_fscrypt_encrypt_pages(struct inode *inode, struct page **page, u64 off,
 	/* Encrypt each block */
 	for (i = 0; i < num_blocks; ++i) {
 		int blkoff = i << CEPH_FSCRYPT_BLOCK_SHIFT;
-		int pgidx = blkoff >> PAGE_SHIFT;
-		unsigned int pgoffs = offset_in_page(blkoff);
+		int pgidx = blkoff >> PG_SHIFT;
+		unsigned int pgoffs = offset_in_pg(blkoff);
 		int fret;
 
 		fret = ceph_fscrypt_encrypt_block_inplace(inode, page[pgidx],

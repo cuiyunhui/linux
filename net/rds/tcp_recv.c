@@ -124,7 +124,7 @@ static void rds_tcp_cong_recv(struct rds_connection *conn,
 	skb_queue_walk(&tinc->ti_skb_list, skb) {
 		skb_off = 0;
 		while (skb_off < skb->len) {
-			to_copy = min_t(unsigned int, PAGE_SIZE - map_off,
+			to_copy = min_t(unsigned int, PG_SIZE - map_off,
 					skb->len - skb_off);
 
 			BUG_ON(map_page >= RDS_CONG_MAP_PAGES);
@@ -137,7 +137,7 @@ static void rds_tcp_cong_recv(struct rds_connection *conn,
 
 			skb_off += to_copy;
 			map_off += to_copy;
-			if (map_off == PAGE_SIZE) {
+			if (map_off == PG_SIZE) {
 				map_off = 0;
 				map_page++;
 			}

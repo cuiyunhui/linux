@@ -48,7 +48,7 @@ struct squashfs_page_actor *squashfs_page_actor_init(void **buffer,
 	if (actor == NULL)
 		return NULL;
 
-	actor->length = length ? : pages * PAGE_SIZE;
+	actor->length = length ? : pages * PG_SIZE;
 	actor->buffer = buffer;
 	actor->pages = pages;
 	actor->next_page = 0;
@@ -67,7 +67,7 @@ static loff_t page_next_index(struct squashfs_page_actor *actor)
 
 static void *handle_next_page(struct squashfs_page_actor *actor)
 {
-	int max_pages = (actor->length + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	int max_pages = (actor->length + PG_SIZE - 1) >> PG_SHIFT;
 
 	if (actor->returned_pages == max_pages)
 		return NULL;
@@ -116,7 +116,7 @@ struct squashfs_page_actor *squashfs_page_actor_init_special(struct squashfs_sb_
 		return NULL;
 
 	if (msblk->decompressor->alloc_buffer) {
-		actor->tmp_buffer = kmalloc(PAGE_SIZE, GFP_KERNEL);
+		actor->tmp_buffer = kmalloc(PG_SIZE, GFP_KERNEL);
 
 		if (actor->tmp_buffer == NULL) {
 			kfree(actor);
@@ -125,12 +125,12 @@ struct squashfs_page_actor *squashfs_page_actor_init_special(struct squashfs_sb_
 	} else
 		actor->tmp_buffer = NULL;
 
-	actor->length = length ? : pages * PAGE_SIZE;
+	actor->length = length ? : pages * PG_SIZE;
 	actor->page = page;
 	actor->pages = pages;
 	actor->next_page = 0;
 	actor->returned_pages = 0;
-	actor->next_index = start_index >> PAGE_SHIFT;
+	actor->next_index = start_index >> PG_SHIFT;
 	actor->pageaddr = NULL;
 	actor->last_page = NULL;
 	actor->alloc_buffer = msblk->decompressor->alloc_buffer;

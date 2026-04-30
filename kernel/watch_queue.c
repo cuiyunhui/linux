@@ -31,7 +31,7 @@ MODULE_DESCRIPTION("Watch queue");
 MODULE_AUTHOR("Red Hat, Inc.");
 
 #define WATCH_QUEUE_NOTE_SIZE 128
-#define WATCH_QUEUE_NOTES_PER_PAGE (PAGE_SIZE / WATCH_QUEUE_NOTE_SIZE)
+#define WATCH_QUEUE_NOTES_PER_PAGE (PG_SIZE / WATCH_QUEUE_NOTE_SIZE)
 
 /*
  * This must be called under the RCU read-lock, which makes

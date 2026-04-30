@@ -541,7 +541,7 @@ static void __damon_va_check_access(struct mm_struct *mm,
 				struct damon_attrs *attrs)
 {
 	static unsigned long last_addr;
-	static unsigned long last_folio_sz = PAGE_SIZE;
+	static unsigned long last_folio_sz = PG_SIZE;
 	static bool last_accessed;
 
 	if (!mm) {
@@ -670,7 +670,7 @@ static void damos_va_migrate_dests_add(struct folio *folio,
 
 	order = folio_order(folio);
 	ilx = vma->vm_pgoff >> order;
-	ilx += (addr - vma->vm_start) >> (PAGE_SHIFT + order);
+	ilx += (addr - vma->vm_start) >> (PG_SHIFT + order);
 
 	for (i = 0; i < dests->nr_dests; i++)
 		weight_total += dests->weight_arr[i];
@@ -733,7 +733,7 @@ huge_out:
 	if (!pte)
 		return 0;
 
-	for (; addr < next; pte += nr, addr += nr * PAGE_SIZE) {
+	for (; addr < next; pte += nr, addr += nr * PG_SIZE) {
 		nr = 1;
 		ptent = ptep_get(pte);
 
@@ -785,8 +785,8 @@ static unsigned long damos_madvise(struct damon_target *target,
 		struct damon_region *r, int behavior)
 {
 	struct mm_struct *mm;
-	unsigned long start = PAGE_ALIGN(r->ar.start);
-	unsigned long len = PAGE_ALIGN(damon_sz_region(r));
+	unsigned long start = PG_ALIGN(r->ar.start);
+	unsigned long len = PG_ALIGN(damon_sz_region(r));
 	unsigned long applied;
 
 	mm = damon_get_mm(target);
@@ -846,7 +846,7 @@ static unsigned long damos_va_migrate(struct damon_target *target,
 
 free_lists:
 	kfree(priv.migration_lists);
-	return applied * PAGE_SIZE;
+	return applied * PG_SIZE;
 }
 
 struct damos_va_stat_private {
@@ -898,7 +898,7 @@ huge_unlock:
 	if (!start_pte)
 		return 0;
 
-	for (; addr < next; pte += nr, addr += nr * PAGE_SIZE) {
+	for (; addr < next; pte += nr, addr += nr * PG_SIZE) {
 		nr = 1;
 		ptent = ptep_get(pte);
 

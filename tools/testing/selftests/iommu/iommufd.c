@@ -37,10 +37,10 @@ static __attribute__((constructor)) void setup_sizes(void)
 	void *vrc;
 	int rc;
 
-	PAGE_SIZE = sysconf(_SC_PAGE_SIZE);
+	PG_SIZE = sysconf(_SC_PAGE_SIZE);
 	HUGEPAGE_SIZE = get_huge_page_size();
 
-	BUFFER_SIZE = PAGE_SIZE * 16;
+	BUFFER_SIZE = PG_SIZE * 16;
 	rc = posix_memalign(&buffer, HUGEPAGE_SIZE, BUFFER_SIZE);
 	assert(!rc);
 	assert(buffer);
@@ -1284,8 +1284,8 @@ static void check_access_rw(struct __test_metadata *_metadata, int fd,
 	for (i = 0; i != BUFFER_SIZE / sizeof(*buffer16); i++)
 		buffer16[i] = rand();
 
-	for (access_cmd.access_rw.iova = iova + PAGE_SIZE - 50;
-	     access_cmd.access_rw.iova < iova + PAGE_SIZE + 50;
+	for (access_cmd.access_rw.iova = iova + PG_SIZE - 50;
+	     access_cmd.access_rw.iova < iova + PG_SIZE + 50;
 	     access_cmd.access_rw.iova++) {
 		for (access_cmd.access_rw.length = 1;
 		     access_cmd.access_rw.length < sizeof(tmp);
@@ -1650,7 +1650,7 @@ FIXTURE_SETUP(iommufd_mock_domain)
 	self->hwpt_id = self->hwpt_ids[0];
 
 	self->mmap_flags = MAP_SHARED | MAP_ANONYMOUS;
-	self->mmap_buf_size = PAGE_SIZE * 8;
+	self->mmap_buf_size = PG_SIZE * 8;
 	if (variant->hugepages) {
 		/*
 		 * MAP_POPULATE will cause the kernel to fail mmap if THPs are
@@ -1744,8 +1744,8 @@ test_basic_mmap(struct __test_metadata *_metadata,
 	__u64 iova;
 
 	/* Simple one page map */
-	test_ioctl_ioas_map(buffer, PAGE_SIZE, &iova);
-	check_mock_iova(buffer, iova, PAGE_SIZE);
+	test_ioctl_ioas_map(buffer, PG_SIZE, &iova);
+	check_mock_iova(buffer, iova, PG_SIZE);
 
 	buf = mmap(0, buf_size, PROT_READ | PROT_WRITE, self->mmap_flags, -1,
 		   0);
@@ -1772,8 +1772,8 @@ test_basic_file(struct __test_metadata *_metadata,
 	int prot = PROT_READ | PROT_WRITE;
 
 	/* Simple one page map */
-	test_ioctl_ioas_map_file(mfd, 0, PAGE_SIZE, &iova);
-	check_mock_iova(mfd_buffer, iova, PAGE_SIZE);
+	test_ioctl_ioas_map_file(mfd, 0, PG_SIZE, &iova);
+	check_mock_iova(mfd_buffer, iova, PG_SIZE);
 
 	buf = memfd_mmap(buf_size, prot, MAP_SHARED, &mfd_tmp);
 	ASSERT_NE(MAP_FAILED, buf);
@@ -2152,10 +2152,10 @@ FIXTURE_SETUP(iommufd_dirty_tracking)
 
 	/* Provision with an extra (PAGE_SIZE) for the unaligned case */
 	size = DIV_ROUND_UP(self->bitmap_size, BITS_PER_BYTE);
-	rc = posix_memalign(&self->bitmap, PAGE_SIZE, size + PAGE_SIZE);
+	rc = posix_memalign(&self->bitmap, PG_SIZE, size + PG_SIZE);
 	assert(!rc);
 	assert(self->bitmap);
-	assert((uintptr_t)self->bitmap % PAGE_SIZE == 0);
+	assert((uintptr_t)self->bitmap % PG_SIZE == 0);
 
 	test_ioctl_ioas_alloc(&self->ioas_id);
 

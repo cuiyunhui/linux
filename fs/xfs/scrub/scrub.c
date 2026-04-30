@@ -922,7 +922,7 @@ xfs_ioc_scrubv_metadata(
 		return 0;
 
 	vec_bytes = array_size(head.svh_nr, sizeof(struct xfs_scrub_vec));
-	if (vec_bytes > PAGE_SIZE)
+	if (vec_bytes > PG_SIZE)
 		return -ENOMEM;
 
 	uvectors = u64_to_user_ptr(head.svh_vectors);

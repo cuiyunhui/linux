@@ -1427,18 +1427,18 @@ static int stm32_sai_pcm_process_spdif(struct snd_pcm_substream *substream,
 /* No support of mmap in S/PDIF mode */
 static const struct snd_pcm_hardware stm32_sai_pcm_hw_spdif = {
 	.info = SNDRV_PCM_INFO_INTERLEAVED,
-	.buffer_bytes_max = 8 * PAGE_SIZE,
+	.buffer_bytes_max = 8 * PG_SIZE,
 	.period_bytes_min = 1024,
-	.period_bytes_max = PAGE_SIZE,
+	.period_bytes_max = PG_SIZE,
 	.periods_min = 2,
 	.periods_max = 8,
 };
 
 static const struct snd_pcm_hardware stm32_sai_pcm_hw = {
 	.info = SNDRV_PCM_INFO_INTERLEAVED | SNDRV_PCM_INFO_MMAP,
-	.buffer_bytes_max = 8 * PAGE_SIZE,
+	.buffer_bytes_max = 8 * PG_SIZE,
 	.period_bytes_min = 1024, /* 5ms at 48kHz */
-	.period_bytes_max = PAGE_SIZE,
+	.period_bytes_max = PG_SIZE,
 	.periods_min = 2,
 	.periods_max = 8,
 };

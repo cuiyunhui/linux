@@ -28,7 +28,7 @@
 #ifdef LP_STATS
 #define LP_STAT(minor)	lp_table[(minor)].stats		/* statistics area */
 #endif
-#define LP_BUFFER_SIZE PAGE_SIZE
+#define LP_BUFFER_SIZE PG_SIZE
 
 #define LP_BASE(x)	lp_table[(x)].dev->port->base
 

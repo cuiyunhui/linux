@@ -69,11 +69,11 @@ bool f2fs_available_free_memory(struct f2fs_sb_info *sbi, int type)
 	 */
 	if (type == FREE_NIDS) {
 		mem_size = (nm_i->nid_cnt[FREE_NID] *
-				sizeof(struct free_nid)) >> PAGE_SHIFT;
+				sizeof(struct free_nid)) >> PG_SHIFT;
 		res = mem_size < ((avail_ram * nm_i->ram_thresh / 100) >> 2);
 	} else if (type == NAT_ENTRIES) {
 		mem_size = (nm_i->nat_cnt[TOTAL_NAT] *
-				sizeof(struct nat_entry)) >> PAGE_SHIFT;
+				sizeof(struct nat_entry)) >> PG_SHIFT;
 		res = mem_size < ((avail_ram * nm_i->ram_thresh / 100) >> 2);
 		if (excess_cached_nats(sbi))
 			res = false;
@@ -88,7 +88,7 @@ bool f2fs_available_free_memory(struct f2fs_sb_info *sbi, int type)
 		for (i = 0; i < MAX_INO_ENTRY; i++)
 			mem_size += sbi->im[i].ino_num *
 						sizeof(struct ino_entry);
-		mem_size >>= PAGE_SHIFT;
+		mem_size >>= PG_SHIFT;
 		res = mem_size < ((avail_ram * nm_i->ram_thresh / 100) >> 1);
 	} else if (type == READ_EXTENT_CACHE || type == AGE_EXTENT_CACHE) {
 		enum extent_type etype = type == READ_EXTENT_CACHE ?
@@ -98,11 +98,11 @@ bool f2fs_available_free_memory(struct f2fs_sb_info *sbi, int type)
 		mem_size = (atomic_read(&eti->total_ext_tree) *
 				sizeof(struct extent_tree) +
 				atomic_read(&eti->total_ext_node) *
-				sizeof(struct extent_node)) >> PAGE_SHIFT;
+				sizeof(struct extent_node)) >> PG_SHIFT;
 		res = mem_size < ((avail_ram * nm_i->ram_thresh / 100) >> 2);
 	} else if (type == DISCARD_CACHE) {
 		mem_size = (atomic_read(&dcc->discard_cmd_cnt) *
-				sizeof(struct discard_cmd)) >> PAGE_SHIFT;
+				sizeof(struct discard_cmd)) >> PG_SHIFT;
 		res = mem_size < (avail_ram * nm_i->ram_thresh / 100);
 	} else if (type == COMPRESS_PAGE) {
 #ifdef CONFIG_F2FS_FS_COMPRESSION
@@ -160,7 +160,7 @@ static struct folio *get_next_nat_folio(struct f2fs_sb_info *sbi, nid_t nid)
 
 	src_addr = folio_address(src_folio);
 	dst_addr = folio_address(dst_folio);
-	memcpy(dst_addr, src_addr, PAGE_SIZE);
+	memcpy(dst_addr, src_addr, PG_SIZE);
 	folio_mark_dirty(dst_folio);
 	f2fs_folio_put(src_folio, true);
 

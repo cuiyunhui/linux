@@ -187,7 +187,7 @@ static int orangefs_writepages(struct address_space *mapping,
 	ow = kzalloc_obj(struct orangefs_writepages);
 	if (!ow)
 		return -ENOMEM;
-	ow->maxpages = orangefs_bufmap_size_query()/PAGE_SIZE;
+	ow->maxpages = orangefs_bufmap_size_query()/PG_SIZE;
 	ow->folios = kzalloc_objs(struct folio *, ow->maxpages);
 	if (!ow->folios) {
 		kfree(ow);
@@ -226,7 +226,7 @@ static void orangefs_readahead(struct readahead_control *rac)
 	size_t new_len = 0;
 
 	loff_t bytes_remaining = inode->i_size - readahead_pos(rac);
-	loff_t pages_remaining = bytes_remaining / PAGE_SIZE;
+	loff_t pages_remaining = bytes_remaining / PG_SIZE;
 
 	if (pages_remaining >= 1024)
 		new_len = 4194304;
@@ -294,8 +294,8 @@ static int orangefs_write_begin(const struct kiocb *iocb,
 	struct folio *folio;
 	int ret;
 
-	folio = __filemap_get_folio(mapping, pos / PAGE_SIZE, FGP_WRITEBEGIN,
-			mapping_gfp_mask(mapping));
+	folio = __filemap_get_folio(mapping, pos / PG_SIZE, FGP_WRITEBEGIN,
+				    mapping_gfp_mask(mapping));
 	if (IS_ERR(folio))
 		return PTR_ERR(folio);
 
@@ -358,14 +358,14 @@ static int orangefs_write_end(const struct kiocb *iocb,
 
 	/* zero the stale part of the folio if we did a short copy */
 	if (!folio_test_uptodate(folio)) {
-		unsigned from = pos & (PAGE_SIZE - 1);
+		unsigned from = pos & (PG_SIZE - 1);
 		if (copied < len) {
 			folio_zero_range(folio, from + copied, len - copied);
 		}
 		/* Set fully written pages uptodate. */
 		if (pos == folio_pos(folio) &&
-		    (len == PAGE_SIZE || pos + len == inode->i_size)) {
-			folio_zero_segment(folio, from + copied, PAGE_SIZE);
+		    (len == PG_SIZE || pos + len == inode->i_size)) {
+			folio_zero_segment(folio, from + copied, PG_SIZE);
 			folio_mark_uptodate(folio);
 		}
 	}
@@ -383,7 +383,7 @@ static void orangefs_invalidate_folio(struct folio *folio,
 {
 	struct orangefs_write_range *wr = folio_get_private(folio);
 
-	if (offset == 0 && length == PAGE_SIZE) {
+	if (offset == 0 && length == PG_SIZE) {
 		kfree(folio_detach_private(folio));
 		return;
 	/* write range entirely within invalidate range (or equal) */
@@ -635,7 +635,7 @@ vm_fault_t orangefs_page_mkwrite(struct vm_fault *vmf)
 		if (uid_eq(wr->uid, current_fsuid()) &&
 		    gid_eq(wr->gid, current_fsgid())) {
 			wr->pos = page_offset(vmf->page);
-			wr->len = PAGE_SIZE;
+			wr->len = PG_SIZE;
 			goto okay;
 		} else {
 			if (orangefs_launder_folio(folio)) {
@@ -650,7 +650,7 @@ vm_fault_t orangefs_page_mkwrite(struct vm_fault *vmf)
 		goto out;
 	}
 	wr->pos = page_offset(vmf->page);
-	wr->len = PAGE_SIZE;
+	wr->len = PG_SIZE;
 	wr->uid = current_fsuid();
 	wr->gid = current_fsgid();
 	folio_attach_private(folio, wr);

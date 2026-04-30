@@ -1101,7 +1101,7 @@ static int free_pipes(struct echoaudio *chip, struct audiopipe *pipe)
 static int sglist_init(struct echoaudio *chip, struct audiopipe *pipe)
 {
 	pipe->sglist_head = 0;
-	memset(pipe->sgpage.area, 0, PAGE_SIZE);
+	memset(pipe->sgpage.area, 0, PG_SIZE);
 	chip->comm_page->sglist_addr[pipe->index].addr =
 		cpu_to_le32(pipe->sgpage.addr);
 	return 0;

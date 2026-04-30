@@ -379,7 +379,7 @@ static int btrfs_dio_iomap_begin(struct inode *inode, loff_t start,
 	 * range.  However we don't have that currently, so simply return
 	 * -EAGAIN at this point so that the normal path is used.
 	 */
-	if (!write && (flags & IOMAP_NOWAIT) && length > PAGE_SIZE)
+	if (!write && (flags & IOMAP_NOWAIT) && length > PG_SIZE)
 		return -EAGAIN;
 
 	/*
@@ -992,8 +992,8 @@ buffered:
 		goto out;
 	written += written_buffered;
 	iocb->ki_pos = pos + written_buffered;
-	invalidate_mapping_pages(file->f_mapping, pos >> PAGE_SHIFT,
-				 endbyte >> PAGE_SHIFT);
+	invalidate_mapping_pages(file->f_mapping, pos >> PG_SHIFT,
+				 endbyte >> PG_SHIFT);
 out:
 	return ret < 0 ? ret : written;
 }

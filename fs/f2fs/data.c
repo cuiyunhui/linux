@@ -149,7 +149,7 @@ static void f2fs_finish_read_bio(struct bio *bio, bool in_task)
 
 	bio_for_each_folio_all(fi, bio) {
 		struct folio *folio = fi.folio;
-		unsigned nr_pages = fi.length >> PAGE_SHIFT;
+		unsigned nr_pages = fi.length >> PG_SHIFT;
 		bool finished = true;
 
 		if (!folio_test_large(folio) &&
@@ -766,7 +766,7 @@ int f2fs_submit_page_bio(struct f2fs_io_info *fio)
 	bio_add_folio_nofail(bio, data_folio, folio_size(data_folio), 0);
 
 	if (fio->io_wbc && !is_read_io(fio->op))
-		wbc_account_cgroup_owner(fio->io_wbc, fio_folio, PAGE_SIZE);
+		wbc_account_cgroup_owner(fio->io_wbc, fio_folio, PG_SIZE);
 
 	inc_page_count(fio->sbi, is_read_io(fio->op) ?
 			__read_io_type(data_folio) : WB_DATA_TYPE(fio->folio, false));
@@ -1158,7 +1158,7 @@ static void f2fs_submit_page_read(struct inode *inode, struct fsverity_info *vi,
 	/* wait for GCed page writeback via META_MAPPING */
 	f2fs_wait_on_block_writeback(inode, blkaddr);
 
-	if (!bio_add_folio(bio, folio, PAGE_SIZE, 0))
+	if (!bio_add_folio(bio, folio, PG_SIZE, 0))
 		f2fs_bug_on(sbi, 1);
 
 	inc_page_count(sbi, F2FS_RD_DATA);
@@ -1258,7 +1258,7 @@ int f2fs_reserve_block(struct dnode_of_data *dn, pgoff_t index)
 static inline struct fsverity_info *f2fs_need_verity(const struct inode *inode,
 						     pgoff_t idx)
 {
-	if (idx < DIV_ROUND_UP(inode->i_size, PAGE_SIZE))
+	if (idx < DIV_ROUND_UP(inode->i_size, PG_SIZE))
 		return fsverity_get_info(inode);
 	return NULL;
 }
@@ -1454,8 +1454,8 @@ struct folio *f2fs_get_new_data_folio(struct inode *inode,
 	}
 got_it:
 	if (new_i_size && i_size_read(inode) <
-				((loff_t)(index + 1) << PAGE_SHIFT))
-		f2fs_i_size_write(inode, ((loff_t)(index + 1) << PAGE_SHIFT));
+				((loff_t)(index + 1) << PG_SHIFT))
+		f2fs_i_size_write(inode, ((loff_t)(index + 1) << PG_SHIFT));
 	return folio;
 }
 
@@ -2529,9 +2529,9 @@ got_it:
 				goto err_out;
 			}
 		} else {
-			size_t page_offset = offset << PAGE_SHIFT;
-			folio_zero_range(folio, page_offset, PAGE_SIZE);
-			if (vi && !fsverity_verify_blocks(vi, folio, PAGE_SIZE, page_offset)) {
+			size_t page_offset = offset << PG_SHIFT;
+			folio_zero_range(folio, page_offset, PG_SIZE);
+			if (vi && !fsverity_verify_blocks(vi, folio, PG_SIZE, page_offset)) {
 				ret = -EIO;
 				goto err_out;
 			}
@@ -2574,7 +2574,7 @@ submit_and_realloc:
 		f2fs_wait_on_block_writeback(inode, block_nr);
 
 		if (!bio_add_folio(bio, folio, F2FS_BLKSIZE,
-					offset << PAGE_SHIFT))
+					offset << PG_SHIFT))
 			goto submit_and_realloc;
 
 		folio_in_bio = true;
@@ -2799,7 +2799,7 @@ int f2fs_encrypt_one_page(struct f2fs_io_info *fio)
 
 retry_encrypt:
 	fio->encrypted_page = fscrypt_encrypt_pagecache_blocks(page_folio(page),
-					PAGE_SIZE, 0, gfp_flags);
+					PG_SIZE, 0, gfp_flags);
 	if (IS_ERR(fio->encrypted_page)) {
 		/* flush pending IOs and wait for a while in the ENOMEM case */
 		if (PTR_ERR(fio->encrypted_page) == -ENOMEM) {
@@ -2815,7 +2815,7 @@ retry_encrypt:
 	if (!IS_ERR(mfolio)) {
 		if (folio_test_uptodate(mfolio))
 			memcpy(folio_address(mfolio),
-				page_address(fio->encrypted_page), PAGE_SIZE);
+				page_address(fio->encrypted_page), PG_SIZE);
 		f2fs_folio_put(mfolio, true);
 	}
 	return 0;
@@ -3062,8 +3062,8 @@ int f2fs_write_single_data_page(struct folio *folio, int *submitted,
 	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
 	loff_t i_size = i_size_read(inode);
 	const pgoff_t end_index = ((unsigned long long)i_size)
-							>> PAGE_SHIFT;
-	loff_t psize = (loff_t)(folio->index + 1) << PAGE_SHIFT;
+							>> PG_SHIFT;
+	loff_t psize = (loff_t)(folio->index + 1) << PG_SHIFT;
 	unsigned offset = 0;
 	bool need_balance_fs = false;
 	bool quota_inode = IS_NOQUOTA(inode);
@@ -3118,7 +3118,7 @@ int f2fs_write_single_data_page(struct folio *folio, int *submitted,
 	 * If the offset is out-of-range of file size,
 	 * this page does not have to be written to disk.
 	 */
-	offset = i_size & (PAGE_SIZE - 1);
+	offset = i_size & (PG_SIZE - 1);
 	if ((folio->index >= end_index + 1) || !offset)
 		goto out;
 
@@ -3242,7 +3242,7 @@ static int f2fs_write_cache_pages(struct address_space *mapping,
 		.valid_nr_cpages = 0,
 		.rbuf = NULL,
 		.cbuf = NULL,
-		.rlen = PAGE_SIZE * F2FS_I(inode)->i_cluster_size,
+		.rlen = PG_SIZE * F2FS_I(inode)->i_cluster_size,
 		.private = NULL,
 	};
 #endif
@@ -3279,8 +3279,8 @@ static int f2fs_write_cache_pages(struct address_space *mapping,
 		index = mapping->writeback_index; /* prev offset */
 		end = -1;
 	} else {
-		index = wbc->range_start >> PAGE_SHIFT;
-		end = wbc->range_end >> PAGE_SHIFT;
+		index = wbc->range_start >> PG_SHIFT;
+		end = wbc->range_end >> PG_SHIFT;
 		if (wbc->range_start == 0 && wbc->range_end == LLONG_MAX)
 			range_whole = 1;
 	}
@@ -3672,7 +3672,7 @@ static int prepare_write_begin(struct f2fs_sb_info *sbi,
 	 * If a whole page is being written and we already preallocated all the
 	 * blocks, then there is no need to get a block address now.
 	 */
-	if (len == PAGE_SIZE && is_inode_flag_set(inode, FI_PREALLOCATED_ALL))
+	if (len == PG_SIZE && is_inode_flag_set(inode, FI_PREALLOCATED_ALL))
 		return 0;
 
 	/* f2fs_lock_op avoids race between write CP and convert_inline_page */
@@ -3681,7 +3681,7 @@ static int prepare_write_begin(struct f2fs_sb_info *sbi,
 			flag = F2FS_GET_BLOCK_DEFAULT;
 		f2fs_map_lock(sbi, &lc, flag);
 		locked = true;
-	} else if ((pos & PAGE_MASK) >= i_size_read(inode)) {
+	} else if ((pos & PG_MASK) >= i_size_read(inode)) {
 		f2fs_map_lock(sbi, &lc, flag);
 		locked = true;
 	}
@@ -3813,7 +3813,7 @@ static int prepare_atomic_write_begin(struct f2fs_sb_info *sbi,
 	block_t ori_blk_addr = NULL_ADDR;
 
 	/* If pos is beyond the end of file, reserve a new block in COW inode */
-	if ((pos & PAGE_MASK) >= i_size_read(inode))
+	if ((pos & PG_MASK) >= i_size_read(inode))
 		goto reserve_block;
 
 	/* Look for the block in COW inode first */
@@ -3853,7 +3853,7 @@ static int f2fs_write_begin(const struct kiocb *iocb,
 	struct inode *inode = mapping->host;
 	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
 	struct folio *folio;
-	pgoff_t index = pos >> PAGE_SHIFT;
+	pgoff_t index = pos >> PG_SHIFT;
 	bool need_balance = false;
 	bool use_cow = false;
 	block_t blkaddr = NULL_ADDR;
@@ -3884,7 +3884,7 @@ static int f2fs_write_begin(const struct kiocb *iocb,
 
 		*fsdata = NULL;
 
-		if (len == PAGE_SIZE && !(f2fs_is_atomic_file(inode)))
+		if (len == PG_SIZE && !(f2fs_is_atomic_file(inode)))
 			goto repeat;
 
 		ret = f2fs_prepare_compress_overwrite(inode, &page,
@@ -3943,7 +3943,7 @@ repeat:
 	if (len == folio_size(folio) || folio_test_uptodate(folio))
 		return 0;
 
-	if (!(pos & (PAGE_SIZE - 1)) && (pos + len) >= i_size_read(inode) &&
+	if (!(pos & (PG_SIZE - 1)) && (pos + len) >= i_size_read(inode) &&
 	    !f2fs_verity_in_progress(inode)) {
 		folio_zero_segment(folio, len, folio_size(folio));
 		return 0;

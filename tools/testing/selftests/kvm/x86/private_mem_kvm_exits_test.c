@@ -14,7 +14,7 @@
 #define EXITS_TEST_GVA 0xc0000000
 #define EXITS_TEST_GPA EXITS_TEST_GVA
 #define EXITS_TEST_NPAGES 1
-#define EXITS_TEST_SIZE (EXITS_TEST_NPAGES * PAGE_SIZE)
+#define EXITS_TEST_SIZE (EXITS_TEST_NPAGES * PG_SIZE)
 #define EXITS_TEST_SLOT 10
 
 static uint64_t guest_repeatedly_read(void)

@@ -14,7 +14,7 @@
 
 #include "kcsan.h"
 
-#define SLOT_RANGE PAGE_SIZE
+#define SLOT_RANGE PG_SIZE
 
 #define INVALID_WATCHPOINT  0
 #define CONSUMED_WATCHPOINT 1
@@ -55,7 +55,7 @@ static inline bool check_encodable(unsigned long addr, size_t size)
 	 * While we can encode addrs<PAGE_SIZE, avoid crashing with a NULL
 	 * pointer deref inside KCSAN.
 	 */
-	return addr >= PAGE_SIZE && size <= MAX_ENCODABLE_SIZE;
+	return addr >= PG_SIZE && size <= MAX_ENCODABLE_SIZE;
 }
 
 static inline long
@@ -87,7 +87,7 @@ static __always_inline bool decode_watchpoint(long watchpoint,
  */
 static __always_inline int watchpoint_slot(unsigned long addr)
 {
-	return (addr / PAGE_SIZE) % CONFIG_KCSAN_NUM_WATCHPOINTS;
+	return (addr / PG_SIZE) % CONFIG_KCSAN_NUM_WATCHPOINTS;
 }
 
 static __always_inline bool matching_access(unsigned long addr1, size_t size1,

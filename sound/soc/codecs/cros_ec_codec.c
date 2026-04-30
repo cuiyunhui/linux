@@ -421,7 +421,7 @@ static void *wov_map_shm(struct cros_ec_codec_priv *priv,
 			return NULL;
 		}
 
-		req = round_up(r.len, PAGE_SIZE);
+		req = round_up(r.len, PG_SIZE);
 		dev_dbg(priv->dev, "round up from %u to %u\n", r.len, req);
 
 		if (priv->ap_shm_last_alloc + req >
@@ -878,7 +878,7 @@ static int wov_pcm_open(struct snd_soc_component *component,
 		.rates = SNDRV_PCM_RATE_16000,
 		.channels_min = 1,
 		.channels_max = 1,
-		.period_bytes_min = PAGE_SIZE,
+		.period_bytes_min = PG_SIZE,
 		.period_bytes_max = 0x20000 / 8,
 		.periods_min = 8,
 		.periods_max = 8,

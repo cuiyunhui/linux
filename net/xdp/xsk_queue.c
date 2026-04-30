@@ -44,7 +44,7 @@ struct xsk_queue *xskq_create(u32 nentries, bool umem_queue)
 		return NULL;
 	}
 
-	size = PAGE_ALIGN(size);
+	size = PG_ALIGN(size);
 
 	q->ring = vmalloc_user(size);
 	if (!q->ring) {

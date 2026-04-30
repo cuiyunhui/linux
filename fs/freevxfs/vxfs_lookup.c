@@ -23,7 +23,7 @@
 /*
  * Number of VxFS blocks per page.
  */
-#define VXFS_BLOCK_PER_PAGE(sbp)  ((PAGE_SIZE / (sbp)->s_blocksize))
+#define VXFS_BLOCK_PER_PAGE(sbp)  ((PG_SIZE / (sbp)->s_blocksize))
 
 
 static struct dentry *	vxfs_lookup(struct inode *, struct dentry *, unsigned int);
@@ -69,20 +69,20 @@ vxfs_find_entry(struct inode *ip, struct dentry *dp, struct page **ppp)
 	while (pos < limit) {
 		struct page *pp;
 		char *kaddr;
-		int pg_ofs = pos & ~PAGE_MASK;
+		int pg_ofs = pos & ~PG_MASK;
 
-		pp = vxfs_get_page(ip->i_mapping, pos >> PAGE_SHIFT);
+		pp = vxfs_get_page(ip->i_mapping, pos >> PG_SHIFT);
 		if (IS_ERR(pp))
 			return NULL;
 		kaddr = (char *)page_address(pp);
 
-		while (pg_ofs < PAGE_SIZE && pos < limit) {
+		while (pg_ofs < PG_SIZE && pos < limit) {
 			struct vxfs_direct *de;
 
 			if ((pos & (bsize - 1)) < 4) {
 				struct vxfs_dirblk *dbp =
 					(struct vxfs_dirblk *)
-					 (kaddr + (pos & ~PAGE_MASK));
+					 (kaddr + (pos & ~PG_MASK));
 				int overhead = VXFS_DIRBLKOV(sbi, dbp);
 
 				pos += overhead;
@@ -217,22 +217,22 @@ vxfs_readdir(struct file *fp, struct dir_context *ctx)
 	while (pos < limit) {
 		struct page *pp;
 		char *kaddr;
-		int pg_ofs = pos & ~PAGE_MASK;
+		int pg_ofs = pos & ~PG_MASK;
 		int rc = 0;
 
-		pp = vxfs_get_page(ip->i_mapping, pos >> PAGE_SHIFT);
+		pp = vxfs_get_page(ip->i_mapping, pos >> PG_SHIFT);
 		if (IS_ERR(pp))
 			return -ENOMEM;
 
 		kaddr = (char *)page_address(pp);
 
-		while (pg_ofs < PAGE_SIZE && pos < limit) {
+		while (pg_ofs < PG_SIZE && pos < limit) {
 			struct vxfs_direct *de;
 
 			if ((pos & (bsize - 1)) < 4) {
 				struct vxfs_dirblk *dbp =
 					(struct vxfs_dirblk *)
-					 (kaddr + (pos & ~PAGE_MASK));
+					 (kaddr + (pos & ~PG_MASK));
 				int overhead = VXFS_DIRBLKOV(sbi, dbp);
 
 				pos += overhead;

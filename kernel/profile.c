@@ -37,7 +37,7 @@ struct profile_hit {
 };
 #define PROFILE_GRPSHIFT	3
 #define PROFILE_GRPSZ		(1 << PROFILE_GRPSHIFT)
-#define NR_PROFILE_HIT		(PAGE_SIZE/sizeof(struct profile_hit))
+#define NR_PROFILE_HIT		(PG_SIZE/sizeof(struct profile_hit))
 #define NR_PROFILE_GRP		(NR_PROFILE_HIT/PROFILE_GRPSZ)
 
 static atomic_t *prof_buffer;

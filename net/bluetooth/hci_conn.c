@@ -2685,7 +2685,7 @@ int hci_get_conn_list(void __user *arg)
 	if (copy_from_user(&req, arg, sizeof(req)))
 		return -EFAULT;
 
-	if (!req.conn_num || req.conn_num > (PAGE_SIZE * 2) / sizeof(*ci))
+	if (!req.conn_num || req.conn_num > (PG_SIZE * 2) / sizeof(*ci))
 		return -EINVAL;
 
 	size = sizeof(req) + req.conn_num * sizeof(*ci);

@@ -110,12 +110,12 @@ unsigned long task_statm(struct mm_struct *mm,
 		}
 	}
 
-	*text = (PAGE_ALIGN(mm->end_code) - (mm->start_code & PAGE_MASK))
-		>> PAGE_SHIFT;
-	*data = (PAGE_ALIGN(mm->start_stack) - (mm->start_data & PAGE_MASK))
-		>> PAGE_SHIFT;
+	*text = (PG_ALIGN(mm->end_code) - (mm->start_code & PG_MASK))
+		>> PG_SHIFT;
+	*data = (PG_ALIGN(mm->start_stack) - (mm->start_data & PG_MASK))
+		>> PG_SHIFT;
 	mmap_read_unlock(mm);
-	size >>= PAGE_SHIFT;
+	size >>= PG_SHIFT;
 	size += *text + *data;
 	*resident = size;
 	return size;
@@ -140,7 +140,7 @@ static int nommu_vma_show(struct seq_file *m, struct vm_area_struct *vma)
 		struct inode *inode = file_inode(vma->vm_file);
 		dev = inode->i_sb->s_dev;
 		ino = inode->i_ino;
-		pgoff = (loff_t)vma->vm_pgoff << PAGE_SHIFT;
+		pgoff = (loff_t)vma->vm_pgoff << PG_SHIFT;
 	}
 
 	seq_setwidth(m, 25 + sizeof(void *) * 6 - 1);

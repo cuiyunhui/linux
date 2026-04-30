@@ -230,7 +230,7 @@ int zlib_deflateInit2(
      *  DFLTCC requires the window to be page aligned.
      *  Thus, we overallocate and take the aligned portion of the buffer.
      */
-    mem->window_memory = (Byte *) PTR_ALIGN(next, PAGE_SIZE);
+    mem->window_memory = (Byte *) PTR_ALIGN(next, PG_SIZE);
 #else
     mem->window_memory = (Byte *) next;
 #endif

@@ -79,13 +79,13 @@ early_param("kho", kho_parse_enable);
  * successor kernel to parse.
  */
 
-#define PRESERVE_BITS (PAGE_SIZE * 8)
+#define PRESERVE_BITS (PG_SIZE * 8)
 
 struct kho_mem_phys_bits {
 	DECLARE_BITMAP(preserve, PRESERVE_BITS);
 };
 
-static_assert(sizeof(struct kho_mem_phys_bits) == PAGE_SIZE);
+static_assert(sizeof(struct kho_mem_phys_bits) == PG_SIZE);
 
 struct kho_mem_phys {
 	/*
@@ -131,7 +131,7 @@ static void *xa_load_or_alloc(struct xarray *xa, unsigned long index)
 	if (!elm)
 		return ERR_PTR(-ENOMEM);
 
-	if (WARN_ON(kho_scratch_overlap(virt_to_phys(elm), PAGE_SIZE)))
+	if (WARN_ON(kho_scratch_overlap(virt_to_phys(elm), PG_SIZE)))
 		return ERR_PTR(-EINVAL);
 
 	res = xa_cmpxchg(xa, index, NULL, elm, GFP_KERNEL);
@@ -347,7 +347,7 @@ struct khoser_mem_chunk_hdr {
 };
 
 #define KHOSER_BITMAP_SIZE                                   \
-	((PAGE_SIZE - sizeof(struct khoser_mem_chunk_hdr)) / \
+	((PG_SIZE - sizeof(struct khoser_mem_chunk_hdr)) / \
 	 sizeof(struct khoser_mem_bitmap_ptr))
 
 struct khoser_mem_chunk {
@@ -355,7 +355,7 @@ struct khoser_mem_chunk {
 	struct khoser_mem_bitmap_ptr bitmaps[KHOSER_BITMAP_SIZE];
 };
 
-static_assert(sizeof(struct khoser_mem_chunk) == PAGE_SIZE);
+static_assert(sizeof(struct khoser_mem_chunk) == PG_SIZE);
 
 static struct khoser_mem_chunk *new_chunk(struct khoser_mem_chunk *cur_chunk,
 					  unsigned long order)
@@ -366,7 +366,7 @@ static struct khoser_mem_chunk *new_chunk(struct khoser_mem_chunk *cur_chunk,
 	if (!chunk)
 		return ERR_PTR(-ENOMEM);
 
-	if (WARN_ON(kho_scratch_overlap(virt_to_phys(chunk), PAGE_SIZE)))
+	if (WARN_ON(kho_scratch_overlap(virt_to_phys(chunk), PG_SIZE)))
 		return ERR_PTR(-EINVAL);
 
 	chunk->hdr.order = order;
@@ -443,7 +443,7 @@ static int kho_mem_serialize(struct kho_out *kho_out)
 			elm = &chunk->bitmaps[chunk->hdr.num_elms];
 			chunk->hdr.num_elms++;
 			elm->phys_start = (phys * PRESERVE_BITS)
-					  << (order + PAGE_SHIFT);
+					  << (order + PG_SHIFT);
 			KHOSER_STORE_PTR(elm->bitmap, bits);
 		}
 	}
@@ -464,9 +464,9 @@ static void __init deserialize_bitmap(unsigned int order,
 	unsigned long bit;
 
 	for_each_set_bit(bit, bitmap->preserve, PRESERVE_BITS) {
-		int sz = 1 << (order + PAGE_SHIFT);
+		int sz = 1 << (order + PG_SHIFT);
 		phys_addr_t phys =
-			elm->phys_start + (bit << (order + PAGE_SHIFT));
+			elm->phys_start + (bit << (order + PG_SHIFT));
 		struct page *page = phys_to_page(phys);
 		union kho_page_info info;
 
@@ -657,7 +657,7 @@ static void __init kho_reserve_scratch(void)
 	/* FIXME: deal with node hot-plug/remove */
 	kho_scratch_cnt = nodes_weight(node_states[N_MEMORY]) + 2;
 	size = kho_scratch_cnt * sizeof(*kho_scratch);
-	kho_scratch = memblock_alloc(size, PAGE_SIZE);
+	kho_scratch = memblock_alloc(size, PG_SIZE);
 	if (!kho_scratch) {
 		pr_err("Failed to reserve scratch array\n");
 		goto err_disable_kho;
@@ -746,7 +746,7 @@ int kho_add_subtree(const char *name, void *fdt)
 
 	guard(mutex)(&kho_out.lock);
 
-	fdt_err = fdt_open_into(root_fdt, root_fdt, PAGE_SIZE);
+	fdt_err = fdt_open_into(root_fdt, root_fdt, PG_SIZE);
 	if (fdt_err < 0)
 		return err;
 
@@ -780,7 +780,7 @@ void kho_remove_subtree(void *fdt)
 
 	guard(mutex)(&kho_out.lock);
 
-	err = fdt_open_into(root_fdt, root_fdt, PAGE_SIZE);
+	err = fdt_open_into(root_fdt, root_fdt, PG_SIZE);
 	if (err < 0)
 		return;
 
@@ -819,7 +819,7 @@ int kho_preserve_folio(struct folio *folio)
 	const unsigned int order = folio_order(folio);
 	struct kho_mem_track *track = &kho_out.track;
 
-	if (WARN_ON(kho_scratch_overlap(pfn << PAGE_SHIFT, PAGE_SIZE << order)))
+	if (WARN_ON(kho_scratch_overlap(pfn << PG_SHIFT, PG_SIZE << order)))
 		return -EINVAL;
 
 	return __kho_preserve_order(track, pfn, order);
@@ -863,8 +863,8 @@ int kho_preserve_pages(struct page *page, unsigned long nr_pages)
 	unsigned long failed_pfn = 0;
 	int err = 0;
 
-	if (WARN_ON(kho_scratch_overlap(start_pfn << PAGE_SHIFT,
-					nr_pages << PAGE_SHIFT))) {
+	if (WARN_ON(kho_scratch_overlap(start_pfn << PG_SHIFT,
+					nr_pages << PG_SHIFT))) {
 		return -EINVAL;
 	}
 
@@ -1095,7 +1095,7 @@ void *kho_restore_vmalloc(const struct kho_vmalloc *preservation)
 		return NULL;
 	order = preservation->order;
 	contig_pages = (1 << order);
-	shift = PAGE_SHIFT + order;
+	shift = PG_SHIFT + order;
 	align = 1 << shift;
 
 	while (chunk) {
@@ -1114,7 +1114,7 @@ void *kho_restore_vmalloc(const struct kho_vmalloc *preservation)
 			for (int j = 0; j < contig_pages; j++)
 				pages[idx++] = page + j;
 
-			phys += contig_pages * PAGE_SIZE;
+			phys += contig_pages * PG_SIZE;
 		}
 
 		page = kho_restore_pages(virt_to_phys(chunk), 1);
@@ -1127,7 +1127,7 @@ void *kho_restore_vmalloc(const struct kho_vmalloc *preservation)
 	if (idx != total_pages)
 		goto err_free_pages_array;
 
-	area = __get_vm_area_node(total_pages * PAGE_SIZE, align, shift,
+	area = __get_vm_area_node(total_pages * PG_SIZE, align, shift,
 				  vm_flags, VMALLOC_START, VMALLOC_END,
 				  NUMA_NO_NODE, GFP_KERNEL,
 				  __builtin_return_address(0));
@@ -1339,7 +1339,7 @@ static __init int kho_out_fdt_setup(void)
 	u64 empty_mem_map = 0;
 	int err;
 
-	err = fdt_create(root, PAGE_SIZE);
+	err = fdt_create(root, PG_SIZE);
 	err |= fdt_finish_reservemap(root);
 	err |= fdt_begin_node(root, "");
 	err |= fdt_property_string(root, "compatible", KHO_FDT_COMPATIBLE);
@@ -1359,7 +1359,7 @@ static __init int kho_init(void)
 	if (!kho_enable)
 		return 0;
 
-	kho_out.fdt = kho_alloc_preserve(PAGE_SIZE);
+	kho_out.fdt = kho_alloc_preserve(PG_SIZE);
 	if (IS_ERR(kho_out.fdt)) {
 		err = PTR_ERR(kho_out.fdt);
 		goto err_free_scratch;
@@ -1384,7 +1384,7 @@ static __init int kho_init(void)
 
 	for (int i = 0; i < kho_scratch_cnt; i++) {
 		unsigned long base_pfn = PHYS_PFN(kho_scratch[i].addr);
-		unsigned long count = kho_scratch[i].size >> PAGE_SHIFT;
+		unsigned long count = kho_scratch[i].size >> PG_SHIFT;
 		unsigned long pfn;
 
 		/*

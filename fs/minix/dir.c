@@ -33,10 +33,10 @@ const struct file_operations minix_dir_operations = {
 static unsigned
 minix_last_byte(struct inode *inode, unsigned long page_nr)
 {
-	unsigned last_byte = PAGE_SIZE;
+	unsigned last_byte = PG_SIZE;
 
-	if (page_nr == (inode->i_size >> PAGE_SHIFT))
-		last_byte = inode->i_size & (PAGE_SIZE - 1);
+	if (page_nr == (inode->i_size >> PG_SHIFT))
+		last_byte = inode->i_size & (PG_SIZE - 1);
 	return last_byte;
 }
 
@@ -95,8 +95,8 @@ static int minix_readdir(struct file *file, struct dir_context *ctx)
 	if (pos >= inode->i_size)
 		return 0;
 
-	offset = pos & ~PAGE_MASK;
-	n = pos >> PAGE_SHIFT;
+	offset = pos & ~PG_MASK;
+	n = pos >> PG_SHIFT;
 
 	for ( ; n < npages; n++, offset = 0) {
 		char *p, *kaddr, *limit;
@@ -227,7 +227,7 @@ int minix_add_link(struct dentry *dentry, struct inode *inode)
 			return PTR_ERR(kaddr);
 		folio_lock(folio);
 		dir_end = kaddr + minix_last_byte(dir, n);
-		limit = kaddr + PAGE_SIZE - sbi->s_dirsize;
+		limit = kaddr + PG_SIZE - sbi->s_dirsize;
 		for (p = kaddr; p <= limit; p = minix_next_entry(p, sbi)) {
 			de = (minix_dirent *)p;
 			de3 = (minix3_dirent *)p;

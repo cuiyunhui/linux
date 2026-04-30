@@ -418,8 +418,8 @@ static int orangefs_fill_sb(struct super_block *sb,
 	sb->s_op = &orangefs_s_ops;
 	set_default_d_op(sb, &orangefs_dentry_operations);
 
-	sb->s_blocksize = PAGE_SIZE;
-	sb->s_blocksize_bits = PAGE_SHIFT;
+	sb->s_blocksize = PG_SIZE;
+	sb->s_blocksize_bits = PG_SHIFT;
 	sb->s_maxbytes = MAX_LFS_FILESIZE;
 
 	ret = super_setup_bdi(sb);

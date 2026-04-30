@@ -73,9 +73,9 @@ static unsigned int nilfs_last_byte(struct inode *inode, unsigned long page_nr)
 {
 	u64 last_byte = inode->i_size;
 
-	last_byte -= page_nr << PAGE_SHIFT;
-	if (last_byte > PAGE_SIZE)
-		last_byte = PAGE_SIZE;
+	last_byte -= page_nr << PG_SHIFT;
+	if (last_byte > PG_SIZE)
+		last_byte = PG_SIZE;
 	return last_byte;
 }
 
@@ -170,7 +170,7 @@ Einumber:
 bad_entry:
 	nilfs_error(sb,
 		    "bad entry in directory #%lu: %s - offset=%lu, inode=%lu, rec_len=%zd, name_len=%d",
-		    dir->i_ino, error, (folio->index << PAGE_SHIFT) + offs,
+		    dir->i_ino, error, (folio->index << PG_SHIFT) + offs,
 		    (unsigned long)le64_to_cpu(p->inode),
 		    rec_len, p->name_len);
 	goto fail;
@@ -178,7 +178,7 @@ Eend:
 	p = (struct nilfs_dir_entry *)(kaddr + offs);
 	nilfs_error(sb,
 		    "entry in directory #%lu spans the page boundary offset=%lu, inode=%lu",
-		    dir->i_ino, (folio->index << PAGE_SHIFT) + offs,
+		    dir->i_ino, (folio->index << PG_SHIFT) + offs,
 		    (unsigned long)le64_to_cpu(p->inode));
 fail:
 	return false;
@@ -237,8 +237,8 @@ static int nilfs_readdir(struct file *file, struct dir_context *ctx)
 	loff_t pos = ctx->pos;
 	struct inode *inode = file_inode(file);
 	struct super_block *sb = inode->i_sb;
-	unsigned int offset = pos & ~PAGE_MASK;
-	unsigned long n = pos >> PAGE_SHIFT;
+	unsigned int offset = pos & ~PG_MASK;
+	unsigned long n = pos >> PG_SHIFT;
 	unsigned long npages = dir_pages(inode);
 
 	if (pos > inode->i_size - NILFS_DIR_REC_LEN(1))
@@ -252,7 +252,7 @@ static int nilfs_readdir(struct file *file, struct dir_context *ctx)
 		kaddr = nilfs_get_folio(inode, n, &folio);
 		if (IS_ERR(kaddr)) {
 			nilfs_error(sb, "bad page in #%lu", inode->i_ino);
-			ctx->pos += PAGE_SIZE - offset;
+			ctx->pos += PG_SIZE - offset;
 			return -EIO;
 		}
 		de = (struct nilfs_dir_entry *)(kaddr + offset);
@@ -334,7 +334,7 @@ struct nilfs_dir_entry *nilfs_find_entry(struct inode *dir,
 		if (++n >= npages)
 			n = 0;
 		/* next folio is past the blocks we've got */
-		if (unlikely(n > (dir->i_blocks >> (PAGE_SHIFT - 9)))) {
+		if (unlikely(n > (dir->i_blocks >> (PG_SHIFT - 9)))) {
 			nilfs_error(dir->i_sb,
 			       "dir %lu size %lld exceeds block count %llu",
 			       dir->i_ino, dir->i_size,

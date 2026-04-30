@@ -207,7 +207,7 @@ static int write_begin_slow(struct address_space *mapping,
 {
 	struct inode *inode = mapping->host;
 	struct ubifs_info *c = inode->i_sb->s_fs_info;
-	pgoff_t index = pos >> PAGE_SHIFT;
+	pgoff_t index = pos >> PG_SHIFT;
 	struct ubifs_budget_req req = { .new_page = 1 };
 	int err, appending = !!(pos + len > inode->i_size);
 	struct folio *folio;
@@ -412,7 +412,7 @@ static int ubifs_write_begin(const struct kiocb *iocb,
 	struct inode *inode = mapping->host;
 	struct ubifs_info *c = inode->i_sb->s_fs_info;
 	struct ubifs_inode *ui = ubifs_inode(inode);
-	pgoff_t index = pos >> PAGE_SHIFT;
+	pgoff_t index = pos >> PG_SHIFT;
 	int err, appending = !!(pos + len > inode->i_size);
 	int skipped_read = 0;
 	struct folio *folio;
@@ -602,7 +602,7 @@ static int populate_page(struct ubifs_info *c, struct folio *folio,
 	dbg_gen("ino %lu, pg %lu, i_size %lld, flags %#lx",
 		inode->i_ino, folio->index, i_size, folio->flags.f);
 
-	end_index = (i_size - 1) >> PAGE_SHIFT;
+	end_index = (i_size - 1) >> PG_SHIFT;
 	if (!i_size || folio->index > end_index) {
 		hole = 1;
 		folio_zero_range(folio, 0, folio_size(folio));
@@ -663,7 +663,7 @@ static int populate_page(struct ubifs_info *c, struct folio *folio,
 	}
 
 	if (end_index == folio->index) {
-		int len = i_size & (PAGE_SIZE - 1);
+		int len = i_size & (PG_SIZE - 1);
 
 		if (len && len < read)
 			folio_zero_range(folio, len, read - len);
@@ -757,7 +757,7 @@ static int ubifs_do_bulk_read(struct ubifs_info *c, struct bu_info *bu,
 	isize = i_size_read(inode);
 	if (isize == 0)
 		goto out_free;
-	end_index = ((isize - 1) >> PAGE_SHIFT);
+	end_index = ((isize - 1) >> PG_SHIFT);
 
 	for (page_idx = 1; page_idx < page_cnt; page_idx++) {
 		pgoff_t page_offset = offset + page_idx;
@@ -892,7 +892,7 @@ static int do_writepage(struct folio *folio, size_t len)
 #ifdef UBIFS_DEBUG
 	struct ubifs_inode *ui = ubifs_inode(inode);
 	spin_lock(&ui->ui_lock);
-	ubifs_assert(c, folio->index <= ui->synced_i_size >> PAGE_SHIFT);
+	ubifs_assert(c, folio->index <= ui->synced_i_size >> PG_SHIFT);
 	spin_unlock(&ui->ui_lock);
 #endif
 
@@ -1134,7 +1134,7 @@ static int do_truncation(struct ubifs_info *c, struct inode *inode,
 	truncate_setsize(inode, new_size);
 
 	if (offset) {
-		pgoff_t index = new_size >> PAGE_SHIFT;
+		pgoff_t index = new_size >> PG_SHIFT;
 		struct folio *folio;
 
 		folio = filemap_lock_folio(inode->i_mapping, index);

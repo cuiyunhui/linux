@@ -220,7 +220,7 @@ int nilfs_btnode_prepare_change_key(struct address_space *btnc,
 	obh = ctxt->bh;
 	ctxt->newbh = NULL;
 
-	if (inode->i_blkbits == PAGE_SHIFT) {
+	if (inode->i_blkbits == PG_SHIFT) {
 		struct folio *ofolio = obh->b_folio;
 		folio_lock(ofolio);
 retry:

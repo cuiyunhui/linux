@@ -21,9 +21,9 @@
 #if DLM_HASH_SIZE_DEFAULT < PAGE_SIZE
 # define DLM_HASH_PAGES		1
 #else
-# define DLM_HASH_PAGES		(DLM_HASH_SIZE_DEFAULT / PAGE_SIZE)
+# define DLM_HASH_PAGES		(DLM_HASH_SIZE_DEFAULT / PG_SIZE)
 #endif
-#define DLM_BUCKETS_PER_PAGE	(PAGE_SIZE / sizeof(struct hlist_head))
+#define DLM_BUCKETS_PER_PAGE	(PG_SIZE / sizeof(struct hlist_head))
 #define DLM_HASH_BUCKETS	(DLM_HASH_PAGES * DLM_BUCKETS_PER_PAGE)
 
 /* Intended to make it easier for us to switch out hash functions */

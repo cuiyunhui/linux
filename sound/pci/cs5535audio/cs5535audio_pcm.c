@@ -101,7 +101,7 @@ static int snd_cs5535audio_playback_close(struct snd_pcm_substream *substream)
 }
 
 #define CS5535AUDIO_DESC_LIST_SIZE \
-	PAGE_ALIGN(CS5535AUDIO_MAX_DESCRIPTORS * sizeof(struct cs5535audio_dma_desc))
+	PG_ALIGN(CS5535AUDIO_MAX_DESCRIPTORS * sizeof(struct cs5535audio_dma_desc))
 
 static int cs5535audio_build_dma_packets(struct cs5535audio *cs5535au,
 					 struct cs5535audio_dma *dma,

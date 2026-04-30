@@ -61,8 +61,9 @@ int main(void)
 	if (fd == -1)
 		return 1;
 
-	for (va = 0; va < va_max; va += PAGE_SIZE) {
-		p = mmap((void *)va, PAGE_SIZE, PROT_NONE, MAP_PRIVATE|MAP_FILE|MAP_FIXED, fd, 0);
+	for (va = 0; va < va_max; va += PG_SIZE) {
+		p = mmap((void *)va, PG_SIZE, PROT_NONE,
+			 MAP_PRIVATE|MAP_FILE|MAP_FIXED, fd, 0);
 		if (p == (void *)va)
 			break;
 	}
@@ -72,7 +73,7 @@ int main(void)
 	}
 
 	a = (unsigned long)p;
-	b = (unsigned long)p + PAGE_SIZE;
+	b = (unsigned long)p + PG_SIZE;
 
 	pass("/proc/self/map_files/%lx-%lx", a, b);
 	fail("/proc/self/map_files/ %lx-%lx", a, b);

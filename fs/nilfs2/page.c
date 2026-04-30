@@ -36,7 +36,7 @@ static struct buffer_head *__nilfs_get_folio_block(struct folio *folio,
 	if (!bh)
 		bh = create_empty_buffers(folio, 1 << blkbits, b_state);
 
-	first_block = (unsigned long)index << (PAGE_SHIFT - blkbits);
+	first_block = (unsigned long)index << (PG_SHIFT - blkbits);
 	bh = get_nth_bh(bh, block - first_block);
 
 	wait_on_buffer(bh);
@@ -49,7 +49,7 @@ struct buffer_head *nilfs_grab_buffer(struct inode *inode,
 				      unsigned long b_state)
 {
 	int blkbits = inode->i_blkbits;
-	pgoff_t index = blkoff >> (PAGE_SHIFT - blkbits);
+	pgoff_t index = blkoff >> (PG_SHIFT - blkbits);
 	struct folio *folio;
 	struct buffer_head *bh;
 
@@ -516,7 +516,7 @@ unsigned long nilfs_find_uncommitted_extent(struct inode *inode,
 	if (inode->i_mapping->nrpages == 0)
 		return 0;
 
-	index = start_blk >> (PAGE_SHIFT - inode->i_blkbits);
+	index = start_blk >> (PG_SHIFT - inode->i_blkbits);
 
 	folio_batch_init(&fbatch);
 
@@ -535,7 +535,7 @@ repeat:
 			struct buffer_head *bh, *head;
 			sector_t b;
 
-			b = folio->index << (PAGE_SHIFT - inode->i_blkbits);
+			b = folio->index << (PG_SHIFT - inode->i_blkbits);
 			bh = head = folio_buffers(folio);
 			do {
 				if (b < start_blk)

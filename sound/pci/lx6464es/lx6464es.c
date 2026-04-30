@@ -786,7 +786,7 @@ static int lx_pcm_create(struct lx6464es *chip)
 		MICROBLAZE_IBL_MAX * /* frames per period */
 		2;		     /* duplex */
 
-	size = PAGE_ALIGN(size);
+	size = PG_ALIGN(size);
 
 	/* hardcoded device name & channel count */
 	err = snd_pcm_new(chip->card, (char *)card_name, 0,

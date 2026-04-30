@@ -106,7 +106,7 @@ static int __init split_nodes_interleave(struct numa_meminfo *ei,
 	 * the division in ulong number of pages and convert back.
 	 */
 	size = max_addr - addr - mem_hole_size(addr, max_addr);
-	size = PFN_PHYS((unsigned long)(size >> PAGE_SHIFT) / nr_nodes);
+	size = PFN_PHYS((unsigned long)(size >> PG_SHIFT) / nr_nodes);
 
 	/*
 	 * Calculate the number of big nodes that can be allocated as a result
@@ -448,7 +448,7 @@ void __init numa_emulation(struct numa_meminfo *numa_meminfo, int numa_dist_cnt)
 
 	/* copy the physical distance table */
 	if (numa_dist_cnt) {
-		phys_dist = memblock_alloc(phys_size, PAGE_SIZE);
+		phys_dist = memblock_alloc(phys_size, PG_SIZE);
 		if (!phys_dist) {
 			pr_warn("NUMA: Warning: can't allocate copy of distance table, disabling emulation\n");
 			goto no_emu;

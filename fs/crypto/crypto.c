@@ -177,7 +177,7 @@ struct page *fscrypt_encrypt_pagecache_blocks(struct folio *folio,
 	const unsigned int du_bits = ci->ci_data_unit_bits;
 	const unsigned int du_size = 1U << du_bits;
 	struct page *ciphertext_page;
-	u64 index = ((u64)folio->index << (PAGE_SHIFT - du_bits)) +
+	u64 index = ((u64)folio->index << (PG_SHIFT - du_bits)) +
 		    (offs >> du_bits);
 	unsigned int i;
 	int err;
@@ -259,7 +259,7 @@ int fscrypt_decrypt_pagecache_blocks(struct folio *folio, size_t len,
 	const struct fscrypt_inode_info *ci = fscrypt_get_inode_info_raw(inode);
 	const unsigned int du_bits = ci->ci_data_unit_bits;
 	const unsigned int du_size = 1U << du_bits;
-	u64 index = ((u64)folio->index << (PAGE_SHIFT - du_bits)) +
+	u64 index = ((u64)folio->index << (PG_SHIFT - du_bits)) +
 		    (offs >> du_bits);
 	size_t i;
 	int err;
@@ -271,10 +271,10 @@ int fscrypt_decrypt_pagecache_blocks(struct folio *folio, size_t len,
 		return -EINVAL;
 
 	for (i = offs; i < offs + len; i += du_size, index++) {
-		struct page *page = folio_page(folio, i >> PAGE_SHIFT);
+		struct page *page = folio_page(folio, i >> PG_SHIFT);
 
 		err = fscrypt_crypt_data_unit(ci, FS_DECRYPT, index, page,
-					      page, du_size, i & ~PAGE_MASK);
+					      page, du_size, i & ~PG_MASK);
 		if (err)
 			return err;
 	}

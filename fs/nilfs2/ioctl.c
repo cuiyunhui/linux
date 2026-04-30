@@ -58,7 +58,7 @@ static int nilfs_ioctl_wrap_copy(struct the_nilfs *nilfs,
 	if (argv->v_nmembs == 0)
 		return 0;
 
-	if ((size_t)argv->v_size > PAGE_SIZE)
+	if ((size_t)argv->v_size > PG_SIZE)
 		return -EINVAL;
 
 	/*
@@ -72,7 +72,7 @@ static int nilfs_ioctl_wrap_copy(struct the_nilfs *nilfs,
 	buf = (void *)get_zeroed_page(GFP_NOFS);
 	if (unlikely(!buf))
 		return -ENOMEM;
-	maxmembs = PAGE_SIZE / argv->v_size;
+	maxmembs = PG_SIZE / argv->v_size;
 
 	ret = 0;
 	total = 0;

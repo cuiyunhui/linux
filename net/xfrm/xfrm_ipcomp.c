@@ -75,7 +75,7 @@ static int ipcomp_post_acomp(struct sk_buff *skb, int err, int hlen)
 		page = sg_page(dsg);
 		dsg = sg_next(dsg);
 
-		len = PAGE_SIZE;
+		len = PG_SIZE;
 		if (dlen < len)
 			len = dlen;
 
@@ -132,7 +132,7 @@ static struct acomp_req *ipcomp_setup_req(struct xfrm_state *x,
 	do {
 		struct sk_buff *trailer;
 
-		if (skb->len > PAGE_SIZE) {
+		if (skb->len > PG_SIZE) {
 			if (skb_linearize_cow(skb))
 				return ERR_PTR(-ENOMEM);
 			nfrags = 1;
@@ -183,8 +183,8 @@ static struct acomp_req *ipcomp_setup_req(struct xfrm_state *x,
 		page = alloc_page(GFP_ATOMIC);
 		if (!page)
 			break;
-		sg_set_page(dsg + i, page, PAGE_SIZE, 0);
-		total += PAGE_SIZE;
+		sg_set_page(dsg + i, page, PG_SIZE, 0);
+		total += PG_SIZE;
 	}
 	if (!i)
 		return ERR_PTR(-ENOMEM);

@@ -173,7 +173,7 @@ io_mapping_map_atomic_wc(struct io_mapping *mapping,
 	else
 		migrate_disable();
 	pagefault_disable();
-	return io_mapping_map_wc(mapping, offset, PAGE_SIZE);
+	return io_mapping_map_wc(mapping, offset, PG_SIZE);
 }
 
 static inline void
@@ -190,7 +190,7 @@ io_mapping_unmap_atomic(void __iomem *vaddr)
 static inline void __iomem *
 io_mapping_map_local_wc(struct io_mapping *mapping, unsigned long offset)
 {
-	return io_mapping_map_wc(mapping, offset, PAGE_SIZE);
+	return io_mapping_map_wc(mapping, offset, PG_SIZE);
 }
 
 static inline void io_mapping_unmap_local(void __iomem *vaddr)

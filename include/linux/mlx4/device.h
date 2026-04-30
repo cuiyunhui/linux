@@ -654,7 +654,7 @@ struct mlx4_mtt {
 };
 
 enum {
-	MLX4_DB_PER_PAGE = PAGE_SIZE / 4
+	MLX4_DB_PER_PAGE = PG_SIZE / 4
 };
 
 struct mlx4_db_pgdir {
@@ -1090,8 +1090,8 @@ static inline void *mlx4_buf_offset(struct mlx4_buf *buf, int offset)
 	if (buf->nbufs == 1)
 		return buf->direct.buf + offset;
 	else
-		return buf->page_list[offset >> PAGE_SHIFT].buf +
-			(offset & (PAGE_SIZE - 1));
+		return buf->page_list[offset >> PG_SHIFT].buf +
+			(offset & (PG_SIZE - 1));
 }
 
 static inline int mlx4_is_bonded(struct mlx4_dev *dev)
@@ -1596,12 +1596,12 @@ int mlx4_get_internal_clock_params(struct mlx4_dev *dev,
 
 static inline int mlx4_to_hw_uar_index(struct mlx4_dev *dev, int index)
 {
-	return (index << (PAGE_SHIFT - dev->uar_page_shift));
+	return (index << (PG_SHIFT - dev->uar_page_shift));
 }
 
 static inline int mlx4_get_num_reserved_uar(struct mlx4_dev *dev)
 {
 	/* The first 128 UARs are used for EQ doorbells */
-	return (128 >> (PAGE_SHIFT - dev->uar_page_shift));
+	return (128 >> (PG_SHIFT - dev->uar_page_shift));
 }
 #endif /* MLX4_DEVICE_H */

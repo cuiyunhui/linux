@@ -123,7 +123,7 @@ nfsd4_block_proc_layoutget(struct svc_rqst *rqstp, struct inode *inode,
 	 * Limit the maximum layout size to avoid allocating
 	 * a large buffer on the server for each layout request.
 	 */
-	nr_extents_max = (min(args->lg_maxcount, PAGE_SIZE) -
+	nr_extents_max = (min(args->lg_maxcount, PG_SIZE) -
 			  PNFS_BLOCK_LAYOUT4_SIZE) / PNFS_BLOCK_EXTENT_SIZE;
 
 	/*

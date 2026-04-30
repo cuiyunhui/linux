@@ -4225,7 +4225,7 @@ int btf_check_and_fixup_fields(const struct btf *btf, struct btf_record *rec)
 					   rec->fields[i].kptr.btf_id);
 			if (!t->size)
 				return -EINVAL;
-			if (t->size > PAGE_SIZE)
+			if (t->size > PG_SIZE)
 				return -E2BIG;
 			continue;
 		}

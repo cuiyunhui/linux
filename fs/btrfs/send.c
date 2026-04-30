@@ -5201,7 +5201,7 @@ static int put_file_data(struct send_ctx *sctx, u64 offset, u32 len)
 	struct btrfs_fs_info *fs_info = root->fs_info;
 	u64 cur = offset;
 	const u64 end = offset + len;
-	const pgoff_t last_index = ((end - 1) >> PAGE_SHIFT);
+	const pgoff_t last_index = ((end - 1) >> PG_SHIFT);
 	struct address_space *mapping = sctx->cur_inode->i_mapping;
 	int ret;
 
@@ -5210,7 +5210,7 @@ static int put_file_data(struct send_ctx *sctx, u64 offset, u32 len)
 		return ret;
 
 	while (cur < end) {
-		pgoff_t index = (cur >> PAGE_SHIFT);
+		pgoff_t index = (cur >> PG_SHIFT);
 		unsigned int cur_len;
 		unsigned int pg_offset;
 		struct folio *folio;
@@ -5584,7 +5584,7 @@ static int send_encoded_extent(struct send_ctx *sctx, struct btrfs_path *path,
 	 * boundary in the send buffer. This means that there may be a gap
 	 * between the beginning of the command and the file data.
 	 */
-	data_offset = PAGE_ALIGN(sctx->send_size);
+	data_offset = PG_ALIGN(sctx->send_size);
 	if (unlikely(data_offset > sctx->send_max_size ||
 		     sctx->send_max_size - data_offset < disk_num_bytes)) {
 		ret = -EOVERFLOW;
@@ -5598,7 +5598,7 @@ static int send_encoded_extent(struct send_ctx *sctx, struct btrfs_path *path,
 	ret = btrfs_encoded_read_regular_fill_pages(inode,
 						    disk_bytenr, disk_num_bytes,
 						    sctx->send_buf_pages +
-						    (data_offset >> PAGE_SHIFT),
+						    (data_offset >> PG_SHIFT),
 						    NULL);
 	if (ret)
 		goto out;
@@ -5694,7 +5694,7 @@ static int send_extent_data(struct send_ctx *sctx, struct btrfs_path *path,
 		 * extent as well.
 		 */
 		sctx->clean_page_cache = (sctx->cur_inode->i_mapping->nrpages == 0);
-		sctx->page_cache_clear_start = round_down(offset, PAGE_SIZE);
+		sctx->page_cache_clear_start = round_down(offset, PG_SIZE);
 	}
 
 	while (sent < len) {
@@ -5707,7 +5707,7 @@ static int send_extent_data(struct send_ctx *sctx, struct btrfs_path *path,
 		sent += size;
 	}
 
-	if (sctx->clean_page_cache && PAGE_ALIGNED(end)) {
+	if (sctx->clean_page_cache && PG_ALIGNED(end)) {
 		/*
 		 * Always operate only on ranges that are a multiple of the page
 		 * size. This is not only to prevent zeroing parts of a page in
@@ -5896,7 +5896,7 @@ static int clone_range(struct send_ctx *sctx, struct btrfs_path *dst_path,
 		type = btrfs_file_extent_type(leaf, ei);
 		if (type == BTRFS_FILE_EXTENT_INLINE) {
 			ext_len = btrfs_file_extent_ram_bytes(leaf, ei);
-			ext_len = PAGE_ALIGN(ext_len);
+			ext_len = PG_ALIGN(ext_len);
 		} else {
 			ext_len = btrfs_file_extent_num_bytes(leaf, ei);
 		}
@@ -6225,7 +6225,7 @@ static int is_extent_unchanged(struct send_ctx *sctx,
 
 		if (right_type == BTRFS_FILE_EXTENT_INLINE) {
 			right_len = btrfs_file_extent_ram_bytes(eb, ei);
-			right_len = PAGE_ALIGN(right_len);
+			right_len = PG_ALIGN(right_len);
 		} else {
 			right_len = btrfs_file_extent_num_bytes(eb, ei);
 		}
@@ -6752,7 +6752,7 @@ static void close_current_inode(struct send_ctx *sctx)
 	if (sctx->clean_page_cache && sctx->page_cache_clear_start < i_size)
 		truncate_inode_pages_range(&sctx->cur_inode->i_data,
 					   sctx->page_cache_clear_start,
-					   round_up(i_size, PAGE_SIZE) - 1);
+					   round_up(i_size, PG_SIZE) - 1);
 
 	iput(sctx->cur_inode);
 	sctx->cur_inode = NULL;
@@ -8096,7 +8096,7 @@ long btrfs_ioctl_send(struct btrfs_root *send_root, const struct btrfs_ioctl_sen
 			ret = -ENOMEM;
 			goto out;
 		}
-		send_buf_num_pages = sctx->send_max_size >> PAGE_SHIFT;
+		send_buf_num_pages = sctx->send_max_size >> PG_SHIFT;
 		sctx->send_buf_pages = kzalloc_objs(*sctx->send_buf_pages,
 						    send_buf_num_pages);
 		if (!sctx->send_buf_pages) {
@@ -8105,7 +8105,7 @@ long btrfs_ioctl_send(struct btrfs_root *send_root, const struct btrfs_ioctl_sen
 		}
 		for (i = 0; i < send_buf_num_pages; i++) {
 			sctx->send_buf_pages[i] =
-				vmalloc_to_page(sctx->send_buf + (i << PAGE_SHIFT));
+				vmalloc_to_page(sctx->send_buf + (i << PG_SHIFT));
 		}
 	} else {
 		sctx->send_max_size = BTRFS_SEND_BUF_SIZE_V1;

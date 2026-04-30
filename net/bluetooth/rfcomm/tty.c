@@ -507,7 +507,7 @@ static int rfcomm_get_dev_list(void __user *arg)
 	if (get_user(dev_num, (u16 __user *) arg))
 		return -EFAULT;
 
-	if (!dev_num || dev_num > (PAGE_SIZE * 4) / sizeof(*di))
+	if (!dev_num || dev_num > (PG_SIZE * 4) / sizeof(*di))
 		return -EINVAL;
 
 	dl = kzalloc_flex(*dl, dev_info, dev_num);

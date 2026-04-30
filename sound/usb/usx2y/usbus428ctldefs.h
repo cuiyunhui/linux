@@ -90,4 +90,4 @@ struct us428ctls_sharedmem {
 	int			p4out_last, p4out_sent;
 };
 
-#define US428_SHAREDMEM_PAGES	PAGE_ALIGN(sizeof(struct us428ctls_sharedmem))
+#define US428_SHAREDMEM_PAGES	PG_ALIGN(sizeof(struct us428ctls_sharedmem))

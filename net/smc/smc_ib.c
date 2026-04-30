@@ -706,7 +706,7 @@ static int smc_ib_map_mr_sg(struct smc_buf_desc *buf_slot, u8 link_idx)
 	sg_num = ib_map_mr_sg(buf_slot->mr[link_idx],
 			      buf_slot->sgt[link_idx].sgl,
 			      buf_slot->sgt[link_idx].orig_nents,
-			      &offset, PAGE_SIZE);
+			      &offset, PG_SIZE);
 
 	return sg_num;
 }
@@ -852,8 +852,8 @@ long smc_ib_setup_per_ibdev(struct smc_ib_device *smcibdev)
 	/* the calculated number of cq entries fits to mlx5 cq allocation */
 	cqe_size_order = cache_line_size() == 128 ? 7 : 6;
 	smc_order = MAX_PAGE_ORDER - cqe_size_order;
-	if (SMC_MAX_CQE + 2 > (0x00000001 << smc_order) * PAGE_SIZE)
-		cqattr.cqe = (0x00000001 << smc_order) * PAGE_SIZE - 2;
+	if (SMC_MAX_CQE + 2 > (0x00000001 << smc_order) * PG_SIZE)
+		cqattr.cqe = (0x00000001 << smc_order) * PG_SIZE - 2;
 	smcibdev->roce_cq_send = ib_create_cq(smcibdev->ibdev,
 					      smc_wr_tx_cq_handler, NULL,
 					      smcibdev, &cqattr);

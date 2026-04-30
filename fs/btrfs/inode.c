@@ -402,8 +402,8 @@ void btrfs_inode_unlock(struct btrfs_inode *inode, unsigned int ilock_flags)
 static inline void btrfs_cleanup_ordered_extents(struct btrfs_inode *inode,
 						 u64 offset, u64 bytes)
 {
-	pgoff_t index = offset >> PAGE_SHIFT;
-	const pgoff_t end_index = (offset + bytes - 1) >> PAGE_SHIFT;
+	pgoff_t index = offset >> PG_SHIFT;
+	const pgoff_t end_index = (offset + bytes - 1) >> PG_SHIFT;
 	struct folio *folio;
 
 	while (index <= end_index) {
@@ -487,7 +487,7 @@ static int insert_inline_extent(struct btrfs_trans_handle *trans,
 	 */
 	if (compressed_folio) {
 		ASSERT(compressed_size <= sectorsize);
-		ASSERT(compressed_size <= PAGE_SIZE);
+		ASSERT(compressed_size <= PG_SIZE);
 	} else {
 		ASSERT(compressed_size == 0);
 	}
@@ -585,7 +585,7 @@ static bool can_cow_file_range_inline(struct btrfs_inode *inode,
 	 * And encoded write is doing exactly that.
 	 * So here limits the inlined extent size to PAGE_SIZE.
 	 */
-	if (size > PAGE_SIZE || compressed_size > PAGE_SIZE)
+	if (size > PG_SIZE || compressed_size > PG_SIZE)
 		return false;
 
 	/* Inline extents are limited to sectorsize. */
@@ -843,11 +843,11 @@ static inline void inode_should_defrag(struct btrfs_inode *inode,
 
 static int extent_range_clear_dirty_for_io(struct btrfs_inode *inode, u64 start, u64 end)
 {
-	const pgoff_t end_index = end >> PAGE_SHIFT;
+	const pgoff_t end_index = end >> PG_SHIFT;
 	struct folio *folio;
 	int ret = 0;
 
-	for (pgoff_t index = start >> PAGE_SHIFT; index <= end_index; index++) {
+	for (pgoff_t index = start >> PG_SHIFT; index <= end_index; index++) {
 		folio = filemap_get_folio(inode->vfs_inode.i_mapping, index);
 		if (IS_ERR(folio)) {
 			if (!ret)
@@ -1676,8 +1676,8 @@ static noinline void submit_compressed_extents(struct btrfs_work *work, bool do_
 		return;
 	}
 
-	nr_pages = (async_chunk->end - async_chunk->start + PAGE_SIZE) >>
-		PAGE_SHIFT;
+	nr_pages = (async_chunk->end - async_chunk->start + PG_SIZE) >>
+		PG_SHIFT;
 
 	while (!list_empty(&async_chunk->extents)) {
 		async_extent = list_first_entry(&async_chunk->extents,
@@ -1771,7 +1771,7 @@ static bool run_delalloc_compressed(struct btrfs_inode *inode,
 		btrfs_init_work(&async_chunk[i].work, compress_file_range,
 				submit_compressed_extents);
 
-		nr_pages = DIV_ROUND_UP(cur_end - start, PAGE_SIZE);
+		nr_pages = DIV_ROUND_UP(cur_end - start, PG_SIZE);
 		atomic_add(nr_pages, &fs_info->async_delalloc_pages);
 
 		btrfs_queue_work(fs_info->delalloc_workers, &async_chunk[i].work);
@@ -2818,7 +2818,7 @@ int btrfs_set_extent_delalloc(struct btrfs_inode *inode, u64 start, u64 end,
 			      unsigned int extra_bits,
 			      struct extent_state **cached_state)
 {
-	WARN_ON(PAGE_ALIGNED(end));
+	WARN_ON(PG_ALIGNED(end));
 
 	if (start >= i_size_read(&inode->vfs_inode) &&
 	    !(inode->flags & BTRFS_INODE_PREALLOC)) {
@@ -2919,7 +2919,7 @@ again:
 	if (folio_test_ordered(folio))
 		goto out_reserved;
 
-	ordered = btrfs_lookup_ordered_range(inode, page_start, PAGE_SIZE);
+	ordered = btrfs_lookup_ordered_range(inode, page_start, PG_SIZE);
 	if (ordered) {
 		btrfs_unlock_extent(&inode->io_tree, page_start, page_end,
 				    &cached_state);
@@ -2944,10 +2944,10 @@ again:
 	BUG_ON(!folio_test_dirty(folio));
 	free_delalloc_space = false;
 out_reserved:
-	btrfs_delalloc_release_extents(inode, PAGE_SIZE);
+	btrfs_delalloc_release_extents(inode, PG_SIZE);
 	if (free_delalloc_space)
 		btrfs_delalloc_release_space(inode, data_reserved, page_start,
-					     PAGE_SIZE, true);
+					     PG_SIZE, true);
 	btrfs_unlock_extent(&inode->io_tree, page_start, page_end, &cached_state);
 out_page:
 	if (ret) {
@@ -2960,7 +2960,7 @@ out_page:
 					       folio_size(folio), !ret);
 		folio_clear_dirty_for_io(folio);
 	}
-	btrfs_folio_clear_checked(fs_info, folio, page_start, PAGE_SIZE);
+	btrfs_folio_clear_checked(fs_info, folio, page_start, PG_SIZE);
 	folio_unlock(folio);
 	folio_put(folio);
 	kfree(fixup);
@@ -3457,15 +3457,15 @@ void btrfs_calculate_block_csum_folio(struct btrfs_fs_info *fs_info,
 {
 	struct folio *folio = page_folio(phys_to_page(paddr));
 	const u32 blocksize = fs_info->sectorsize;
-	const u32 step = min(blocksize, PAGE_SIZE);
+	const u32 step = min(blocksize, PG_SIZE);
 	const u32 nr_steps = blocksize / step;
-	phys_addr_t paddrs[BTRFS_MAX_BLOCKSIZE / PAGE_SIZE];
+	phys_addr_t paddrs[BTRFS_MAX_BLOCKSIZE / PG_SIZE];
 
 	/* The full block must be inside the folio. */
 	ASSERT(offset_in_folio(folio, paddr) + blocksize <= folio_size(folio));
 
 	for (int i = 0; i < nr_steps; i++) {
-		u32 pindex = offset_in_folio(folio, paddr + i * step) >> PAGE_SHIFT;
+		u32 pindex = offset_in_folio(folio, paddr + i * step) >> PG_SHIFT;
 
 		/*
 		 * For bs <= ps cases, we will only run the loop once, so the offset
@@ -3474,7 +3474,7 @@ void btrfs_calculate_block_csum_folio(struct btrfs_fs_info *fs_info,
 		 * For bs > ps cases, the block must be page aligned, thus offset
 		 * inside the page will always be 0.
 		 */
-		paddrs[i] = page_to_phys(folio_page(folio, pindex)) + offset_in_page(paddr);
+		paddrs[i] = page_to_phys(folio_page(folio, pindex)) + offset_in_pg(paddr);
 	}
 	return btrfs_calculate_block_csum_pages(fs_info, paddrs, dest);
 }
@@ -3489,7 +3489,7 @@ void btrfs_calculate_block_csum_pages(struct btrfs_fs_info *fs_info,
 				      const phys_addr_t paddrs[], u8 *dest)
 {
 	const u32 blocksize = fs_info->sectorsize;
-	const u32 step = min(blocksize, PAGE_SIZE);
+	const u32 step = min(blocksize, PG_SIZE);
 	const u32 nr_steps = blocksize / step;
 	struct btrfs_csum_ctx csum;
 
@@ -3498,8 +3498,8 @@ void btrfs_calculate_block_csum_pages(struct btrfs_fs_info *fs_info,
 		const phys_addr_t paddr = paddrs[i];
 		void *kaddr;
 
-		ASSERT(offset_in_page(paddr) + step <= PAGE_SIZE);
-		kaddr = kmap_local_page(phys_to_page(paddr)) + offset_in_page(paddr);
+		ASSERT(offset_in_pg(paddr) + step <= PG_SIZE);
+		kaddr = kmap_local_page(phys_to_page(paddr)) + offset_in_pg(paddr);
 		btrfs_csum_update(&csum, kaddr, step);
 		kunmap_local(kaddr);
 	}
@@ -3541,7 +3541,7 @@ bool btrfs_data_csum_ok(struct btrfs_bio *bbio, struct btrfs_device *dev,
 	struct btrfs_inode *inode = bbio->inode;
 	struct btrfs_fs_info *fs_info = inode->root->fs_info;
 	const u32 blocksize = fs_info->sectorsize;
-	const u32 step = min(blocksize, PAGE_SIZE);
+	const u32 step = min(blocksize, PG_SIZE);
 	const u32 nr_steps = blocksize / step;
 	u64 file_offset = bbio->file_offset + bio_offset;
 	u64 end = file_offset + blocksize - 1;
@@ -3573,7 +3573,8 @@ zeroit:
 	if (dev)
 		btrfs_dev_stat_inc_and_print(dev, BTRFS_DEV_STAT_CORRUPTION_ERRS);
 	for (int i = 0; i < nr_steps; i++)
-		memzero_page(phys_to_page(paddrs[i]), offset_in_page(paddrs[i]), step);
+		memzero_page(phys_to_page(paddrs[i]), offset_in_pg(paddrs[i]),
+			     step);
 	return false;
 }
 
@@ -4986,7 +4987,7 @@ static bool is_inside_block(u64 bytenr, u64 blockstart, u32 blocksize)
 
 static int truncate_block_zero_beyond_eof(struct btrfs_inode *inode, u64 start)
 {
-	const pgoff_t index = (start >> PAGE_SHIFT);
+	const pgoff_t index = (start >> PG_SHIFT);
 	struct address_space *mapping = inode->vfs_inode.i_mapping;
 	struct folio *folio;
 	u64 zero_start;
@@ -5057,7 +5058,7 @@ int btrfs_truncate_block(struct btrfs_inode *inode, u64 offset, u64 start, u64 e
 	struct extent_changeset *data_reserved = NULL;
 	bool only_release_metadata = false;
 	u32 blocksize = fs_info->sectorsize;
-	pgoff_t index = (offset >> PAGE_SHIFT);
+	pgoff_t index = (offset >> PG_SHIFT);
 	struct folio *folio;
 	gfp_t mask = btrfs_alloc_write_mask(mapping);
 	int ret = 0;
@@ -5082,7 +5083,7 @@ int btrfs_truncate_block(struct btrfs_inode *inode, u64 offset, u64 start, u64 e
 		 * For block size < page size case, we may have polluted blocks
 		 * beyond EOF. So we also need to zero them out.
 		 */
-		if (end == (u64)-1 && blocksize < PAGE_SIZE)
+		if (end == (u64)-1 && blocksize < PG_SIZE)
 			ret = truncate_block_zero_beyond_eof(inode, start);
 		goto out;
 	}
@@ -6254,7 +6255,7 @@ static int btrfs_opendir(struct inode *inode, struct file *file)
 	if (!private)
 		return -ENOMEM;
 	private->last_index = last_index;
-	private->filldir_buf = kzalloc(PAGE_SIZE, GFP_KERNEL);
+	private->filldir_buf = kzalloc(PG_SIZE, GFP_KERNEL);
 	if (!private->filldir_buf) {
 		kfree(private);
 		return -ENOMEM;
@@ -6357,7 +6358,7 @@ again:
 		di = btrfs_item_ptr(leaf, path->slots[0], struct btrfs_dir_item);
 		name_len = btrfs_dir_name_len(leaf, di);
 		if ((total_len + sizeof(struct dir_entry) + name_len) >=
-		    PAGE_SIZE) {
+		    PG_SIZE) {
 			btrfs_release_path(path);
 			ret = btrfs_filldir(private->filldir_buf, entries, ctx);
 			if (ret)
@@ -9604,7 +9605,7 @@ int btrfs_encoded_read_regular_fill_pages(struct btrfs_inode *inode,
 	bbio->bio.bi_iter.bi_sector = disk_bytenr >> SECTOR_SHIFT;
 
 	do {
-		size_t bytes = min_t(u64, disk_io_size, PAGE_SIZE);
+		size_t bytes = min_t(u64, disk_io_size, PG_SIZE);
 
 		if (bio_add_page(&bbio->bio, pages[i], bytes, 0) < bytes) {
 			refcount_inc(&priv->pending_refs);
@@ -9655,7 +9656,7 @@ ssize_t btrfs_encoded_read_regular(struct kiocb *iocb, struct iov_iter *iter,
 	size_t page_offset;
 	ssize_t ret;
 
-	nr_pages = DIV_ROUND_UP(disk_io_size, PAGE_SIZE);
+	nr_pages = DIV_ROUND_UP(disk_io_size, PG_SIZE);
 	pages = kzalloc_objs(struct page *, nr_pages, GFP_NOFS);
 	if (!pages)
 		return -ENOMEM;
@@ -9678,13 +9679,13 @@ ssize_t btrfs_encoded_read_regular(struct kiocb *iocb, struct iov_iter *iter,
 		i = 0;
 		page_offset = 0;
 	} else {
-		i = (iocb->ki_pos - start) >> PAGE_SHIFT;
-		page_offset = (iocb->ki_pos - start) & (PAGE_SIZE - 1);
+		i = (iocb->ki_pos - start) >> PG_SHIFT;
+		page_offset = (iocb->ki_pos - start) & (PG_SIZE - 1);
 	}
 	cur = 0;
 	while (cur < count) {
 		size_t bytes = min_t(size_t, count - cur,
-				     PAGE_SIZE - page_offset);
+				     PG_SIZE - page_offset);
 
 		if (copy_page_to_iter(pages[i], page_offset, bytes,
 				      iter) != bytes) {
@@ -10015,8 +10016,8 @@ ssize_t btrfs_do_encoded_write(struct kiocb *iocb, struct iov_iter *from,
 		if (ret)
 			goto out_cb;
 		ret = invalidate_inode_pages2_range(inode->vfs_inode.i_mapping,
-						    start >> PAGE_SHIFT,
-						    end >> PAGE_SHIFT);
+						    start >> PG_SHIFT,
+						    end >> PG_SHIFT);
 		if (ret)
 			goto out_cb;
 		btrfs_lock_extent(io_tree, start, end, &cached_state);
@@ -10227,8 +10228,8 @@ static int btrfs_add_swap_extent(struct swap_info_struct *sis,
 		return 0;
 
 	max_pages = sis->max - bsi->nr_pages;
-	first_ppage = PAGE_ALIGN(bsi->block_start) >> PAGE_SHIFT;
-	next_ppage = PAGE_ALIGN_DOWN(bsi->block_start + bsi->block_len) >> PAGE_SHIFT;
+	first_ppage = PG_ALIGN(bsi->block_start) >> PG_SHIFT;
+	next_ppage = PG_ALIGN_DOWN(bsi->block_start + bsi->block_len) >> PG_SHIFT;
 
 	if (first_ppage >= next_ppage)
 		return 0;

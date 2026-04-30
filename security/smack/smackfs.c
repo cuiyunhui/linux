@@ -468,8 +468,8 @@ static ssize_t smk_write_rules_list(struct file *file, const char __user *buf,
 		if (count < SMK_OLOADLEN || count > SMK_LOADLEN)
 			return -EINVAL;
 	} else {
-		if (count >= PAGE_SIZE) {
-			count = PAGE_SIZE - 1;
+		if (count >= PG_SIZE) {
+			count = PG_SIZE - 1;
 			trunc = 1;
 		}
 	}
@@ -857,7 +857,7 @@ static ssize_t smk_set_cipso(struct file *file, const char __user *buf,
 	if (format == SMK_FIXED24_FMT &&
 	    (count < SMK_CIPSOMIN || count > SMK_CIPSOMAX))
 		return -EINVAL;
-	if (count > PAGE_SIZE)
+	if (count > PG_SIZE)
 		return -EINVAL;
 
 	data = memdup_user_nul(buf, count);
@@ -1176,7 +1176,7 @@ static ssize_t smk_write_net4addr(struct file *file, const char __user *buf,
 		return -EPERM;
 	if (*ppos != 0)
 		return -EINVAL;
-	if (count < SMK_NETLBLADDRMIN || count > PAGE_SIZE - 1)
+	if (count < SMK_NETLBLADDRMIN || count > PG_SIZE - 1)
 		return -EINVAL;
 
 	data = memdup_user_nul(buf, count);
@@ -1434,7 +1434,7 @@ static ssize_t smk_write_net6addr(struct file *file, const char __user *buf,
 		return -EPERM;
 	if (*ppos != 0)
 		return -EINVAL;
-	if (count < SMK_NETLBLADDRMIN || count > PAGE_SIZE - 1)
+	if (count < SMK_NETLBLADDRMIN || count > PG_SIZE - 1)
 		return -EINVAL;
 
 	data = memdup_user_nul(buf, count);
@@ -1841,7 +1841,7 @@ static ssize_t smk_write_ambient(struct file *file, const char __user *buf,
 		return -EPERM;
 
 	/* Enough data must be present */
-	if (count == 0 || count > PAGE_SIZE)
+	if (count == 0 || count > PG_SIZE)
 		return -EINVAL;
 
 	data = memdup_user_nul(buf, count);
@@ -2015,7 +2015,7 @@ static ssize_t smk_write_onlycap(struct file *file, const char __user *buf,
 	if (!smack_privileged(CAP_MAC_ADMIN))
 		return -EPERM;
 
-	if (count > PAGE_SIZE)
+	if (count > PG_SIZE)
 		return -EINVAL;
 
 	data = memdup_user_nul(buf, count);
@@ -2105,7 +2105,7 @@ static ssize_t smk_write_unconfined(struct file *file, const char __user *buf,
 	if (!smack_privileged(CAP_MAC_ADMIN))
 		return -EPERM;
 
-	if (count > PAGE_SIZE)
+	if (count > PG_SIZE)
 		return -EINVAL;
 
 	data = memdup_user_nul(buf, count);
@@ -2667,7 +2667,7 @@ static ssize_t smk_write_syslog(struct file *file, const char __user *buf,
 		return -EPERM;
 
 	/* Enough data must be present */
-	if (count == 0 || count > PAGE_SIZE)
+	if (count == 0 || count > PG_SIZE)
 		return -EINVAL;
 
 	data = memdup_user_nul(buf, count);
@@ -2767,7 +2767,7 @@ static ssize_t smk_write_relabel_self(struct file *file, const char __user *buf,
 	 */
 	if (*ppos != 0)
 		return -EINVAL;
-	if (count == 0 || count > PAGE_SIZE)
+	if (count == 0 || count > PG_SIZE)
 		return -EINVAL;
 
 	data = memdup_user_nul(buf, count);

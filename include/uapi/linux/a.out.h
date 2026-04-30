@@ -110,7 +110,7 @@ enum machine_type {
 
 /* Address of text segment in memory after it is loaded.  */
 #if !defined (N_TXTADDR)
-#define N_TXTADDR(x) (N_MAGIC(x) == QMAGIC ? PAGE_SIZE : 0)
+#define N_TXTADDR(x) (N_MAGIC(x) == QMAGIC ? PG_SIZE : 0)
 #endif
 
 /* Address of data segment in memory after it is loaded. */

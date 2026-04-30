@@ -288,9 +288,9 @@ cifs_read_super(struct super_block *sb)
 		cifs_sb->ctx->rsize =
 			tcon->ses->server->ops->negotiate_rsize(tcon, cifs_sb->ctx);
 	if (cifs_sb->ctx->rasize)
-		sb->s_bdi->ra_pages = cifs_sb->ctx->rasize / PAGE_SIZE;
+		sb->s_bdi->ra_pages = cifs_sb->ctx->rasize / PG_SIZE;
 	else
-		sb->s_bdi->ra_pages = 2 * (cifs_sb->ctx->rsize / PAGE_SIZE);
+		sb->s_bdi->ra_pages = 2 * (cifs_sb->ctx->rsize / PG_SIZE);
 
 	sb->s_blocksize = CIFS_MAX_MSGSIZE;
 	sb->s_blocksize_bits = 14;	/* default 2**14 = CIFS_MAX_MSGSIZE */
@@ -1303,7 +1303,7 @@ static int cifs_flush_folio(struct inode *inode, loff_t pos, loff_t *_fstart, lo
 {
 	struct folio *folio;
 	unsigned long long fpos, fend;
-	pgoff_t index = pos / PAGE_SIZE;
+	pgoff_t index = pos / PG_SIZE;
 	size_t size;
 	int rc = 0;
 

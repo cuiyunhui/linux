@@ -5,7 +5,7 @@
 struct z_erofs_deflate {
 	struct z_erofs_deflate *next;
 	struct z_stream_s z;
-	u8 bounce[PAGE_SIZE];
+	u8 bounce[PG_SIZE];
 };
 
 static DEFINE_SPINLOCK(z_erofs_deflate_lock);
@@ -134,7 +134,7 @@ again:
 	}
 
 	rq->fillgaps = true;	/* DEFLATE doesn't support NULL output buffer */
-	strm->z.avail_in = min(rq->inputsize, PAGE_SIZE - rq->pageofs_in);
+	strm->z.avail_in = min(rq->inputsize, PG_SIZE - rq->pageofs_in);
 	rq->inputsize -= strm->z.avail_in;
 	strm->z.next_in = dctx.kin + rq->pageofs_in;
 	strm->z.avail_out = 0;

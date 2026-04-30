@@ -377,7 +377,7 @@ static int virtio_transport_send_pkt_info(struct vsock_sock *vsk,
 
 		if (can_zcopy)
 			max_skb_len = min_t(u32, VIRTIO_VSOCK_MAX_PKT_BUF_SIZE,
-					    (MAX_SKB_FRAGS * PAGE_SIZE));
+					    (MAX_SKB_FRAGS * PG_SIZE));
 	}
 
 	rest_len = pkt_len;

@@ -76,9 +76,9 @@ ext2_last_byte(struct inode *inode, unsigned long page_nr)
 {
 	unsigned last_byte = inode->i_size;
 
-	last_byte -= page_nr << PAGE_SHIFT;
-	if (last_byte > PAGE_SIZE)
-		last_byte = PAGE_SIZE;
+	last_byte -= page_nr << PG_SHIFT;
+	if (last_byte > PG_SIZE)
+		last_byte = PG_SIZE;
 	return last_byte;
 }
 
@@ -243,7 +243,7 @@ ext2_validate_entry(char *base, unsigned offset, unsigned mask)
 			break;
 		p = ext2_next_entry(p);
 	}
-	return offset_in_page(p);
+	return offset_in_pg(p);
 }
 
 static inline void ext2_set_de_type(ext2_dirent *de, struct inode *inode)
@@ -260,8 +260,8 @@ ext2_readdir(struct file *file, struct dir_context *ctx)
 	loff_t pos = ctx->pos;
 	struct inode *inode = file_inode(file);
 	struct super_block *sb = inode->i_sb;
-	unsigned int offset = pos & ~PAGE_MASK;
-	unsigned long n = pos >> PAGE_SHIFT;
+	unsigned int offset = pos & ~PG_MASK;
+	unsigned long n = pos >> PG_SHIFT;
 	unsigned long npages = dir_pages(inode);
 	unsigned chunk_mask = ~(ext2_chunk_size(inode)-1);
 	bool need_revalidate = !inode_eq_iversion(inode, *(u64 *)file->private_data);
@@ -283,13 +283,13 @@ ext2_readdir(struct file *file, struct dir_context *ctx)
 			ext2_error(sb, __func__,
 				   "bad page in #%lu",
 				   inode->i_ino);
-			ctx->pos += PAGE_SIZE - offset;
+			ctx->pos += PG_SIZE - offset;
 			return PTR_ERR(kaddr);
 		}
 		if (unlikely(need_revalidate)) {
 			if (offset) {
 				offset = ext2_validate_entry(kaddr, offset, chunk_mask);
-				ctx->pos = (n<<PAGE_SHIFT) + offset;
+				ctx->pos = (n<<PG_SHIFT) + offset;
 			}
 			*(u64 *)file->private_data = inode_query_iversion(inode);
 			need_revalidate = false;
@@ -381,7 +381,7 @@ struct ext2_dir_entry_2 *ext2_find_entry (struct inode *dir,
 		if (++n >= npages)
 			n = 0;
 		/* next folio is past the blocks we've got */
-		if (unlikely(n > (dir->i_blocks >> (PAGE_SHIFT - 9)))) {
+		if (unlikely(n > (dir->i_blocks >> (PG_SHIFT - 9)))) {
 			ext2_error(dir->i_sb, __func__,
 				"dir %lu size %lld exceeds block count %llu",
 				dir->i_ino, dir->i_size,

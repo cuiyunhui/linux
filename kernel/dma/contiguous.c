@@ -153,7 +153,7 @@ static phys_addr_t __init __maybe_unused cma_early_percent_memory(void)
 {
 	unsigned long total_pages = PHYS_PFN(memblock_phys_mem_size());
 
-	return (total_pages * CONFIG_CMA_SIZE_PERCENTAGE / 100) << PAGE_SHIFT;
+	return (total_pages * CONFIG_CMA_SIZE_PERCENTAGE / 100) << PG_SHIFT;
 }
 
 #else
@@ -351,7 +351,7 @@ static struct page *cma_alloc_aligned(struct cma *cma, size_t size, gfp_t gfp)
 {
 	unsigned int align = min(get_order(size), CONFIG_CMA_ALIGNMENT);
 
-	return cma_alloc(cma, size >> PAGE_SHIFT, align, gfp & __GFP_NOWARN);
+	return cma_alloc(cma, size >> PG_SHIFT, align, gfp & __GFP_NOWARN);
 }
 
 /**
@@ -380,7 +380,7 @@ struct page *dma_alloc_contiguous(struct device *dev, size_t size, gfp_t gfp)
 		return NULL;
 	if (dev->cma_area)
 		return cma_alloc_aligned(dev->cma_area, size, gfp);
-	if (size <= PAGE_SIZE)
+	if (size <= PG_SIZE)
 		return NULL;
 
 #ifdef CONFIG_DMA_NUMA_CMA
@@ -421,7 +421,7 @@ struct page *dma_alloc_contiguous(struct device *dev, size_t size, gfp_t gfp)
  */
 void dma_free_contiguous(struct device *dev, struct page *page, size_t size)
 {
-	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+	unsigned int count = PG_ALIGN(size) >> PG_SHIFT;
 
 	/* if dev has its own cma, free page from there */
 	if (dev->cma_area) {

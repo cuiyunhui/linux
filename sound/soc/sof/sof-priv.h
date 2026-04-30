@@ -71,7 +71,7 @@ bool sof_debug_check_flag(int mask);
 #define SND_SOF_SUSPEND_DELAY_MS	2000
 
 /* DMA buffer size for trace */
-#define DMA_BUF_SIZE_FOR_TRACE (PAGE_SIZE * 16)
+#define DMA_BUF_SIZE_FOR_TRACE (PG_SIZE * 16)
 
 #define SOF_IPC_DSP_REPLY		0
 #define SOF_IPC_HOST_REPLY		1

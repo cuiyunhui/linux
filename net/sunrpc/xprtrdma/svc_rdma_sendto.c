@@ -612,7 +612,7 @@ static int svc_rdma_iov_dma_map(void *data, const struct kvec *iov)
 	if (!iov->iov_len)
 		return 0;
 	return svc_rdma_page_dma_map(data, virt_to_page(iov->iov_base),
-				     offset_in_page(iov->iov_base),
+				     offset_in_pg(iov->iov_base),
 				     iov->iov_len);
 }
 
@@ -639,11 +639,11 @@ static int svc_rdma_xb_dma_map(const struct xdr_buf *xdr, void *data)
 	if (ret < 0)
 		return ret;
 
-	ppages = xdr->pages + (xdr->page_base >> PAGE_SHIFT);
-	pageoff = offset_in_page(xdr->page_base);
+	ppages = xdr->pages + (xdr->page_base >> PG_SHIFT);
+	pageoff = offset_in_pg(xdr->page_base);
 	remaining = xdr->page_len;
 	while (remaining) {
-		len = min_t(u32, PAGE_SIZE - pageoff, remaining);
+		len = min_t(u32, PG_SIZE - pageoff, remaining);
 
 		ret = svc_rdma_page_dma_map(data, *ppages++, pageoff, len);
 		if (ret < 0)
@@ -684,11 +684,11 @@ static int svc_rdma_xb_count_sges(const struct xdr_buf *xdr,
 	if (xdr->head[0].iov_len)
 		++args->pd_num_sges;
 
-	offset = offset_in_page(xdr->page_base);
+	offset = offset_in_pg(xdr->page_base);
 	remaining = xdr->page_len;
 	while (remaining) {
 		++args->pd_num_sges;
-		remaining -= min_t(u32, PAGE_SIZE - offset, remaining);
+		remaining -= min_t(u32, PG_SIZE - offset, remaining);
 		offset = 0;
 	}
 
@@ -753,11 +753,11 @@ static int svc_rdma_xb_linearize(const struct xdr_buf *xdr,
 		args->pd_dest += xdr->head[0].iov_len;
 	}
 
-	ppages = xdr->pages + (xdr->page_base >> PAGE_SHIFT);
-	pageoff = offset_in_page(xdr->page_base);
+	ppages = xdr->pages + (xdr->page_base >> PG_SHIFT);
+	pageoff = offset_in_pg(xdr->page_base);
 	remaining = xdr->page_len;
 	while (remaining) {
-		len = min_t(u32, PAGE_SIZE - pageoff, remaining);
+		len = min_t(u32, PG_SIZE - pageoff, remaining);
 		memcpy(args->pd_dest, page_address(*ppages) + pageoff, len);
 		remaining -= len;
 		args->pd_dest += len;

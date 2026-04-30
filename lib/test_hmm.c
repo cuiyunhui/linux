@@ -175,7 +175,7 @@ static int dmirror_fops_open(struct inode *inode, struct file *filp)
 	xa_init(&dmirror->pt);
 
 	ret = mmu_interval_notifier_insert(&dmirror->notifier, current->mm,
-				0, ULONG_MAX & PAGE_MASK, &dmirror_min_ops);
+				0, ULONG_MAX & PG_MASK, &dmirror_min_ops);
 	if (ret) {
 		kfree(dmirror);
 		return ret;
@@ -212,8 +212,8 @@ static int dmirror_do_fault(struct dmirror *dmirror, struct hmm_range *range)
 	unsigned long *pfns = range->hmm_pfns;
 	unsigned long pfn;
 
-	for (pfn = (range->start >> PAGE_SHIFT);
-	     pfn < (range->end >> PAGE_SHIFT);
+	for (pfn = (range->start >> PG_SHIFT);
+	     pfn < (range->end >> PG_SHIFT);
 	     pfn++, pfns++) {
 		struct page *page;
 		void *entry;
@@ -252,8 +252,8 @@ static void dmirror_do_update(struct dmirror *dmirror, unsigned long start,
 	 * the mmu notifier to clear page pointers when they become stale.
 	 * Therefore, it is OK to just clear the entry.
 	 */
-	xa_for_each_range(&dmirror->pt, pfn, entry, start >> PAGE_SHIFT,
-			  end >> PAGE_SHIFT)
+	xa_for_each_range(&dmirror->pt, pfn, entry, start >> PG_SHIFT,
+			  end >> PG_SHIFT)
 		xa_erase(&dmirror->pt, pfn);
 }
 
@@ -349,7 +349,7 @@ static int dmirror_fault(struct dmirror *dmirror, unsigned long start,
 
 	for (addr = start; addr < end; addr = range.end) {
 		range.start = addr;
-		range.end = min(addr + (ARRAY_SIZE(pfns) << PAGE_SHIFT), end);
+		range.end = min(addr + (ARRAY_SIZE(pfns) << PG_SHIFT), end);
 
 		ret = dmirror_range_fault(dmirror, &range);
 		if (ret)
@@ -366,9 +366,9 @@ static int dmirror_do_read(struct dmirror *dmirror, unsigned long start,
 	unsigned long pfn;
 	void *ptr;
 
-	ptr = bounce->ptr + ((start - bounce->addr) & PAGE_MASK);
+	ptr = bounce->ptr + ((start - bounce->addr) & PG_MASK);
 
-	for (pfn = start >> PAGE_SHIFT; pfn < (end >> PAGE_SHIFT); pfn++) {
+	for (pfn = start >> PG_SHIFT; pfn < (end >> PG_SHIFT); pfn++) {
 		void *entry;
 		struct page *page;
 
@@ -377,9 +377,9 @@ static int dmirror_do_read(struct dmirror *dmirror, unsigned long start,
 		if (!page)
 			return -ENOENT;
 
-		memcpy_from_page(ptr, page, 0, PAGE_SIZE);
+		memcpy_from_page(ptr, page, 0, PG_SIZE);
 
-		ptr += PAGE_SIZE;
+		ptr += PG_SIZE;
 		bounce->cpages++;
 	}
 
@@ -390,7 +390,7 @@ static int dmirror_read(struct dmirror *dmirror, struct hmm_dmirror_cmd *cmd)
 {
 	struct dmirror_bounce bounce;
 	unsigned long start, end;
-	unsigned long size = cmd->npages << PAGE_SHIFT;
+	unsigned long size = cmd->npages << PG_SHIFT;
 	int ret;
 
 	start = cmd->addr;
@@ -409,7 +409,7 @@ static int dmirror_read(struct dmirror *dmirror, struct hmm_dmirror_cmd *cmd)
 		if (ret != -ENOENT)
 			break;
 
-		start = cmd->addr + (bounce.cpages << PAGE_SHIFT);
+		start = cmd->addr + (bounce.cpages << PG_SHIFT);
 		ret = dmirror_fault(dmirror, start, end, false);
 		if (ret)
 			break;
@@ -432,9 +432,9 @@ static int dmirror_do_write(struct dmirror *dmirror, unsigned long start,
 	unsigned long pfn;
 	void *ptr;
 
-	ptr = bounce->ptr + ((start - bounce->addr) & PAGE_MASK);
+	ptr = bounce->ptr + ((start - bounce->addr) & PG_MASK);
 
-	for (pfn = start >> PAGE_SHIFT; pfn < (end >> PAGE_SHIFT); pfn++) {
+	for (pfn = start >> PG_SHIFT; pfn < (end >> PG_SHIFT); pfn++) {
 		void *entry;
 		struct page *page;
 
@@ -443,9 +443,9 @@ static int dmirror_do_write(struct dmirror *dmirror, unsigned long start,
 		if (!page || xa_pointer_tag(entry) != DPT_XA_TAG_WRITE)
 			return -ENOENT;
 
-		memcpy_to_page(page, 0, ptr, PAGE_SIZE);
+		memcpy_to_page(page, 0, ptr, PG_SIZE);
 
-		ptr += PAGE_SIZE;
+		ptr += PG_SIZE;
 		bounce->cpages++;
 	}
 
@@ -456,7 +456,7 @@ static int dmirror_write(struct dmirror *dmirror, struct hmm_dmirror_cmd *cmd)
 {
 	struct dmirror_bounce bounce;
 	unsigned long start, end;
-	unsigned long size = cmd->npages << PAGE_SHIFT;
+	unsigned long size = cmd->npages << PG_SHIFT;
 	int ret;
 
 	start = cmd->addr;
@@ -480,7 +480,7 @@ static int dmirror_write(struct dmirror *dmirror, struct hmm_dmirror_cmd *cmd)
 		if (ret != -ENOENT)
 			break;
 
-		start = cmd->addr + (bounce.cpages << PAGE_SHIFT);
+		start = cmd->addr + (bounce.cpages << PG_SHIFT);
 		ret = dmirror_fault(dmirror, start, end, true);
 		if (ret)
 			break;
@@ -561,8 +561,8 @@ static int dmirror_allocate_chunk(struct dmirror_device *mdevice,
 	}
 
 	devmem->mdevice = mdevice;
-	pfn_first = devmem->pagemap.range.start >> PAGE_SHIFT;
-	pfn_last = pfn_first + (range_len(&devmem->pagemap.range) >> PAGE_SHIFT);
+	pfn_first = devmem->pagemap.range.start >> PG_SHIFT;
+	pfn_last = pfn_first + (range_len(&devmem->pagemap.range) >> PG_SHIFT);
 	mdevice->devmem_chunks[mdevice->devmem_count++] = devmem;
 
 	mutex_unlock(&mdevice->devmem_lock);
@@ -738,7 +738,7 @@ static void dmirror_migrate_alloc_and_copy(struct migrate_vma *args,
 					clear_highpage(rpage);
 				src++;
 				dst++;
-				addr += PAGE_SIZE;
+				addr += PG_SIZE;
 			}
 			continue;
 		}
@@ -776,7 +776,7 @@ static void dmirror_migrate_alloc_and_copy(struct migrate_vma *args,
 						clear_highpage(dst_page);
 					src++;
 					dst++;
-					addr += PAGE_SIZE;
+					addr += PG_SIZE;
 				}
 				continue;
 			}
@@ -790,7 +790,7 @@ static void dmirror_migrate_alloc_and_copy(struct migrate_vma *args,
 next:
 		src++;
 		dst++;
-		addr += PAGE_SIZE;
+		addr += PG_SIZE;
 	}
 }
 
@@ -799,7 +799,7 @@ static int dmirror_check_atomic(struct dmirror *dmirror, unsigned long start,
 {
 	unsigned long pfn;
 
-	for (pfn = start >> PAGE_SHIFT; pfn < (end >> PAGE_SHIFT); pfn++) {
+	for (pfn = start >> PG_SHIFT; pfn < (end >> PG_SHIFT); pfn++) {
 		void *entry;
 
 		entry = xa_load(&dmirror->pt, pfn);
@@ -819,7 +819,7 @@ static int dmirror_atomic_map(unsigned long addr, struct page *page,
 	mutex_lock(&dmirror->mutex);
 
 	entry = xa_tag_pointer(page, DPT_XA_TAG_ATOMIC);
-	entry = xa_store(&dmirror->pt, addr >> PAGE_SHIFT, entry, GFP_ATOMIC);
+	entry = xa_store(&dmirror->pt, addr >> PG_SHIFT, entry, GFP_ATOMIC);
 	if (xa_is_err(entry)) {
 		mutex_unlock(&dmirror->mutex);
 		return xa_err(entry);
@@ -837,8 +837,8 @@ static int dmirror_migrate_finalize_and_map(struct migrate_vma *args,
 	const unsigned long *src = args->src;
 	const unsigned long *dst = args->dst;
 	unsigned long pfn;
-	const unsigned long start_pfn = start >> PAGE_SHIFT;
-	const unsigned long end_pfn = end >> PAGE_SHIFT;
+	const unsigned long start_pfn = start >> PG_SHIFT;
+	const unsigned long end_pfn = end >> PG_SHIFT;
 
 	/* Map the migrated pages into the device's page tables. */
 	mutex_lock(&dmirror->mutex);
@@ -886,7 +886,7 @@ static int dmirror_exclusive(struct dmirror *dmirror,
 			     struct hmm_dmirror_cmd *cmd)
 {
 	unsigned long start, end, addr;
-	unsigned long size = cmd->npages << PAGE_SHIFT;
+	unsigned long size = cmd->npages << PG_SHIFT;
 	struct mm_struct *mm = dmirror->notifier.mm;
 	struct dmirror_bounce bounce;
 	int ret = 0;
@@ -901,7 +901,7 @@ static int dmirror_exclusive(struct dmirror *dmirror,
 		return -EINVAL;
 
 	mmap_read_lock(mm);
-	for (addr = start; !ret && addr < end; addr += PAGE_SIZE) {
+	for (addr = start; !ret && addr < end; addr += PG_SIZE) {
 		struct folio *folio;
 		struct page *page;
 
@@ -955,13 +955,13 @@ static vm_fault_t dmirror_devmem_fault_alloc_and_copy(struct migrate_vma *args,
 
 		spage = migrate_pfn_to_page(*src);
 		if (!spage || !(*src & MIGRATE_PFN_MIGRATE)) {
-			addr += PAGE_SIZE;
+			addr += PG_SIZE;
 			goto next;
 		}
 
 		if (WARN_ON(!is_device_private_page(spage) &&
 			    !is_device_coherent_page(spage))) {
-			addr += PAGE_SIZE;
+			addr += PG_SIZE;
 			goto next;
 		}
 
@@ -1011,8 +1011,8 @@ static vm_fault_t dmirror_devmem_fault_alloc_and_copy(struct migrate_vma *args,
 
 			src_page = pfn_to_page(page_to_pfn(spage) + i);
 
-			xa_erase(&dmirror->pt, addr >> PAGE_SHIFT);
-			addr += PAGE_SIZE;
+			xa_erase(&dmirror->pt, addr >> PG_SHIFT);
+			addr += PG_SIZE;
 			copy_highpage(dst_page, src_page);
 		}
 next:
@@ -1040,7 +1040,7 @@ static int dmirror_migrate_to_system(struct dmirror *dmirror,
 				     struct hmm_dmirror_cmd *cmd)
 {
 	unsigned long start, end, addr;
-	unsigned long size = cmd->npages << PAGE_SHIFT;
+	unsigned long size = cmd->npages << PG_SHIFT;
 	struct mm_struct *mm = dmirror->notifier.mm;
 	struct vm_area_struct *vma;
 	struct migrate_vma args = { 0 };
@@ -1069,7 +1069,7 @@ static int dmirror_migrate_to_system(struct dmirror *dmirror,
 			ret = -EINVAL;
 			goto out;
 		}
-		next = min(end, addr + (PTRS_PER_PTE << PAGE_SHIFT));
+		next = min(end, addr + (PTRS_PER_PTE << PG_SHIFT));
 		if (next > vma->vm_end)
 			next = vma->vm_end;
 
@@ -1105,7 +1105,7 @@ static int dmirror_migrate_to_device(struct dmirror *dmirror,
 				struct hmm_dmirror_cmd *cmd)
 {
 	unsigned long start, end, addr;
-	unsigned long size = cmd->npages << PAGE_SHIFT;
+	unsigned long size = cmd->npages << PG_SHIFT;
 	struct mm_struct *mm = dmirror->notifier.mm;
 	struct vm_area_struct *vma;
 	struct dmirror_bounce bounce;
@@ -1143,7 +1143,7 @@ static int dmirror_migrate_to_device(struct dmirror *dmirror,
 			ret = -EINVAL;
 			goto out;
 		}
-		next = min(end, addr + (PTRS_PER_PTE << PAGE_SHIFT));
+		next = min(end, addr + (PTRS_PER_PTE << PG_SHIFT));
 		if (next > vma->vm_end)
 			next = vma->vm_end;
 
@@ -1231,9 +1231,9 @@ static void dmirror_mkentry(struct dmirror *dmirror, struct hmm_range *range,
 		*perm |= HMM_DMIRROR_PROT_WRITE;
 	else
 		*perm |= HMM_DMIRROR_PROT_READ;
-	if (hmm_pfn_to_map_order(entry) + PAGE_SHIFT == PMD_SHIFT)
+	if (hmm_pfn_to_map_order(entry) + PG_SHIFT == PMD_SHIFT)
 		*perm |= HMM_DMIRROR_PROT_PMD;
-	else if (hmm_pfn_to_map_order(entry) + PAGE_SHIFT == PUD_SHIFT)
+	else if (hmm_pfn_to_map_order(entry) + PG_SHIFT == PUD_SHIFT)
 		*perm |= HMM_DMIRROR_PROT_PUD;
 }
 
@@ -1311,7 +1311,7 @@ static int dmirror_range_snapshot(struct dmirror *dmirror,
 		break;
 	}
 
-	n = (range->end - range->start) >> PAGE_SHIFT;
+	n = (range->end - range->start) >> PG_SHIFT;
 	for (i = 0; i < n; i++)
 		dmirror_mkentry(dmirror, range, perm + i, range->hmm_pfns[i]);
 
@@ -1326,7 +1326,7 @@ static int dmirror_snapshot(struct dmirror *dmirror,
 {
 	struct mm_struct *mm = dmirror->notifier.mm;
 	unsigned long start, end;
-	unsigned long size = cmd->npages << PAGE_SHIFT;
+	unsigned long size = cmd->npages << PG_SHIFT;
 	unsigned long addr;
 	unsigned long next;
 	unsigned long pfns[32];
@@ -1355,7 +1355,7 @@ static int dmirror_snapshot(struct dmirror *dmirror,
 	for (addr = start; addr < end; addr = next) {
 		unsigned long n;
 
-		next = min(addr + (ARRAY_SIZE(pfns) << PAGE_SHIFT), end);
+		next = min(addr + (ARRAY_SIZE(pfns) << PG_SHIFT), end);
 		range.start = addr;
 		range.end = next;
 
@@ -1363,7 +1363,7 @@ static int dmirror_snapshot(struct dmirror *dmirror,
 		if (ret)
 			break;
 
-		n = (range.end - range.start) >> PAGE_SHIFT;
+		n = (range.end - range.start) >> PG_SHIFT;
 		if (copy_to_user(uptr, perm, n)) {
 			ret = -EFAULT;
 			break;
@@ -1379,8 +1379,8 @@ static int dmirror_snapshot(struct dmirror *dmirror,
 
 static void dmirror_device_evict_chunk(struct dmirror_chunk *chunk)
 {
-	unsigned long start_pfn = chunk->pagemap.range.start >> PAGE_SHIFT;
-	unsigned long end_pfn = chunk->pagemap.range.end >> PAGE_SHIFT;
+	unsigned long start_pfn = chunk->pagemap.range.start >> PG_SHIFT;
+	unsigned long end_pfn = chunk->pagemap.range.end >> PG_SHIFT;
 	unsigned long npages = end_pfn - start_pfn + 1;
 	unsigned long i;
 	unsigned long *src_pfns;
@@ -1491,9 +1491,9 @@ static long dmirror_fops_unlocked_ioctl(struct file *filp,
 	if (copy_from_user(&cmd, uarg, sizeof(cmd)))
 		return -EFAULT;
 
-	if (cmd.addr & ~PAGE_MASK)
+	if (cmd.addr & ~PG_MASK)
 		return -EINVAL;
-	if (cmd.addr >= (cmd.addr + (cmd.npages << PAGE_SHIFT)))
+	if (cmd.addr >= (cmd.addr + (cmd.npages << PG_SHIFT)))
 		return -EINVAL;
 
 	cmd.cpages = 0;
@@ -1522,7 +1522,7 @@ static long dmirror_fops_unlocked_ioctl(struct file *filp,
 
 	case HMM_DMIRROR_CHECK_EXCLUSIVE:
 		ret = dmirror_check_atomic(dmirror, cmd.addr,
-					cmd.addr + (cmd.npages << PAGE_SHIFT));
+					cmd.addr + (cmd.npages << PG_SHIFT));
 		break;
 
 	case HMM_DMIRROR_SNAPSHOT:
@@ -1554,7 +1554,7 @@ static int dmirror_fops_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	unsigned long addr;
 
-	for (addr = vma->vm_start; addr < vma->vm_end; addr += PAGE_SIZE) {
+	for (addr = vma->vm_start; addr < vma->vm_end; addr += PG_SIZE) {
 		struct page *page;
 		int ret;
 
@@ -1648,11 +1648,11 @@ static vm_fault_t dmirror_devmem_fault(struct vm_fault *vmf)
 	 * Consider a per-cpu cache of src and dst pfns, but with
 	 * large number of cpus that might not scale well.
 	 */
-	args.start = ALIGN_DOWN(vmf->address, (PAGE_SIZE << order));
+	args.start = ALIGN_DOWN(vmf->address, (PG_SIZE << order));
 	args.vma = vmf->vma;
-	args.end = args.start + (PAGE_SIZE << order);
+	args.end = args.start + (PG_SIZE << order);
 
-	nr = (args.end - args.start) >> PAGE_SHIFT;
+	nr = (args.end - args.start) >> PG_SHIFT;
 	args.src = kcalloc(nr, sizeof(unsigned long), GFP_KERNEL);
 	args.dst = kcalloc(nr, sizeof(unsigned long), GFP_KERNEL);
 	args.pgmap_owner = dmirror->mdevice;

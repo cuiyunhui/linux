@@ -53,10 +53,12 @@ int main(void)
 	/* main thread */
 	f((void *)0);
 
-	stack = mmap(NULL, 2 * PAGE_SIZE, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+	stack = mmap(NULL, 2 * PG_SIZE, PROT_READ|PROT_WRITE,
+		     MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
 	assert(stack != MAP_FAILED);
 	/* side thread */
-	pid = clone(f, stack + PAGE_SIZE, CLONE_THREAD|CLONE_SIGHAND|CLONE_VM, (void *)1);
+	pid = clone(f, stack + PG_SIZE, CLONE_THREAD|CLONE_SIGHAND|CLONE_VM,
+		    (void *)1);
 	assert(pid > 0);
 	pause();
 

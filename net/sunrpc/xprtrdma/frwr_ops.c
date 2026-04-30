@@ -304,7 +304,7 @@ struct rpcrdma_mr_seg *frwr_map(struct rpcrdma_xprt *r_xprt,
 		if (ep->re_mrtype == IB_MR_TYPE_SG_GAPS)
 			continue;
 		if ((i < nsegs && seg->mr_offset) ||
-		    offset_in_page((seg-1)->mr_offset + (seg-1)->mr_len))
+		    offset_in_pg((seg - 1)->mr_offset + (seg - 1)->mr_len))
 			break;
 	}
 	mr->mr_dir = rpcrdma_data_dir(writing);
@@ -317,7 +317,7 @@ struct rpcrdma_mr_seg *frwr_map(struct rpcrdma_xprt *r_xprt,
 	mr->mr_device = ep->re_id->device;
 
 	ibmr = mr->mr_ibmr;
-	n = ib_map_mr_sg(ibmr, mr->mr_sg, dma_nents, NULL, PAGE_SIZE);
+	n = ib_map_mr_sg(ibmr, mr->mr_sg, dma_nents, NULL, PG_SIZE);
 	if (n != dma_nents)
 		goto out_mapmr_err;
 
@@ -681,7 +681,7 @@ int frwr_wp_create(struct rpcrdma_xprt *r_xprt)
 
 	seg.mr_len = XDR_UNIT;
 	seg.mr_page = virt_to_page(ep->re_write_pad);
-	seg.mr_offset = offset_in_page(ep->re_write_pad);
+	seg.mr_offset = offset_in_pg(ep->re_write_pad);
 	if (IS_ERR(frwr_map(r_xprt, &seg, 1, true, xdr_zero, mr)))
 		return -EIO;
 	trace_xprtrdma_mr_fastreg(mr);

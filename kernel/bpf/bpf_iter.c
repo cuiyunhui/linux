@@ -102,7 +102,7 @@ static ssize_t bpf_seq_read(struct file *file, char __user *buf, size_t size,
 	mutex_lock(&seq->lock);
 
 	if (!seq->buf) {
-		seq->size = PAGE_SIZE << 3;
+		seq->size = PG_SIZE << 3;
 		seq->buf = kvmalloc(seq->size, GFP_KERNEL);
 		if (!seq->buf) {
 			err = -ENOMEM;

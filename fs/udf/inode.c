@@ -262,7 +262,7 @@ static int udf_write_begin(const struct kiocb *iocb,
 			udf_write_failed(mapping, pos + len);
 		return ret;
 	}
-	if (WARN_ON_ONCE(pos >= PAGE_SIZE))
+	if (WARN_ON_ONCE(pos >= PG_SIZE))
 		return -EIO;
 	folio = __filemap_get_folio(mapping, 0, FGP_WRITEBEGIN,
 			mapping_gfp_mask(mapping));

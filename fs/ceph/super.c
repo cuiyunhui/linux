@@ -449,19 +449,19 @@ static int ceph_parse_mount_param(struct fs_context *fc,
 	case Opt_mon_addr:
 		return ceph_parse_mon_addr(param, fc);
 	case Opt_wsize:
-		if (result.uint_32 < PAGE_SIZE ||
+		if (result.uint_32 < PG_SIZE ||
 		    result.uint_32 > CEPH_MAX_WRITE_SIZE)
 			goto out_of_range;
-		fsopt->wsize = ALIGN(result.uint_32, PAGE_SIZE);
+		fsopt->wsize = ALIGN(result.uint_32, PG_SIZE);
 		break;
 	case Opt_rsize:
-		if (result.uint_32 < PAGE_SIZE ||
+		if (result.uint_32 < PG_SIZE ||
 		    result.uint_32 > CEPH_MAX_READ_SIZE)
 			goto out_of_range;
-		fsopt->rsize = ALIGN(result.uint_32, PAGE_SIZE);
+		fsopt->rsize = ALIGN(result.uint_32, PG_SIZE);
 		break;
 	case Opt_rasize:
-		fsopt->rasize = ALIGN(result.uint_32, PAGE_SIZE);
+		fsopt->rasize = ALIGN(result.uint_32, PG_SIZE);
 		break;
 	case Opt_caps_wanted_delay_min:
 		if (result.uint_32 < 1)
@@ -484,7 +484,7 @@ static int ceph_parse_mount_param(struct fs_context *fc,
 		fsopt->max_readdir = result.uint_32;
 		break;
 	case Opt_readdir_max_bytes:
-		if (result.uint_32 < PAGE_SIZE && result.uint_32 != 0)
+		if (result.uint_32 < PG_SIZE && result.uint_32 != 0)
 			goto out_of_range;
 		fsopt->max_readdir_bytes = result.uint_32;
 		break;
@@ -962,7 +962,7 @@ static int __init init_caches(void)
 		goto bad_mds_req;
 
 	ceph_wb_pagevec_pool = mempool_create_kmalloc_pool(10,
-	    (CEPH_MAX_WRITE_SIZE >> PAGE_SHIFT) * sizeof(struct page *));
+	    (CEPH_MAX_WRITE_SIZE >> PG_SHIFT) * sizeof(struct page *));
 	if (!ceph_wb_pagevec_pool)
 		goto bad_pagevec_pool;
 
@@ -1280,10 +1280,10 @@ static int ceph_setup_bdi(struct super_block *sb, struct ceph_fs_client *fsc)
 		return err;
 
 	/* set ra_pages based on rasize mount option? */
-	sb->s_bdi->ra_pages = fsc->mount_options->rasize >> PAGE_SHIFT;
+	sb->s_bdi->ra_pages = fsc->mount_options->rasize >> PG_SHIFT;
 
 	/* set io_pages based on max osd read size */
-	sb->s_bdi->io_pages = fsc->mount_options->rsize >> PAGE_SHIFT;
+	sb->s_bdi->io_pages = fsc->mount_options->rsize >> PG_SHIFT;
 
 	return 0;
 }

@@ -535,13 +535,13 @@ static struct bio *o2hb_setup_one_bio(struct o2hb_region *reg,
 	bio->bi_private = wc;
 	bio->bi_end_io = o2hb_bio_end_io;
 
-	vec_start = (cs << bits) % PAGE_SIZE;
+	vec_start = (cs << bits) % PG_SIZE;
 	while(cs < max_slots) {
 		current_page = cs / spp;
 		page = reg->hr_slot_data[current_page];
 
-		vec_len = min(PAGE_SIZE - vec_start,
-			      (max_slots-cs) * (PAGE_SIZE/spp) );
+		vec_len = min(PG_SIZE - vec_start,
+			      (max_slots-cs) * (PG_SIZE/spp) );
 
 		mlog(ML_HB_BIO, "page %d, vec_len = %u, vec_start = %u\n",
 		     current_page, vec_len, vec_start);
@@ -549,7 +549,7 @@ static struct bio *o2hb_setup_one_bio(struct o2hb_region *reg,
 		len = bio_add_page(bio, page, vec_len, vec_start);
 		if (len != vec_len) break;
 
-		cs += vec_len / (PAGE_SIZE/spp);
+		cs += vec_len / (PG_SIZE/spp);
 		vec_start = 0;
 	}
 
@@ -1285,7 +1285,7 @@ static int o2hb_debug_open(struct inode *inode, struct file *file)
 	/* max_nodes should be the largest bitmap we pass here */
 	BUG_ON(sizeof(map) < db->db_size);
 
-	buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	buf = kmalloc(PG_SIZE, GFP_KERNEL);
 	if (!buf)
 		goto bail;
 
@@ -1308,8 +1308,8 @@ static int o2hb_debug_open(struct inode *inode, struct file *file)
 
 	case O2HB_DB_TYPE_REGION_NUMBER:
 		reg = (struct o2hb_region *)db->db_data;
-		out += scnprintf(buf + out, PAGE_SIZE - out, "%d\n",
-				reg->hr_region_num);
+		out += scnprintf(buf + out, PG_SIZE - out, "%d\n",
+				 reg->hr_region_num);
 		goto done;
 
 	case O2HB_DB_TYPE_REGION_ELAPSED_TIME:
@@ -1318,13 +1318,13 @@ static int o2hb_debug_open(struct inode *inode, struct file *file)
 		/* If 0, it has never been set before */
 		if (lts)
 			lts = jiffies_to_msecs(jiffies - lts);
-		out += scnprintf(buf + out, PAGE_SIZE - out, "%lu\n", lts);
+		out += scnprintf(buf + out, PG_SIZE - out, "%lu\n", lts);
 		goto done;
 
 	case O2HB_DB_TYPE_REGION_PINNED:
 		reg = (struct o2hb_region *)db->db_data;
-		out += scnprintf(buf + out, PAGE_SIZE - out, "%u\n",
-				!!reg->hr_item_pinned);
+		out += scnprintf(buf + out, PG_SIZE - out, "%u\n",
+				 !!reg->hr_item_pinned);
 		goto done;
 
 	default:
@@ -1332,8 +1332,8 @@ static int o2hb_debug_open(struct inode *inode, struct file *file)
 	}
 
 	while ((i = find_next_bit(map, db->db_len, i + 1)) < db->db_len)
-		out += scnprintf(buf + out, PAGE_SIZE - out, "%d ", i);
-	out += scnprintf(buf + out, PAGE_SIZE - out, "\n");
+		out += scnprintf(buf + out, PG_SIZE - out, "%d ", i);
+	out += scnprintf(buf + out, PG_SIZE - out, "\n");
 
 done:
 	i_size_write(inode, out);
@@ -1653,7 +1653,7 @@ static ssize_t o2hb_region_dev_show(struct config_item *item, char *page)
 
 static void o2hb_init_region_params(struct o2hb_region *reg)
 {
-	reg->hr_slots_per_page = PAGE_SIZE >> reg->hr_block_bits;
+	reg->hr_slots_per_page = PG_SIZE >> reg->hr_block_bits;
 	reg->hr_timeout_ms = O2HB_REGION_TIMEOUT_MS;
 
 	mlog(ML_HEARTBEAT, "hr_start_block = %llu, hr_blocks = %u\n",

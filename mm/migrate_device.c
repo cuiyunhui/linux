@@ -25,7 +25,7 @@ static int migrate_vma_collect_skip(unsigned long start,
 	struct migrate_vma *migrate = walk->private;
 	unsigned long addr;
 
-	for (addr = start; addr < end; addr += PAGE_SIZE) {
+	for (addr = start; addr < end; addr += PG_SIZE) {
 		migrate->dst[migrate->npages] = 0;
 		migrate->src[migrate->npages++] = 0;
 	}
@@ -59,10 +59,10 @@ static int migrate_vma_collect_hole(unsigned long start,
 		 * Collect the remaining entries as holes, in case we
 		 * need to split later
 		 */
-		return migrate_vma_collect_skip(start + PAGE_SIZE, end, walk);
+		return migrate_vma_collect_skip(start + PG_SIZE, end, walk);
 	}
 
-	for (addr = start; addr < end; addr += PAGE_SIZE) {
+	for (addr = start; addr < end; addr += PG_SIZE) {
 		migrate->src[migrate->npages] = MIGRATE_PFN_MIGRATE;
 		migrate->dst[migrate->npages] = 0;
 		migrate->npages++;
@@ -222,7 +222,7 @@ static int migrate_vma_collect_huge_pmd(pmd_t *pmdp, unsigned long start,
 			migrate->dst[migrate->npages] = 0;
 			goto fallback;
 		}
-		migrate_vma_collect_skip(start + PAGE_SIZE, end, walk);
+		migrate_vma_collect_skip(start + PG_SIZE, end, walk);
 		spin_unlock(ptl);
 		return 0;
 	}
@@ -272,9 +272,9 @@ again:
 	if (!ptep)
 		goto again;
 	lazy_mmu_mode_enable();
-	ptep += (addr - start) / PAGE_SIZE;
+	ptep += (addr - start) / PG_SIZE;
 
-	for (; addr < end; addr += PAGE_SIZE, ptep++) {
+	for (; addr < end; addr += PG_SIZE, ptep++) {
 		struct dev_pagemap *pgmap;
 		unsigned long mpfn = 0, pfn;
 		struct folio *folio;
@@ -523,7 +523,7 @@ static void migrate_vma_collect(struct migrate_vma *migrate)
 			&migrate_vma_walk_ops, migrate);
 
 	mmu_notifier_invalidate_range_end(&range);
-	migrate->end = migrate->start + (migrate->npages << PAGE_SHIFT);
+	migrate->end = migrate->start + (migrate->npages << PG_SHIFT);
 }
 
 /*
@@ -734,10 +734,10 @@ static void migrate_vma_unmap(struct migrate_vma *migrate)
  */
 int migrate_vma_setup(struct migrate_vma *args)
 {
-	long nr_pages = (args->end - args->start) >> PAGE_SHIFT;
+	long nr_pages = (args->end - args->start) >> PG_SHIFT;
 
-	args->start &= PAGE_MASK;
-	args->end &= PAGE_MASK;
+	args->start &= PG_MASK;
+	args->end &= PG_MASK;
 	if (!args->vma || is_vm_hugetlb_page(args->vma) ||
 	    (args->vma->vm_flags & VM_SPECIAL) || vma_is_dax(args->vma))
 		return -EINVAL;
@@ -1132,7 +1132,7 @@ static void __migrate_device_pages(unsigned long *src_pfns,
 			 * called if the page could not be unmapped.
 			 */
 			VM_BUG_ON(!migrate);
-			addr = migrate->start + i*PAGE_SIZE;
+			addr = migrate->start + i*PG_SIZE;
 			if (!notified) {
 				notified = true;
 
@@ -1154,7 +1154,7 @@ static void __migrate_device_pages(unsigned long *src_pfns,
 			for (j = 0; j < nr && i + j < npages; j++) {
 				src_pfns[i+j] |= MIGRATE_PFN_MIGRATE;
 				migrate_vma_insert_page(migrate,
-					addr + j * PAGE_SIZE,
+					addr + j * PG_SIZE,
 					&dst_pfns[i+j], &src_pfns[i+j]);
 			}
 			goto next;
@@ -1179,7 +1179,7 @@ static void __migrate_device_pages(unsigned long *src_pfns,
 					goto next;
 				}
 				nr = 1 << folio_order(folio);
-				addr = migrate->start + i * PAGE_SIZE;
+				addr = migrate->start + i * PG_SIZE;
 				if (migrate_vma_split_unmapped_folio(migrate, i, addr, folio)) {
 					src_pfns[i] &= ~(MIGRATE_PFN_MIGRATE |
 							 MIGRATE_PFN_COMPOUND);

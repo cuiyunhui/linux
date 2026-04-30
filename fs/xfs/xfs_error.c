@@ -79,7 +79,7 @@ xfs_errortag_attr_show(
 {
 	struct xfs_mount	*mp = to_mp(kobject);
 
-	return snprintf(buf, PAGE_SIZE, "%u\n",
+	return snprintf(buf, PG_SIZE, "%u\n",
 			READ_ONCE(mp->m_errortag[to_attr(attr)->tag]));
 }
 

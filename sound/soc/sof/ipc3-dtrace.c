@@ -517,7 +517,7 @@ static int ipc3_dtrace_init(struct snd_sof_dev *sdev)
 
 	/* allocate trace page table buffer */
 	ret = snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, sdev->dev,
-				  PAGE_SIZE, &priv->dmatp);
+				  PG_SIZE, &priv->dmatp);
 	if (ret < 0) {
 		dev_err(sdev->dev, "can't alloc page table for trace %d\n", ret);
 		return ret;

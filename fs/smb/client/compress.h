@@ -24,7 +24,7 @@
 #define SMB_COMPRESS_HDR_LEN		16
 /* sizeof(smb2_compression_payload_hdr) - sizeof(OriginalPayloadSize) */
 #define SMB_COMPRESS_PAYLOAD_HDR_LEN	8
-#define SMB_COMPRESS_MIN_LEN		PAGE_SIZE
+#define SMB_COMPRESS_MIN_LEN		PG_SIZE
 
 #ifdef CONFIG_CIFS_COMPRESSION
 typedef int (*compress_send_fn)(struct TCP_Server_Info *, int, struct smb_rqst *);

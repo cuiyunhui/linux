@@ -290,7 +290,7 @@ event_inject_write(struct file *filp, const char __user *ubuf, size_t cnt,
 	void *entry = NULL;
 	char *buf;
 
-	if (cnt >= PAGE_SIZE)
+	if (cnt >= PG_SIZE)
 		return -EINVAL;
 
 	buf = memdup_user_nul(ubuf, cnt);

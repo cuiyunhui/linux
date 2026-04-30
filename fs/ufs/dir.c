@@ -215,9 +215,9 @@ ufs_last_byte(struct inode *inode, unsigned long page_nr)
 {
 	unsigned last_byte = inode->i_size;
 
-	last_byte -= page_nr << PAGE_SHIFT;
-	if (last_byte > PAGE_SIZE)
-		last_byte = PAGE_SIZE;
+	last_byte -= page_nr << PG_SHIFT;
+	if (last_byte > PG_SIZE)
+		last_byte = PG_SIZE;
 	return last_byte;
 }
 
@@ -414,8 +414,8 @@ ufs_readdir(struct file *file, struct dir_context *ctx)
 	loff_t pos = ctx->pos;
 	struct inode *inode = file_inode(file);
 	struct super_block *sb = inode->i_sb;
-	unsigned int offset = pos & ~PAGE_MASK;
-	unsigned long n = pos >> PAGE_SHIFT;
+	unsigned int offset = pos & ~PG_MASK;
+	unsigned long n = pos >> PG_SHIFT;
 	unsigned long npages = dir_pages(inode);
 	unsigned chunk_mask = ~(UFS_SB(sb)->s_uspi->s_dirblksize - 1);
 	bool need_revalidate = !inode_eq_iversion(inode, *(u64 *)file->private_data);
@@ -436,13 +436,13 @@ ufs_readdir(struct file *file, struct dir_context *ctx)
 			ufs_error(sb, __func__,
 				  "bad page in #%lu",
 				  inode->i_ino);
-			ctx->pos += PAGE_SIZE - offset;
+			ctx->pos += PG_SIZE - offset;
 			return PTR_ERR(kaddr);
 		}
 		if (unlikely(need_revalidate)) {
 			if (offset) {
 				offset = ufs_validate_entry(sb, kaddr, offset, chunk_mask);
-				ctx->pos = (n<<PAGE_SHIFT) + offset;
+				ctx->pos = (n<<PG_SHIFT) + offset;
 			}
 			*(u64 *)file->private_data = inode_query_iversion(inode);
 			need_revalidate = false;

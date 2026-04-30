@@ -230,8 +230,8 @@ static void memop_ioctl(struct test_info info, struct kvm_s390_mem_op *ksmo,
 #define CR0_FETCH_PROTECTION_OVERRIDE	(1UL << (63 - 38))
 #define CR0_STORAGE_PROTECTION_OVERRIDE	(1UL << (63 - 39))
 
-static uint8_t __aligned(PAGE_SIZE) mem1[65536];
-static uint8_t __aligned(PAGE_SIZE) mem2[65536];
+static uint8_t __aligned(PG_SIZE) mem1[65536];
+static uint8_t __aligned(PG_SIZE) mem2[65536];
 
 struct test_default {
 	struct kvm_vm *kvm_vm;
@@ -406,7 +406,7 @@ static void set_storage_key_range(void *addr, size_t len, uint8_t key)
 	int not_mapped = 0;
 
 	_addr = (uintptr_t)addr;
-	for (i = _addr & PAGE_MASK; i < _addr + len; i += PAGE_SIZE) {
+	for (i = _addr & PG_MASK; i < _addr + len; i += PG_SIZE) {
 		abs = i;
 		asm volatile (
 			       "lra	%[abs], 0(0,%[abs])\n"
@@ -768,8 +768,8 @@ static void test_copy_key_fetch_prot(void)
 static void guest_error_key(void)
 {
 	GUEST_SYNC(STAGE_INITED);
-	set_storage_key_range(mem1, PAGE_SIZE, 0x18);
-	set_storage_key_range(mem1 + PAGE_SIZE, sizeof(mem1) - PAGE_SIZE, 0x98);
+	set_storage_key_range(mem1, PG_SIZE, 0x18);
+	set_storage_key_range(mem1 + PG_SIZE, sizeof(mem1) - PG_SIZE, 0x98);
 	GUEST_SYNC(STAGE_SKEYS_SET);
 	GUEST_SYNC(STAGE_IDLED);
 }
@@ -855,7 +855,7 @@ static void test_errors_key_storage_prot_override(void)
 	kvm_vm_free(t.kvm_vm);
 }
 
-const uint64_t last_page_addr = -PAGE_SIZE;
+const uint64_t last_page_addr = -PG_SIZE;
 
 static void guest_copy_key_fetch_prot_override(void)
 {
@@ -880,8 +880,8 @@ static void test_copy_key_fetch_prot_override(void)
 	struct test_default t = test_default_init(guest_copy_key_fetch_prot_override);
 	vm_vaddr_t guest_0_page, guest_last_page;
 
-	guest_0_page = vm_vaddr_alloc(t.kvm_vm, PAGE_SIZE, 0);
-	guest_last_page = vm_vaddr_alloc(t.kvm_vm, PAGE_SIZE, last_page_addr);
+	guest_0_page = vm_vaddr_alloc(t.kvm_vm, PG_SIZE, 0);
+	guest_last_page = vm_vaddr_alloc(t.kvm_vm, PG_SIZE, last_page_addr);
 	if (guest_0_page != 0 || guest_last_page != last_page_addr) {
 		print_skip("did not allocate guest pages at required positions");
 		goto out;
@@ -894,7 +894,7 @@ static void test_copy_key_fetch_prot_override(void)
 
 	/* vcpu, mismatching keys on fetch, fetch protection override applies */
 	prepare_mem12();
-	MOP(t.vcpu, LOGICAL, WRITE, mem1, PAGE_SIZE, GADDR_V(mem1));
+	MOP(t.vcpu, LOGICAL, WRITE, mem1, PG_SIZE, GADDR_V(mem1));
 	HOST_SYNC(t.vcpu, STAGE_COPIED);
 	CHECK_N_DO(MOP, t.vcpu, LOGICAL, READ, mem2, 2048, GADDR_V(guest_0_page), KEY(2));
 	ASSERT_MEM_EQ(mem1, mem2, 2048);
@@ -904,9 +904,10 @@ static void test_copy_key_fetch_prot_override(void)
 	 * wraparound
 	 */
 	prepare_mem12();
-	MOP(t.vcpu, LOGICAL, WRITE, mem1, 2 * PAGE_SIZE, GADDR_V(guest_last_page));
+	MOP(t.vcpu, LOGICAL, WRITE, mem1, 2 * PG_SIZE,
+	    GADDR_V(guest_last_page));
 	HOST_SYNC(t.vcpu, STAGE_COPIED);
-	CHECK_N_DO(MOP, t.vcpu, LOGICAL, READ, mem2, PAGE_SIZE + 2048,
+	CHECK_N_DO(MOP, t.vcpu, LOGICAL, READ, mem2, PG_SIZE + 2048,
 		   GADDR_V(guest_last_page), KEY(2));
 	ASSERT_MEM_EQ(mem1, mem2, 2048);
 
@@ -919,8 +920,8 @@ static void test_errors_key_fetch_prot_override_not_enabled(void)
 	struct test_default t = test_default_init(guest_copy_key_fetch_prot_override);
 	vm_vaddr_t guest_0_page, guest_last_page;
 
-	guest_0_page = vm_vaddr_alloc(t.kvm_vm, PAGE_SIZE, 0);
-	guest_last_page = vm_vaddr_alloc(t.kvm_vm, PAGE_SIZE, last_page_addr);
+	guest_0_page = vm_vaddr_alloc(t.kvm_vm, PG_SIZE, 0);
+	guest_last_page = vm_vaddr_alloc(t.kvm_vm, PG_SIZE, last_page_addr);
 	if (guest_0_page != 0 || guest_last_page != last_page_addr) {
 		print_skip("did not allocate guest pages at required positions");
 		goto out;
@@ -940,8 +941,8 @@ static void test_errors_key_fetch_prot_override_enabled(void)
 	struct test_default t = test_default_init(guest_copy_key_fetch_prot_override);
 	vm_vaddr_t guest_0_page, guest_last_page;
 
-	guest_0_page = vm_vaddr_alloc(t.kvm_vm, PAGE_SIZE, 0);
-	guest_last_page = vm_vaddr_alloc(t.kvm_vm, PAGE_SIZE, last_page_addr);
+	guest_0_page = vm_vaddr_alloc(t.kvm_vm, PG_SIZE, 0);
+	guest_last_page = vm_vaddr_alloc(t.kvm_vm, PG_SIZE, last_page_addr);
 	if (guest_0_page != 0 || guest_last_page != last_page_addr) {
 		print_skip("did not allocate guest pages at required positions");
 		goto out;
@@ -956,7 +957,8 @@ static void test_errors_key_fetch_prot_override_enabled(void)
 	 * fetch protection override does not apply because memory range exceeded
 	 */
 	CHECK_N_DO(ERR_PROT_MOP, t.vcpu, LOGICAL, READ, mem2, 2048 + 1, GADDR_V(0), KEY(2));
-	CHECK_N_DO(ERR_PROT_MOP, t.vcpu, LOGICAL, READ, mem2, PAGE_SIZE + 2048 + 1,
+	CHECK_N_DO(ERR_PROT_MOP, t.vcpu, LOGICAL, READ, mem2,
+		   PG_SIZE + 2048 + 1,
 		   GADDR_V(guest_last_page), KEY(2));
 	/* vm, fetch protected override does not apply */
 	CHECK_N_DO(ERR_PROT_MOP, t.vm, ABSOLUTE, READ, mem2, 2048, GADDR(0), KEY(2));
@@ -1020,7 +1022,7 @@ static void test_errors(void)
 	rv = ERR_MOP(t.vcpu, INVALID, WRITE, mem1, t.size, GADDR_V(mem1));
 	TEST_ASSERT(rv == -1 && errno == EINVAL, "ioctl allows bad operations");
 	/* virtual addresses are not translated when passing INVALID */
-	rv = ERR_MOP(t.vm, INVALID, WRITE, mem1, PAGE_SIZE, GADDR(0));
+	rv = ERR_MOP(t.vm, INVALID, WRITE, mem1, PG_SIZE, GADDR(0));
 	TEST_ASSERT(rv == -1 && errno == EINVAL, "ioctl allows bad operations");
 
 	/* Bad access register: */

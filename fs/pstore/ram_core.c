@@ -420,8 +420,8 @@ static void *persistent_ram_vmap(phys_addr_t start, size_t size,
 	unsigned int i;
 	void *vaddr;
 
-	page_start = start - offset_in_page(start);
-	page_count = DIV_ROUND_UP(size + offset_in_page(start), PAGE_SIZE);
+	page_start = start - offset_in_pg(start);
+	page_count = DIV_ROUND_UP(size + offset_in_pg(start), PG_SIZE);
 
 	switch (memtype) {
 	case MEM_TYPE_NORMAL:
@@ -446,8 +446,8 @@ static void *persistent_ram_vmap(phys_addr_t start, size_t size,
 	}
 
 	for (i = 0; i < page_count; i++) {
-		phys_addr_t addr = page_start + i * PAGE_SIZE;
-		pages[i] = pfn_to_page(addr >> PAGE_SHIFT);
+		phys_addr_t addr = page_start + i * PG_SIZE;
+		pages[i] = pfn_to_page(addr >> PG_SHIFT);
 	}
 	/*
 	 * VM_IOREMAP used here to bypass this region during vread()
@@ -468,7 +468,7 @@ static void *persistent_ram_vmap(phys_addr_t start, size_t size,
 	 * into the page here, to get the byte granularity address
 	 * into the mapping to represent the actual "start" location.
 	 */
-	return vaddr + offset_in_page(start);
+	return vaddr + offset_in_pg(start);
 }
 
 static void *persistent_ram_iomap(phys_addr_t start, size_t size,
@@ -502,7 +502,7 @@ static int persistent_ram_buffer_map(phys_addr_t start, phys_addr_t size,
 	prz->paddr = start;
 	prz->size = size;
 
-	if (pfn_valid(start >> PAGE_SHIFT))
+	if (pfn_valid(start >> PG_SHIFT))
 		prz->vaddr = persistent_ram_vmap(start, size, memtype);
 	else
 		prz->vaddr = persistent_ram_iomap(start, size, memtype,
@@ -576,9 +576,9 @@ void persistent_ram_free(struct persistent_ram_zone **_prz)
 		return;
 
 	if (prz->vaddr) {
-		if (pfn_valid(prz->paddr >> PAGE_SHIFT)) {
+		if (pfn_valid(prz->paddr >> PG_SHIFT)) {
 			/* We must vunmap() at page-granularity. */
-			vunmap(prz->vaddr - offset_in_page(prz->paddr));
+			vunmap(prz->vaddr - offset_in_pg(prz->paddr));
 		} else {
 			iounmap(prz->vaddr);
 			release_mem_region(prz->paddr, prz->size);

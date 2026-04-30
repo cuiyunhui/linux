@@ -211,7 +211,7 @@ static int tls_strp_copyin_frag(struct tls_strparser *strp, struct sk_buff *skb,
 				struct sk_buff *in_skb, unsigned int offset,
 				size_t in_len)
 {
-	unsigned int nfrag = skb->len / PAGE_SIZE;
+	unsigned int nfrag = skb->len / PG_SIZE;
 	size_t len, chunk;
 	skb_frag_t *frag;
 	int sz;
@@ -227,7 +227,8 @@ static int tls_strp_copyin_frag(struct tls_strparser *strp, struct sk_buff *skb,
 	/* First make sure we got the header */
 	if (!strp->stm.full_len) {
 		/* Assume one page is more than enough for headers */
-		chunk =	min_t(size_t, len, PAGE_SIZE - skb_frag_size(frag));
+		chunk =	min_t(size_t, len,
+				     PG_SIZE - skb_frag_size(frag));
 		WARN_ON_ONCE(skb_copy_bits(in_skb, offset,
 					   skb_frag_address(frag) +
 					   skb_frag_size(frag),
@@ -265,7 +266,7 @@ static int tls_strp_copyin_frag(struct tls_strparser *strp, struct sk_buff *skb,
 	/* Load up more data */
 	while (len && strp->stm.full_len > skb->len) {
 		chunk =	min_t(size_t, len, strp->stm.full_len - skb->len);
-		chunk = min_t(size_t, chunk, PAGE_SIZE - skb_frag_size(frag));
+		chunk = min_t(size_t, chunk, PG_SIZE - skb_frag_size(frag));
 		WARN_ON_ONCE(skb_copy_bits(in_skb, offset,
 					   skb_frag_address(frag) +
 					   skb_frag_size(frag),
@@ -295,7 +296,7 @@ static int tls_strp_copyin_skb(struct tls_strparser *strp, struct sk_buff *skb,
 	if (strp->stm.full_len)
 		chunk = strp->stm.full_len - skb->len;
 	else
-		chunk = TLS_MAX_PAYLOAD_SIZE + PAGE_SIZE;
+		chunk = TLS_MAX_PAYLOAD_SIZE + PG_SIZE;
 	chunk = min(chunk, in_len);
 
 	nskb = tls_strp_skb_copy(strp, in_skb, offset, chunk);
@@ -404,9 +405,9 @@ static int tls_strp_read_copy(struct tls_strparser *strp, bool qshort)
 	shinfo = skb_shinfo(strp->anchor);
 
 	/* If we don't know the length go max plus page for cipher overhead */
-	need_spc = strp->stm.full_len ?: TLS_MAX_PAYLOAD_SIZE + PAGE_SIZE;
+	need_spc = strp->stm.full_len ?: TLS_MAX_PAYLOAD_SIZE + PG_SIZE;
 
-	for (len = need_spc; len > 0; len -= PAGE_SIZE) {
+	for (len = need_spc; len > 0; len -= PG_SIZE) {
 		page = alloc_page(strp->sk->sk_allocation);
 		if (!page) {
 			tls_strp_flush_anchor_copy(strp);
@@ -424,7 +425,7 @@ static int tls_strp_read_copy(struct tls_strparser *strp, bool qshort)
 
 	strp->anchor->len = 0;
 	strp->anchor->data_len = 0;
-	strp->anchor->truesize = round_up(need_spc, PAGE_SIZE);
+	strp->anchor->truesize = round_up(need_spc, PG_SIZE);
 
 	tls_strp_read_copyin(strp);
 

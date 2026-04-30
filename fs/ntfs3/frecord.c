@@ -1912,9 +1912,9 @@ int ni_read_folio_cmpr(struct ntfs_inode *ni, struct folio *folio)
 	frame_size = 1u << frame_bits;
 	frame = vbo >> frame_bits;
 	frame_vbo = (u64)frame << frame_bits;
-	idx = (vbo - frame_vbo) >> PAGE_SHIFT;
+	idx = (vbo - frame_vbo) >> PG_SHIFT;
 
-	pages_per_frame = frame_size >> PAGE_SHIFT;
+	pages_per_frame = frame_size >> PG_SHIFT;
 	pages = kzalloc_objs(struct page *, pages_per_frame, GFP_NOFS);
 	if (!pages) {
 		err = -ENOMEM;
@@ -1922,7 +1922,7 @@ int ni_read_folio_cmpr(struct ntfs_inode *ni, struct folio *folio)
 	}
 
 	pages[idx] = &folio->page;
-	index = frame_vbo >> PAGE_SHIFT;
+	index = frame_vbo >> PG_SHIFT;
 	gfp_mask = mapping_gfp_mask(mapping);
 
 	for (i = 0; i < pages_per_frame; i++, index++) {
@@ -1997,7 +1997,7 @@ int ni_decompress_file(struct ntfs_inode *ni)
 
 	frame_bits = ni_ext_compress_bits(ni);
 	frame_size = 1u << frame_bits;
-	pages_per_frame = frame_size >> PAGE_SHIFT;
+	pages_per_frame = frame_size >> PG_SHIFT;
 	pages = kzalloc_objs(struct page *, pages_per_frame, GFP_NOFS);
 	if (!pages) {
 		err = -ENOMEM;
@@ -2248,7 +2248,7 @@ int ni_read_frame(struct ntfs_inode *ni, u64 frame_vbo, struct page **pages,
 	 * To simplify decompress algorithm do vmap for source
 	 * and target pages.
 	 */
-	frame_size = pages_per_frame << PAGE_SHIFT;
+	frame_size = pages_per_frame << PG_SHIFT;
 	frame_mem = vmap(pages, pages_per_frame, VM_MAP, PAGE_KERNEL);
 	if (!frame_mem) {
 		err = -ENOMEM;

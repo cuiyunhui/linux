@@ -49,8 +49,8 @@ static void set_no_shadow_origin_page(struct page *page)
  * There are separate pages for loads and stores, so that every load returns a
  * zero, and every store doesn't affect other loads.
  */
-static char dummy_load_page[PAGE_SIZE] __aligned(PAGE_SIZE);
-static char dummy_store_page[PAGE_SIZE] __aligned(PAGE_SIZE);
+static char dummy_load_page[PG_SIZE] __aligned(PG_SIZE);
+static char dummy_store_page[PG_SIZE] __aligned(PG_SIZE);
 
 static unsigned long vmalloc_meta(void *addr, bool is_origin)
 {
@@ -88,7 +88,7 @@ struct shadow_origin_ptr kmsan_get_shadow_origin_ptr(void *address, u64 size,
 	 * Even if we redirect this memory access to the dummy page, it will
 	 * go out of bounds.
 	 */
-	KMSAN_WARN_ON(size > PAGE_SIZE);
+	KMSAN_WARN_ON(size > PG_SIZE);
 
 	if (!kmsan_enabled)
 		goto return_dummy;
@@ -143,7 +143,7 @@ void *kmsan_get_metadata(void *address, bool is_origin)
 		return NULL;
 	if (!page_has_metadata(page))
 		return NULL;
-	off = offset_in_page(addr);
+	off = offset_in_pg(addr);
 
 	return (is_origin ? origin_ptr_for(page) : shadow_ptr_for(page)) + off;
 }
@@ -155,14 +155,14 @@ void kmsan_copy_page_meta(struct page *dst, struct page *src)
 	if (!dst || !page_has_metadata(dst))
 		return;
 	if (!src || !page_has_metadata(src)) {
-		kmsan_internal_unpoison_memory(page_address(dst), PAGE_SIZE,
+		kmsan_internal_unpoison_memory(page_address(dst), PG_SIZE,
 					       /*checked*/ false);
 		return;
 	}
 
 	kmsan_enter_runtime();
-	__memcpy(shadow_ptr_for(dst), shadow_ptr_for(src), PAGE_SIZE);
-	__memcpy(origin_ptr_for(dst), origin_ptr_for(src), PAGE_SIZE);
+	__memcpy(shadow_ptr_for(dst), shadow_ptr_for(src), PG_SIZE);
+	__memcpy(origin_ptr_for(dst), origin_ptr_for(src), PG_SIZE);
 	kmsan_leave_runtime();
 }
 EXPORT_SYMBOL(kmsan_copy_page_meta);
@@ -181,8 +181,8 @@ void kmsan_alloc_page(struct page *page, unsigned int order, gfp_t flags)
 	origin = origin_page_for(page);
 
 	if (initialized) {
-		__memset(page_address(shadow), 0, PAGE_SIZE * pages);
-		__memset(page_address(origin), 0, PAGE_SIZE * pages);
+		__memset(page_address(shadow), 0, PG_SIZE * pages);
+		__memset(page_address(origin), 0, PG_SIZE * pages);
 		return;
 	}
 
@@ -190,7 +190,7 @@ void kmsan_alloc_page(struct page *page, unsigned int order, gfp_t flags)
 	if (kmsan_in_runtime())
 		return;
 
-	__memset(page_address(shadow), -1, PAGE_SIZE * pages);
+	__memset(page_address(shadow), -1, PG_SIZE * pages);
 	kmsan_enter_runtime();
 	handle = kmsan_save_stack_with_flags(flags, /*extra_bits*/ 0);
 	kmsan_leave_runtime();
@@ -198,7 +198,7 @@ void kmsan_alloc_page(struct page *page, unsigned int order, gfp_t flags)
 	 * Addresses are page-aligned, pages are contiguous, so it's ok
 	 * to just fill the origin pages with @handle.
 	 */
-	for (int i = 0; i < PAGE_SIZE * pages / sizeof(handle); i++)
+	for (int i = 0; i < PG_SIZE * pages / sizeof(handle); i++)
 		((depot_stack_handle_t *)page_address(origin))[i] = handle;
 }
 
@@ -207,7 +207,7 @@ void kmsan_free_page(struct page *page, unsigned int order)
 	if (!kmsan_enabled || kmsan_in_runtime())
 		return;
 	kmsan_enter_runtime();
-	kmsan_internal_poison_memory(page_address(page), PAGE_SIZE << order,
+	kmsan_internal_poison_memory(page_address(page), PG_SIZE << order,
 				     GFP_KERNEL & ~(__GFP_RECLAIM),
 				     KMSAN_POISON_CHECK | KMSAN_POISON_FREE);
 	kmsan_leave_runtime();
@@ -229,7 +229,7 @@ int kmsan_vmap_pages_range_noflush(unsigned long start, unsigned long end,
 	if (!shadow_start)
 		return 0;
 
-	nr = (end - start) / PAGE_SIZE;
+	nr = (end - start) / PG_SIZE;
 	s_pages = kzalloc_objs(*s_pages, nr, gfp_mask);
 	o_pages = kzalloc_objs(*o_pages, nr, gfp_mask);
 	if (!s_pages || !o_pages) {
@@ -279,12 +279,12 @@ void __init kmsan_init_alloc_meta_for_range(void *start, void *end)
 	struct page *page;
 	u64 size;
 
-	start = (void *)PAGE_ALIGN_DOWN((u64)start);
-	size = PAGE_ALIGN((u64)end - (u64)start);
-	shadow = memblock_alloc_or_panic(size, PAGE_SIZE);
-	origin = memblock_alloc_or_panic(size, PAGE_SIZE);
+	start = (void *) PG_ALIGN_DOWN((u64)start);
+	size = PG_ALIGN((u64)end - (u64)start);
+	shadow = memblock_alloc_or_panic(size, PG_SIZE);
+	origin = memblock_alloc_or_panic(size, PG_SIZE);
 
-	for (u64 addr = 0; addr < size; addr += PAGE_SIZE) {
+	for (u64 addr = 0; addr < size; addr += PG_SIZE) {
 		page = virt_to_page_or_null((char *)start + addr);
 		shadow_p = virt_to_page((char *)shadow + addr);
 		set_no_shadow_origin_page(shadow_p);

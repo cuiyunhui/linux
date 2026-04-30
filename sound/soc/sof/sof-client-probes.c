@@ -218,7 +218,7 @@ static ssize_t sof_probes_dfs_points_read(struct file *file, char __user *to,
 		return -ENOENT;
 	}
 
-	buf = kzalloc(PAGE_SIZE, GFP_KERNEL);
+	buf = kzalloc(PG_SIZE, GFP_KERNEL);
 	if (!buf)
 		return -ENOMEM;
 
@@ -238,7 +238,7 @@ static ssize_t sof_probes_dfs_points_read(struct file *file, char __user *to,
 
 	for (i = 0; i < num_desc; i++) {
 		offset = strlen(buf);
-		remaining = PAGE_SIZE - offset;
+		remaining = PG_SIZE - offset;
 		if (ipc->point_print)
 			ret = ipc->point_print(cdev, buf + offset, remaining, &desc[i]);
 		else

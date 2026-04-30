@@ -25,7 +25,7 @@
 #include "hda.h"
 
 #define HDA_SKL_WAIT_TIMEOUT		500	/* 500 msec */
-#define HDA_SKL_CLDMA_MAX_BUFFER_SIZE	(32 * PAGE_SIZE)
+#define HDA_SKL_CLDMA_MAX_BUFFER_SIZE	(32 * PG_SIZE)
 
 /* Stream Reset */
 #define HDA_CL_SD_CTL_SRST_SHIFT	0

@@ -229,8 +229,8 @@ static void kvm_gmem_invalidate_end(struct inode *inode, pgoff_t start,
 
 static long kvm_gmem_punch_hole(struct inode *inode, loff_t offset, loff_t len)
 {
-	pgoff_t start = offset >> PAGE_SHIFT;
-	pgoff_t end = (offset + len) >> PAGE_SHIFT;
+	pgoff_t start = offset >> PG_SHIFT;
+	pgoff_t end = (offset + len) >> PG_SHIFT;
 
 	/*
 	 * Bindings must be stable across invalidation to ensure the start+end
@@ -261,8 +261,8 @@ static long kvm_gmem_allocate(struct inode *inode, loff_t offset, loff_t len)
 
 	filemap_invalidate_lock_shared(mapping);
 
-	start = offset >> PAGE_SHIFT;
-	end = (offset + len) >> PAGE_SHIFT;
+	start = offset >> PG_SHIFT;
+	end = (offset + len) >> PG_SHIFT;
 
 	r = 0;
 	for (index = start; index < end; ) {
@@ -307,7 +307,7 @@ static long kvm_gmem_fallocate(struct file *file, int mode, loff_t offset,
 	if (mode & ~(FALLOC_FL_KEEP_SIZE | FALLOC_FL_PUNCH_HOLE))
 		return -EOPNOTSUPP;
 
-	if (!PAGE_ALIGNED(offset) || !PAGE_ALIGNED(len))
+	if (!PG_ALIGNED(offset) || !PG_ALIGNED(len))
 		return -EINVAL;
 
 	if (mode & FALLOC_FL_PUNCH_HOLE)
@@ -394,7 +394,7 @@ static vm_fault_t kvm_gmem_fault_user_mapping(struct vm_fault *vmf)
 	struct folio *folio;
 	vm_fault_t ret = VM_FAULT_LOCKED;
 
-	if (((loff_t)vmf->pgoff << PAGE_SHIFT) >= i_size_read(inode))
+	if (((loff_t)vmf->pgoff << PG_SHIFT) >= i_size_read(inode))
 		return VM_FAULT_SIGBUS;
 
 	if (!(GMEM_I(inode)->flags & GUEST_MEMFD_FLAG_INIT_SHARED))
@@ -442,7 +442,7 @@ static struct mempolicy *kvm_gmem_get_policy(struct vm_area_struct *vma,
 {
 	struct inode *inode = file_inode(vma->vm_file);
 
-	*pgoff = vma->vm_pgoff + ((addr - vma->vm_start) >> PAGE_SHIFT);
+	*pgoff = vma->vm_pgoff + ((addr - vma->vm_start) >> PG_SHIFT);
 
 	/*
 	 * Return the memory policy for this index, or NULL if none is set.
@@ -633,7 +633,7 @@ int kvm_gmem_create(struct kvm *kvm, struct kvm_create_guest_memfd *args)
 	if (flags & ~kvm_gmem_get_supported_flags(kvm))
 		return -EINVAL;
 
-	if (size <= 0 || !PAGE_ALIGNED(size))
+	if (size <= 0 || !PG_ALIGNED(size))
 		return -EINVAL;
 
 	return __kvm_gmem_create(kvm, size, flags);
@@ -642,7 +642,7 @@ int kvm_gmem_create(struct kvm *kvm, struct kvm_create_guest_memfd *args)
 int kvm_gmem_bind(struct kvm *kvm, struct kvm_memory_slot *slot,
 		  unsigned int fd, loff_t offset)
 {
-	loff_t size = slot->npages << PAGE_SHIFT;
+	loff_t size = slot->npages << PG_SHIFT;
 	unsigned long start, end;
 	struct gmem_file *f;
 	struct inode *inode;
@@ -664,13 +664,13 @@ int kvm_gmem_bind(struct kvm *kvm, struct kvm_memory_slot *slot,
 
 	inode = file_inode(file);
 
-	if (offset < 0 || !PAGE_ALIGNED(offset) ||
+	if (offset < 0 || !PG_ALIGNED(offset) ||
 	    offset + size > i_size_read(inode))
 		goto err;
 
 	filemap_invalidate_lock(inode->i_mapping);
 
-	start = offset >> PAGE_SHIFT;
+	start = offset >> PG_SHIFT;
 	end = start + slot->npages;
 
 	if (!xa_empty(&f->bindings) &&
@@ -870,7 +870,7 @@ long kvm_gmem_populate(struct kvm *kvm, gfn_t start_gfn, void __user *src, long 
 	if (WARN_ON_ONCE(npages <= 0))
 		return -EINVAL;
 
-	if (WARN_ON_ONCE(!PAGE_ALIGNED(src)))
+	if (WARN_ON_ONCE(!PG_ALIGNED(src)))
 		return -EINVAL;
 
 	slot = gfn_to_memslot(kvm, start_gfn);
@@ -891,7 +891,7 @@ long kvm_gmem_populate(struct kvm *kvm, gfn_t start_gfn, void __user *src, long 
 		}
 
 		if (src) {
-			unsigned long uaddr = (unsigned long)src + i * PAGE_SIZE;
+			unsigned long uaddr = (unsigned long)src + i * PG_SIZE;
 
 			ret = get_user_pages_fast(uaddr, 1, 0, &src_page);
 			if (ret < 0)

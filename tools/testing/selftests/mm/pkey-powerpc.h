@@ -134,7 +134,7 @@ static inline void *malloc_pkey_with_mprotect_subpage(long size, int prot, u16 p
 		return PTR_ERR_ENOTSUP;
 	}
 
-	ret = mprotect_pkey((void *)ptr, PAGE_SIZE, prot, pkey);
+	ret = mprotect_pkey((void *)ptr, PG_SIZE, prot, pkey);
 	pkey_assert(!ret);
 	record_pkey_malloc(ptr, size, prot);
 

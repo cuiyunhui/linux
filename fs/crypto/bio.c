@@ -74,7 +74,7 @@ static int fscrypt_zeroout_range_inline_crypt(const struct inode *inode,
 					      unsigned int len)
 {
 	const unsigned int blockbits = inode->i_blkbits;
-	const unsigned int blocks_per_page = 1 << (PAGE_SHIFT - blockbits);
+	const unsigned int blocks_per_page = 1 << (PG_SHIFT - blockbits);
 	struct fscrypt_zero_done done = {
 		.pending	= ATOMIC_INIT(1),
 		.done		= COMPLETION_INITIALIZER_ONSTACK(done.done),
@@ -137,7 +137,7 @@ int fscrypt_zeroout_range(const struct inode *inode, pgoff_t lblk,
 	const struct fscrypt_inode_info *ci = fscrypt_get_inode_info_raw(inode);
 	const unsigned int du_bits = ci->ci_data_unit_bits;
 	const unsigned int du_size = 1U << du_bits;
-	const unsigned int du_per_page_bits = PAGE_SHIFT - du_bits;
+	const unsigned int du_per_page_bits = PG_SHIFT - du_bits;
 	const unsigned int du_per_page = 1U << du_per_page_bits;
 	u64 du_index = (u64)lblk << (inode->i_blkbits - du_bits);
 	u64 du_remaining = (u64)len << (inode->i_blkbits - du_bits);
@@ -195,7 +195,7 @@ int fscrypt_zeroout_range(const struct inode *inode, pgoff_t lblk,
 			sector += 1U << (du_bits - SECTOR_SHIFT);
 			du_remaining--;
 			offset += du_size;
-			if (offset == PAGE_SIZE || du_remaining == 0) {
+			if (offset == PG_SIZE || du_remaining == 0) {
 				ret = bio_add_page(bio, pages[i++], offset, 0);
 				if (WARN_ON_ONCE(ret != offset)) {
 					err = -EIO;

@@ -22,7 +22,7 @@
 
 #define STM32_ADFSDM_DRV_NAME "stm32-adfsdm"
 
-#define DFSDM_MAX_PERIOD_SIZE	(PAGE_SIZE / 2)
+#define DFSDM_MAX_PERIOD_SIZE	(PG_SIZE / 2)
 #define DFSDM_MAX_PERIODS	6
 
 struct stm32_adfsdm_priv {

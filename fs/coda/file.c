@@ -167,7 +167,7 @@ coda_file_mmap(struct file *coda_file, struct vm_area_struct *vma)
 		return -EIO;
 
 	count = vma->vm_end - vma->vm_start;
-	ppos = vma->vm_pgoff * PAGE_SIZE;
+	ppos = vma->vm_pgoff * PG_SIZE;
 
 	ret = venus_access_intent(coda_inode->i_sb, coda_i2f(coda_inode),
 				  &cfi->cfi_access_intent,

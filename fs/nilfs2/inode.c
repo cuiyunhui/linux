@@ -244,7 +244,7 @@ static int nilfs_write_end(const struct kiocb *iocb,
 			   struct folio *folio, void *fsdata)
 {
 	struct inode *inode = mapping->host;
-	unsigned int start = pos & (PAGE_SIZE - 1);
+	unsigned int start = pos & (PG_SIZE - 1);
 	unsigned int nr_dirty;
 	int err;
 

@@ -723,7 +723,7 @@ libeth_xdp_tx_fill_buf(struct libeth_xdp_tx_frame frm, u32 i,
 	if (frm.len_fl & LIBETH_XDP_TX_FIRST) {
 		sinfo = frm.data + frm.soff;
 		skb_frag_fill_netmem_desc(frag, virt_to_netmem(frm.data),
-					  offset_in_page(frm.data),
+					  offset_in_pg(frm.data),
 					  frm.len_fl);
 	} else {
 		sinfo = NULL;

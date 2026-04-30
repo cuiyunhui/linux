@@ -183,7 +183,7 @@ int bpf_struct_ops_test_run(struct bpf_prog *prog, const union bpf_attr *kattr,
 	if (err < 0)
 		goto out;
 
-	err = arch_protect_bpf_trampoline(image, PAGE_SIZE);
+	err = arch_protect_bpf_trampoline(image, PG_SIZE);
 	if (err)
 		goto out;
 	prog_ret = dummy_ops_call_op(image, args);

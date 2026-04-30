@@ -1194,7 +1194,7 @@ struct fuse_removemapping_one {
 };
 
 #define FUSE_REMOVEMAPPING_MAX_ENTRY   \
-		(PAGE_SIZE / sizeof(struct fuse_removemapping_one))
+		(PG_SIZE / sizeof(struct fuse_removemapping_one))
 
 struct fuse_syncfs_in {
 	uint64_t	padding;

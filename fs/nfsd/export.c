@@ -101,13 +101,13 @@ static int expkey_parse(struct cache_detail *cd, char *mesg, int mlen)
 		return -EINVAL;
 	mesg[mlen-1] = 0;
 
-	buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	buf = kmalloc(PG_SIZE, GFP_KERNEL);
 	err = -ENOMEM;
 	if (!buf)
 		goto out;
 
 	err = -EINVAL;
-	if (qword_get(&mesg, buf, PAGE_SIZE) <= 0)
+	if (qword_get(&mesg, buf, PG_SIZE) <= 0)
 		goto out;
 
 	err = -ENOENT;
@@ -117,14 +117,14 @@ static int expkey_parse(struct cache_detail *cd, char *mesg, int mlen)
 	dprintk("found domain %s\n", buf);
 
 	err = -EINVAL;
-	if (qword_get(&mesg, buf, PAGE_SIZE) <= 0)
+	if (qword_get(&mesg, buf, PG_SIZE) <= 0)
 		goto out;
 	if (kstrtou8(buf, 10, &fsidtype))
 		goto out;
 	dprintk("found fsidtype %u\n", fsidtype);
 	if (key_len(fsidtype)==0) /* invalid type */
 		goto out;
-	if ((len=qword_get(&mesg, buf, PAGE_SIZE)) <= 0)
+	if ((len=qword_get(&mesg, buf, PG_SIZE)) <= 0)
 		goto out;
 	dprintk("found fsid length %d\n", len);
 	if (len != key_len(fsidtype))
@@ -147,7 +147,7 @@ static int expkey_parse(struct cache_detail *cd, char *mesg, int mlen)
 
 	/* now we want a pathname, or empty meaning NEGATIVE  */
 	err = -EINVAL;
-	len = qword_get(&mesg, buf, PAGE_SIZE);
+	len = qword_get(&mesg, buf, PG_SIZE);
 	if (len < 0)
 		goto out;
 	dprintk("Path seems to be <%s>\n", buf);
@@ -498,7 +498,7 @@ fsloc_parse(char **mesg, char *buf, struct nfsd4_fs_locations *fsloc)
 	for (i=0; i < fsloc->locations_count; i++) {
 		/* colon separated host list */
 		err = -EINVAL;
-		len = qword_get(mesg, buf, PAGE_SIZE);
+		len = qword_get(mesg, buf, PG_SIZE);
 		if (len <= 0)
 			goto out_free_all;
 		err = -ENOMEM;
@@ -507,7 +507,7 @@ fsloc_parse(char **mesg, char *buf, struct nfsd4_fs_locations *fsloc)
 			goto out_free_all;
 		err = -EINVAL;
 		/* slash separated path component list */
-		len = qword_get(mesg, buf, PAGE_SIZE);
+		len = qword_get(mesg, buf, PG_SIZE);
 		if (len <= 0)
 			goto out_free_all;
 		err = -ENOMEM;
@@ -606,7 +606,7 @@ nfsd_uuid_parse(char **mesg, char *buf, unsigned char **puuid)
 		return -EINVAL;
 
 	/* expect a 16 byte uuid encoded as \xXXXX... */
-	len = qword_get(mesg, buf, PAGE_SIZE);
+	len = qword_get(mesg, buf, PG_SIZE);
 	if (len != EX_UUID_LEN)
 		return -EINVAL;
 
@@ -630,13 +630,13 @@ static int svc_export_parse(struct cache_detail *cd, char *mesg, int mlen)
 		return -EINVAL;
 	mesg[mlen-1] = 0;
 
-	buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	buf = kmalloc(PG_SIZE, GFP_KERNEL);
 	if (!buf)
 		return -ENOMEM;
 
 	/* client */
 	err = -EINVAL;
-	if (qword_get(&mesg, buf, PAGE_SIZE) <= 0)
+	if (qword_get(&mesg, buf, PG_SIZE) <= 0)
 		goto out;
 
 	err = -ENOENT;
@@ -646,7 +646,7 @@ static int svc_export_parse(struct cache_detail *cd, char *mesg, int mlen)
 
 	/* path */
 	err = -EINVAL;
-	if (qword_get(&mesg, buf, PAGE_SIZE) <= 0)
+	if (qword_get(&mesg, buf, PG_SIZE) <= 0)
 		goto out1;
 
 	err = kern_path(buf, 0, &exp.ex_path);
@@ -691,7 +691,7 @@ static int svc_export_parse(struct cache_detail *cd, char *mesg, int mlen)
 			goto out3;
 		exp.ex_fsid = an_int;
 
-		while (qword_get(&mesg, buf, PAGE_SIZE) > 0) {
+		while (qword_get(&mesg, buf, PG_SIZE) > 0) {
 			if (strcmp(buf, "fsloc") == 0)
 				err = fsloc_parse(&mesg, buf, &exp.ex_fslocs);
 			else if (strcmp(buf, "uuid") == 0)

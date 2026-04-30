@@ -175,7 +175,7 @@ static void gso_test_func(struct kunit *test)
 			pg_off += tcase->frags[i];
 		}
 
-		KUNIT_ASSERT_LE(test, pg_off, PAGE_SIZE);
+		KUNIT_ASSERT_LE(test, pg_off, PG_SIZE);
 
 		skb->data_len = pg_off;
 		skb->len += skb->data_len;

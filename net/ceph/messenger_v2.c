@@ -288,7 +288,7 @@ static void set_out_bvec_zero(struct ceph_connection *con)
 	WARN_ON(!con->v2.out_zero);
 
 	bvec_set_page(&con->v2.out_bvec, ceph_zero_page,
-		      min(con->v2.out_zero, (int)PAGE_SIZE), 0);
+		      min(con->v2.out_zero, (int) PG_SIZE), 0);
 	con->v2.out_iter_sendpage = true;
 	iov_iter_bvec(&con->v2.out_iter, ITER_SOURCE, &con->v2.out_bvec, 1,
 		      con->v2.out_bvec.bv_len);
@@ -440,7 +440,7 @@ static const int frame_aligns[] = {
 	sizeof(void *),
 	sizeof(void *),
 	sizeof(void *),
-	PAGE_SIZE
+	PG_SIZE
 };
 
 /*
@@ -855,8 +855,8 @@ static int calc_sg_cnt(void *buf, int buf_len)
 
 	sg_cnt = need_padding(buf_len) ? 1 : 0;
 	if (is_vmalloc_addr(buf)) {
-		WARN_ON(offset_in_page(buf));
-		sg_cnt += PAGE_ALIGN(buf_len) >> PAGE_SHIFT;
+		WARN_ON(offset_in_pg(buf));
+		sg_cnt += PG_ALIGN(buf_len) >> PG_SHIFT;
 	} else {
 		sg_cnt++;
 	}
@@ -898,8 +898,8 @@ static void init_sgs(struct scatterlist **sg, void *buf, int buf_len, u8 *pad)
 		p = buf;
 		do {
 			page = vmalloc_to_page(p);
-			len = min_t(int, end - p, PAGE_SIZE);
-			WARN_ON(!page || !len || offset_in_page(p));
+			len = min_t(int, end - p, PG_SIZE);
+			WARN_ON(!page || !len || offset_in_pg(p));
 			sg_set_page(*sg, page, len, 0);
 			*sg = sg_next(*sg);
 			p += len;
@@ -952,12 +952,12 @@ static void init_sgs_cursor(struct scatterlist **sg,
 static void init_sgs_pages(struct scatterlist **sg, struct page **pages,
 			   int dpos, int dlen, u8 *pad)
 {
-	int idx = dpos >> PAGE_SHIFT;
-	int off = offset_in_page(dpos);
+	int idx = dpos >> PG_SHIFT;
+	int off = offset_in_pg(dpos);
 	int resid = dlen;
 
 	do {
-		int len = min(resid, (int)PAGE_SIZE - off);
+		int len = min(resid, (int) PG_SIZE - off);
 
 		sg_set_page(*sg, pages[idx], len, off);
 		*sg = sg_next(*sg);
@@ -1076,10 +1076,10 @@ static int process_v2_sparse_read(struct ceph_connection *con,
 		dout("%s: sparse_read return %x buf %p\n", __func__, ret, buf);
 
 		do {
-			int idx = spos >> PAGE_SHIFT;
-			int soff = offset_in_page(spos);
+			int idx = spos >> PG_SHIFT;
+			int soff = offset_in_pg(spos);
 			struct page *spage = con->v2.in_enc_pages[idx];
-			int len = min_t(int, ret, PAGE_SIZE - soff);
+			int len = min_t(int, ret, PG_SIZE - soff);
 
 			if (buf) {
 				memcpy_from_page(buf, spage, soff, len);
@@ -2056,7 +2056,7 @@ static void prepare_read_enc_page(struct ceph_connection *con)
 	WARN_ON(!con->v2.in_enc_resid);
 
 	bvec_set_page(&bv, con->v2.in_enc_pages[con->v2.in_enc_i],
-		      min(con->v2.in_enc_resid, (int)PAGE_SIZE), 0);
+		      min(con->v2.in_enc_resid, (int) PG_SIZE), 0);
 
 	set_in_bvec(con, &bv);
 	con->v2.in_enc_i++;
@@ -3215,7 +3215,7 @@ static void queue_enc_page(struct ceph_connection *con)
 	WARN_ON(!con->v2.out_enc_resid);
 
 	bvec_set_page(&bv, con->v2.out_enc_pages[con->v2.out_enc_i],
-		      min(con->v2.out_enc_resid, (int)PAGE_SIZE), 0);
+		      min(con->v2.out_enc_resid, (int) PG_SIZE), 0);
 
 	set_out_bvec(con, &bv, false);
 	con->v2.out_enc_i++;
@@ -3429,7 +3429,7 @@ static u32 crc32c_zeros(u32 crc, int zero_len)
 	int len;
 
 	while (zero_len) {
-		len = min(zero_len, (int)PAGE_SIZE);
+		len = min(zero_len, (int) PG_SIZE);
 		crc = crc32c(crc, page_address(ceph_zero_page), len);
 		zero_len -= len;
 	}

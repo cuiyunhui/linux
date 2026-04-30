@@ -251,8 +251,8 @@ static noinline void end_compressed_writeback(const struct compressed_bio *cb)
 {
 	struct inode *inode = &cb->bbio.inode->vfs_inode;
 	struct btrfs_fs_info *fs_info = inode_to_fs_info(inode);
-	pgoff_t index = cb->start >> PAGE_SHIFT;
-	const pgoff_t end_index = (cb->start + cb->len - 1) >> PAGE_SHIFT;
+	pgoff_t index = cb->start >> PG_SHIFT;
+	const pgoff_t end_index = (cb->start + cb->len - 1) >> PG_SHIFT;
 	struct folio_batch fbatch;
 	int i;
 	int ret;
@@ -397,18 +397,18 @@ static noinline int add_ra_bio_pages(struct inode *inode,
 	 * This makes readahead less effective, so here disable readahead for
 	 * subpage for now, until full compressed write is supported.
 	 */
-	if (fs_info->sectorsize < PAGE_SIZE)
+	if (fs_info->sectorsize < PG_SIZE)
 		return 0;
 
 	/* For bs > ps cases, we don't support readahead for compressed folios for now. */
 	if (fs_info->block_min_order)
 		return 0;
 
-	end_index = (i_size_read(inode) - 1) >> PAGE_SHIFT;
+	end_index = (i_size_read(inode) - 1) >> PG_SHIFT;
 
 	while (cur < compressed_end) {
 		pgoff_t page_end;
-		pgoff_t pg_index = cur >> PAGE_SHIFT;
+		pgoff_t pg_index = cur >> PG_SHIFT;
 		u32 add_size;
 
 		if (pg_index > end_index)
@@ -459,7 +459,7 @@ static noinline int add_ra_bio_pages(struct inode *inode,
 			break;
 		}
 
-		page_end = (pg_index << PAGE_SHIFT) + folio_size(folio) - 1;
+		page_end = (pg_index << PG_SHIFT) + folio_size(folio) - 1;
 		btrfs_lock_extent(tree, cur, page_end, NULL);
 		read_lock(&em_tree->lock);
 		em = btrfs_lookup_extent_mapping(em_tree, cur, page_end + 1 - cur);
@@ -505,7 +505,7 @@ static noinline int add_ra_bio_pages(struct inode *inode,
 		 * subpage::readers number, as at endio we will decrease
 		 * subpage::readers and to unlock the page.
 		 */
-		if (fs_info->sectorsize < PAGE_SIZE)
+		if (fs_info->sectorsize < PG_SIZE)
 			btrfs_folio_set_lock(fs_info, folio, cur, add_size);
 		folio_put(folio);
 		cur += add_size;
@@ -974,7 +974,7 @@ int btrfs_compress_filemap_get_folio(struct address_space *mapping, u64 start,
 	 * The compressed write path should have the folio locked already, thus
 	 * we only need to grab one reference.
 	 */
-	in_folio = filemap_get_folio(mapping, start >> PAGE_SHIFT);
+	in_folio = filemap_get_folio(mapping, start >> PG_SHIFT);
 	if (IS_ERR(in_folio)) {
 		struct btrfs_inode *inode = BTRFS_I(mapping->host);
 
@@ -1145,7 +1145,7 @@ int __init btrfs_init_compress(void)
 	INIT_LIST_HEAD(&compr_pool.list);
 	compr_pool.count = 0;
 	/* 128K / 4K = 32, for 8 threads is 256 pages. */
-	compr_pool.thresh = BTRFS_MAX_COMPRESSED / PAGE_SIZE * 8;
+	compr_pool.thresh = BTRFS_MAX_COMPRESSED / PG_SIZE * 8;
 	compr_pool.shrinker->count_objects = btrfs_compr_pool_count;
 	compr_pool.shrinker->scan_objects = btrfs_compr_pool_scan;
 	compr_pool.shrinker->batch = 32;
@@ -1177,7 +1177,7 @@ static u64 file_offset_from_bvec(const struct bio_vec *bvec)
 	const struct page *page = bvec->bv_page;
 	const struct folio *folio = page_folio(page);
 
-	return (page_pgoff(folio, page) << PAGE_SHIFT) + bvec->bv_offset;
+	return (page_pgoff(folio, page) << PG_SHIFT) + bvec->bv_offset;
 }
 
 /*
@@ -1525,11 +1525,11 @@ static void heuristic_collect_sample(struct inode *inode, u64 start, u64 end,
 	if (end - start > BTRFS_MAX_UNCOMPRESSED)
 		end = start + BTRFS_MAX_UNCOMPRESSED;
 
-	index = start >> PAGE_SHIFT;
-	index_end = end >> PAGE_SHIFT;
+	index = start >> PG_SHIFT;
+	index_end = end >> PG_SHIFT;
 
 	/* Don't miss unaligned end */
-	if (!PAGE_ALIGNED(end))
+	if (!PG_ALIGNED(end))
 		index_end++;
 
 	curr_sample_pos = 0;
@@ -1537,8 +1537,8 @@ static void heuristic_collect_sample(struct inode *inode, u64 start, u64 end,
 		page = find_get_page(inode->i_mapping, index);
 		in_data = kmap_local_page(page);
 		/* Handle case where the start is not aligned to PAGE_SIZE */
-		i = start % PAGE_SIZE;
-		while (i < PAGE_SIZE - SAMPLING_READ_SIZE) {
+		i = start % PG_SIZE;
+		while (i < PG_SIZE - SAMPLING_READ_SIZE) {
 			/* Don't sample any garbage from the last page */
 			if (start > end - SAMPLING_READ_SIZE)
 				break;

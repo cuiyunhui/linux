@@ -121,7 +121,7 @@ void rds_info_copy(struct rds_info_iterator *iter, void *data,
 		if (!iter->addr)
 			iter->addr = kmap_atomic(*iter->pages);
 
-		this = min(bytes, PAGE_SIZE - iter->offset);
+		this = min(bytes, PG_SIZE - iter->offset);
 
 		rdsdebug("page %p addr %p offset %lu this %lu data %p "
 			  "bytes %lu\n", *iter->pages, iter->addr,
@@ -133,7 +133,7 @@ void rds_info_copy(struct rds_info_iterator *iter, void *data,
 		bytes -= this;
 		iter->offset += this;
 
-		if (iter->offset == PAGE_SIZE) {
+		if (iter->offset == PG_SIZE) {
 			kunmap_atomic(iter->addr);
 			iter->addr = NULL;
 			iter->offset = 0;
@@ -175,7 +175,7 @@ int rds_info_getsockopt(struct socket *sock, int optname, char __user *optval,
 
 	/* check for all kinds of wrapping and the like */
 	start = (unsigned long)optval;
-	if (len < 0 || len > INT_MAX - PAGE_SIZE + 1 || start + len < start) {
+	if (len < 0 || len > INT_MAX - PG_SIZE + 1 || start + len < start) {
 		ret = -EINVAL;
 		goto out;
 	}
@@ -184,8 +184,8 @@ int rds_info_getsockopt(struct socket *sock, int optname, char __user *optval,
 	if (len == 0)
 		goto call_func;
 
-	nr_pages = (PAGE_ALIGN(start + len) - (start & PAGE_MASK))
-			>> PAGE_SHIFT;
+	nr_pages = (PG_ALIGN(start + len) - (start & PG_MASK))
+			>> PG_SHIFT;
 
 	pages = kmalloc_objs(struct page *, nr_pages);
 	if (!pages) {
@@ -213,7 +213,7 @@ call_func:
 
 	iter.pages = pages;
 	iter.addr = NULL;
-	iter.offset = start & (PAGE_SIZE - 1);
+	iter.offset = start & (PG_SIZE - 1);
 
 	func(sock, len, &iter, &lens);
 	BUG_ON(lens.each == 0);

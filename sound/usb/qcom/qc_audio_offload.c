@@ -58,12 +58,12 @@
 					(((u64)sid) << 32)))
 #define IOVA_MASK(iova) (((u64)(iova)) & 0xFFFFFFFF)
 #define IOVA_BASE 0x1000
-#define IOVA_XFER_RING_BASE (IOVA_BASE + PAGE_SIZE * (SNDRV_CARDS + 1))
-#define IOVA_XFER_BUF_BASE (IOVA_XFER_RING_BASE + PAGE_SIZE * SNDRV_CARDS * 32)
-#define IOVA_XFER_RING_MAX (IOVA_XFER_BUF_BASE - PAGE_SIZE)
-#define IOVA_XFER_BUF_MAX (0xfffff000 - PAGE_SIZE)
+#define IOVA_XFER_RING_BASE (IOVA_BASE + PG_SIZE * (SNDRV_CARDS + 1))
+#define IOVA_XFER_BUF_BASE (IOVA_XFER_RING_BASE + PG_SIZE * SNDRV_CARDS * 32)
+#define IOVA_XFER_RING_MAX (IOVA_XFER_BUF_BASE - PG_SIZE)
+#define IOVA_XFER_BUF_MAX (0xfffff000 - PG_SIZE)
 
-#define MAX_XFER_BUFF_LEN (24 * PAGE_SIZE)
+#define MAX_XFER_BUFF_LEN (24 * PG_SIZE)
 
 struct iova_info {
 	struct list_head list;
@@ -398,7 +398,7 @@ static unsigned long uaudio_get_iova(unsigned long *curr_iova,
 	size_t tmp_size = size;
 	unsigned long iova = 0;
 
-	if (size % PAGE_SIZE)
+	if (size % PG_SIZE)
 		goto done;
 
 	if (size > *curr_iova_size)
@@ -616,7 +616,7 @@ static unsigned long uaudio_iommu_map_xfer_buf(bool dma_coherent, size_t size,
 
 	iova_sg = iova;
 	for_each_sg(sgt->sgl, sg, sgt->nents, i) {
-		sg_len = PAGE_ALIGN(sg->offset + sg->length);
+		sg_len = PG_ALIGN(sg->offset + sg->length);
 		pa_sg = page_to_phys(sg_page(sg));
 		ret = iommu_map(uaudio_qdev->data->domain, iova_sg, pa_sg, sg_len,
 				prot, GFP_KERNEL);
@@ -696,8 +696,8 @@ static void uaudio_event_ring_cleanup_free(struct uaudio_dev *dev)
 	clear_bit(dev->chip->card->number, &uaudio_qdev->card_slot);
 	/* all audio devices are disconnected */
 	if (!uaudio_qdev->card_slot) {
-		uaudio_iommu_unmap(MEM_EVENT_RING, IOVA_BASE, PAGE_SIZE,
-				   PAGE_SIZE);
+		uaudio_iommu_unmap(MEM_EVENT_RING, IOVA_BASE, PG_SIZE,
+				   PG_SIZE);
 		xhci_sideband_remove_interrupter(uadev[dev->chip->card->number].sb);
 		usb_offload_put(dev->udev);
 	}
@@ -1035,12 +1035,12 @@ static int uaudio_transfer_buffer_setup(struct snd_usb_substream *subs,
 
 	/* xfer buffer, multiple of 4K only */
 	if (!len)
-		len = PAGE_SIZE;
+		len = PG_SIZE;
 
-	mult = len / PAGE_SIZE;
-	remainder = len % PAGE_SIZE;
-	len = mult * PAGE_SIZE;
-	len += remainder ? PAGE_SIZE : 0;
+	mult = len / PG_SIZE;
+	remainder = len % PG_SIZE;
+	len = mult * PG_SIZE;
+	len += remainder ? PG_SIZE : 0;
 
 	if (len > MAX_XFER_BUFF_LEN) {
 		dev_err(uaudio_qdev->data->dev,
@@ -1141,14 +1141,14 @@ uaudio_endpoint_setup(struct snd_usb_substream *subs,
 
 	/* data transfer ring */
 	iova = uaudio_iommu_map_pa(MEM_XFER_RING, dma_coherent, tr_pa,
-				   PAGE_SIZE);
+				   PG_SIZE);
 	if (!iova) {
 		ret = -ENOMEM;
 		goto clear_pa;
 	}
 
 	mem_info->iova = PREPEND_SID_TO_IOVA(iova, uaudio_qdev->data->sid);
-	mem_info->size = PAGE_SIZE;
+	mem_info->size = PG_SIZE;
 
 	return 0;
 
@@ -1209,14 +1209,14 @@ static int uaudio_event_ring_setup(struct snd_usb_substream *subs,
 	sg_free_table(sgt);
 
 	iova = uaudio_iommu_map_pa(MEM_EVENT_RING, dma_coherent, er_pa,
-				   PAGE_SIZE);
+				   PG_SIZE);
 	if (!iova) {
 		ret = -ENOMEM;
 		goto clear_pa;
 	}
 
 	mem_info->iova = PREPEND_SID_TO_IOVA(iova, uaudio_qdev->data->sid);
-	mem_info->size = PAGE_SIZE;
+	mem_info->size = PG_SIZE;
 
 	return 0;
 
@@ -1456,10 +1456,10 @@ static int prepare_qmi_response(struct snd_usb_substream *subs,
 	/* cache intf specific info to use it for unmap and free xfer buf */
 	uadev[card_num].info[info_idx].data_xfer_ring_va =
 					IOVA_MASK(resp->xhci_mem_info.tr_data.iova);
-	uadev[card_num].info[info_idx].data_xfer_ring_size = PAGE_SIZE;
+	uadev[card_num].info[info_idx].data_xfer_ring_size = PG_SIZE;
 	uadev[card_num].info[info_idx].sync_xfer_ring_va =
 					IOVA_MASK(resp->xhci_mem_info.tr_sync.iova);
-	uadev[card_num].info[info_idx].sync_xfer_ring_size = PAGE_SIZE;
+	uadev[card_num].info[info_idx].sync_xfer_ring_size = PG_SIZE;
 	uadev[card_num].info[info_idx].xfer_buf_iova =
 					IOVA_MASK(resp->xhci_mem_info.xfer_buff.iova);
 	uadev[card_num].info[info_idx].xfer_buf_dma =
@@ -1486,7 +1486,7 @@ static int prepare_qmi_response(struct snd_usb_substream *subs,
 	return 0;
 
 unmap_er:
-	uaudio_iommu_unmap(MEM_EVENT_RING, IOVA_BASE, PAGE_SIZE, PAGE_SIZE);
+	uaudio_iommu_unmap(MEM_EVENT_RING, IOVA_BASE, PG_SIZE, PG_SIZE);
 free_sec_ring:
 	xhci_sideband_remove_interrupter(uadev[card_num].sb);
 	usb_offload_put(subs->dev);
@@ -1494,13 +1494,13 @@ drop_sync_ep:
 	if (subs->sync_endpoint) {
 		uaudio_iommu_unmap(MEM_XFER_RING,
 				   IOVA_MASK(resp->xhci_mem_info.tr_sync.iova),
-				   PAGE_SIZE, PAGE_SIZE);
+				   PG_SIZE, PG_SIZE);
 		xhci_sideband_remove_endpoint(uadev[card_num].sb,
 			usb_pipe_endpoint(subs->dev, subs->sync_endpoint->pipe));
 	}
 drop_data_ep:
 	uaudio_iommu_unmap(MEM_XFER_RING, IOVA_MASK(resp->xhci_mem_info.tr_data.iova),
-			   PAGE_SIZE, PAGE_SIZE);
+			   PG_SIZE, PG_SIZE);
 	xhci_sideband_remove_endpoint(uadev[card_num].sb,
 			usb_pipe_endpoint(subs->dev, subs->data_endpoint->pipe));
 

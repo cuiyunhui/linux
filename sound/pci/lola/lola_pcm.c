@@ -583,7 +583,7 @@ int lola_create_pcm(struct lola *chip)
 	for (i = 0; i < 2; i++) {
 		chip->pcm[i].bdl =
 			snd_devm_alloc_pages(&chip->pci->dev, SNDRV_DMA_TYPE_DEV,
-					     PAGE_SIZE);
+					     PG_SIZE);
 		if (!chip->pcm[i].bdl)
 			return -ENOMEM;
 	}

@@ -116,7 +116,7 @@ int jffs2_scan_medium(struct jffs2_sb_info *c)
 		if (jffs2_cleanmarker_oob(c))
 			try_size = c->sector_size;
 		else
-			try_size = PAGE_SIZE;
+			try_size = PG_SIZE;
 
 		jffs2_dbg(1, "Trying to allocate readbuf of %zu "
 			  "bytes\n", try_size);

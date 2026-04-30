@@ -70,7 +70,7 @@ static inline void lock_metapage(struct metapage *mp)
 static struct kmem_cache *metapage_cache;
 static mempool_t *metapage_mempool;
 
-#define MPS_PER_PAGE (PAGE_SIZE >> L2PSIZE)
+#define MPS_PER_PAGE (PG_SIZE >> L2PSIZE)
 
 #if MPS_PER_PAGE > 1
 
@@ -395,7 +395,7 @@ static void last_write_complete(struct folio *folio, blk_status_t status)
 		mapping_set_error(folio->mapping, err);
 	}
 
-	for (offset = 0; offset < PAGE_SIZE; offset += PSIZE) {
+	for (offset = 0; offset < PG_SIZE; offset += PSIZE) {
 		mp = folio_to_mp(folio, offset);
 		if (mp && test_bit(META_io, &mp->flag)) {
 			if (mp->lsn)
@@ -446,7 +446,7 @@ static int metapage_write_folio(struct folio *folio,
 	BUG_ON(folio_test_writeback(folio));
 	folio_start_writeback(folio);
 
-	for (offset = 0; offset < PAGE_SIZE; offset += PSIZE) {
+	for (offset = 0; offset < PG_SIZE; offset += PSIZE) {
 		mp = folio_to_mp(folio, offset);
 
 		if (!mp || !test_bit(META_dirty, &mp->flag))
@@ -615,7 +615,7 @@ static bool metapage_release_folio(struct folio *folio, gfp_t gfp_mask)
 	bool ret = true;
 	int offset;
 
-	for (offset = 0; offset < PAGE_SIZE; offset += PSIZE) {
+	for (offset = 0; offset < PG_SIZE; offset += PSIZE) {
 		mp = folio_to_mp(folio, offset);
 
 		if (!mp)
@@ -696,10 +696,10 @@ struct metapage *__get_metapage(struct inode *inode, unsigned long lblock,
 		 inode->i_ino, lblock, absolute);
 
 	l2bsize = inode->i_blkbits;
-	l2BlocksPerPage = PAGE_SHIFT - l2bsize;
+	l2BlocksPerPage = PG_SHIFT - l2bsize;
 	page_index = lblock >> l2BlocksPerPage;
 	page_offset = (lblock - (page_index << l2BlocksPerPage)) << l2bsize;
-	if ((page_offset + size) > PAGE_SIZE) {
+	if ((page_offset + size) > PG_SIZE) {
 		jfs_err("MetaData crosses page boundary!!");
 		jfs_err("lblock = %lx, size  = %d", lblock, size);
 		dump_stack();
@@ -718,7 +718,7 @@ struct metapage *__get_metapage(struct inode *inode, unsigned long lblock,
 		mapping = inode->i_mapping;
 	}
 
-	if (new && (PSIZE == PAGE_SIZE)) {
+	if (new && (PSIZE == PG_SIZE)) {
 		folio = filemap_grab_folio(mapping, page_index);
 		if (IS_ERR(folio)) {
 			jfs_err("filemap_grab_folio failed!");
@@ -898,7 +898,7 @@ void release_metapage(struct metapage * mp)
 void __invalidate_metapages(struct inode *ip, s64 addr, int len)
 {
 	sector_t lblock;
-	int l2BlocksPerPage = PAGE_SHIFT - ip->i_blkbits;
+	int l2BlocksPerPage = PG_SHIFT - ip->i_blkbits;
 	int BlocksPerPage = 1 << l2BlocksPerPage;
 	/* All callers are interested in block device's mapping */
 	struct address_space *mapping =
@@ -916,7 +916,7 @@ void __invalidate_metapages(struct inode *ip, s64 addr, int len)
 				lblock >> l2BlocksPerPage);
 		if (IS_ERR(folio))
 			continue;
-		for (offset = 0; offset < PAGE_SIZE; offset += PSIZE) {
+		for (offset = 0; offset < PG_SIZE; offset += PSIZE) {
 			mp = folio_to_mp(folio, offset);
 			if (!mp)
 				continue;

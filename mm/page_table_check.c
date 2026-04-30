@@ -152,7 +152,7 @@ void __page_table_check_pte_clear(struct mm_struct *mm, unsigned long addr,
 		return;
 
 	if (pte_user_accessible_page(pte, addr)) {
-		page_table_check_clear(pte_pfn(pte), PAGE_SIZE >> PAGE_SHIFT);
+		page_table_check_clear(pte_pfn(pte), PG_SIZE >> PG_SHIFT);
 	}
 }
 EXPORT_SYMBOL(__page_table_check_pte_clear);
@@ -164,7 +164,7 @@ void __page_table_check_pmd_clear(struct mm_struct *mm, unsigned long addr,
 		return;
 
 	if (pmd_user_accessible_page(pmd, addr)) {
-		page_table_check_clear(pmd_pfn(pmd), PMD_SIZE >> PAGE_SHIFT);
+		page_table_check_clear(pmd_pfn(pmd), PMD_SIZE >> PG_SHIFT);
 	}
 }
 EXPORT_SYMBOL(__page_table_check_pmd_clear);
@@ -176,7 +176,7 @@ void __page_table_check_pud_clear(struct mm_struct *mm, unsigned long addr,
 		return;
 
 	if (pud_user_accessible_page(pud, addr)) {
-		page_table_check_clear(pud_pfn(pud), PUD_SIZE >> PAGE_SHIFT);
+		page_table_check_clear(pud_pfn(pud), PUD_SIZE >> PG_SHIFT);
 	}
 }
 EXPORT_SYMBOL(__page_table_check_pud_clear);
@@ -210,7 +210,8 @@ void __page_table_check_ptes_set(struct mm_struct *mm, unsigned long addr,
 	page_table_check_pte_flags(pte);
 
 	for (i = 0; i < nr; i++)
-		__page_table_check_pte_clear(mm, addr + PAGE_SIZE * i, ptep_get(ptep + i));
+		__page_table_check_pte_clear(mm, addr + PG_SIZE * i,
+				             ptep_get(ptep + i));
 	if (pte_user_accessible_page(pte, addr))
 		page_table_check_set(pte_pfn(pte), nr, pte_write(pte));
 }
@@ -231,7 +232,7 @@ static inline void page_table_check_pmd_flags(pmd_t pmd)
 void __page_table_check_pmds_set(struct mm_struct *mm, unsigned long addr,
 		pmd_t *pmdp, pmd_t pmd, unsigned int nr)
 {
-	unsigned long stride = PMD_SIZE >> PAGE_SHIFT;
+	unsigned long stride = PMD_SIZE >> PG_SHIFT;
 	unsigned int i;
 
 	if (&init_mm == mm)
@@ -249,7 +250,7 @@ EXPORT_SYMBOL(__page_table_check_pmds_set);
 void __page_table_check_puds_set(struct mm_struct *mm, unsigned long addr,
 		pud_t *pudp, pud_t pud,	unsigned int nr)
 {
-	unsigned long stride = PUD_SIZE >> PAGE_SHIFT;
+	unsigned long stride = PUD_SIZE >> PG_SHIFT;
 	unsigned int i;
 
 	if (&init_mm == mm)
@@ -277,7 +278,7 @@ void __page_table_check_pte_clear_range(struct mm_struct *mm,
 			return;
 		for (i = 0; i < PTRS_PER_PTE; i++) {
 			__page_table_check_pte_clear(mm, addr, ptep_get(ptep));
-			addr += PAGE_SIZE;
+			addr += PG_SIZE;
 			ptep++;
 		}
 		pte_unmap(ptep - PTRS_PER_PTE);

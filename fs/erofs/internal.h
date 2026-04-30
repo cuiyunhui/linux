@@ -477,9 +477,9 @@ erofs_get_aops(struct inode *realinode, bool no_fscache)
 	if (erofs_inode_is_data_compressed(EROFS_I(realinode)->datalayout)) {
 		if (!IS_ENABLED(CONFIG_EROFS_FS_ZIP))
 			return ERR_PTR(-EOPNOTSUPP);
-		DO_ONCE_LITE_IF(realinode->i_blkbits != PAGE_SHIFT,
-			  erofs_info, realinode->i_sb,
-			  "EXPERIMENTAL EROFS subpage compressed block support in use. Use at your own risk!");
+		DO_ONCE_LITE_IF(realinode->i_blkbits != PG_SHIFT,
+				erofs_info, realinode->i_sb,
+				"EXPERIMENTAL EROFS subpage compressed block support in use. Use at your own risk!");
 		return &z_erofs_aops;
 	}
 	if (IS_ENABLED(CONFIG_EROFS_FS_ONDEMAND) && !no_fscache &&

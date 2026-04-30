@@ -122,7 +122,7 @@ int ceph_fscrypt_prepare_readdir(struct inode *dir);
 static inline unsigned int ceph_fscrypt_blocks(u64 off, u64 len)
 {
 	/* crypto blocks cannot span more than one page */
-	BUILD_BUG_ON(CEPH_FSCRYPT_BLOCK_SHIFT > PAGE_SHIFT);
+	BUILD_BUG_ON(CEPH_FSCRYPT_BLOCK_SHIFT > PG_SHIFT);
 
 	return ((off+len+CEPH_FSCRYPT_BLOCK_SIZE-1) >> CEPH_FSCRYPT_BLOCK_SHIFT) -
 		(off >> CEPH_FSCRYPT_BLOCK_SHIFT);

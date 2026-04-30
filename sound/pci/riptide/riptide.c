@@ -1314,8 +1314,8 @@ static const struct snd_pcm_hardware snd_riptide_playback = {
 	.channels_min = 1,
 	.channels_max = 2,
 	.buffer_bytes_max = (64 * 1024),
-	.period_bytes_min = PAGE_SIZE >> 1,
-	.period_bytes_max = PAGE_SIZE << 8,
+	.period_bytes_min = PG_SIZE >> 1,
+	.period_bytes_max = PG_SIZE << 8,
 	.periods_min = 2,
 	.periods_max = 64,
 	.fifo_size = 0,
@@ -1333,8 +1333,8 @@ static const struct snd_pcm_hardware snd_riptide_capture = {
 	.channels_min = 1,
 	.channels_max = 2,
 	.buffer_bytes_max = (64 * 1024),
-	.period_bytes_min = PAGE_SIZE >> 1,
-	.period_bytes_max = PAGE_SIZE << 3,
+	.period_bytes_min = PG_SIZE >> 1,
+	.period_bytes_max = PG_SIZE << 3,
 	.periods_min = 2,
 	.periods_max = 64,
 	.fifo_size = 0,
@@ -1479,7 +1479,7 @@ static int snd_riptide_prepare(struct snd_pcm_substream *substream)
 
 		size = frames_to_bytes(runtime, runtime->buffer_size);
 		period = frames_to_bytes(runtime, runtime->period_size);
-		f = PAGE_SIZE;
+		f = PG_SIZE;
 		while ((size + (f >> 1) - 1) <= (f << 7) && (f << 1) > period)
 			f = f >> 1;
 		pages = DIV_ROUND_UP(size, f);
@@ -1499,10 +1499,10 @@ static int snd_riptide_prepare(struct snd_pcm_substream *substream)
 							     sizeof(struct
 								    sgd)));
 			c->dwNextLink = cpu_to_le32(data->sgdlist.addr);
-			ofs = j << PAGE_SHIFT;
+			ofs = j << PG_SHIFT;
 			addr = snd_pcm_sgbuf_get_addr(substream, ofs) + pt;
 			c->dwSegPtrPhys = cpu_to_le32(addr);
-			pt = (pt + f) % PAGE_SIZE;
+			pt = (pt + f) % PG_SIZE;
 			if (pt == 0)
 				j++;
 			c->dwSegLen = cpu_to_le32(f);

@@ -493,13 +493,13 @@ static int locate_mem_hole_top_down(unsigned long start, unsigned long end,
 		 * segments
 		 */
 		if (kimage_is_destination_range(image, temp_start, temp_end)) {
-			temp_start = temp_start - PAGE_SIZE;
+			temp_start = temp_start - PG_SIZE;
 			continue;
 		}
 
 		/* Make sure this does not conflict with exclude range */
 		if (arch_check_excluded_range(image, temp_start, temp_end)) {
-			temp_start = temp_start - PAGE_SIZE;
+			temp_start = temp_start - PG_SIZE;
 			continue;
 		}
 
@@ -535,13 +535,13 @@ static int locate_mem_hole_bottom_up(unsigned long start, unsigned long end,
 		 * segments
 		 */
 		if (kimage_is_destination_range(image, temp_start, temp_end)) {
-			temp_start = temp_start + PAGE_SIZE;
+			temp_start = temp_start + PG_SIZE;
 			continue;
 		}
 
 		/* Make sure this does not conflict with exclude range */
 		if (arch_check_excluded_range(image, temp_start, temp_end)) {
-			temp_start = temp_start + PAGE_SIZE;
+			temp_start = temp_start + PG_SIZE;
 			continue;
 		}
 
@@ -669,7 +669,7 @@ static int kexec_walk_resources(struct kexec_buf *kbuf,
 
 static int kexec_alloc_contig(struct kexec_buf *kbuf)
 {
-	size_t nr_pages = kbuf->memsz >> PAGE_SHIFT;
+	size_t nr_pages = kbuf->memsz >> PG_SHIFT;
 	unsigned long mem;
 	struct page *p;
 
@@ -687,7 +687,7 @@ static int kexec_alloc_contig(struct kexec_buf *kbuf)
 
 	pr_debug("allocated %zu DMA pages at 0x%lx", nr_pages, page_to_boot_pfn(p));
 
-	mem = page_to_boot_pfn(p) << PAGE_SHIFT;
+	mem = page_to_boot_pfn(p) << PG_SHIFT;
 
 	if (kimage_is_destination_range(kbuf->image, mem, mem + kbuf->memsz)) {
 		/* Our region is already in use by a statically defined one. Bail out. */
@@ -696,7 +696,7 @@ static int kexec_alloc_contig(struct kexec_buf *kbuf)
 		return -EBUSY;
 	}
 
-	kbuf->mem = page_to_boot_pfn(p) << PAGE_SHIFT;
+	kbuf->mem = page_to_boot_pfn(p) << PG_SHIFT;
 	kbuf->cma = p;
 
 	arch_kexec_post_alloc_pages(page_address(p), (int)nr_pages, 0);
@@ -778,8 +778,8 @@ int kexec_add_buffer(struct kexec_buf *kbuf)
 	}
 
 	/* Ensure minimum alignment needed for segments. */
-	kbuf->memsz = ALIGN(kbuf->memsz, PAGE_SIZE);
-	kbuf->buf_align = max(kbuf->buf_align, PAGE_SIZE);
+	kbuf->memsz = ALIGN(kbuf->memsz, PG_SIZE);
+	kbuf->buf_align = max(kbuf->buf_align, PG_SIZE);
 	kbuf->cma = NULL;
 
 	/* Walk the RAM ranges and allocate a suitable range for the buffer */
@@ -812,8 +812,8 @@ static int kexec_calculate_store_digests(struct kimage *image)
 	if (!IS_ENABLED(CONFIG_ARCH_SUPPORTS_KEXEC_PURGATORY))
 		return 0;
 
-	zero_buf = __va(page_to_pfn(ZERO_PAGE(0)) << PAGE_SHIFT);
-	zero_buf_sz = PAGE_SIZE;
+	zero_buf = __va(page_to_pfn(ZERO_PAGE(0)) << PG_SHIFT);
+	zero_buf_sz = PG_SIZE;
 
 	sha_region_sz = KEXEC_SEGMENT_MAX * sizeof(struct kexec_sha_region);
 	sha_regions = vzalloc(sha_region_sz);

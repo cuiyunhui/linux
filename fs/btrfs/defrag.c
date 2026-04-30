@@ -1129,7 +1129,7 @@ next:
 }
 
 #define CLUSTER_SIZE	(SZ_256K)
-static_assert(PAGE_ALIGNED(CLUSTER_SIZE));
+static_assert(PG_ALIGNED(CLUSTER_SIZE));
 
 /*
  * Defrag one contiguous target range.
@@ -1199,11 +1199,11 @@ static int defrag_one_range(struct btrfs_inode *inode, u64 start, u32 len,
 	struct folio **folios;
 	const u32 sectorsize = inode->root->fs_info->sectorsize;
 	u64 cur = start;
-	const unsigned int nr_pages = ((start + len - 1) >> PAGE_SHIFT) -
-				      (start >> PAGE_SHIFT) + 1;
+	const unsigned int nr_pages = ((start + len - 1) >> PG_SHIFT) -
+				      (start >> PG_SHIFT) + 1;
 	int ret = 0;
 
-	ASSERT(nr_pages <= CLUSTER_SIZE / PAGE_SIZE);
+	ASSERT(nr_pages <= CLUSTER_SIZE / PG_SIZE);
 	ASSERT(IS_ALIGNED(start, sectorsize) && IS_ALIGNED(len, sectorsize));
 
 	folios = kzalloc_objs(struct folio *, nr_pages, GFP_NOFS);
@@ -1212,7 +1212,7 @@ static int defrag_one_range(struct btrfs_inode *inode, u64 start, u32 len,
 
 	/* Prepare all pages */
 	for (int i = 0; cur < start + len && i < nr_pages; i++) {
-		folios[i] = defrag_prepare_one_folio(inode, cur >> PAGE_SHIFT);
+		folios[i] = defrag_prepare_one_folio(inode, cur >> PG_SHIFT);
 		if (IS_ERR(folios[i])) {
 			ret = PTR_ERR(folios[i]);
 			folios[i] = NULL;
@@ -1310,9 +1310,9 @@ static int defrag_one_cluster(struct btrfs_inode *inode,
 			continue;
 
 		page_cache_sync_readahead(inode->vfs_inode.i_mapping,
-				ra, NULL, entry->start >> PAGE_SHIFT,
-				((entry->start + range_len - 1) >> PAGE_SHIFT) -
-				(entry->start >> PAGE_SHIFT) + 1);
+				ra, NULL, entry->start >> PG_SHIFT,
+				((entry->start + range_len - 1) >> PG_SHIFT) -
+				(entry->start >> PG_SHIFT) + 1);
 		/*
 		 * Here we may not defrag any range if holes are punched before
 		 * we locked the pages.
@@ -1418,7 +1418,7 @@ int btrfs_defrag_file(struct btrfs_inode *inode, struct file_ra_state *ra,
 	 * Make writeback start from the beginning of the range, so that the
 	 * defrag range can be written sequentially.
 	 */
-	start_index = cur >> PAGE_SHIFT;
+	start_index = cur >> PG_SHIFT;
 	if (start_index < inode->vfs_inode.i_mapping->writeback_index)
 		inode->vfs_inode.i_mapping->writeback_index = start_index;
 
@@ -1433,8 +1433,8 @@ int btrfs_defrag_file(struct btrfs_inode *inode, struct file_ra_state *ra,
 		}
 
 		/* We want the cluster end at page boundary when possible */
-		cluster_end = (((cur >> PAGE_SHIFT) +
-			       (SZ_256K >> PAGE_SHIFT)) << PAGE_SHIFT) - 1;
+		cluster_end = (((cur >> PG_SHIFT) +
+				(SZ_256K >> PG_SHIFT)) << PG_SHIFT) - 1;
 		cluster_end = min(cluster_end, last_byte);
 
 		btrfs_inode_lock(inode, 0);

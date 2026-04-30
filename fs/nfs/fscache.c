@@ -307,8 +307,8 @@ static void nfs_netfs_issue_read(struct netfs_io_subrequest *sreq)
 	pgoff_t start, last;
 	int err;
 
-	start = (sreq->start + sreq->transferred) >> PAGE_SHIFT;
-	last = ((sreq->start + sreq->len - sreq->transferred - 1) >> PAGE_SHIFT);
+	start = (sreq->start + sreq->transferred) >> PG_SHIFT;
+	last = ((sreq->start + sreq->len - sreq->transferred - 1) >> PG_SHIFT);
 
 	nfs_pageio_init_read(&pgio, inode, false,
 			     &nfs_async_read_completion_ops);

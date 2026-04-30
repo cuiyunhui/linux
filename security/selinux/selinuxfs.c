@@ -141,7 +141,7 @@ static ssize_t sel_write_enforce(struct file *file, const char __user *buf,
 	int scan_value;
 	bool old_value, new_value;
 
-	if (count >= PAGE_SIZE)
+	if (count >= PG_SIZE)
 		return -ENOMEM;
 
 	/* No partial writes. */
@@ -248,7 +248,7 @@ static int sel_mmap_handle_status(struct file *filp,
 	BUG_ON(!status);
 
 	/* only allows one page from the head */
-	if (vma->vm_pgoff > 0 || size != PAGE_SIZE)
+	if (vma->vm_pgoff > 0 || size != PG_SIZE)
 		return -EIO;
 	/* disallow writable mapping */
 	if (vma->vm_flags & VM_WRITE)
@@ -276,7 +276,7 @@ static ssize_t sel_write_disable(struct file *file, const char __user *buf,
 	ssize_t length;
 	int new_value;
 
-	if (count >= PAGE_SIZE)
+	if (count >= PG_SIZE)
 		return -ENOMEM;
 
 	/* No partial writes. */
@@ -448,8 +448,8 @@ static vm_fault_t sel_mmap_policy_fault(struct vm_fault *vmf)
 	if (vmf->flags & (FAULT_FLAG_MKWRITE | FAULT_FLAG_WRITE))
 		return VM_FAULT_SIGBUS;
 
-	offset = vmf->pgoff << PAGE_SHIFT;
-	if (offset >= roundup(plm->len, PAGE_SIZE))
+	offset = vmf->pgoff << PG_SHIFT;
+	if (offset >= roundup(plm->len, PG_SIZE))
 		return VM_FAULT_SIGBUS;
 
 	page = vmalloc_to_page(plm->data + offset);
@@ -699,7 +699,7 @@ static ssize_t sel_write_checkreqprot(struct file *file, const char __user *buf,
 	if (length)
 		return length;
 
-	if (count >= PAGE_SIZE)
+	if (count >= PG_SIZE)
 		return -ENOMEM;
 
 	/* No partial writes. */
@@ -752,7 +752,7 @@ static ssize_t sel_write_validatetrans(struct file *file,
 		goto out;
 
 	rc = -ENOMEM;
-	if (count >= PAGE_SIZE)
+	if (count >= PG_SIZE)
 		goto out;
 
 	/* No partial writes. */
@@ -1273,7 +1273,7 @@ static ssize_t sel_write_bool(struct file *filep, const char __user *buf,
 	unsigned index = file_inode(filep)->i_ino & SEL_INO_MASK;
 	const char *name = filep->f_path.dentry->d_name.name;
 
-	if (count >= PAGE_SIZE)
+	if (count >= PG_SIZE)
 		return -ENOMEM;
 
 	/* No partial writes. */
@@ -1328,7 +1328,7 @@ static ssize_t sel_commit_bools_write(struct file *filep,
 	ssize_t length;
 	int new_value;
 
-	if (count >= PAGE_SIZE)
+	if (count >= PG_SIZE)
 		return -ENOMEM;
 
 	/* No partial writes. */
@@ -1395,8 +1395,9 @@ static int sel_make_bools(struct selinux_policy *newpolicy, struct dentry *bool_
 		ssize_t len;
 		u32 sid;
 
-		len = snprintf(page, PAGE_SIZE, "/%s/%s", BOOL_DIR_NAME, names[i]);
-		if (len >= PAGE_SIZE) {
+		len = snprintf(page, PG_SIZE, "/%s/%s", BOOL_DIR_NAME,
+			       names[i]);
+		if (len >= PG_SIZE) {
 			ret = -ENAMETOOLONG;
 			break;
 		}
@@ -1454,7 +1455,7 @@ static ssize_t sel_write_avc_cache_threshold(struct file *file,
 	if (ret)
 		return ret;
 
-	if (count >= PAGE_SIZE)
+	if (count >= PG_SIZE)
 		return -ENOMEM;
 
 	/* No partial writes. */

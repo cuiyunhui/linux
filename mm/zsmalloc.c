@@ -74,7 +74,7 @@
 #endif
 #endif
 
-#define _PFN_BITS		(MAX_POSSIBLE_PHYSMEM_BITS - PAGE_SHIFT)
+#define _PFN_BITS		(MAX_POSSIBLE_PHYSMEM_BITS - PG_SHIFT)
 
 /*
  * Head in allocated object should have OBJ_ALLOCATED_TAG
@@ -100,9 +100,9 @@
 
 /* ZS_MIN_ALLOC_SIZE must be multiple of ZS_ALIGN */
 #define ZS_MIN_ALLOC_SIZE \
-	MAX(32, (ZS_MAX_PAGES_PER_ZSPAGE << PAGE_SHIFT >> OBJ_INDEX_BITS))
+	MAX(32, (ZS_MAX_PAGES_PER_ZSPAGE << PG_SHIFT >> OBJ_INDEX_BITS))
 /* each chunk includes extra space to keep handle */
-#define ZS_MAX_ALLOC_SIZE	PAGE_SIZE
+#define ZS_MAX_ALLOC_SIZE	PG_SIZE
 
 /*
  * On systems with 4K page size, this gives 255 size classes! There is a
@@ -117,7 +117,7 @@
  *  ZS_MIN_ALLOC_SIZE and ZS_SIZE_CLASS_DELTA must be multiple of ZS_ALIGN
  *  (reason above)
  */
-#define ZS_SIZE_CLASS_DELTA	(PAGE_SIZE >> CLASS_BITS)
+#define ZS_SIZE_CLASS_DELTA	(PG_SIZE >> CLASS_BITS)
 #define ZS_SIZE_CLASSES	(DIV_ROUND_UP(ZS_MAX_ALLOC_SIZE - ZS_MIN_ALLOC_SIZE, \
 				      ZS_SIZE_CLASS_DELTA) + 1)
 
@@ -437,7 +437,7 @@ static inline unsigned int get_first_obj_offset(struct zpdesc *zpdesc)
 static inline void set_first_obj_offset(struct zpdesc *zpdesc, unsigned int offset)
 {
 	/* With 24 bits available, we can support offsets into 16 MiB pages. */
-	BUILD_BUG_ON(PAGE_SIZE > SZ_16M);
+	BUILD_BUG_ON(PG_SIZE > SZ_16M);
 	VM_WARN_ON_ONCE(!PageZsmalloc(zpdesc_page(zpdesc)));
 	VM_WARN_ON_ONCE(offset & ~FIRST_OBJ_PAGE_TYPE_MASK);
 	zpdesc->first_obj_offset &= ~FIRST_OBJ_PAGE_TYPE_MASK;
@@ -865,7 +865,7 @@ static void init_zspage(struct size_class *class, struct zspage *zspage)
 		vaddr = kmap_local_zpdesc(zpdesc);
 		link = (struct link_free *)vaddr + off / sizeof(*link);
 
-		while ((off += class->size) < PAGE_SIZE) {
+		while ((off += class->size) < PG_SIZE) {
 			link->next = freeobj++ << OBJ_TAG_BITS;
 			link += class->size / sizeof(*link);
 		}
@@ -887,7 +887,7 @@ static void init_zspage(struct size_class *class, struct zspage *zspage)
 		}
 		kunmap_local(vaddr);
 		zpdesc = next_zpdesc;
-		off %= PAGE_SIZE;
+		off %= PG_SIZE;
 	}
 
 	set_freeobj(zspage, 0);
@@ -1055,12 +1055,12 @@ void *zs_obj_read_begin(struct zs_pool *pool, unsigned long handle,
 	read_unlock(&pool->lock);
 
 	class = zspage_class(pool, zspage);
-	off = offset_in_page(class->size * obj_idx);
+	off = offset_in_pg(class->size * obj_idx);
 
 	if (!ZsHugePage(zspage))
 		off += ZS_HANDLE_SIZE;
 
-	if (off + mem_len <= PAGE_SIZE) {
+	if (off + mem_len <= PG_SIZE) {
 		/* this object is contained entirely within a page */
 		addr = kmap_local_zpdesc(zpdesc);
 		addr += off;
@@ -1068,7 +1068,7 @@ void *zs_obj_read_begin(struct zs_pool *pool, unsigned long handle,
 		size_t sizes[2];
 
 		/* this object spans two pages */
-		sizes[0] = PAGE_SIZE - off;
+		sizes[0] = PG_SIZE - off;
 		sizes[1] = mem_len - sizes[0];
 		addr = local_copy;
 
@@ -1097,12 +1097,12 @@ void zs_obj_read_end(struct zs_pool *pool, unsigned long handle,
 	obj_to_location(obj, &zpdesc, &obj_idx);
 	zspage = get_zspage(zpdesc);
 	class = zspage_class(pool, zspage);
-	off = offset_in_page(class->size * obj_idx);
+	off = offset_in_pg(class->size * obj_idx);
 
 	if (!ZsHugePage(zspage))
 		off += ZS_HANDLE_SIZE;
 
-	if (off + mem_len <= PAGE_SIZE) {
+	if (off + mem_len <= PG_SIZE) {
 		handle_mem -= off;
 		kunmap_local(handle_mem);
 	}
@@ -1131,12 +1131,12 @@ void zs_obj_read_sg_begin(struct zs_pool *pool, unsigned long handle,
 	read_unlock(&pool->lock);
 
 	class = zspage_class(pool, zspage);
-	off = offset_in_page(class->size * obj_idx);
+	off = offset_in_pg(class->size * obj_idx);
 
 	if (!ZsHugePage(zspage))
 		off += ZS_HANDLE_SIZE;
 
-	if (off + mem_len <= PAGE_SIZE) {
+	if (off + mem_len <= PG_SIZE) {
 		/* this object is contained entirely within a page */
 		sg_init_table(sg, 1);
 		sg_set_page(sg, zpdesc_page(zpdesc), mem_len, off);
@@ -1144,7 +1144,7 @@ void zs_obj_read_sg_begin(struct zs_pool *pool, unsigned long handle,
 		size_t sizes[2];
 
 		/* this object spans two pages */
-		sizes[0] = PAGE_SIZE - off;
+		sizes[0] = PG_SIZE - off;
 		sizes[1] = mem_len - sizes[0];
 
 		sg_init_table(sg, 2);
@@ -1193,12 +1193,12 @@ void zs_obj_write(struct zs_pool *pool, unsigned long handle,
 	read_unlock(&pool->lock);
 
 	class = zspage_class(pool, zspage);
-	off = offset_in_page(class->size * obj_idx);
+	off = offset_in_pg(class->size * obj_idx);
 
 	if (!ZsHugePage(zspage))
 		off += ZS_HANDLE_SIZE;
 
-	if (off + mem_len <= PAGE_SIZE) {
+	if (off + mem_len <= PG_SIZE) {
 		/* this object is contained entirely within a page */
 		void *dst = kmap_local_zpdesc(zpdesc);
 
@@ -1208,7 +1208,7 @@ void zs_obj_write(struct zs_pool *pool, unsigned long handle,
 		/* this object spans two pages */
 		size_t sizes[2];
 
-		sizes[0] = PAGE_SIZE - off;
+		sizes[0] = PG_SIZE - off;
 		sizes[1] = mem_len - sizes[0];
 
 		memcpy_to_page(zpdesc_page(zpdesc), off,
@@ -1257,8 +1257,8 @@ static unsigned long obj_malloc(struct zs_pool *pool,
 	obj = get_freeobj(zspage);
 
 	offset = obj * class->size;
-	nr_zpdesc = offset >> PAGE_SHIFT;
-	m_offset = offset_in_page(offset);
+	nr_zpdesc = offset >> PG_SHIFT;
+	m_offset = offset_in_pg(offset);
 	m_zpdesc = get_first_zpdesc(zspage);
 
 	for (i = 0; i < nr_zpdesc; i++)
@@ -1364,7 +1364,7 @@ static void obj_free(int class_size, unsigned long obj)
 
 
 	obj_to_location(obj, &f_zpdesc, &f_objidx);
-	f_offset = offset_in_page(class_size * f_objidx);
+	f_offset = offset_in_pg(class_size * f_objidx);
 	zspage = get_zspage(f_zpdesc);
 
 	vaddr = kmap_local_zpdesc(f_zpdesc);
@@ -1431,14 +1431,14 @@ static void zs_object_copy(struct size_class *class, unsigned long dst,
 	obj_to_location(src, &s_zpdesc, &s_objidx);
 	obj_to_location(dst, &d_zpdesc, &d_objidx);
 
-	s_off = offset_in_page(class->size * s_objidx);
-	d_off = offset_in_page(class->size * d_objidx);
+	s_off = offset_in_pg(class->size * s_objidx);
+	d_off = offset_in_pg(class->size * d_objidx);
 
-	if (s_off + class->size > PAGE_SIZE)
-		s_size = PAGE_SIZE - s_off;
+	if (s_off + class->size > PG_SIZE)
+		s_size = PG_SIZE - s_off;
 
-	if (d_off + class->size > PAGE_SIZE)
-		d_size = PAGE_SIZE - d_off;
+	if (d_off + class->size > PG_SIZE)
+		d_size = PG_SIZE - d_off;
 
 	s_addr = kmap_local_zpdesc(s_zpdesc);
 	d_addr = kmap_local_zpdesc(d_zpdesc);
@@ -1463,7 +1463,7 @@ static void zs_object_copy(struct size_class *class, unsigned long dst,
 		 * kunmap_local(d_addr). For more details see
 		 * Documentation/mm/highmem.rst.
 		 */
-		if (s_off >= PAGE_SIZE) {
+		if (s_off >= PG_SIZE) {
 			kunmap_local(d_addr);
 			kunmap_local(s_addr);
 			s_zpdesc = get_next_zpdesc(s_zpdesc);
@@ -1473,7 +1473,7 @@ static void zs_object_copy(struct size_class *class, unsigned long dst,
 			s_off = 0;
 		}
 
-		if (d_off >= PAGE_SIZE) {
+		if (d_off >= PG_SIZE) {
 			kunmap_local(d_addr);
 			d_zpdesc = get_next_zpdesc(d_zpdesc);
 			d_addr = kmap_local_zpdesc(d_zpdesc);
@@ -1501,7 +1501,7 @@ static unsigned long find_alloced_obj(struct size_class *class,
 	offset = get_first_obj_offset(zpdesc);
 	offset += class->size * index;
 
-	while (offset < PAGE_SIZE) {
+	while (offset < PG_SIZE) {
 		if (obj_allocated(zpdesc, addr + offset, &handle))
 			break;
 
@@ -1743,7 +1743,7 @@ static int zs_page_migrate(struct page *newpage, struct page *page,
 	copy_page(d_addr, s_addr);
 	kunmap_local(d_addr);
 
-	for (addr = s_addr + offset; addr < s_addr + PAGE_SIZE;
+	for (addr = s_addr + offset; addr < s_addr + PG_SIZE;
 					addr += class->size) {
 		if (obj_allocated(zpdesc, addr, &handle)) {
 
@@ -2036,7 +2036,7 @@ static int calculate_zspage_chain_size(int class_size)
 	for (i = 1; i <= ZS_MAX_PAGES_PER_ZSPAGE; i++) {
 		int waste;
 
-		waste = (i * PAGE_SIZE) % class_size;
+		waste = (i * PG_SIZE) % class_size;
 		if (waste < min_waste) {
 			min_waste = waste;
 			chain_size = i;
@@ -2089,7 +2089,7 @@ struct zs_pool *zs_create_pool(const char *name)
 		if (size > ZS_MAX_ALLOC_SIZE)
 			size = ZS_MAX_ALLOC_SIZE;
 		pages_per_zspage = calculate_zspage_chain_size(size);
-		objs_per_zspage = pages_per_zspage * PAGE_SIZE / size;
+		objs_per_zspage = pages_per_zspage * PG_SIZE / size;
 
 		/*
 		 * We iterate from biggest down to smallest classes,

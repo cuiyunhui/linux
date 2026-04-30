@@ -1817,7 +1817,7 @@ static int lbmLogInit(struct jfs_log * log)
 		if (!page)
 			goto error;
 		buffer = page_address(page);
-		for (offset = 0; offset < PAGE_SIZE; offset += LOGPSIZE) {
+		for (offset = 0; offset < PG_SIZE; offset += LOGPSIZE) {
 			lbuf = kmalloc_obj(struct lbuf);
 			if (lbuf == NULL) {
 				if (offset == 0)

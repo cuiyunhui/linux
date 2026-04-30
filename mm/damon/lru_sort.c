@@ -182,7 +182,7 @@ DEFINE_DAMON_MODULES_DAMOS_STATS_PARAMS(damon_lru_sort_cold_stat,
 
 static struct damos_access_pattern damon_lru_sort_stub_pattern = {
 	/* Find regions having PAGE_SIZE or larger size */
-	.min_sz_region = PAGE_SIZE,
+	.min_sz_region = PG_SIZE,
 	.max_sz_region = ULONG_MAX,
 	/* no matter its access frequency */
 	.min_nr_accesses = 0,

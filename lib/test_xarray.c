@@ -822,7 +822,7 @@ static noinline void check_xa_multi_store_adv(struct xarray *xa,
 	unsigned long index, base, next_index, next_next_index;
 	unsigned int i;
 
-	index = pos >> PAGE_SHIFT;
+	index = pos >> PG_SHIFT;
 	base = round_down(index, nrpages);
 	next_index = round_down(base + nrpages, nrpages);
 	next_next_index = round_down(next_index + nrpages, nrpages);

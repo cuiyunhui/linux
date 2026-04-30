@@ -58,7 +58,7 @@ static int zlib_uncompress(struct squashfs_sb_info *msblk, void *strm,
 	int zlib_init = 0, error = 0;
 	z_stream *stream = strm;
 
-	stream->avail_out = PAGE_SIZE;
+	stream->avail_out = PG_SIZE;
 	stream->next_out = squashfs_first_page(output);
 	stream->avail_in = 0;
 
@@ -94,7 +94,7 @@ static int zlib_uncompress(struct squashfs_sb_info *msblk, void *strm,
 				error = PTR_ERR(stream->next_out);
 				break;
 			} else if (stream->next_out != NULL)
-				stream->avail_out = PAGE_SIZE;
+				stream->avail_out = PG_SIZE;
 		}
 
 		if (!zlib_init) {

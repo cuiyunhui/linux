@@ -1544,7 +1544,7 @@ static int snd_cs46xx_capture_open(struct snd_pcm_substream *substream)
 	struct snd_cs46xx *chip = snd_pcm_substream_chip(substream);
 
 	if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, &chip->pci->dev,
-				PAGE_SIZE, &chip->capt.hw_buf) < 0)
+				PG_SIZE, &chip->capt.hw_buf) < 0)
 		return -ENOMEM;
 	chip->capt.substream = substream;
 	substream->runtime->hw = snd_cs46xx_capture;

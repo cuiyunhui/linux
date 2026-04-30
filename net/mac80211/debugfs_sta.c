@@ -668,7 +668,7 @@ static ssize_t link_sta_he_capa_read(struct file *file, char __user *userbuf,
 				     size_t count, loff_t *ppos)
 {
 	char *buf, *p;
-	size_t buf_sz = PAGE_SIZE;
+	size_t buf_sz = PG_SIZE;
 	struct link_sta_info *link_sta = file->private_data;
 	struct ieee80211_sta_he_cap *hec = &link_sta->pub->he_cap;
 	struct ieee80211_he_mcs_nss_supp *nss = &hec->he_mcs_nss_supp;
@@ -1041,7 +1041,7 @@ static ssize_t link_sta_eht_capa_read(struct file *file, char __user *userbuf,
 				      size_t count, loff_t *ppos)
 {
 	char *buf, *p;
-	size_t buf_sz = PAGE_SIZE;
+	size_t buf_sz = PG_SIZE;
 	struct link_sta_info *link_sta = file->private_data;
 	struct ieee80211_sta_eht_cap *bec = &link_sta->pub->eht_cap;
 	struct ieee80211_eht_cap_elem_fixed *fixed = &bec->eht_cap_elem;

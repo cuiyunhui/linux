@@ -54,7 +54,7 @@ static void guest_code(void)
 			     "a" (0x5a), "d" (0));
 
 	/* Hyper-V hypercall page */
-	u64 msrval = HCALL_REGION_GPA + PAGE_SIZE + 1;
+	u64 msrval = HCALL_REGION_GPA + PG_SIZE + 1;
 	__asm__ __volatile__("wrmsr" : : "c" (HV_HYPERCALL_MSR),
 			     "a" (msrval & 0xffffffff),
 			     "d" (msrval >> 32));
@@ -71,7 +71,7 @@ static void guest_code(void)
 	rcx = HVCALL_SIGNAL_EVENT;	/* code */
 	rdx = 0x5a5a5a5a;		/* ingpa (badly aligned) */
 	__asm__ __volatile__("call *%1" : "=a"(rax) :
-			     "r"(HCALL_REGION_GPA + PAGE_SIZE),
+			     "r"(HCALL_REGION_GPA + PG_SIZE),
 			     "a"(rax), "c"(rcx), "d"(rdx),
 			     "r"(r8));
 	GUEST_ASSERT(rax == HV_STATUS_INVALID_ALIGNMENT);

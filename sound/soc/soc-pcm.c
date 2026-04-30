@@ -234,7 +234,7 @@ static ssize_t dpcm_state_read_file(struct file *file, char __user *user_buf,
 				    size_t count, loff_t *ppos)
 {
 	struct snd_soc_pcm_runtime *fe = file->private_data;
-	ssize_t out_count = PAGE_SIZE, offset = 0, ret = 0;
+	ssize_t out_count = PG_SIZE, offset = 0, ret = 0;
 	int stream;
 	char *buf;
 

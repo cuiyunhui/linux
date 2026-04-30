@@ -390,8 +390,8 @@ static void nfs42_copy_dest_done(struct file *file, loff_t pos, loff_t len,
 	loff_t end = newsize - 1;
 
 	nfs_truncate_last_folio(mapping, oldsize, pos);
-	WARN_ON_ONCE(invalidate_inode_pages2_range(mapping, pos >> PAGE_SHIFT,
-						   end >> PAGE_SHIFT));
+	WARN_ON_ONCE(invalidate_inode_pages2_range(mapping, pos >> PG_SHIFT,
+						   end >> PG_SHIFT));
 
 	spin_lock(&inode->i_lock);
 	if (newsize > i_size_read(inode))
@@ -1367,7 +1367,7 @@ out_put_src_lock:
 	return err;
 }
 
-#define NFS4XATTR_MAXPAGES DIV_ROUND_UP(XATTR_SIZE_MAX, PAGE_SIZE)
+#define NFS4XATTR_MAXPAGES DIV_ROUND_UP(XATTR_SIZE_MAX, PG_SIZE)
 
 static int _nfs42_proc_removexattr(struct inode *inode, const char *name)
 {
@@ -1533,7 +1533,7 @@ static ssize_t _nfs42_proc_listxattrs(struct inode *inode, void *buf,
 	xdrlen = nfs42_listxattr_xdrsize(buflen);
 	if (xdrlen > server->lxasize)
 		xdrlen = server->lxasize;
-	np = xdrlen / PAGE_SIZE + 1;
+	np = xdrlen / PG_SIZE + 1;
 
 	pages = kzalloc_objs(struct page *, np);
 	if (!pages)
@@ -1600,7 +1600,7 @@ ssize_t nfs42_proc_getxattr(struct inode *inode, const char *name,
 	 */
 	do {
 		err = _nfs42_proc_getxattr(inode, name, buf, buflen,
-			pages, np * PAGE_SIZE);
+			pages, np * PG_SIZE);
 		if (err >= 0)
 			break;
 		err = nfs4_handle_exception(NFS_SERVER(inode), err,

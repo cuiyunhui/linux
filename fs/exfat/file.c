@@ -602,7 +602,7 @@ static int exfat_extend_valid_size(struct inode *inode, loff_t new_valid_size)
 		struct folio *folio;
 		unsigned long off;
 
-		len = PAGE_SIZE - (pos & (PAGE_SIZE - 1));
+		len = PG_SIZE - (pos & (PG_SIZE - 1));
 		if (pos + len > new_valid_size)
 			len = new_valid_size - pos;
 
@@ -716,7 +716,7 @@ static vm_fault_t exfat_page_mkwrite(struct vm_fault *vmf)
 	if (!inode_trylock(inode))
 		return VM_FAULT_RETRY;
 
-	new_valid_size = ((loff_t)vmf->pgoff + 1) << PAGE_SHIFT;
+	new_valid_size = ((loff_t)vmf->pgoff + 1) << PG_SHIFT;
 	new_valid_size = min(new_valid_size, i_size_read(inode));
 
 	if (ei->valid_size < new_valid_size) {

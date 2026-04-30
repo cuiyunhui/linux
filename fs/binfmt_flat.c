@@ -544,7 +544,7 @@ static int load_flat_file(struct linux_binprm *bprm,
 
 		len = data_len + extra +
 			DATA_START_OFFSET_WORDS * sizeof(unsigned long);
-		len = PAGE_ALIGN(len);
+		len = PG_ALIGN(len);
 		realdatastart = vm_mmap(NULL, 0, len,
 			PROT_READ|PROT_WRITE|PROT_EXEC, MAP_PRIVATE, 0);
 
@@ -591,7 +591,7 @@ static int load_flat_file(struct linux_binprm *bprm,
 
 		len = text_len + data_len + extra +
 			DATA_START_OFFSET_WORDS * sizeof(u32);
-		len = PAGE_ALIGN(len);
+		len = PG_ALIGN(len);
 		textpos = vm_mmap(NULL, 0, len,
 			PROT_READ | PROT_EXEC | PROT_WRITE, MAP_PRIVATE, 0);
 
@@ -871,7 +871,7 @@ static int load_flat_binary(struct linux_binprm *bprm)
 	 * a lot of entries.
 	 */
 #ifndef CONFIG_MMU
-	stack_len += PAGE_SIZE * MAX_ARG_PAGES - bprm->p; /* the strings */
+	stack_len += PG_SIZE * MAX_ARG_PAGES - bprm->p; /* the strings */
 #endif
 	stack_len += (bprm->argc + 1) * sizeof(char *);   /* the argv array */
 	stack_len += (bprm->envc + 1) * sizeof(char *);   /* the envp array */

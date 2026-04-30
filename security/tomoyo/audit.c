@@ -28,7 +28,7 @@ static char *tomoyo_print_bprm(struct linux_binprm *bprm,
 	char *last_start;
 	int len;
 	unsigned long pos = bprm->p;
-	int offset = pos % PAGE_SIZE;
+	int offset = pos % PG_SIZE;
 	int argv_count = bprm->argc;
 	int envp_count = bprm->envc;
 	bool truncated = false;
@@ -45,9 +45,9 @@ static char *tomoyo_print_bprm(struct linux_binprm *bprm,
 	while (argv_count || envp_count) {
 		if (!tomoyo_dump_page(bprm, pos, dump))
 			goto out;
-		pos += PAGE_SIZE - offset;
+		pos += PG_SIZE - offset;
 		/* Read. */
-		while (offset < PAGE_SIZE) {
+		while (offset < PG_SIZE) {
 			const char *kaddr = dump->data;
 			const unsigned char c = kaddr[offset++];
 

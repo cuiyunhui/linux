@@ -33,7 +33,7 @@
 #define MDPY_CLASS_NAME		"mdpy"
 
 #define MDPY_CONFIG_SPACE_SIZE	0xff
-#define MDPY_MEMORY_BAR_OFFSET	PAGE_SIZE
+#define MDPY_MEMORY_BAR_OFFSET	PG_SIZE
 #define MDPY_DISPLAY_REGION	16
 
 #define STORE_LE16(addr, val)	(*(u16 *)addr = val)
@@ -423,7 +423,7 @@ static int mdpy_mmap(struct vfio_device *vdev, struct vm_area_struct *vma)
 	struct mdev_state *mdev_state =
 		container_of(vdev, struct mdev_state, vdev);
 
-	if (vma->vm_pgoff != MDPY_MEMORY_BAR_OFFSET >> PAGE_SHIFT)
+	if (vma->vm_pgoff != MDPY_MEMORY_BAR_OFFSET >> PG_SHIFT)
 		return -EINVAL;
 	if (vma->vm_end < vma->vm_start)
 		return -EINVAL;

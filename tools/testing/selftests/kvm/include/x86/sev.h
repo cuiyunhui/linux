@@ -136,7 +136,7 @@ static inline void snp_launch_update_data(struct kvm_vm *vm, vm_paddr_t gpa,
 {
 	struct kvm_sev_snp_launch_update update_data = {
 		.uaddr = hva,
-		.gfn_start = gpa >> PAGE_SHIFT,
+		.gfn_start = gpa >> PG_SHIFT,
 		.len = size,
 		.type = type,
 	};

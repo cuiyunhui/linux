@@ -46,7 +46,7 @@ int ceph_cls_lock(struct ceph_osd_client *osdc,
 			   /* flag and type */
 			   sizeof(u8) + sizeof(u8) +
 			   CEPH_ENCODING_START_BLK_LEN;
-	if (lock_op_buf_size > PAGE_SIZE)
+	if (lock_op_buf_size > PG_SIZE)
 		return -E2BIG;
 
 	lock_op_page = alloc_page(GFP_NOIO);
@@ -105,7 +105,7 @@ int ceph_cls_unlock(struct ceph_osd_client *osdc,
 	unlock_op_buf_size = name_len + sizeof(__le32) +
 			     cookie_len + sizeof(__le32) +
 			     CEPH_ENCODING_START_BLK_LEN;
-	if (unlock_op_buf_size > PAGE_SIZE)
+	if (unlock_op_buf_size > PG_SIZE)
 		return -E2BIG;
 
 	unlock_op_page = alloc_page(GFP_NOIO);
@@ -158,7 +158,7 @@ int ceph_cls_break_lock(struct ceph_osd_client *osdc,
 			    cookie_len + sizeof(__le32) +
 			    sizeof(u8) + sizeof(__le64) +
 			    CEPH_ENCODING_START_BLK_LEN;
-	if (break_op_buf_size > PAGE_SIZE)
+	if (break_op_buf_size > PG_SIZE)
 		return -E2BIG;
 
 	break_op_page = alloc_page(GFP_NOIO);
@@ -207,7 +207,7 @@ int ceph_cls_set_cookie(struct ceph_osd_client *osdc,
 			     tag_len + sizeof(__le32) +
 			     new_cookie_len + sizeof(__le32) +
 			     sizeof(u8) + CEPH_ENCODING_START_BLK_LEN;
-	if (cookie_op_buf_size > PAGE_SIZE)
+	if (cookie_op_buf_size > PG_SIZE)
 		return -E2BIG;
 
 	cookie_op_page = alloc_page(GFP_NOIO);
@@ -340,13 +340,13 @@ int ceph_cls_lock_info(struct ceph_osd_client *osdc,
 	int get_info_op_buf_size;
 	int name_len = strlen(lock_name);
 	struct page *get_info_op_page, *reply_page;
-	size_t reply_len = PAGE_SIZE;
+	size_t reply_len = PG_SIZE;
 	void *p, *end;
 	int ret;
 
 	get_info_op_buf_size = name_len + sizeof(__le32) +
 			       CEPH_ENCODING_START_BLK_LEN;
-	if (get_info_op_buf_size > PAGE_SIZE)
+	if (get_info_op_buf_size > PG_SIZE)
 		return -E2BIG;
 
 	get_info_op_page = alloc_page(GFP_NOIO);
@@ -401,7 +401,7 @@ int ceph_cls_assert_locked(struct ceph_osd_request *req, int which,
 			     cookie_len + sizeof(__le32) +
 			     tag_len + sizeof(__le32) +
 			     sizeof(u8) + CEPH_ENCODING_START_BLK_LEN;
-	if (assert_op_buf_size > PAGE_SIZE)
+	if (assert_op_buf_size > PG_SIZE)
 		return -E2BIG;
 
 	ret = osd_req_op_cls_init(req, which, "lock", "assert_locked");

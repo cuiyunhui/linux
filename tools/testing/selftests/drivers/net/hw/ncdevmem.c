@@ -990,7 +990,7 @@ static int do_server(struct memory_buffer *mem)
 			total_received += dmabuf_cmsg->frag_size;
 			fprintf(stderr,
 				"received frag_page=%llu, in_page_offset=%llu, frag_offset=%llu, frag_size=%u, token=%u, total_received=%lu, dmabuf_id=%u\n",
-				dmabuf_cmsg->frag_offset >> PAGE_SHIFT,
+				dmabuf_cmsg->frag_offset >> PG_SHIFT,
 				dmabuf_cmsg->frag_offset % getpagesize(),
 				dmabuf_cmsg->frag_offset,
 				dmabuf_cmsg->frag_size, dmabuf_cmsg->frag_token,

@@ -387,7 +387,7 @@ static int snd_emu10k1_playback_hw_params(struct snd_pcm_substream *substream,
 		mapped = ((struct snd_emu10k1_memblk *)epcm->memblk)->mapped_page;
 		if (mapped < 0)
 			return -ENOMEM;
-		epcm->start_addr = mapped << PAGE_SHIFT;
+		epcm->start_addr = mapped << PG_SHIFT;
 	}
 	return 0;
 }

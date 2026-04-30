@@ -148,7 +148,7 @@ bool __attribute_const__ btrfs_supported_blocksize(u32 blocksize)
 	ASSERT(is_power_of_2(blocksize) && blocksize >= BTRFS_MIN_BLOCKSIZE &&
 	       blocksize <= BTRFS_MAX_BLOCKSIZE);
 
-	if (blocksize == PAGE_SIZE || blocksize == SZ_4K || blocksize == BTRFS_MIN_BLOCKSIZE)
+	if (blocksize == PG_SIZE || blocksize == SZ_4K || blocksize == BTRFS_MIN_BLOCKSIZE)
 		return true;
 #ifdef CONFIG_BTRFS_EXPERIMENTAL
 	/*
@@ -167,7 +167,7 @@ bool __attribute_const__ btrfs_supported_blocksize(u32 blocksize)
 	 * Considering HIGHMEM is such a pain to deal with and it's going
 	 * to be deprecated eventually, just reject HIGHMEM && bs > ps cases.
 	 */
-	if (IS_ENABLED(CONFIG_HIGHMEM) && blocksize > PAGE_SIZE)
+	if (IS_ENABLED(CONFIG_HIGHMEM) && blocksize > PG_SIZE)
 		return false;
 	return true;
 #endif

@@ -127,7 +127,7 @@ static int afs_mntpt_set_params(struct fs_context *fc, struct dentry *mntpt)
 		if (src_as->cell)
 			ctx->cell = afs_use_cell(src_as->cell, afs_cell_trace_use_mntpt);
 
-		if (size < 2 || size > PAGE_SIZE - 1)
+		if (size < 2 || size > PG_SIZE - 1)
 			return -EINVAL;
 
 		content = afs_get_link(mntpt, d_inode(mntpt), &cleanup);

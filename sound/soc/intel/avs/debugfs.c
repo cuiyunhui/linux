@@ -108,7 +108,7 @@ static ssize_t probe_points_read(struct file *file, char __user *to, size_t coun
 	if (*ppos)
 		return 0;
 
-	buf = kzalloc(PAGE_SIZE, GFP_KERNEL);
+	buf = kzalloc(PG_SIZE, GFP_KERNEL);
 	if (!buf)
 		return -ENOMEM;
 
@@ -119,7 +119,7 @@ static ssize_t probe_points_read(struct file *file, char __user *to, size_t coun
 	}
 
 	for (i = 0; i < num_desc; i++) {
-		ret = scnprintf(buf + len, PAGE_SIZE - len,
+		ret = scnprintf(buf + len, PG_SIZE - len,
 				"Id: %#010x  Purpose: %d  Node id: %#x\n",
 				desc[i].id.value, desc[i].purpose, desc[i].node_id.val);
 		len += ret;
@@ -238,7 +238,7 @@ static int strace_open(struct inode *inode, struct file *file)
 	if (kfifo_initialized(&adev->trace_fifo))
 		return -EBUSY;
 
-	ret = kfifo_alloc(&adev->trace_fifo, PAGE_SIZE, GFP_KERNEL);
+	ret = kfifo_alloc(&adev->trace_fifo, PG_SIZE, GFP_KERNEL);
 	if (ret < 0)
 		return ret;
 

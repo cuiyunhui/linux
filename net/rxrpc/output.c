@@ -330,7 +330,7 @@ void rxrpc_send_ACK(struct rxrpc_call *call, u8 ack_reason,
 		if (len > probe_mtu)
 			goto skip;
 		while (len < probe_mtu) {
-			size_t part = umin(probe_mtu - len, PAGE_SIZE);
+			size_t part = umin(probe_mtu - len, PG_SIZE);
 
 			kv[nr_kv].iov_base = page_address(ZERO_PAGE(0));
 			kv[nr_kv].iov_len = part;

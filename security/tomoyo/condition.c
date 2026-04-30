@@ -111,7 +111,7 @@ static bool tomoyo_scan_bprm(struct tomoyo_execve *ee,
 	char *arg_ptr = ee->tmp;
 	int arg_len = 0;
 	unsigned long pos = bprm->p;
-	int offset = pos % PAGE_SIZE;
+	int offset = pos % PG_SIZE;
 	int argv_count = bprm->argc;
 	int envp_count = bprm->envc;
 	bool result = true;
@@ -131,8 +131,8 @@ static bool tomoyo_scan_bprm(struct tomoyo_execve *ee,
 			result = false;
 			goto out;
 		}
-		pos += PAGE_SIZE - offset;
-		while (offset < PAGE_SIZE) {
+		pos += PG_SIZE - offset;
+		while (offset < PG_SIZE) {
 			/* Read. */
 			const char *kaddr = dump->data;
 			const unsigned char c = kaddr[offset++];

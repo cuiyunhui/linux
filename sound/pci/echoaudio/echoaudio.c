@@ -324,7 +324,7 @@ static int pcm_open(struct snd_pcm_substream *substream,
 	/* Allocate a page for the scatter-gather list */
 	err = snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV,
 				  &chip->pci->dev,
-				  PAGE_SIZE, &pipe->sgpage);
+				  PG_SIZE, &pipe->sgpage);
 	if (err < 0) {
 		dev_err(chip->card->dev, "s-g list allocation failed\n");
 		return err;
@@ -1891,8 +1891,8 @@ static int snd_echo_create(struct snd_card *card,
 
 	chip->dsp_registers_phys = pci_resource_start(pci, 0);
 	sz = pci_resource_len(pci, 0);
-	if (sz > PAGE_SIZE)
-		sz = PAGE_SIZE;		/* We map only the required part */
+	if (sz > PG_SIZE)
+		sz = PG_SIZE;		/* We map only the required part */
 
 	chip->dsp_registers = devm_ioremap(&pci->dev, chip->dsp_registers_phys, sz);
 	if (!chip->dsp_registers) {

@@ -164,7 +164,7 @@ static long long read_indexes(struct super_block *sb, int n,
 {
 	int err, i;
 	long long block = 0;
-	__le32 *blist = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	__le32 *blist = kmalloc(PG_SIZE, GFP_KERNEL);
 
 	if (blist == NULL) {
 		ERROR("read_indexes: Failed to allocate block_list\n");
@@ -172,7 +172,7 @@ static long long read_indexes(struct super_block *sb, int n,
 	}
 
 	while (n) {
-		int blocks = min_t(int, n, PAGE_SIZE >> 2);
+		int blocks = min_t(int, n, PG_SIZE >> 2);
 
 		err = squashfs_read_metadata(sb, blist, start_block,
 				offset, blocks << 2);
@@ -380,7 +380,7 @@ static bool squashfs_fill_page(struct folio *folio,
 
 	pageaddr = kmap_local_folio(folio, 0);
 	copied = squashfs_copy_data(pageaddr, buffer, offset, avail);
-	memset(pageaddr + copied, 0, PAGE_SIZE - copied);
+	memset(pageaddr + copied, 0, PG_SIZE - copied);
 	kunmap_local(pageaddr);
 
 	flush_dcache_folio(folio);
@@ -396,7 +396,7 @@ void squashfs_copy_cache(struct folio *folio,
 	struct address_space *mapping = folio->mapping;
 	struct inode *inode = mapping->host;
 	struct squashfs_sb_info *msblk = inode->i_sb->s_fs_info;
-	int i, mask = (1 << (msblk->block_log - PAGE_SHIFT)) - 1;
+	int i, mask = (1 << (msblk->block_log - PG_SHIFT)) - 1;
 	int start_index = folio->index & ~mask, end_index = start_index | mask;
 
 	/*
@@ -406,9 +406,9 @@ void squashfs_copy_cache(struct folio *folio,
 	 * been called to fill.
 	 */
 	for (i = start_index; i <= end_index && bytes > 0; i++,
-			bytes -= PAGE_SIZE, offset += PAGE_SIZE) {
+			bytes -= PG_SIZE, offset += PG_SIZE) {
 		struct folio *push_folio;
-		size_t avail = buffer ? min(bytes, PAGE_SIZE) : 0;
+		size_t avail = buffer ? min(bytes, PG_SIZE) : 0;
 		bool updated = false;
 
 		TRACE("bytes %zu, i %d, available_bytes %zu\n", bytes, i, avail);
@@ -463,7 +463,7 @@ static int squashfs_read_folio(struct file *file, struct folio *folio)
 {
 	struct inode *inode = folio->mapping->host;
 	struct squashfs_sb_info *msblk = inode->i_sb->s_fs_info;
-	int index = folio->index >> (msblk->block_log - PAGE_SHIFT);
+	int index = folio->index >> (msblk->block_log - PG_SHIFT);
 	int file_end = i_size_read(inode) >> msblk->block_log;
 	int expected = index == file_end ?
 			(i_size_read(inode) & (msblk->block_size - 1)) :
@@ -473,8 +473,8 @@ static int squashfs_read_folio(struct file *file, struct folio *folio)
 	TRACE("Entered squashfs_readpage, page index %lx, start block %llx\n",
 				folio->index, squashfs_i(inode)->start);
 
-	if (folio->index >= ((i_size_read(inode) + PAGE_SIZE - 1) >>
-					PAGE_SHIFT))
+	if (folio->index >= ((i_size_read(inode) + PG_SIZE - 1) >>
+					PG_SHIFT))
 		goto out;
 
 	if (index < file_end || squashfs_i(inode)->fragment_block ==
@@ -526,8 +526,8 @@ static int squashfs_readahead_fragment(struct inode *inode, struct page **page,
 	squashfs_actor_nobuff(actor);
 	addr = squashfs_first_page(actor);
 
-	for (copied = offset = 0; offset < expected; offset += PAGE_SIZE) {
-		int avail = min_t(int, expected - offset, PAGE_SIZE);
+	for (copied = offset = 0; offset < expected; offset += PG_SIZE) {
+		int avail = min_t(int, expected - offset, PG_SIZE);
 
 		if (!IS_ERR(addr)) {
 			bytes = squashfs_copy_data(addr, buffer, offset +
@@ -545,9 +545,9 @@ static int squashfs_readahead_fragment(struct inode *inode, struct page **page,
 
 	if (copied == expected && !IS_ERR(last_page)) {
 		/* Last page (if present) may have trailing bytes not filled */
-		bytes = copied % PAGE_SIZE;
+		bytes = copied % PG_SIZE;
 		if (bytes && last_page)
-			memzero_page(last_page, bytes, PAGE_SIZE - bytes);
+			memzero_page(last_page, bytes, PG_SIZE - bytes);
 
 		for (i = 0; i < pages; i++) {
 			flush_dcache_page(page[i]);
@@ -576,7 +576,7 @@ static void squashfs_readahead(struct readahead_control *ractl)
 	struct inode *inode = ractl->mapping->host;
 	struct squashfs_sb_info *msblk = inode->i_sb->s_fs_info;
 	size_t mask = (1UL << msblk->block_log) - 1;
-	unsigned short shift = msblk->block_log - PAGE_SHIFT;
+	unsigned short shift = msblk->block_log - PG_SHIFT;
 	loff_t start = readahead_pos(ractl) & ~mask;
 	size_t len = readahead_length(ractl) + readahead_pos(ractl) - start;
 	struct squashfs_page_actor *actor;
@@ -602,7 +602,7 @@ static void squashfs_readahead(struct readahead_control *ractl)
 			   (i_size_read(inode) & (msblk->block_size - 1)) :
 			    msblk->block_size;
 
-		max_pages = (expected + PAGE_SIZE - 1) >> PAGE_SHIFT;
+		max_pages = (expected + PG_SIZE - 1) >> PG_SHIFT;
 
 		nr_pages = __readahead_batch(ractl, pages, max_pages);
 		if (!nr_pages)
@@ -637,10 +637,10 @@ static void squashfs_readahead(struct readahead_control *ractl)
 			int bytes;
 
 			/* Last page (if present) may have trailing bytes not filled */
-			bytes = res % PAGE_SIZE;
+			bytes = res % PG_SIZE;
 			if (start >> msblk->block_log == file_end && bytes && last_page)
 				memzero_page(last_page, bytes,
-					     PAGE_SIZE - bytes);
+					     PG_SIZE - bytes);
 
 			for (i = 0; i < nr_pages; i++) {
 				flush_dcache_page(pages[i]);

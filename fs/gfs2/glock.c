@@ -2585,7 +2585,7 @@ static const struct seq_operations gfs2_sbstats_sops = {
 	.show  = gfs2_sbstats_seq_show,
 };
 
-#define GFS2_SEQ_GOODSIZE min(PAGE_SIZE << PAGE_ALLOC_COSTLY_ORDER, 65536UL)
+#define GFS2_SEQ_GOODSIZE min(PG_SIZE << PAGE_ALLOC_COSTLY_ORDER, 65536UL)
 
 static int __gfs2_glocks_open(struct inode *inode, struct file *file,
 			      const struct seq_operations *ops)

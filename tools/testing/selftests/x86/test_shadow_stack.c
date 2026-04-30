@@ -571,7 +571,7 @@ int test_guard_gap_other_gaps(void)
 		return 1;
 
 	while (test_map > shstk) {
-		test_map = mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE,
+		test_map = mmap(0, PG_SIZE, PROT_READ | PROT_WRITE,
 				MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 		if (test_map == MAP_FAILED)
 			return 1;
@@ -585,13 +585,13 @@ int test_guard_gap_other_gaps(void)
 	while (head) {
 		cur = head;
 		head = cur->next;
-		munmap(cur->mapping, PAGE_SIZE);
+		munmap(cur->mapping, PG_SIZE);
 		free(cur);
 	}
 
 	free_shstk(shstk);
 
-	if (shstk - test_map - PAGE_SIZE != PAGE_SIZE)
+	if (shstk - test_map - PG_SIZE != PG_SIZE)
 		return 1;
 
 	printf("[OK]\tGuard gap test, other mapping's gaps\n");
@@ -606,18 +606,19 @@ int test_guard_gap_new_mappings_gaps(void)
 	struct node *head = NULL, *cur;
 	int ret = 0;
 
-	free_area = mmap(0, PAGE_SIZE * 4, PROT_READ | PROT_WRITE,
+	free_area = mmap(0, PG_SIZE * 4, PROT_READ | PROT_WRITE,
 			 MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-	munmap(free_area, PAGE_SIZE * 4);
+	munmap(free_area, PG_SIZE * 4);
 
 	/* Test letting map_shadow_stack find a free space */
-	shstk_start = mmap(free_area, PAGE_SIZE, PROT_READ | PROT_WRITE,
+	shstk_start = mmap(free_area, PG_SIZE, PROT_READ | PROT_WRITE,
 			   MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	if (shstk_start == MAP_FAILED || shstk_start != free_area)
 		return 1;
 
 	while (test_map > shstk_start) {
-		test_map = (void *)syscall(__NR_map_shadow_stack, 0, PAGE_SIZE, 0);
+		test_map = (void *)syscall(__NR_map_shadow_stack, 0, PG_SIZE,
+					   0);
 		if (test_map == MAP_FAILED) {
 			printf("[INFO]\tmap_shadow_stack MAP_FAILED\n");
 			ret = 1;
@@ -630,7 +631,7 @@ int test_guard_gap_new_mappings_gaps(void)
 		cur->next = head;
 		head = cur;
 
-		if (test_map == free_area + PAGE_SIZE) {
+		if (test_map == free_area + PG_SIZE) {
 			printf("[INFO]\tNew mapping has other mapping in guard gap!\n");
 			ret = 1;
 			break;
@@ -640,11 +641,11 @@ int test_guard_gap_new_mappings_gaps(void)
 	while (head) {
 		cur = head;
 		head = cur->next;
-		munmap(cur->mapping, PAGE_SIZE);
+		munmap(cur->mapping, PG_SIZE);
 		free(cur);
 	}
 
-	munmap(shstk_start, PAGE_SIZE);
+	munmap(shstk_start, PG_SIZE);
 
 	if (!ret)
 		printf("[OK]\tGuard gap test, placement mapping's gaps\n");

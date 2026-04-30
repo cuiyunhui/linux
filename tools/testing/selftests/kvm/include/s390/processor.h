@@ -23,8 +23,8 @@
 
 /* Page size definitions */
 #define PAGE_SHIFT 12
-#define PAGE_SIZE BIT_ULL(PAGE_SHIFT)
-#define PAGE_MASK (~(PAGE_SIZE - 1))
+#define PAGE_SIZE BIT_ULL(PG_SHIFT)
+#define PAGE_MASK (~(PG_SIZE - 1))
 
 /* Is there a portable way to do this? */
 static inline void cpu_relax(void)

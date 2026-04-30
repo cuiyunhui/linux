@@ -23,7 +23,7 @@
 #define GUEST_PAGES 256UL
 
 #define BUF_START_GFN	(GUEST_PAGES - BUF_PAGES)
-#define BUF_START_ADDR	(BUF_START_GFN << PAGE_SHIFT)
+#define BUF_START_ADDR	(BUF_START_GFN << PG_SHIFT)
 
 #define KEY_BITS_ACC	0xf0
 #define KEY_BIT_F	0x08
@@ -71,7 +71,7 @@ static void set_skeys(struct kvm_vcpu *vcpu, unsigned char skeys[])
 static int do_keyop(struct kvm_vcpu *vcpu, int op, unsigned long page_idx, unsigned char skey)
 {
 	struct kvm_s390_keyop keyop = {
-		.guest_addr = BUF_START_ADDR + page_idx * PAGE_SIZE,
+		.guest_addr = BUF_START_ADDR + page_idx * PG_SIZE,
 		.key = skey,
 		.operation = op,
 	};
@@ -95,7 +95,8 @@ static void fault_in_buffer(struct kvm_vcpu *vcpu, int where, int cur_loc)
 		return;
 
 	for (i = 0; i < BUF_PAGES; i++) {
-		r = ioctl(vcpu->fd, KVM_S390_VCPU_FAULT, BUF_START_ADDR + i * PAGE_SIZE);
+		r = ioctl(vcpu->fd, KVM_S390_VCPU_FAULT,
+			  BUF_START_ADDR + i * PG_SIZE);
 		TEST_ASSERT(!r, "Faulting in buffer page %lu, r=%d", i, r);
 	}
 }

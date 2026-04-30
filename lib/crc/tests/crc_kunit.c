@@ -94,7 +94,7 @@ static int crc_suite_init(struct kunit_suite *suite)
 	 * so that it is immediately followed by a guard page.  This allows
 	 * buffer overreads to be detected, even in assembly code.
 	 */
-	test_buflen = round_up(CRC_KUNIT_MAX_LEN, PAGE_SIZE);
+	test_buflen = round_up(CRC_KUNIT_MAX_LEN, PG_SIZE);
 	test_buffer = vmalloc(test_buflen);
 	if (!test_buffer)
 		return -ENOMEM;

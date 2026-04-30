@@ -81,7 +81,7 @@ int osf_partition(struct parsed_partitions *state)
 				le32_to_cpu(partition->p_size));
 		slot++;
 	}
-	strlcat(state->pp_buf, "\n", PAGE_SIZE);
+	strlcat(state->pp_buf, "\n", PG_SIZE);
 	put_dev_sector(sect);
 	return 1;
 }

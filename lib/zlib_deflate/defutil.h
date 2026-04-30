@@ -242,7 +242,7 @@ typedef struct deflate_state {
 
 #ifdef CONFIG_ZLIB_DFLTCC
 #define zlib_deflate_window_memsize(windowBits) \
-	(2 * (1 << (windowBits)) * sizeof(Byte) + PAGE_SIZE)
+	(2 * (1 << (windowBits)) * sizeof(Byte) + PG_SIZE)
 #else
 #define zlib_deflate_window_memsize(windowBits) \
 	(2 * (1 << (windowBits)) * sizeof(Byte))

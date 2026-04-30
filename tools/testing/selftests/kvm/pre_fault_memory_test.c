@@ -13,8 +13,8 @@
 #include <pthread.h>
 
 /* Arbitrarily chosen values */
-#define TEST_SIZE		(SZ_2M + PAGE_SIZE)
-#define TEST_NPAGES		(TEST_SIZE / PAGE_SIZE)
+#define TEST_SIZE		(SZ_2M + PG_SIZE)
+#define TEST_NPAGES		(TEST_SIZE / PG_SIZE)
 #define TEST_SLOT		10
 
 static void guest_code(uint64_t base_gva)
@@ -23,7 +23,7 @@ static void guest_code(uint64_t base_gva)
 	int i;
 
 	for (i = 0; i < TEST_NPAGES; i++) {
-		uint64_t *src = (uint64_t *)(base_gva + i * PAGE_SIZE);
+		uint64_t *src = (uint64_t *)(base_gva + i * PG_SIZE);
 
 		val = *src;
 	}
@@ -191,8 +191,8 @@ static void __test_pre_fault_memory(unsigned long vm_type, bool private)
 		vm_mem_set_private(vm, gpa, TEST_SIZE);
 
 	pre_fault_memory(vcpu, gpa, 0, SZ_2M, 0, private);
-	pre_fault_memory(vcpu, gpa, SZ_2M, PAGE_SIZE * 2, PAGE_SIZE, private);
-	pre_fault_memory(vcpu, gpa, TEST_SIZE, PAGE_SIZE, PAGE_SIZE, private);
+	pre_fault_memory(vcpu, gpa, SZ_2M, PG_SIZE * 2, PG_SIZE, private);
+	pre_fault_memory(vcpu, gpa, TEST_SIZE, PG_SIZE, PG_SIZE, private);
 
 	vcpu_args_set(vcpu, 1, gva);
 	vcpu_run(vcpu);

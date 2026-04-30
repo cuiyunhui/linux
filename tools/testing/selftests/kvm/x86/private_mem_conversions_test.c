@@ -24,7 +24,7 @@
 
 #define BASE_DATA_SLOT		10
 #define BASE_DATA_GPA		((uint64_t)(1ull << 32))
-#define PER_CPU_DATA_SIZE	((uint64_t)(SZ_2M + PAGE_SIZE))
+#define PER_CPU_DATA_SIZE	((uint64_t)(SZ_2M + PG_SIZE))
 
 /* Horrific macro so that the line info is captured accurately :-( */
 #define memcmp_g(gpa, pattern,  size)								\
@@ -112,11 +112,11 @@ struct {
 	uint64_t offset;
 	uint64_t size;
 } static const test_ranges[] = {
-	GUEST_STAGE(0, PAGE_SIZE),
+	GUEST_STAGE(0, PG_SIZE),
 	GUEST_STAGE(0, SZ_2M),
-	GUEST_STAGE(PAGE_SIZE, PAGE_SIZE),
-	GUEST_STAGE(PAGE_SIZE, SZ_2M),
-	GUEST_STAGE(SZ_2M, PAGE_SIZE),
+	GUEST_STAGE(PG_SIZE, PG_SIZE),
+	GUEST_STAGE(PG_SIZE, SZ_2M),
+	GUEST_STAGE(SZ_2M, PG_SIZE),
 };
 
 static void guest_test_explicit_conversion(uint64_t base_gpa, bool do_fallocate)
@@ -157,8 +157,8 @@ static void guest_test_explicit_conversion(uint64_t base_gpa, bool do_fallocate)
 		 */
 		guest_map_private(gpa, size, do_fallocate);
 
-		if (size > PAGE_SIZE) {
-			memset((void *)gpa, p2, PAGE_SIZE);
+		if (size > PG_SIZE) {
+			memset((void *)gpa, p2, PG_SIZE);
 			goto skip;
 		}
 
@@ -180,14 +180,15 @@ static void guest_test_explicit_conversion(uint64_t base_gpa, bool do_fallocate)
 		 * Convert odd-number page frames back to shared to verify KVM
 		 * also correctly handles holes in private ranges.
 		 */
-		for (j = 0; j < size; j += PAGE_SIZE) {
-			if ((j >> PAGE_SHIFT) & 1) {
-				guest_map_shared(gpa + j, PAGE_SIZE, do_fallocate);
-				guest_sync_shared(gpa + j, PAGE_SIZE, p1, p3);
+		for (j = 0; j < size; j += PG_SIZE) {
+			if ((j >> PG_SHIFT) & 1) {
+				guest_map_shared(gpa + j, PG_SIZE,
+						 do_fallocate);
+				guest_sync_shared(gpa + j, PG_SIZE, p1, p3);
 
-				memcmp_g(gpa + j, p3, PAGE_SIZE);
+				memcmp_g(gpa + j, p3, PG_SIZE);
 			} else {
-				guest_sync_private(gpa + j, PAGE_SIZE, p1);
+				guest_sync_private(gpa + j, PG_SIZE, p1);
 			}
 		}
 
@@ -290,7 +291,7 @@ static void handle_exit_hypercall(struct kvm_vcpu *vcpu)
 {
 	struct kvm_run *run = vcpu->run;
 	uint64_t gpa = run->hypercall.args[0];
-	uint64_t size = run->hypercall.args[1] * PAGE_SIZE;
+	uint64_t size = run->hypercall.args[1] * PG_SIZE;
 	bool set_attributes = run->hypercall.args[2] & MAP_GPA_SET_ATTRIBUTES;
 	bool map_shared = run->hypercall.args[2] & MAP_GPA_SHARED;
 	bool do_fallocate = run->hypercall.args[2] & MAP_GPA_DO_FALLOCATE;

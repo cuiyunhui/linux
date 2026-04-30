@@ -20,8 +20,8 @@
 
 KSTM_MODULE_GLOBALS();
 
-static char pbl_buffer[PAGE_SIZE] __initdata;
-static char print_buf[PAGE_SIZE * 2] __initdata;
+static char pbl_buffer[PG_SIZE] __initdata;
+static char print_buf[PG_SIZE * 2] __initdata;
 
 static const unsigned long exp1[] __initconst = {
 	BITMAP_FROM_U64(1),
@@ -529,8 +529,8 @@ static void __init test_bitmap_parselist(void)
 
 static void __init test_bitmap_printlist(void)
 {
-	unsigned long *bmap = kmalloc(PAGE_SIZE, GFP_KERNEL);
-	char *buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	unsigned long *bmap = kmalloc(PG_SIZE, GFP_KERNEL);
+	char *buf = kmalloc(PG_SIZE, GFP_KERNEL);
 	char expected[256];
 	int ret, slen;
 	ktime_t time;
@@ -538,13 +538,13 @@ static void __init test_bitmap_printlist(void)
 	if (!buf || !bmap)
 		goto out;
 
-	memset(bmap, -1, PAGE_SIZE);
-	slen = snprintf(expected, 256, "0-%ld", PAGE_SIZE * 8 - 1);
+	memset(bmap, -1, PG_SIZE);
+	slen = snprintf(expected, 256, "0-%ld", PG_SIZE * 8 - 1);
 	if (slen < 0)
 		goto out;
 
 	time = ktime_get();
-	ret = bitmap_print_to_pagebuf(true, buf, bmap, PAGE_SIZE * 8);
+	ret = bitmap_print_to_pagebuf(true, buf, bmap, PG_SIZE * 8);
 	time = ktime_get() - time;
 
 	if (ret != slen + 1) {
@@ -1178,21 +1178,21 @@ static void __init test_bitmap_print_buf(void)
 		int n;
 
 		n = bitmap_print_bitmask_to_buf(print_buf, t->bitmap, t->nbits,
-						0, 2 * PAGE_SIZE);
+						0, 2 * PG_SIZE);
 		expect_eq_uint(strlen(t->mask) + 1, n);
 		expect_eq_str(t->mask, print_buf, n);
 
 		n = bitmap_print_list_to_buf(print_buf, t->bitmap, t->nbits,
-					     0, 2 * PAGE_SIZE);
+					     0, 2 * PG_SIZE);
 		expect_eq_uint(strlen(t->list) + 1, n);
 		expect_eq_str(t->list, print_buf, n);
 
 		/* test by non-zero offset */
-		if (strlen(t->list) > PAGE_SIZE) {
+		if (strlen(t->list) > PG_SIZE) {
 			n = bitmap_print_list_to_buf(print_buf, t->bitmap, t->nbits,
-						     PAGE_SIZE, PAGE_SIZE);
-			expect_eq_uint(strlen(t->list) + 1 - PAGE_SIZE, n);
-			expect_eq_str(t->list + PAGE_SIZE, print_buf, n);
+						     PG_SIZE, PG_SIZE);
+			expect_eq_uint(strlen(t->list) + 1 - PG_SIZE, n);
+			expect_eq_str(t->list + PG_SIZE, print_buf, n);
 		}
 	}
 }

@@ -45,7 +45,7 @@ size_t xprt_rdma_bc_maxpayload(struct rpc_xprt *xprt)
 	size_t maxmsg;
 
 	maxmsg = min_t(unsigned int, ep->re_inline_send, ep->re_inline_recv);
-	maxmsg = min_t(unsigned int, maxmsg, PAGE_SIZE);
+	maxmsg = min_t(unsigned int, maxmsg, PG_SIZE);
 	return maxmsg - RPCRDMA_HDRLEN_MIN;
 }
 
@@ -189,7 +189,7 @@ create_req:
 	if (xprt->bc_alloc_count >= RPCRDMA_BACKWARD_WRS)
 		return NULL;
 
-	size = min_t(size_t, r_xprt->rx_ep->re_inline_recv, PAGE_SIZE);
+	size = min_t(size_t, r_xprt->rx_ep->re_inline_recv, PG_SIZE);
 	req = rpcrdma_req_create(r_xprt, size);
 	if (!req)
 		return NULL;

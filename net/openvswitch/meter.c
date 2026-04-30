@@ -737,7 +737,7 @@ int ovs_meters_init(struct datapath *dp)
 		return -ENOMEM;
 
 	/* Allow meters in a datapath to use ~3.12% of physical memory. */
-	free_mem_bytes = nr_free_buffer_pages() * (PAGE_SIZE >> 5);
+	free_mem_bytes = nr_free_buffer_pages() * (PG_SIZE >> 5);
 	tbl->max_meters_allowed = min(free_mem_bytes / sizeof(struct dp_meter),
 				      DP_METER_NUM_MAX);
 	if (!tbl->max_meters_allowed)

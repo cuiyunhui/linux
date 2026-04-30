@@ -128,7 +128,7 @@ MODULE_PARM_DESC(load_all, "Allow to load cards not on the allowlist");
 #define MY_INTERRUPTS (INT_RISCI | ERROR_INTERRUPTS)
 
 /* SYNC, one WRITE per line, one extra WRITE per page boundary, SYNC, JUMP */
-#define MAX_RISC_SIZE ((1 + 255 + (PAGE_ALIGN(255 * 4092) / PAGE_SIZE - 1) + 1 + 1) * 8)
+#define MAX_RISC_SIZE ((1 + 255 + (PG_ALIGN(255 * 4092) / PG_SIZE - 1) + 1 + 1) * 8)
 
 /* Cards with configuration information */
 enum snd_bt87x_boardid {
@@ -216,7 +216,7 @@ static int snd_bt87x_create_risc(struct snd_bt87x *chip, struct snd_pcm_substrea
 
 	if (chip->dma_risc.area == NULL) {
 		if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, &chip->pci->dev,
-					PAGE_ALIGN(MAX_RISC_SIZE), &chip->dma_risc) < 0)
+					PG_ALIGN(MAX_RISC_SIZE), &chip->dma_risc) < 0)
 			return -ENOMEM;
 	}
 	risc = (__le32 *)chip->dma_risc.area;
@@ -231,7 +231,7 @@ static int snd_bt87x_create_risc(struct snd_bt87x *chip, struct snd_pcm_substrea
 			u32 cmd, len;
 			unsigned int addr;
 
-			len = PAGE_SIZE - (offset % PAGE_SIZE);
+			len = PG_SIZE - (offset % PG_SIZE);
 			if (len > rest)
 				len = rest;
 			cmd = RISC_WRITE | len;

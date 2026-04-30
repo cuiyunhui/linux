@@ -49,7 +49,7 @@ static const struct snd_pcm_hardware rt5514_spi_pcm_hardware = {
 				  SNDRV_PCM_INFO_MMAP_VALID |
 				  SNDRV_PCM_INFO_INTERLEAVED,
 	.formats		= SNDRV_PCM_FMTBIT_S16_LE,
-	.period_bytes_min	= PAGE_SIZE,
+	.period_bytes_min	= PG_SIZE,
 	.period_bytes_max	= 0x20000 / 8,
 	.periods_min		= 8,
 	.periods_max		= 8,

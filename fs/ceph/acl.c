@@ -193,7 +193,7 @@ int ceph_pre_init_acls(struct inode *dir, umode_t *mode,
 	if (!pagelist)
 		goto out_err;
 
-	err = ceph_pagelist_reserve(pagelist, PAGE_SIZE);
+	err = ceph_pagelist_reserve(pagelist, PG_SIZE);
 	if (err)
 		goto out_err;
 

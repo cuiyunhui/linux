@@ -180,7 +180,7 @@ int ct_vm_create(struct ct_vm **rvm, struct pci_dev *pci)
 	for (i = 0; i < CT_PTP_NUM; i++) {
 		err = snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV,
 					  &pci->dev,
-					  PAGE_SIZE, &vm->ptp[i]);
+					  PG_SIZE, &vm->ptp[i]);
 		if (err < 0)
 			break;
 	}

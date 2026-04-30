@@ -30,7 +30,7 @@ static void free_workspace(void)
 static int __init alloc_workspace(void)
 {
 	lzo_mem = vmalloc(LZO1X_MEM_COMPRESS);
-	lzo_compress_buf = vmalloc(lzo1x_worst_compress(PAGE_SIZE));
+	lzo_compress_buf = vmalloc(lzo1x_worst_compress(PG_SIZE));
 
 	if (!lzo_mem || !lzo_compress_buf) {
 		free_workspace();

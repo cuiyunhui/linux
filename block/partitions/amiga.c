@@ -86,7 +86,7 @@ int amiga_partition(struct parsed_partitions *state)
 
 		/* Be more informative */
 		snprintf(tmp, sizeof(tmp), " RDSK (%d)", blksize * 512);
-		strlcat(state->pp_buf, tmp, PAGE_SIZE);
+		strlcat(state->pp_buf, tmp, PG_SIZE);
 	}
 	blk = be32_to_cpu(rdb->rdb_PartitionList);
 	put_dev_sector(sect);
@@ -191,15 +191,15 @@ int amiga_partition(struct parsed_partitions *state)
 				snprintf(tmp, sizeof(tmp), " (%c%c%c%c)",
 					dostype[0], dostype[1],
 					dostype[2], dostype[3]);
-			strlcat(state->pp_buf, tmp, PAGE_SIZE);
+			strlcat(state->pp_buf, tmp, PG_SIZE);
 			snprintf(tmp, sizeof(tmp), "(res %d spb %d)",
 				be32_to_cpu(pb->pb_Environment[6]),
 				be32_to_cpu(pb->pb_Environment[4]));
-			strlcat(state->pp_buf, tmp, PAGE_SIZE);
+			strlcat(state->pp_buf, tmp, PG_SIZE);
 		}
 		res = 1;
 	}
-	strlcat(state->pp_buf, "\n", PAGE_SIZE);
+	strlcat(state->pp_buf, "\n", PG_SIZE);
 
 rdb_done:
 	return res;

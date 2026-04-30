@@ -629,7 +629,7 @@ static int exfat_dir_readahead(struct super_block *sb, sector_t sec)
 	struct exfat_sb_info *sbi = EXFAT_SB(sb);
 	struct buffer_head *bh;
 	unsigned int max_ra_count = EXFAT_MAX_RA_SIZE >> sb->s_blocksize_bits;
-	unsigned int page_ra_count = PAGE_SIZE >> sb->s_blocksize_bits;
+	unsigned int page_ra_count = PG_SIZE >> sb->s_blocksize_bits;
 	unsigned int adj_ra_count = max(sbi->sect_per_clus, page_ra_count);
 	unsigned int ra_count = min(adj_ra_count, max_ra_count);
 
@@ -661,7 +661,7 @@ static int exfat_dir_readahead(struct super_block *sb, sector_t sec)
 struct exfat_dentry *exfat_get_dentry(struct super_block *sb,
 		struct exfat_chain *p_dir, int entry, struct buffer_head **bh)
 {
-	unsigned int dentries_per_page = EXFAT_B_TO_DEN(PAGE_SIZE);
+	unsigned int dentries_per_page = EXFAT_B_TO_DEN(PG_SIZE);
 	int off;
 	sector_t sec;
 

@@ -47,8 +47,8 @@ static void guest_do_CALL(uint64_t target)
 void guest_code(void)
 {
 	uint64_t hpage_1 = HPAGE_GVA;
-	uint64_t hpage_2 = hpage_1 + (PAGE_SIZE * 512);
-	uint64_t hpage_3 = hpage_2 + (PAGE_SIZE * 512);
+	uint64_t hpage_2 = hpage_1 + (PG_SIZE * 512);
+	uint64_t hpage_3 = hpage_2 + (PG_SIZE * 512);
 
 	READ_ONCE(*(uint64_t *)hpage_1);
 	GUEST_SYNC(1);

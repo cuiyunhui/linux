@@ -110,7 +110,7 @@ int main(int argc, char **argv, char **envp)
 		ksft_exit_fail_msg("failed to fork (%d): %m\n", errno);
 
 	if (child == 0) {
-		unsigned long vdso_size = PAGE_SIZE;
+		unsigned long vdso_size = PG_SIZE;
 		unsigned long auxval;
 		int ret = -1;
 
@@ -124,7 +124,7 @@ int main(int argc, char **argv, char **envp)
 		/* Simpler than parsing ELF header */
 		while (ret < 0) {
 			ret = try_to_remap((void *)auxval, vdso_size);
-			vdso_size += PAGE_SIZE;
+			vdso_size += PG_SIZE;
 		}
 
 #ifdef __i386__

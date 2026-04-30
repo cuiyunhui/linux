@@ -129,7 +129,7 @@ static const char *get_wild_bug_type(struct kasan_report_info *info)
 {
 	const char *bug_type = "unknown-crash";
 
-	if ((unsigned long)info->access_addr < PAGE_SIZE)
+	if ((unsigned long)info->access_addr < PG_SIZE)
 		bug_type = "null-ptr-deref";
 	else if ((unsigned long)info->access_addr < TASK_SIZE)
 		bug_type = "user-memory-access";

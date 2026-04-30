@@ -77,7 +77,7 @@ xfarray_create(
 	struct xfile		*xfile;
 	int			error;
 
-	ASSERT(obj_size < PAGE_SIZE);
+	ASSERT(obj_size < PG_SIZE);
 
 	error = xfile_create(description, 0, &xfile);
 	if (error)
@@ -288,7 +288,7 @@ xfarray_find_data(
 	xfarray_idx_t	*cur,
 	loff_t		*pos)
 {
-	unsigned int	pgoff = offset_in_page(*pos);
+	unsigned int	pgoff = offset_in_pg(*pos);
 	loff_t		end_pos = *pos + array->obj_size - 1;
 	loff_t		new_pos;
 
@@ -296,7 +296,7 @@ xfarray_find_data(
 	 * If the current array record is not adjacent to a page boundary, we
 	 * are in the middle of the page.  We do not need to move the cursor.
 	 */
-	if (pgoff != 0 && pgoff + array->obj_size - 1 < PAGE_SIZE)
+	if (pgoff != 0 && pgoff + array->obj_size - 1 < PG_SIZE)
 		return 0;
 
 	/*

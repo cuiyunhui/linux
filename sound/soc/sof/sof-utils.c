@@ -42,7 +42,7 @@ int snd_sof_create_page_table(struct device *dev,
 		 * This can be calculated by multiplying the page number by 2.5.
 		 */
 		u32 idx = (5 * i) >> 1;
-		u32 pfn = snd_sgbuf_get_addr(dmab, i * PAGE_SIZE) >> PAGE_SHIFT;
+		u32 pfn = snd_sgbuf_get_addr(dmab, i * PG_SIZE) >> PG_SHIFT;
 		u8 *pg_table;
 
 		pg_table = (u8 *)(page_table + idx);

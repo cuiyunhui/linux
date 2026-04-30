@@ -482,7 +482,7 @@ int main(int argc, char *argv[])
 	if (parallel)
 		return parallel_test(vdev.features, getrange, fast_vringh);
 
-	if (posix_memalign(&__user_addr_min, PAGE_SIZE, USER_MEM) != 0)
+	if (posix_memalign(&__user_addr_min, PG_SIZE, USER_MEM) != 0)
 		abort();
 	__user_addr_max = __user_addr_min + USER_MEM;
 	memset(__user_addr_min, 0, vring_size(RINGSIZE, ALIGN));

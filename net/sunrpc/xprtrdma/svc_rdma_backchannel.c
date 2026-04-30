@@ -104,7 +104,7 @@ xprt_rdma_bc_allocate(struct rpc_task *task)
 	size_t size = rqst->rq_callsize;
 	struct page *page;
 
-	if (size > PAGE_SIZE) {
+	if (size > PG_SIZE) {
 		WARN_ONCE(1, "svcrdma: large bc buffer request (size %zu)\n",
 			  size);
 		return -EINVAL;

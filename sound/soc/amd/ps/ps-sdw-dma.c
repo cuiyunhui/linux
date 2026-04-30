@@ -227,7 +227,7 @@ static void acp63_config_dma(struct acp_sdw_dma_stream *stream, void __iomem *ac
 		high |= BIT(31);
 		writel(high, acp_base + ACP_SCRATCH_REG_0 + val + 4);
 		val += 8;
-		addr += PAGE_SIZE;
+		addr += PG_SIZE;
 	}
 	writel(0x1, acp_base + ACPAXI2AXI_ATU_CTRL);
 }
@@ -414,7 +414,7 @@ static int acp63_sdw_dma_hw_params(struct snd_soc_component *component,
 	size = params_buffer_bytes(params);
 	period_bytes = params_period_bytes(params);
 	stream->dma_addr = substream->runtime->dma_addr;
-	stream->num_pages = (PAGE_ALIGN(size) >> PAGE_SHIFT);
+	stream->num_pages = (PG_ALIGN(size) >> PG_SHIFT);
 	acp63_config_dma(stream, sdw_data->acp_base, stream_id);
 	ret = acp63_configure_sdw_ringbuffer(sdw_data->acp_base, stream_id, size,
 					     stream->instance, sdw_data->acp_rev);

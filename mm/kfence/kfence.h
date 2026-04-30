@@ -105,7 +105,7 @@ struct kfence_metadata {
 #endif
 };
 
-#define KFENCE_METADATA_SIZE PAGE_ALIGN(sizeof(struct kfence_metadata) * \
+#define KFENCE_METADATA_SIZE PG_ALIGN(sizeof(struct kfence_metadata) * \
 					CONFIG_KFENCE_NUM_OBJECTS)
 
 extern struct kfence_metadata *kfence_metadata;
@@ -124,7 +124,7 @@ static inline struct kfence_metadata *addr_to_metadata(unsigned long addr)
 	 * __kfence_pool, in which case we would report an "invalid access"
 	 * error.
 	 */
-	index = (addr - (unsigned long)__kfence_pool) / (PAGE_SIZE * 2) - 1;
+	index = (addr - (unsigned long)__kfence_pool) / (PG_SIZE * 2) - 1;
 	if (index < 0 || index >= CONFIG_KFENCE_NUM_OBJECTS)
 		return NULL;
 

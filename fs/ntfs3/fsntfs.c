@@ -1235,11 +1235,11 @@ int ntfs_read_run_nb_ra(struct ntfs_sb_info *sbi, const struct runs_tree *run,
 		sector_t block = lbo >> sb->s_blocksize_bits;
 
 		if (ra) {
-			pgoff_t index = lbo >> PAGE_SHIFT;
+			pgoff_t index = lbo >> PG_SHIFT;
 			if (!ra_has_index(ra, index)) {
 				page_cache_sync_readahead(mapping, ra, NULL,
 							  index, 1);
-				ra->prev_pos = (loff_t)index << PAGE_SHIFT;
+				ra->prev_pos = (loff_t)index << PG_SHIFT;
 			}
 		}
 
@@ -1538,13 +1538,13 @@ int ntfs_read_write_run(struct ntfs_sb_info *sbi, const struct runs_tree *run,
 
 	for (;;) {
 		/* Read range [lbo, lbo+len). */
-		folio = read_mapping_folio(mapping, lbo >> PAGE_SHIFT, NULL);
+		folio = read_mapping_folio(mapping, lbo >> PG_SHIFT, NULL);
 
 		if (IS_ERR(folio))
 			return PTR_ERR(folio);
 
-		off = offset_in_page(lbo);
-		op = PAGE_SIZE - off;
+		off = offset_in_pg(lbo);
+		op = PG_SIZE - off;
 
 		if (op > len)
 			op = len;
@@ -1614,7 +1614,7 @@ int ntfs_bio_fill_1(struct ntfs_sb_info *sbi, const struct runs_tree *run)
 		return -ENOMEM;
 
 	kaddr = kmap_atomic(fill);
-	memset(kaddr, -1, PAGE_SIZE);
+	memset(kaddr, -1, PG_SIZE);
 	kunmap_atomic(kaddr);
 	flush_dcache_page(fill);
 	lock_page(fill);
@@ -1641,7 +1641,7 @@ new_bio:
 		bio->bi_iter.bi_sector = lbo >> 9;
 
 		for (;;) {
-			u32 add = len > PAGE_SIZE ? PAGE_SIZE : len;
+			u32 add = len > PG_SIZE ? PG_SIZE : len;
 
 			if (bio_add_page(bio, fill, add, 0) < add)
 				goto new_bio;

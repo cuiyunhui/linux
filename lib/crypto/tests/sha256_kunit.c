@@ -33,7 +33,7 @@ static void free_guarded_buf(void *buf)
  */
 static void *alloc_guarded_buf(struct kunit *test, size_t len)
 {
-	size_t full_len = round_up(len, PAGE_SIZE);
+	size_t full_len = round_up(len, PG_SIZE);
 	void *buf = vmalloc(full_len);
 
 	KUNIT_ASSERT_NOT_NULL(test, buf);

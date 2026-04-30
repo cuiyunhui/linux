@@ -59,8 +59,8 @@ static struct vsock_test_data test_data_array[] = {
 		.sendmsg_errno = 0,
 		.vecs_cnt = 3,
 		{
-			{ NULL, PAGE_SIZE },
-			{ NULL, PAGE_SIZE },
+			{ NULL, PG_SIZE },
+			{ NULL, PG_SIZE },
 			{ NULL, 200 }
 		}
 	},
@@ -71,9 +71,9 @@ static struct vsock_test_data test_data_array[] = {
 		.sendmsg_errno = 0,
 		.vecs_cnt = 3,
 		{
-			{ NULL, PAGE_SIZE },
-			{ NULL, PAGE_SIZE * 2 },
-			{ NULL, PAGE_SIZE * 3 }
+			{ NULL, PG_SIZE },
+			{ NULL, PG_SIZE * 2 },
+			{ NULL, PG_SIZE * 3 }
 		}
 	},
 	/* All elements have page aligned base and size. But
@@ -85,9 +85,9 @@ static struct vsock_test_data test_data_array[] = {
 		.sendmsg_errno = 0,
 		.vecs_cnt = 3,
 		{
-			{ NULL, PAGE_SIZE * 16 },
-			{ NULL, PAGE_SIZE * 16 },
-			{ NULL, PAGE_SIZE * 16 }
+			{ NULL, PG_SIZE * 16 },
+			{ NULL, PG_SIZE * 16 },
+			{ NULL, PG_SIZE * 16 }
 		}
 	},
 	/* Middle element has both non-page aligned base and size. */
@@ -97,9 +97,9 @@ static struct vsock_test_data test_data_array[] = {
 		.sendmsg_errno = 0,
 		.vecs_cnt = 3,
 		{
-			{ NULL, PAGE_SIZE },
+			{ NULL, PG_SIZE },
 			{ (void *)1, 100 },
-			{ NULL, PAGE_SIZE }
+			{ NULL, PG_SIZE }
 		}
 	},
 	/* Middle element is unmapped. */
@@ -109,9 +109,9 @@ static struct vsock_test_data test_data_array[] = {
 		.sendmsg_errno = ENOMEM,
 		.vecs_cnt = 3,
 		{
-			{ NULL, PAGE_SIZE },
-			{ MAP_FAILED, PAGE_SIZE },
-			{ NULL, PAGE_SIZE }
+			{ NULL, PG_SIZE },
+			{ MAP_FAILED, PG_SIZE },
+			{ NULL, PG_SIZE }
 		}
 	},
 	/* Valid data, but SO_ZEROCOPY is off. This
@@ -123,7 +123,7 @@ static struct vsock_test_data test_data_array[] = {
 		.sendmsg_errno = 0,
 		.vecs_cnt = 1,
 		{
-			{ NULL, PAGE_SIZE }
+			{ NULL, PG_SIZE }
 		}
 	},
 	/* Valid data, but message is bigger than peer's
@@ -138,7 +138,7 @@ static struct vsock_test_data test_data_array[] = {
 		.sendmsg_errno = 0,
 		.vecs_cnt = 1,
 		{
-			{ NULL, 100 * PAGE_SIZE }
+			{ NULL, 100 * PG_SIZE }
 		}
 	},
 };
@@ -365,7 +365,7 @@ void test_stream_msgzcopy_empty_errq_server(const struct test_opts *opts)
 
 void test_stream_msgzcopy_mangle_client(const struct test_opts *opts)
 {
-	char sbuf1[PAGE_SIZE + 1], sbuf2[GOOD_COPY_LEN];
+	char sbuf1[PG_SIZE + 1], sbuf2[GOOD_COPY_LEN];
 	unsigned long hash;
 	struct pollfd fds;
 	int fd, i;
@@ -404,7 +404,7 @@ void test_stream_msgzcopy_mangle_client(const struct test_opts *opts)
 void test_stream_msgzcopy_mangle_server(const struct test_opts *opts)
 {
 	unsigned long local_hash, remote_hash;
-	char rbuf[PAGE_SIZE + 1];
+	char rbuf[PG_SIZE + 1];
 	int fd;
 
 	fd = vsock_stream_accept(VMADDR_CID_ANY, opts->peer_port, NULL);
@@ -414,10 +414,10 @@ void test_stream_msgzcopy_mangle_server(const struct test_opts *opts)
 	}
 
 	/* Wait, don't race the (buggy) skbs coalescence. */
-	vsock_ioctl_int(fd, SIOCINQ, PAGE_SIZE + 1 + GOOD_COPY_LEN);
+	vsock_ioctl_int(fd, SIOCINQ, PG_SIZE + 1 + GOOD_COPY_LEN);
 
 	/* Discard the first packet. */
-	recv_buf(fd, rbuf, PAGE_SIZE + 1, 0, PAGE_SIZE + 1);
+	recv_buf(fd, rbuf, PG_SIZE + 1, 0, PG_SIZE + 1);
 
 	recv_buf(fd, rbuf, GOOD_COPY_LEN, 0, GOOD_COPY_LEN);
 	remote_hash = control_readulong();

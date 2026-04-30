@@ -20,7 +20,7 @@ int xfile_store(struct xfile *xf, const void *buf, size_t count,
 void xfile_discard(struct xfile *xf, loff_t pos, u64 count);
 loff_t xfile_seek_data(struct xfile *xf, loff_t pos);
 
-#define XFILE_MAX_FOLIO_SIZE	(PAGE_SIZE << MAX_PAGECACHE_ORDER)
+#define XFILE_MAX_FOLIO_SIZE	(PG_SIZE << MAX_PAGECACHE_ORDER)
 
 #define XFILE_ALLOC		(1 << 0) /* allocate folio if not present */
 struct folio *xfile_get_folio(struct xfile *xf, loff_t offset, size_t len,

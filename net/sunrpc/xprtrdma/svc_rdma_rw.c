@@ -458,14 +458,14 @@ static void svc_rdma_pagelist_to_bvec(struct svc_rdma_write_info *info,
 	struct page **page;
 
 	page_off = info->wi_next_off + xdr->page_base;
-	page_no = page_off >> PAGE_SHIFT;
-	page_off = offset_in_page(page_off);
+	page_no = page_off >> PG_SHIFT;
+	page_off = offset_in_pg(page_off);
 	page = xdr->pages + page_no;
 	info->wi_next_off += remaining;
 	bvec_idx = 0;
 	do {
 		bvec_len = min_t(unsigned int, remaining,
-				 PAGE_SIZE - page_off);
+				 PG_SIZE - page_off);
 		bvec_set_page(&ctxt->rw_bvec[bvec_idx], *page, bvec_len,
 			      page_off);
 		remaining -= bvec_len;
@@ -505,7 +505,7 @@ svc_rdma_build_writes(struct svc_rdma_write_info *info,
 		if (!write_len)
 			goto out_overflow;
 		ctxt = svc_rdma_get_rw_ctxt(rdma,
-					    (write_len >> PAGE_SHIFT) + 2);
+					    (write_len >> PG_SHIFT) + 2);
 		if (!ctxt)
 			return -ENOMEM;
 
@@ -757,7 +757,7 @@ static int svc_rdma_build_read_segment(struct svc_rqst *rqstp,
 	len = segment->rs_length;
 	if (check_add_overflow(head->rc_pageoff, len, &total))
 		return -EINVAL;
-	nr_bvec = PAGE_ALIGN(total) >> PAGE_SHIFT;
+	nr_bvec = PG_ALIGN(total) >> PG_SHIFT;
 	ctxt = svc_rdma_get_rw_ctxt(rdma, nr_bvec);
 	if (!ctxt)
 		return -ENOMEM;
@@ -765,7 +765,7 @@ static int svc_rdma_build_read_segment(struct svc_rqst *rqstp,
 
 	for (bvec_idx = 0; bvec_idx < ctxt->rw_nents; bvec_idx++) {
 		seg_len = min_t(unsigned int, len,
-				PAGE_SIZE - head->rc_pageoff);
+				PG_SIZE - head->rc_pageoff);
 
 		if (!head->rc_pageoff)
 			head->rc_page_count++;
@@ -775,7 +775,7 @@ static int svc_rdma_build_read_segment(struct svc_rqst *rqstp,
 			      seg_len, head->rc_pageoff);
 
 		head->rc_pageoff += seg_len;
-		if (head->rc_pageoff == PAGE_SIZE) {
+		if (head->rc_pageoff == PG_SIZE) {
 			head->rc_curpage++;
 			head->rc_pageoff = 0;
 		}
@@ -854,7 +854,7 @@ static int svc_rdma_copy_inline_range(struct svc_rqst *rqstp,
 	unsigned char *dst, *src = head->rc_recv_buf;
 	unsigned int page_no, numpages;
 
-	numpages = PAGE_ALIGN(head->rc_pageoff + remaining) >> PAGE_SHIFT;
+	numpages = PG_ALIGN(head->rc_pageoff + remaining) >> PG_SHIFT;
 	for (page_no = 0; page_no < numpages; page_no++) {
 		unsigned int page_len;
 
@@ -862,7 +862,7 @@ static int svc_rdma_copy_inline_range(struct svc_rqst *rqstp,
 			return -EINVAL;
 
 		page_len = min_t(unsigned int, remaining,
-				 PAGE_SIZE - head->rc_pageoff);
+				 PG_SIZE - head->rc_pageoff);
 
 		if (!head->rc_pageoff)
 			head->rc_page_count++;
@@ -872,7 +872,7 @@ static int svc_rdma_copy_inline_range(struct svc_rqst *rqstp,
 
 		head->rc_readbytes += page_len;
 		head->rc_pageoff += page_len;
-		if (head->rc_pageoff == PAGE_SIZE) {
+		if (head->rc_pageoff == PG_SIZE) {
 			head->rc_curpage++;
 			head->rc_pageoff = 0;
 		}

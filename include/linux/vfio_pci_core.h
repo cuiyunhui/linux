@@ -230,7 +230,7 @@ static inline bool is_aligned_for_order(struct vm_area_struct *vma,
 					unsigned int order)
 {
 	return !(order && (addr < vma->vm_start ||
-			   addr + (PAGE_SIZE << order) > vma->vm_end ||
+			   addr + (PG_SIZE << order) > vma->vm_end ||
 			   !IS_ALIGNED(pfn, 1 << order)));
 }
 

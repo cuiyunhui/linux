@@ -165,7 +165,7 @@ static unsigned int do_reclaim_caches(struct f2fs_sb_info *sbi,
 	struct inode *inode;
 	struct f2fs_inode_info *fi;
 	unsigned int nfiles = sbi->donate_files;
-	pgoff_t npages = reclaim_caches_kb >> (PAGE_SHIFT - 10);
+	pgoff_t npages = reclaim_caches_kb >> (PG_SHIFT - 10);
 
 	while (npages && nfiles--) {
 		pgoff_t len;
@@ -198,7 +198,7 @@ static unsigned int do_reclaim_caches(struct f2fs_sb_info *sbi,
 		iput(inode);
 		cond_resched();
 	}
-	return npages << (PAGE_SHIFT - 10);
+	return npages << (PG_SHIFT - 10);
 }
 
 void f2fs_reclaim_caches(unsigned int reclaim_caches_kb)

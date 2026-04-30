@@ -35,7 +35,7 @@ void put_page_bootmem(struct page *page)
 		ClearPagePrivate(page);
 		set_page_private(page, 0);
 		INIT_LIST_HEAD(&page->lru);
-		kmemleak_free_part_phys(PFN_PHYS(page_to_pfn(page)), PAGE_SIZE);
+		kmemleak_free_part_phys(PFN_PHYS(page_to_pfn(page)), PG_SIZE);
 		free_reserved_page(page);
 	}
 }
@@ -60,7 +60,7 @@ static void __init register_page_bootmem_info_section(unsigned long start_pfn)
 	 */
 	page = virt_to_page(memmap);
 	mapsize = sizeof(struct page) * PAGES_PER_SECTION;
-	mapsize = PAGE_ALIGN(mapsize) >> PAGE_SHIFT;
+	mapsize = PG_ALIGN(mapsize) >> PG_SHIFT;
 
 	/* remember memmap's page */
 	for (i = 0; i < mapsize; i++, page++)
@@ -69,7 +69,7 @@ static void __init register_page_bootmem_info_section(unsigned long start_pfn)
 	usage = ms->usage;
 	page = virt_to_page(usage);
 
-	mapsize = PAGE_ALIGN(mem_section_usage_size()) >> PAGE_SHIFT;
+	mapsize = PG_ALIGN(mem_section_usage_size()) >> PG_SHIFT;
 
 	for (i = 0; i < mapsize; i++, page++)
 		get_page_bootmem(section_nr, page, MIX_SECTION_INFO);
@@ -95,7 +95,7 @@ static void __init register_page_bootmem_info_section(unsigned long start_pfn)
 	usage = ms->usage;
 	page = virt_to_page(usage);
 
-	mapsize = PAGE_ALIGN(mem_section_usage_size()) >> PAGE_SHIFT;
+	mapsize = PG_ALIGN(mem_section_usage_size()) >> PG_SHIFT;
 
 	for (i = 0; i < mapsize; i++, page++)
 		get_page_bootmem(section_nr, page, MIX_SECTION_INFO);
@@ -108,7 +108,7 @@ void __init register_page_bootmem_info_node(struct pglist_data *pgdat)
 	int node = pgdat->node_id;
 	struct page *page;
 
-	nr_pages = PAGE_ALIGN(sizeof(struct pglist_data)) >> PAGE_SHIFT;
+	nr_pages = PG_ALIGN(sizeof(struct pglist_data)) >> PG_SHIFT;
 	page = virt_to_page(pgdat);
 
 	for (i = 0; i < nr_pages; i++, page++)

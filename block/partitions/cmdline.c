@@ -55,7 +55,7 @@ static int parse_subpart(struct cmdline_subpart **subpart, char *partdef)
 		partdef++;
 	} else {
 		new_subpart->size = (sector_t)memparse(partdef, &partdef);
-		if (new_subpart->size < (sector_t)PAGE_SIZE) {
+		if (new_subpart->size < (sector_t) PG_SIZE) {
 			pr_warn("cmdline partition size is invalid.");
 			ret = -EINVAL;
 			goto fail;
@@ -245,7 +245,7 @@ static int add_part(int slot, struct cmdline_subpart *subpart,
 	strscpy(info->volname, subpart->name, sizeof(info->volname));
 
 	snprintf(tmp, sizeof(tmp), "(%s)", info->volname);
-	strlcat(state->pp_buf, tmp, PAGE_SIZE);
+	strlcat(state->pp_buf, tmp, PG_SIZE);
 
 	state->parts[slot].has_info = true;
 
@@ -379,7 +379,7 @@ int cmdline_partition(struct parsed_partitions *state)
 	cmdline_parts_set(parts, disk_size, state);
 	cmdline_parts_verifier(1, state);
 
-	strlcat(state->pp_buf, "\n", PAGE_SIZE);
+	strlcat(state->pp_buf, "\n", PG_SIZE);
 
 	return 1;
 }

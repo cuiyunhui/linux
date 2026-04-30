@@ -550,7 +550,7 @@ static inline void mmu_notifier_range_init_owner(
 	unsigned long ___address = __address;				\
 	__young = ptep_test_and_clear_young(___vma, ___address, __ptep);\
 	__young |= mmu_notifier_clear_young(___vma->vm_mm, ___address,	\
-					    ___address + PAGE_SIZE);	\
+					    ___address + PG_SIZE);	\
 	__young;							\
 })
 

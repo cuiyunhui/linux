@@ -326,9 +326,9 @@ static void test_init_kmsan_vmap_vunmap(struct kunit *test)
 	for (int i = 0; i < npages; i++)
 		pages[i] = alloc_page(GFP_KERNEL);
 	vbuf = vmap(pages, npages, VM_MAP, PAGE_KERNEL);
-	memset(vbuf, 0xfe, npages * PAGE_SIZE);
+	memset(vbuf, 0xfe, npages * PG_SIZE);
 	for (int i = 0; i < npages; i++)
-		kmsan_check_memory(page_address(pages[i]), PAGE_SIZE);
+		kmsan_check_memory(page_address(pages[i]), PG_SIZE);
 
 	if (vbuf)
 		vunmap(vbuf);
@@ -351,12 +351,12 @@ static void test_init_vmalloc(struct kunit *test)
 	char *buf;
 
 	kunit_info(test, "vmalloc buffer can be initialized (no reports)\n");
-	buf = vmalloc(PAGE_SIZE * npages);
+	buf = vmalloc(PG_SIZE * npages);
 	buf[0] = 1;
-	memset(buf, 0xfe, PAGE_SIZE * npages);
+	memset(buf, 0xfe, PG_SIZE * npages);
 	USE(buf[0]);
 	for (int i = 0; i < npages; i++)
-		kmsan_check_memory(&buf[PAGE_SIZE * i], PAGE_SIZE);
+		kmsan_check_memory(&buf[PG_SIZE * i], PG_SIZE);
 	vfree(buf);
 	KUNIT_EXPECT_TRUE(test, report_matches(&expect));
 }
@@ -431,7 +431,7 @@ static void test_uaf_high_order_pages(struct kunit *test)
 	 * Create a high-order non-compound page, free it, then try to access
 	 * its tail page.
 	 */
-	value = *test_uaf_pages_helper(1, PAGE_SIZE + 3);
+	value = *test_uaf_pages_helper(1, PG_SIZE + 3);
 	USE(value);
 
 	KUNIT_EXPECT_TRUE(test, report_matches(&expect));
@@ -618,14 +618,14 @@ DEFINE_TEST_MEMSETXX(64)
 /* Test case: ensure that KMSAN does not access shadow memory out of bounds. */
 static void test_memset_on_guarded_buffer(struct kunit *test)
 {
-	void *buf = vmalloc(PAGE_SIZE);
+	void *buf = vmalloc(PG_SIZE);
 
 	kunit_info(test,
 		   "memset() on ends of guarded buffer should not crash\n");
 
 	for (size_t size = 0; size <= 128; size++) {
 		memset(buf, 0xff, size);
-		memset(buf + PAGE_SIZE - size, 0xff, size);
+		memset(buf + PG_SIZE - size, 0xff, size);
 	}
 	vfree(buf);
 }

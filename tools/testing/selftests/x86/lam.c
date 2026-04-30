@@ -153,12 +153,12 @@ static inline int la57_enabled(void)
 	int ret;
 	void *p;
 
-	p = mmap((void *)HIGH_ADDR, PAGE_SIZE, PROT_READ | PROT_WRITE,
+	p = mmap((void *)HIGH_ADDR, PG_SIZE, PROT_READ | PROT_WRITE,
 		 MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
 
 	ret = p == MAP_FAILED ? 0 : 1;
 
-	munmap(p, PAGE_SIZE);
+	munmap(p, PG_SIZE);
 	return ret;
 }
 
@@ -346,7 +346,7 @@ static int handle_mmap(struct testcases *test)
 		if (set_lam(test->lam) != 0)
 			return 1;
 
-	ptr = mmap((void *)test->addr, PAGE_SIZE, PROT_READ | PROT_WRITE,
+	ptr = mmap((void *)test->addr, PG_SIZE, PROT_READ | PROT_WRITE,
 		   flags, -1, 0);
 	if (ptr == MAP_FAILED) {
 		if (test->addr == HIGH_ADDR)
@@ -368,7 +368,7 @@ static int handle_mmap(struct testcases *test)
 		}
 	}
 
-	munmap(ptr, PAGE_SIZE);
+	munmap(ptr, PG_SIZE);
 	return ret;
 }
 
@@ -412,7 +412,7 @@ static int get_user_syscall(struct testcases *test)
 		ptr_address = LOW_ADDR;
 	}
 
-	ptr = mmap((void *)ptr_address, PAGE_SIZE, PROT_READ | PROT_WRITE,
+	ptr = mmap((void *)ptr_address, PG_SIZE, PROT_READ | PROT_WRITE,
 		   MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
 
 	if (ptr == MAP_FAILED) {
@@ -427,7 +427,7 @@ static int get_user_syscall(struct testcases *test)
 
 	fd = memfd_create("lam_ioctl", 0);
 	if (fd == -1) {
-		munmap(ptr, PAGE_SIZE);
+		munmap(ptr, PG_SIZE);
 		exit(EXIT_FAILURE);
 	}
 
@@ -466,7 +466,7 @@ static int get_user_syscall(struct testcases *test)
 
 	close(fd);
 error:
-	munmap(ptr, PAGE_SIZE);
+	munmap(ptr, PG_SIZE);
 	return ret;
 }
 

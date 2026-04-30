@@ -562,7 +562,7 @@ static int user_event_enabler_write(struct user_event_mm *mm,
 	}
 
 	kaddr = kmap_local_page(page);
-	ptr = kaddr + (uaddr & ~PAGE_MASK);
+	ptr = kaddr + (uaddr & ~PG_MASK);
 
 	/* Update bit atomically, user tracers must be atomic as well */
 	if (enabler->event && enabler->event->status)
@@ -2396,7 +2396,7 @@ static long user_reg_get(struct user_reg __user *ureg, struct user_reg *kreg)
 	if (ret)
 		return ret;
 
-	if (size > PAGE_SIZE)
+	if (size > PG_SIZE)
 		return -E2BIG;
 
 	if (size < offsetofend(struct user_reg, write_index))
@@ -2558,7 +2558,7 @@ static long user_unreg_get(struct user_unreg __user *ureg,
 	if (ret)
 		return ret;
 
-	if (size > PAGE_SIZE)
+	if (size > PG_SIZE)
 		return -E2BIG;
 
 	if (size < offsetofend(struct user_unreg, disable_addr))

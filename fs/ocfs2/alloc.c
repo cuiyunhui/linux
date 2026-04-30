@@ -6912,8 +6912,8 @@ static int ocfs2_grab_folios(struct inode *inode, loff_t start, loff_t end,
 	BUG_ON(start > end);
 
 	numfolios = 0;
-	last_page_bytes = PAGE_ALIGN(end);
-	index = start >> PAGE_SHIFT;
+	last_page_bytes = PG_ALIGN(end);
+	index = start >> PG_SHIFT;
 	do {
 		folios[numfolios] = __filemap_get_folio(mapping, index,
 				FGP_LOCK | FGP_ACCESSED | FGP_CREAT, GFP_NOFS);
@@ -6926,7 +6926,7 @@ static int ocfs2_grab_folios(struct inode *inode, loff_t start, loff_t end,
 
 		index = folio_next_index(folios[numfolios]);
 		numfolios++;
-	} while (index < (last_page_bytes >> PAGE_SHIFT));
+	} while (index < (last_page_bytes >> PG_SHIFT));
 
 out:
 	if (ret != 0) {
@@ -7119,7 +7119,7 @@ int ocfs2_convert_inline_data_to_extents(struct inode *inode,
 	}
 
 	if (has_data) {
-		unsigned int page_end = min_t(unsigned, PAGE_SIZE,
+		unsigned int page_end = min_t(unsigned, PG_SIZE,
 							osb->s_clustersize);
 		u64 phys;
 

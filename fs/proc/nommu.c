@@ -53,7 +53,7 @@ static int nommu_region_show(struct seq_file *m, struct vm_region *region)
 		   flags & VM_WRITE ? 'w' : '-',
 		   flags & VM_EXEC ? 'x' : '-',
 		   flags & VM_MAYSHARE ? flags & VM_SHARED ? 'S' : 's' : 'p',
-		   ((loff_t)region->vm_pgoff) << PAGE_SHIFT,
+		   ((loff_t)region->vm_pgoff) << PG_SHIFT,
 		   MAJOR(dev), MINOR(dev), ino);
 
 	if (file) {

@@ -29,7 +29,7 @@ MODULE_PARM_DESC(ahash_minsize, "Minimum file size for ahash use");
 
 /* default is 0 - 1 page. */
 static int ima_maxorder;
-static unsigned int ima_bufsize = PAGE_SIZE;
+static unsigned int ima_bufsize = PG_SIZE;
 
 static int param_set_bufsize(const char *val, const struct kernel_param *kp)
 {
@@ -41,7 +41,7 @@ static int param_set_bufsize(const char *val, const struct kernel_param *kp)
 	if (order > MAX_PAGE_ORDER)
 		return -EINVAL;
 	ima_maxorder = order;
-	ima_bufsize = PAGE_SIZE << order;
+	ima_bufsize = PG_SIZE << order;
 	return 0;
 }
 
@@ -248,7 +248,7 @@ static void *ima_alloc_pages(loff_t max_size, size_t *allocated_size,
 	for (; order; order--) {
 		ptr = (void *)__get_free_pages(gfp_mask, order);
 		if (ptr) {
-			*allocated_size = PAGE_SIZE << order;
+			*allocated_size = PG_SIZE << order;
 			return ptr;
 		}
 	}
@@ -262,7 +262,7 @@ static void *ima_alloc_pages(loff_t max_size, size_t *allocated_size,
 
 	ptr = (void *)__get_free_pages(gfp_mask, 0);
 	if (ptr) {
-		*allocated_size = PAGE_SIZE;
+		*allocated_size = PG_SIZE;
 		return ptr;
 	}
 
@@ -470,14 +470,14 @@ static int ima_calc_file_hash_tfm(struct file *file,
 	if (i_size == 0)
 		goto out;
 
-	rbuf = kzalloc(PAGE_SIZE, GFP_KERNEL);
+	rbuf = kzalloc(PG_SIZE, GFP_KERNEL);
 	if (!rbuf)
 		return -ENOMEM;
 
 	while (offset < i_size) {
 		int rbuf_len;
 
-		rbuf_len = integrity_kernel_read(file, offset, rbuf, PAGE_SIZE);
+		rbuf_len = integrity_kernel_read(file, offset, rbuf, PG_SIZE);
 		if (rbuf_len < 0) {
 			rc = rbuf_len;
 			break;
@@ -729,7 +729,7 @@ static int calc_buffer_shash_tfm(const void *buf, loff_t size,
 		return rc;
 
 	while (size) {
-		len = size < PAGE_SIZE ? size : PAGE_SIZE;
+		len = size < PG_SIZE ? size : PG_SIZE;
 		rc = crypto_shash_update(shash, buf, len);
 		if (rc)
 			break;

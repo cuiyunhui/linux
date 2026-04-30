@@ -64,7 +64,7 @@ static void add_of_partition(struct parsed_partitions *state, int slot,
 	strscpy(info->volname, partname, sizeof(info->volname));
 
 	snprintf(tmp, sizeof(tmp), "(%s)", info->volname);
-	strlcat(state->pp_buf, tmp, PAGE_SIZE);
+	strlcat(state->pp_buf, tmp, PG_SIZE);
 }
 
 int of_partition(struct parsed_partitions *state)
@@ -104,7 +104,7 @@ int of_partition(struct parsed_partitions *state)
 		slot++;
 	}
 
-	strlcat(state->pp_buf, "\n", PAGE_SIZE);
+	strlcat(state->pp_buf, "\n", PG_SIZE);
 
 	return 1;
 }

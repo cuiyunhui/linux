@@ -1349,7 +1349,7 @@ int kvm_gfn_to_hva_cache_init(struct kvm *kvm, struct gfn_to_hva_cache *ghc,
 	struct kvm *__kvm = kvm;					\
 									\
 	__kvm_get_guest(__kvm, __gpa >> PTE_SHIFT,			\
-			offset_in_page(__gpa), v);			\
+			offset_in_pg(__gpa), v);			\
 })
 
 #define __kvm_put_guest(kvm, gfn, offset, v)				\
@@ -1371,7 +1371,7 @@ int kvm_gfn_to_hva_cache_init(struct kvm *kvm, struct gfn_to_hva_cache *ghc,
 	struct kvm *__kvm = kvm;					\
 									\
 	__kvm_put_guest(__kvm, __gpa >> PTE_SHIFT,			\
-			offset_in_page(__gpa), v);			\
+			offset_in_pg(__gpa), v);			\
 })
 
 int kvm_clear_guest(struct kvm *kvm, gpa_t gpa, unsigned long len);

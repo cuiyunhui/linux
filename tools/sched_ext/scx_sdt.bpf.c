@@ -110,7 +110,8 @@ void __arena *scx_alloc_from_pool(struct sdt_pool *pool)
 	/* If the chunk is spent, get a new one. */
 	if (pool->idx >= max_elems) {
 		slab = bpf_arena_alloc_pages(&arena, NULL,
-			div_round_up(max_elems * elem_size, PAGE_SIZE), NUMA_NO_NODE, 0);
+			div_round_up(max_elems * elem_size, PG_SIZE),
+			NUMA_NO_NODE, 0);
 		if (!slab)
 			return NULL;
 
@@ -165,7 +166,7 @@ static int pool_set_size(struct sdt_pool *pool, __u64 data_size, __u64 nr_pages)
 		return -EINVAL;
 
 	pool->elem_size = data_size;
-	pool->max_elems = (PAGE_SIZE * nr_pages) / pool->elem_size;
+	pool->max_elems = (PG_SIZE * nr_pages) / pool->elem_size;
 	/* Populate the pool slab on the first allocation. */
 	pool->idx = pool->max_elems;
 
@@ -179,8 +180,8 @@ scx_alloc_init(struct scx_allocator *alloc, __u64 data_size)
 	size_t min_chunk_size;
 	int ret;
 
-	_Static_assert(sizeof(struct sdt_chunk) <= PAGE_SIZE,
-		"chunk size must fit into a page");
+	_Static_assert(sizeof(struct sdt_chunk) <= PG_SIZE,
+		       "chunk size must fit into a page");
 
 	ret = pool_set_size(&chunk_pool, sizeof(struct sdt_chunk), 1);
 	if (ret != 0)
@@ -198,7 +199,8 @@ scx_alloc_init(struct scx_allocator *alloc, __u64 data_size)
 	 * Ensure we allocate large enough chunks from the arena to avoid excessive
 	 * internal fragmentation when turning chunks it into structs.
 	 */
-	min_chunk_size = div_round_up(SDT_TASK_MIN_ELEM_PER_ALLOC * data_size, PAGE_SIZE);
+	min_chunk_size = div_round_up(SDT_TASK_MIN_ELEM_PER_ALLOC * data_size,
+				      PG_SIZE);
 	ret = pool_set_size(&alloc->pool, data_size, min_chunk_size);
 	if (ret != 0)
 		return ret;

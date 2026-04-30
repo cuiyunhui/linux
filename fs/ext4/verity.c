@@ -45,8 +45,8 @@ static int pagecache_read(struct inode *inode, void *buf, size_t count,
 		struct folio *folio;
 		size_t n;
 
-		folio = read_mapping_folio(inode->i_mapping, pos >> PAGE_SHIFT,
-					 NULL);
+		folio = read_mapping_folio(inode->i_mapping, pos >> PG_SHIFT,
+					   NULL);
 		if (IS_ERR(folio))
 			return PTR_ERR(folio);
 
@@ -75,7 +75,7 @@ static int pagecache_write(struct inode *inode, const void *buf, size_t count,
 
 	while (count) {
 		size_t n = min_t(size_t, count,
-				 PAGE_SIZE - offset_in_page(pos));
+				 PG_SIZE - offset_in_pg(pos));
 		struct folio *folio;
 		void *fsdata = NULL;
 		int res;
@@ -362,14 +362,14 @@ static int ext4_get_verity_descriptor(struct inode *inode, void *buf,
 static struct page *ext4_read_merkle_tree_page(struct inode *inode,
 					       pgoff_t index)
 {
-	index += ext4_verity_metadata_pos(inode) >> PAGE_SHIFT;
+	index += ext4_verity_metadata_pos(inode) >> PG_SHIFT;
 	return generic_read_merkle_tree_page(inode, index);
 }
 
 static void ext4_readahead_merkle_tree(struct inode *inode, pgoff_t index,
 				       unsigned long nr_pages)
 {
-	index += ext4_verity_metadata_pos(inode) >> PAGE_SHIFT;
+	index += ext4_verity_metadata_pos(inode) >> PG_SHIFT;
 	generic_readahead_merkle_tree(inode, index, nr_pages);
 }
 

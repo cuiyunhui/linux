@@ -37,7 +37,7 @@ static void makedata(int disks)
 	int i;
 
 	for (i = 0; i < disks; i++) {
-		get_random_bytes(page_address(data[i]), PAGE_SIZE);
+		get_random_bytes(page_address(data[i]), PG_SIZE);
 		dataptrs[i] = data[i];
 		dataoffs[i] = 0;
 	}
@@ -128,16 +128,16 @@ static int test_disks(int i, int j, int disks)
 {
 	int erra, errb;
 
-	memset(page_address(recovi), 0xf0, PAGE_SIZE);
-	memset(page_address(recovj), 0xba, PAGE_SIZE);
+	memset(page_address(recovi), 0xf0, PG_SIZE);
+	memset(page_address(recovj), 0xba, PG_SIZE);
 
 	dataptrs[i] = recovi;
 	dataptrs[j] = recovj;
 
-	raid6_dual_recov(disks, PAGE_SIZE, i, j, dataptrs, dataoffs);
+	raid6_dual_recov(disks, PG_SIZE, i, j, dataptrs, dataoffs);
 
-	erra = memcmp(page_address(data[i]), page_address(recovi), PAGE_SIZE);
-	errb = memcmp(page_address(data[j]), page_address(recovj), PAGE_SIZE);
+	erra = memcmp(page_address(data[i]), page_address(recovi), PG_SIZE);
+	errb = memcmp(page_address(data[j]), page_address(recovj), PG_SIZE);
 
 	pr("%s(%d, %d): faila=%3d(%c)  failb=%3d(%c)  %s\n",
 	   __func__, i, j, i, disk_type(i, disks), j, disk_type(j, disks),
@@ -164,13 +164,13 @@ static int test(int disks, int *tests)
 	makedata(disks);
 
 	/* Nuke syndromes */
-	memset(page_address(data[disks-2]), 0xee, PAGE_SIZE);
-	memset(page_address(data[disks-1]), 0xee, PAGE_SIZE);
+	memset(page_address(data[disks-2]), 0xee, PG_SIZE);
+	memset(page_address(data[disks-1]), 0xee, PG_SIZE);
 
 	/* Generate assumed good syndrome */
 	init_completion(&cmp);
 	init_async_submit(&submit, ASYNC_TX_ACK, NULL, callback, &cmp, addr_conv);
-	tx = async_gen_syndrome(dataptrs, dataoffs, disks, PAGE_SIZE, &submit);
+	tx = async_gen_syndrome(dataptrs, dataoffs, disks, PG_SIZE, &submit);
 	async_tx_issue_pending(tx);
 
 	if (wait_for_completion_timeout(&cmp, msecs_to_jiffies(3000)) == 0) {

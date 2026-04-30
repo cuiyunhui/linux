@@ -197,7 +197,7 @@ static void config_acp_dma(struct pdm_stream_instance *rtd, int direction)
 		high |= BIT(31);
 		rn_writel(high, rtd->acp_base + ACP_SCRATCH_REG_0 + val + 4);
 		val += 8;
-		addr += PAGE_SIZE;
+		addr += PG_SIZE;
 	}
 }
 
@@ -249,7 +249,7 @@ static int acp_pdm_dma_hw_params(struct snd_soc_component *component,
 	size = params_buffer_bytes(params);
 	period_bytes = params_period_bytes(params);
 	rtd->dma_addr = substream->runtime->dma_addr;
-	rtd->num_pages = (PAGE_ALIGN(size) >> PAGE_SHIFT);
+	rtd->num_pages = (PG_ALIGN(size) >> PG_SHIFT);
 	config_acp_dma(rtd, substream->stream);
 	init_pdm_ring_buffer(MEM_WINDOW_START, size, period_bytes,
 			     rtd->acp_base);

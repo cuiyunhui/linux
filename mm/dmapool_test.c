@@ -35,7 +35,7 @@ static u64 dma_mask;
 
 static inline int nr_blocks(int size)
 {
-	return clamp_t(int, (PAGE_SIZE / size) * 512, 1024, 8192);
+	return clamp_t(int, (PG_SIZE / size) * 512, 1024, 8192);
 }
 
 static int dmapool_test_alloc(struct dma_pool_pair *p, int blocks)

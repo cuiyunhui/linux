@@ -345,11 +345,11 @@ static int ocfs2_osb_debug_open(struct inode *inode, struct file *file)
 	struct ocfs2_super *osb = inode->i_private;
 	char *buf = NULL;
 
-	buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	buf = kmalloc(PG_SIZE, GFP_KERNEL);
 	if (!buf)
 		goto bail;
 
-	i_size_write(inode, ocfs2_osb_dump(osb, buf, PAGE_SIZE));
+	i_size_write(inode, ocfs2_osb_dump(osb, buf, PG_SIZE));
 
 	file->private_data = buf;
 
@@ -585,8 +585,8 @@ static unsigned long long ocfs2_max_file_offset(unsigned int bbits,
 	/*
 	 * We might be limited by page cache size.
 	 */
-	if (bytes > PAGE_SIZE) {
-		bytes = PAGE_SIZE;
+	if (bytes > PG_SIZE) {
+		bytes = PG_SIZE;
 		trim = 1;
 		/*
 		 * Shift by 31 here so that we don't get larger than

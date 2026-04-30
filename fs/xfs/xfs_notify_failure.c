@@ -47,7 +47,7 @@ xfs_failure_pgoff(
 	if (notify->startblock > rec->rm_startblock)
 		pos += XFS_FSB_TO_B(mp,
 				notify->startblock - rec->rm_startblock);
-	return pos >> PAGE_SHIFT;
+	return pos >> PG_SHIFT;
 }
 
 static unsigned long
@@ -67,7 +67,7 @@ xfs_failure_pgcnt(
 	end_notify = notify->startblock + notify->blockcount;
 	end_cross = min(end_rec, end_notify);
 
-	return XFS_FSB_TO_B(mp, end_cross - start_cross) >> PAGE_SHIFT;
+	return XFS_FSB_TO_B(mp, end_cross - start_cross) >> PG_SHIFT;
 }
 
 static int
@@ -118,8 +118,8 @@ xfs_dax_failure_fn(
 		invalidate_inode_pages2_range(mapping, pgoff,
 					      pgoff + pgcnt - 1);
 
-	fserror_report_data_lost(VFS_I(ip), (u64)pgoff << PAGE_SHIFT,
-			(u64)pgcnt << PAGE_SHIFT, GFP_NOFS);
+	fserror_report_data_lost(VFS_I(ip), (u64)pgoff << PG_SHIFT,
+				 (u64)pgcnt << PG_SHIFT, GFP_NOFS);
 
 	xfs_irele(ip);
 	return error;

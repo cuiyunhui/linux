@@ -480,8 +480,8 @@ bool filemap_range_has_page(struct address_space *mapping,
 			   loff_t start_byte, loff_t end_byte)
 {
 	struct folio *folio;
-	XA_STATE(xas, &mapping->i_pages, start_byte >> PAGE_SHIFT);
-	pgoff_t max = end_byte >> PAGE_SHIFT;
+	XA_STATE(xas, &mapping->i_pages, start_byte >> PG_SHIFT);
+	pgoff_t max = end_byte >> PG_SHIFT;
 
 	if (end_byte < start_byte)
 		return false;
@@ -510,8 +510,8 @@ EXPORT_SYMBOL(filemap_range_has_page);
 static void __filemap_fdatawait_range(struct address_space *mapping,
 				     loff_t start_byte, loff_t end_byte)
 {
-	pgoff_t index = start_byte >> PAGE_SHIFT;
-	pgoff_t end = end_byte >> PAGE_SHIFT;
+	pgoff_t index = start_byte >> PG_SHIFT;
+	pgoff_t end = end_byte >> PG_SHIFT;
 	struct folio_batch fbatch;
 	unsigned nr_folios;
 
@@ -637,8 +637,8 @@ static bool mapping_needs_writeback(struct address_space *mapping)
 bool filemap_range_has_writeback(struct address_space *mapping,
 				 loff_t start_byte, loff_t end_byte)
 {
-	XA_STATE(xas, &mapping->i_pages, start_byte >> PAGE_SHIFT);
-	pgoff_t max = end_byte >> PAGE_SHIFT;
+	XA_STATE(xas, &mapping->i_pages, start_byte >> PG_SHIFT);
+	pgoff_t max = end_byte >> PG_SHIFT;
 	struct folio *folio;
 
 	if (end_byte < start_byte)
@@ -2628,7 +2628,7 @@ static int filemap_create_folio(struct kiocb *iocb, struct folio_batch *fbatch)
 	 * well to keep locking rules simple.
 	 */
 	filemap_invalidate_lock_shared(mapping);
-	index = (iocb->ki_pos >> (PAGE_SHIFT + min_order)) << min_order;
+	index = (iocb->ki_pos >> (PG_SHIFT + min_order)) << min_order;
 	error = filemap_add_folio(mapping, folio, index,
 			mapping_gfp_constraint(mapping, GFP_KERNEL));
 	if (error == -EEXIST)
@@ -2669,7 +2669,7 @@ static int filemap_get_pages(struct kiocb *iocb, size_t count,
 {
 	struct file *filp = iocb->ki_filp;
 	struct address_space *mapping = filp->f_mapping;
-	pgoff_t index = iocb->ki_pos >> PAGE_SHIFT;
+	pgoff_t index = iocb->ki_pos >> PG_SHIFT;
 	pgoff_t last_index;
 	struct folio *folio;
 	unsigned int flags;
@@ -2677,7 +2677,7 @@ static int filemap_get_pages(struct kiocb *iocb, size_t count,
 
 	/* "last_index" is the index of the folio beyond the end of the read */
 	last_index = round_up(iocb->ki_pos + count,
-			mapping_min_folio_nrbytes(mapping)) >> PAGE_SHIFT;
+			mapping_min_folio_nrbytes(mapping)) >> PG_SHIFT;
 retry:
 	if (fatal_signal_pending(current))
 		return -EINTR;
@@ -2917,8 +2917,8 @@ int filemap_invalidate_pages(struct address_space *mapping,
 	 * about to write.  We do this *before* the write so that we can return
 	 * without clobbering -EIOCBQUEUED from ->direct_IO().
 	 */
-	return invalidate_inode_pages2_range(mapping, pos >> PAGE_SHIFT,
-					     end >> PAGE_SHIFT);
+	return invalidate_inode_pages2_range(mapping, pos >> PG_SHIFT,
+					     end >> PG_SHIFT);
 }
 
 int kiocb_invalidate_pages(struct kiocb *iocb, size_t count)
@@ -3007,13 +3007,13 @@ size_t splice_folio_into_pipe(struct pipe_inode_info *pipe,
 	struct page *page;
 	size_t spliced = 0, offset = offset_in_folio(folio, fpos);
 
-	page = folio_page(folio, offset / PAGE_SIZE);
+	page = folio_page(folio, offset / PG_SIZE);
 	size = min(size, folio_size(folio) - offset);
-	offset %= PAGE_SIZE;
+	offset %= PG_SIZE;
 
 	while (spliced < size && !pipe_is_full(pipe)) {
 		struct pipe_buffer *buf = pipe_head_buf(pipe);
-		size_t part = min_t(size_t, PAGE_SIZE - offset, size - spliced);
+		size_t part = min_t(size_t, PG_SIZE - offset, size - spliced);
 
 		*buf = (struct pipe_buffer) {
 			.ops	= &page_cache_pipe_buf_ops,
@@ -3070,7 +3070,7 @@ ssize_t filemap_splice_read(struct file *in, loff_t *ppos,
 	/* Work out how much data we can actually add into the pipe */
 	used = pipe_buf_usage(pipe);
 	npages = max_t(ssize_t, pipe->max_usage - used, 0);
-	len = min_t(size_t, len, npages * PAGE_SIZE);
+	len = min_t(size_t, len, npages * PG_SIZE);
 
 	folio_batch_init(&fbatch);
 
@@ -3179,7 +3179,7 @@ unlock:
 static inline size_t seek_folio_size(struct xa_state *xas, struct folio *folio)
 {
 	if (xa_is_value(folio))
-		return PAGE_SIZE << xas_get_order(xas);
+		return PG_SIZE << xas_get_order(xas);
 	return folio_size(folio);
 }
 
@@ -3204,8 +3204,8 @@ static inline size_t seek_folio_size(struct xa_state *xas, struct folio *folio)
 loff_t mapping_seek_hole_data(struct address_space *mapping, loff_t start,
 		loff_t end, int whence)
 {
-	XA_STATE(xas, &mapping->i_pages, start >> PAGE_SHIFT);
-	pgoff_t max = (end - 1) >> PAGE_SHIFT;
+	XA_STATE(xas, &mapping->i_pages, start >> PG_SHIFT);
+	pgoff_t max = (end - 1) >> PG_SHIFT;
 	bool seek_data = (whence == SEEK_DATA);
 	struct folio *folio;
 
@@ -3214,7 +3214,7 @@ loff_t mapping_seek_hole_data(struct address_space *mapping, loff_t start,
 
 	rcu_read_lock();
 	while ((folio = find_get_entry(&xas, max, XA_PRESENT))) {
-		loff_t pos = (u64)xas.xa_index << PAGE_SHIFT;
+		loff_t pos = (u64)xas.xa_index << PG_SHIFT;
 		size_t seek_size;
 
 		if (start < pos) {
@@ -3231,8 +3231,8 @@ loff_t mapping_seek_hole_data(struct address_space *mapping, loff_t start,
 			goto unlock;
 		if (start >= end)
 			break;
-		if (seek_size > PAGE_SIZE)
-			xas_set(&xas, pos >> PAGE_SHIFT);
+		if (seek_size > PG_SIZE)
+			xas_set(&xas, pos >> PG_SHIFT);
 		if (!xa_is_value(folio))
 			folio_put(folio);
 	}
@@ -3521,7 +3521,7 @@ vm_fault_t filemap_fault(struct vm_fault *vmf)
 	vm_fault_t ret = 0;
 	bool mapping_locked = false;
 
-	max_idx = DIV_ROUND_UP(i_size_read(inode), PAGE_SIZE);
+	max_idx = DIV_ROUND_UP(i_size_read(inode), PG_SIZE);
 	if (unlikely(index >= max_idx))
 		return VM_FAULT_SIGBUS;
 
@@ -3625,7 +3625,7 @@ retry_find:
 	 * Found the page and have a reference on it.
 	 * We must recheck i_size under page lock.
 	 */
-	max_idx = DIV_ROUND_UP(i_size_read(inode), PAGE_SIZE);
+	max_idx = DIV_ROUND_UP(i_size_read(inode), PG_SIZE);
 	if (unlikely(index >= max_idx)) {
 		folio_unlock(folio);
 		folio_put(folio);
@@ -4271,8 +4271,8 @@ void kiocb_invalidate_post_direct_write(struct kiocb *iocb, size_t count)
 
 	if (mapping->nrpages &&
 	    invalidate_inode_pages2_range(mapping,
-			iocb->ki_pos >> PAGE_SHIFT,
-			(iocb->ki_pos + count - 1) >> PAGE_SHIFT))
+			iocb->ki_pos >> PG_SHIFT,
+			(iocb->ki_pos + count - 1) >> PG_SHIFT))
 		dio_warn_stale_pagecache(iocb->ki_filp);
 }
 
@@ -4397,7 +4397,7 @@ retry:
 			 * halfway through, might be a race with munmap,
 			 * might be severe memory pressure.
 			 */
-			if (chunk > PAGE_SIZE)
+			if (chunk > PG_SIZE)
 				chunk /= 2;
 			if (copied) {
 				bytes = copied;
@@ -4562,8 +4562,8 @@ int filemap_invalidate_inode(struct inode *inode, bool flush,
 			     loff_t start, loff_t end)
 {
 	struct address_space *mapping = inode->i_mapping;
-	pgoff_t first = start >> PAGE_SHIFT;
-	pgoff_t last = end >> PAGE_SHIFT;
+	pgoff_t first = start >> PG_SHIFT;
+	pgoff_t last = end >> PG_SHIFT;
 	pgoff_t nr = end == LLONG_MAX ? ULONG_MAX : last - first + 1;
 
 	if (!mapping || !mapping->nrpages || end < start)
@@ -4582,7 +4582,7 @@ int filemap_invalidate_inode(struct inode *inode, bool flush,
 		filemap_fdatawrite_range(mapping, start, end);
 
 	/* Wait for writeback to complete on all folios and discard. */
-	invalidate_inode_pages2_range(mapping, start / PAGE_SIZE, end / PAGE_SIZE);
+	invalidate_inode_pages2_range(mapping, start / PG_SIZE, end / PG_SIZE);
 
 unlock:
 	filemap_invalidate_unlock(mapping);
@@ -4775,9 +4775,9 @@ SYSCALL_DEFINE4(cachestat, unsigned int, fd,
 	if (flags != 0)
 		return -EINVAL;
 
-	first_index = csr.off >> PAGE_SHIFT;
+	first_index = csr.off >> PG_SHIFT;
 	last_index =
-		csr.len == 0 ? ULONG_MAX : (csr.off + csr.len - 1) >> PAGE_SHIFT;
+		csr.len == 0 ? ULONG_MAX : (csr.off + csr.len - 1) >> PG_SHIFT;
 	memset(&cs, 0, sizeof(struct cachestat));
 	mapping = fd_file(f)->f_mapping;
 	filemap_cachestat(mapping, first_index, last_index, &cs);

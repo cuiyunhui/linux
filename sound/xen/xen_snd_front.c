@@ -363,9 +363,9 @@ static int __init xen_drv_init(void)
 		return -ENODEV;
 
 	/* At the moment we only support case with XEN_PAGE_SIZE == PAGE_SIZE */
-	if (XEN_PAGE_SIZE != PAGE_SIZE) {
+	if (XEN_PAGE_SIZE != PG_SIZE) {
 		pr_err(XENSND_DRIVER_NAME ": different kernel and Xen page sizes are not supported: XEN_PAGE_SIZE (%lu) != PAGE_SIZE (%lu)\n",
-		       XEN_PAGE_SIZE, PAGE_SIZE);
+		       XEN_PAGE_SIZE, PG_SIZE);
 		return -ENODEV;
 	}
 

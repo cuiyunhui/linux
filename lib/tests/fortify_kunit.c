@@ -279,12 +279,12 @@ DEFINE_ALLOC_SIZE_TEST_PAIR(kmalloc)
 /* Sizes are in pages, not bytes. */
 #define TEST_vmalloc(checker, expected_pages, alloc_pages)	do {	\
 	gfp_t gfp = GFP_KERNEL | __GFP_NOWARN;				\
-	checker((expected_pages) * PAGE_SIZE,				\
-		vmalloc((alloc_pages) * PAGE_SIZE),	   vfree(p));	\
-	checker((expected_pages) * PAGE_SIZE,				\
-		vzalloc((alloc_pages) * PAGE_SIZE),	   vfree(p));	\
-	checker((expected_pages) * PAGE_SIZE,				\
-		__vmalloc((alloc_pages) * PAGE_SIZE, gfp), vfree(p));	\
+	checker((expected_pages) * PG_SIZE,				\
+		vmalloc((alloc_pages) * PG_SIZE),	   vfree(p));	\
+	checker((expected_pages) * PG_SIZE,				\
+		vzalloc((alloc_pages) * PG_SIZE),	   vfree(p));	\
+	checker((expected_pages) * PG_SIZE,				\
+		__vmalloc((alloc_pages) * PG_SIZE, gfp), vfree(p));	\
 } while (0)
 DEFINE_ALLOC_SIZE_TEST_PAIR(vmalloc)
 
@@ -294,36 +294,36 @@ DEFINE_ALLOC_SIZE_TEST_PAIR(vmalloc)
 	size_t prev_size;						\
 	void *orig;							\
 									\
-	checker((expected_pages) * PAGE_SIZE,				\
-		kvmalloc((alloc_pages) * PAGE_SIZE, gfp),		\
+	checker((expected_pages) * PG_SIZE,				\
+		kvmalloc((alloc_pages) * PG_SIZE, gfp),		\
 		kvfree(p));						\
-	checker((expected_pages) * PAGE_SIZE,				\
-		kvmalloc_node((alloc_pages) * PAGE_SIZE, gfp, NUMA_NO_NODE), \
+	checker((expected_pages) * PG_SIZE,				\
+		kvmalloc_node((alloc_pages) * PG_SIZE, gfp, NUMA_NO_NODE), \
 		kvfree(p));						\
-	checker((expected_pages) * PAGE_SIZE,				\
-		kvzalloc((alloc_pages) * PAGE_SIZE, gfp),		\
+	checker((expected_pages) * PG_SIZE,				\
+		kvzalloc((alloc_pages) * PG_SIZE, gfp),		\
 		kvfree(p));						\
-	checker((expected_pages) * PAGE_SIZE,				\
-		kvzalloc_node((alloc_pages) * PAGE_SIZE, gfp, NUMA_NO_NODE), \
+	checker((expected_pages) * PG_SIZE,				\
+		kvzalloc_node((alloc_pages) * PG_SIZE, gfp, NUMA_NO_NODE), \
 		kvfree(p));						\
-	checker((expected_pages) * PAGE_SIZE,				\
-		kvcalloc(1, (alloc_pages) * PAGE_SIZE, gfp),		\
+	checker((expected_pages) * PG_SIZE,				\
+		kvcalloc(1, (alloc_pages) * PG_SIZE, gfp),		\
 		kvfree(p));						\
-	checker((expected_pages) * PAGE_SIZE,				\
-		kvcalloc((alloc_pages) * PAGE_SIZE, 1, gfp),		\
+	checker((expected_pages) * PG_SIZE,				\
+		kvcalloc((alloc_pages) * PG_SIZE, 1, gfp),		\
 		kvfree(p));						\
-	checker((expected_pages) * PAGE_SIZE,				\
-		kvmalloc_array(1, (alloc_pages) * PAGE_SIZE, gfp),	\
+	checker((expected_pages) * PG_SIZE,				\
+		kvmalloc_array(1, (alloc_pages) * PG_SIZE, gfp),	\
 		kvfree(p));						\
-	checker((expected_pages) * PAGE_SIZE,				\
-		kvmalloc_array((alloc_pages) * PAGE_SIZE, 1, gfp),	\
+	checker((expected_pages) * PG_SIZE,				\
+		kvmalloc_array((alloc_pages) * PG_SIZE, 1, gfp),	\
 		kvfree(p));						\
 									\
-	prev_size = (expected_pages) * PAGE_SIZE;			\
+	prev_size = (expected_pages) * PG_SIZE;			\
 	orig = kvmalloc(prev_size, gfp);				\
 	KUNIT_EXPECT_TRUE(test, orig != NULL);				\
-	checker(((expected_pages) * PAGE_SIZE) * 2,			\
-		kvrealloc(orig, ((alloc_pages) * PAGE_SIZE) * 2, gfp),	\
+	checker(((expected_pages) * PG_SIZE) * 2,			\
+		kvrealloc(orig, ((alloc_pages) * PG_SIZE) * 2, gfp),	\
 		kvfree(p));						\
 } while (0)
 DEFINE_ALLOC_SIZE_TEST_PAIR(kvmalloc)

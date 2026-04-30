@@ -306,7 +306,7 @@ int squashfs_read_inode(struct inode *inode, long long ino)
 			goto failed_read;
 
 		inode->i_size = le32_to_cpu(sqsh_ino->symlink_size);
-		if (inode->i_size > PAGE_SIZE) {
+		if (inode->i_size > PG_SIZE) {
 			ERROR("Corrupted symlink\n");
 			return -EINVAL;
 		}

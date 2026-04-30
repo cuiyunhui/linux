@@ -64,7 +64,7 @@ void damon_ptep_mkold(pte_t *pte, struct vm_area_struct *vma, unsigned long addr
 	 */
 	if (likely(pte_present(pteval)))
 		young |= ptep_test_and_clear_young(vma, addr, pte);
-	young |= mmu_notifier_clear_young(vma->vm_mm, addr, addr + PAGE_SIZE);
+	young |= mmu_notifier_clear_young(vma->vm_mm, addr, addr + PG_SIZE);
 	if (young)
 		folio_set_young(folio);
 

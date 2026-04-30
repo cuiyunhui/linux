@@ -711,9 +711,9 @@ retry_dn:
 		}
 
 		if (!file_keep_isize(inode) &&
-			(i_size_read(inode) <= ((loff_t)index << PAGE_SHIFT)))
+			(i_size_read(inode) <= ((loff_t)index << PG_SHIFT)))
 			f2fs_i_size_write(inode,
-				(loff_t)(index + 1) << PAGE_SHIFT);
+				(loff_t)(index + 1) << PG_SHIFT);
 
 		/*
 		 * dest is reserved block, invalidate src block
@@ -915,7 +915,7 @@ skip:
 
 	/* truncate meta pages to be used by the recovery */
 	truncate_inode_pages_range(META_MAPPING(sbi),
-			(loff_t)MAIN_BLKADDR(sbi) << PAGE_SHIFT, -1);
+			(loff_t)MAIN_BLKADDR(sbi) << PG_SHIFT, -1);
 
 	if (err) {
 		truncate_inode_pages_final(NODE_MAPPING(sbi));

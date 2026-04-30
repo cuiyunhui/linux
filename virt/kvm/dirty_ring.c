@@ -261,7 +261,7 @@ bool kvm_dirty_ring_check_request(struct kvm_vcpu *vcpu)
 
 struct page *kvm_dirty_ring_get_page(struct kvm_dirty_ring *ring, u32 offset)
 {
-	return vmalloc_to_page((void *)ring->dirty_gfns + offset * PAGE_SIZE);
+	return vmalloc_to_page((void *)ring->dirty_gfns + offset * PG_SIZE);
 }
 
 void kvm_dirty_ring_free(struct kvm_dirty_ring *ring)

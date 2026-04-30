@@ -39,7 +39,7 @@ static struct dma_coherent_mem *dma_init_coherent_memory(phys_addr_t phys_addr,
 		dma_addr_t device_addr, size_t size, bool use_dma_pfn_offset)
 {
 	struct dma_coherent_mem *dma_mem;
-	int pages = size >> PAGE_SHIFT;
+	int pages = size >> PG_SHIFT;
 	void *mem_base;
 
 	if (!size)
@@ -149,7 +149,7 @@ static void *__dma_alloc_from_coherent(struct device *dev,
 
 	spin_lock_irqsave(&mem->spinlock, flags);
 
-	if (unlikely(size > ((dma_addr_t)mem->size << PAGE_SHIFT)))
+	if (unlikely(size > ((dma_addr_t)mem->size << PG_SHIFT)))
 		goto err;
 
 	pageno = bitmap_find_free_region(mem->bitmap, mem->size, order);
@@ -160,8 +160,8 @@ static void *__dma_alloc_from_coherent(struct device *dev,
 	 * Memory was found in the coherent area.
 	 */
 	*dma_handle = dma_get_device_base(dev, mem) +
-			((dma_addr_t)pageno << PAGE_SHIFT);
-	ret = mem->virt_base + ((dma_addr_t)pageno << PAGE_SHIFT);
+			((dma_addr_t)pageno << PG_SHIFT);
+	ret = mem->virt_base + ((dma_addr_t)pageno << PG_SHIFT);
 	spin_unlock_irqrestore(&mem->spinlock, flags);
 	memset(ret, 0, size);
 	return ret;
@@ -200,8 +200,8 @@ static int __dma_release_from_coherent(struct dma_coherent_mem *mem,
 				       int order, void *vaddr)
 {
 	if (mem && vaddr >= mem->virt_base && vaddr <
-		   (mem->virt_base + ((dma_addr_t)mem->size << PAGE_SHIFT))) {
-		int page = (vaddr - mem->virt_base) >> PAGE_SHIFT;
+		   (mem->virt_base + ((dma_addr_t)mem->size << PG_SHIFT))) {
+		int page = (vaddr - mem->virt_base) >> PG_SHIFT;
 		unsigned long flags;
 
 		spin_lock_irqsave(&mem->spinlock, flags);
@@ -235,17 +235,17 @@ static int __dma_mmap_from_coherent(struct dma_coherent_mem *mem,
 		struct vm_area_struct *vma, void *vaddr, size_t size, int *ret)
 {
 	if (mem && vaddr >= mem->virt_base && vaddr + size <=
-		   (mem->virt_base + ((dma_addr_t)mem->size << PAGE_SHIFT))) {
+		   (mem->virt_base + ((dma_addr_t)mem->size << PG_SHIFT))) {
 		unsigned long off = vma->vm_pgoff;
-		int start = (vaddr - mem->virt_base) >> PAGE_SHIFT;
+		int start = (vaddr - mem->virt_base) >> PG_SHIFT;
 		unsigned long user_count = vma_pages(vma);
-		int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+		int count = PG_ALIGN(size) >> PG_SHIFT;
 
 		*ret = -ENXIO;
 		if (off < count && user_count <= count - off) {
 			unsigned long pfn = mem->pfn_base + start + off;
 			*ret = remap_pfn_range(vma, vma->vm_start, pfn,
-					       user_count << PAGE_SHIFT,
+					       user_count << PG_SHIFT,
 					       vma->vm_page_prot);
 		}
 		return 1;

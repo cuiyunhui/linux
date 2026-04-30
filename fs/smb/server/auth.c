@@ -745,7 +745,7 @@ static inline void smb2_sg_set_buf(struct scatterlist *sg, const void *buf,
 		addr = vmalloc_to_page(buf);
 	else
 		addr = virt_to_page(buf);
-	sg_set_page(sg, addr, buflen, offset_in_page(buf));
+	sg_set_page(sg, addr, buflen, offset_in_pg(buf));
 }
 
 static struct scatterlist *ksmbd_init_sg(struct kvec *iov, unsigned int nvec,
@@ -767,8 +767,8 @@ static struct scatterlist *ksmbd_init_sg(struct kvec *iov, unsigned int nvec,
 
 		if (is_vmalloc_addr(iov[i + 1].iov_base)) {
 			nr_entries[i] = ((kaddr + iov[i + 1].iov_len +
-					PAGE_SIZE - 1) >> PAGE_SHIFT) -
-				(kaddr >> PAGE_SHIFT);
+					PG_SIZE - 1) >> PG_SHIFT) -
+				(kaddr >> PG_SHIFT);
 		} else {
 			nr_entries[i]++;
 		}
@@ -791,10 +791,10 @@ static struct scatterlist *ksmbd_init_sg(struct kvec *iov, unsigned int nvec,
 		int len = iov[i + 1].iov_len;
 
 		if (is_vmalloc_addr(data)) {
-			int j, offset = offset_in_page(data);
+			int j, offset = offset_in_pg(data);
 
 			for (j = 0; j < nr_entries[i]; j++) {
-				unsigned int bytes = PAGE_SIZE - offset;
+				unsigned int bytes = PG_SIZE - offset;
 
 				if (!len)
 					break;
@@ -804,7 +804,7 @@ static struct scatterlist *ksmbd_init_sg(struct kvec *iov, unsigned int nvec,
 
 				sg_set_page(&sg[sg_idx++],
 					    vmalloc_to_page(data), bytes,
-					    offset_in_page(data));
+					    offset_in_pg(data));
 
 				data += bytes;
 				len -= bytes;
@@ -812,7 +812,7 @@ static struct scatterlist *ksmbd_init_sg(struct kvec *iov, unsigned int nvec,
 			}
 		} else {
 			sg_set_page(&sg[sg_idx++], virt_to_page(data), len,
-				    offset_in_page(data));
+				    offset_in_pg(data));
 		}
 	}
 	smb2_sg_set_buf(&sg[sg_idx], sign, SMB2_SIGNATURE_SIZE);

@@ -104,7 +104,7 @@ int acp_dsp_stream_config(struct snd_sof_dev *sdev, struct acp_dsp_stream *strea
 	snd_sof_dsp_write(sdev, ACP_DSP_BAR, pte_size, PAGE_SIZE_4K_ENABLE);
 
 	for (page_idx = 0; page_idx < stream->num_pages; page_idx++) {
-		addr = snd_sgbuf_get_addr(stream->dmab, page_idx * PAGE_SIZE);
+		addr = snd_sgbuf_get_addr(stream->dmab, page_idx * PG_SIZE);
 
 		/* Load the low address of page int ACP SRAM through SRBM */
 		low = lower_32_bits(addr);

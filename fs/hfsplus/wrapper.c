@@ -211,7 +211,7 @@ reread:
 		goto out_free_backup_vhdr;
 	sbi->alloc_blksz = blocksize;
 	sbi->alloc_blksz_shift = ilog2(blocksize);
-	blocksize = min_t(u32, sbi->alloc_blksz, PAGE_SIZE);
+	blocksize = min_t(u32, sbi->alloc_blksz, PG_SIZE);
 
 	/*
 	 * Align block size to block offset.

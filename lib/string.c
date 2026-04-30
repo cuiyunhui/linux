@@ -126,7 +126,7 @@ ssize_t sized_strscpy(char *dest, const char *src, size_t count)
 	 * since we don't know if the next page is mapped.
 	 */
 	if ((long)src & (sizeof(long) - 1)) {
-		size_t limit = PAGE_SIZE - ((long)src & (PAGE_SIZE - 1));
+		size_t limit = PG_SIZE - ((long)src & (PG_SIZE - 1));
 		if (limit < max)
 			max = limit;
 	}

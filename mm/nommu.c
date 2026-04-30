@@ -513,7 +513,7 @@ static void delete_nommu_region(struct vm_region *region)
  */
 static void free_page_series(unsigned long from, unsigned long to)
 {
-	for (; from < to; from += PAGE_SIZE) {
+	for (; from < to; from += PG_SIZE) {
 		struct page *page = virt_to_page((void *)from);
 
 		atomic_long_dec(&mmap_pages_allocated);
@@ -710,12 +710,12 @@ static int validate_mmap_request(struct file *file,
 		return -EINVAL;
 
 	/* Careful about overflows.. */
-	rlen = PAGE_ALIGN(len);
+	rlen = PG_ALIGN(len);
 	if (!rlen || rlen > TASK_SIZE)
 		return -ENOMEM;
 
 	/* offset overflow? */
-	if ((pgoff + (rlen >> PAGE_SHIFT)) < pgoff)
+	if ((pgoff + (rlen >> PG_SHIFT)) < pgoff)
 		return -EOVERFLOW;
 
 	if (file) {
@@ -950,13 +950,13 @@ static int do_mmap_private(struct vm_area_struct *vma,
 	 */
 	order = get_order(len);
 	total = 1 << order;
-	point = len >> PAGE_SHIFT;
+	point = len >> PG_SHIFT;
 
 	/* we don't want to allocate a power-of-2 sized page set */
 	if (sysctl_nr_trim_pages && total - point >= sysctl_nr_trim_pages)
 		total = point;
 
-	base = alloc_pages_exact(total << PAGE_SHIFT, GFP_KERNEL);
+	base = alloc_pages_exact(total << PG_SHIFT, GFP_KERNEL);
 	if (!base)
 		goto enomem;
 
@@ -966,7 +966,7 @@ static int do_mmap_private(struct vm_area_struct *vma,
 	region->vm_flags = vma->vm_flags;
 	region->vm_start = (unsigned long) base;
 	region->vm_end   = region->vm_start + len;
-	region->vm_top   = region->vm_start + (total << PAGE_SHIFT);
+	region->vm_top   = region->vm_start + (total << PG_SHIFT);
 
 	vma->vm_start = region->vm_start;
 	vma->vm_end   = region->vm_start + len;
@@ -976,7 +976,7 @@ static int do_mmap_private(struct vm_area_struct *vma,
 		loff_t fpos;
 
 		fpos = vma->vm_pgoff;
-		fpos <<= PAGE_SHIFT;
+		fpos <<= PG_SHIFT;
 
 		ret = kernel_read(vma->vm_file, base, len, &fpos);
 		if (ret < 0)
@@ -1037,7 +1037,7 @@ unsigned long do_mmap(struct file *file,
 
 	/* we ignore the address hint */
 	addr = 0;
-	len = PAGE_ALIGN(len);
+	len = PG_ALIGN(len);
 
 	/* we've determined that we can make the mapping, now translate what we
 	 * now know into VMA flags */
@@ -1079,7 +1079,7 @@ unsigned long do_mmap(struct file *file,
 		struct vm_region *pregion;
 		unsigned long pglen, rpglen, pgend, rpgend, start;
 
-		pglen = (len + PAGE_SIZE - 1) >> PAGE_SHIFT;
+		pglen = (len + PG_SIZE - 1) >> PG_SHIFT;
 		pgend = pgoff + pglen;
 
 		for (rb = rb_first(&nommu_region_tree); rb; rb = rb_next(rb)) {
@@ -1097,7 +1097,7 @@ unsigned long do_mmap(struct file *file,
 				continue;
 
 			rpglen = pregion->vm_end - pregion->vm_start;
-			rpglen = (rpglen + PAGE_SIZE - 1) >> PAGE_SHIFT;
+			rpglen = (rpglen + PG_SIZE - 1) >> PG_SHIFT;
 			rpgend = pregion->vm_pgoff + rpglen;
 			if (pgoff >= rpgend)
 				continue;
@@ -1116,7 +1116,7 @@ unsigned long do_mmap(struct file *file,
 			pregion->vm_usage++;
 			vma->vm_region = pregion;
 			start = pregion->vm_start;
-			start += (pgoff - pregion->vm_pgoff) << PAGE_SHIFT;
+			start += (pgoff - pregion->vm_pgoff) << PG_SHIFT;
 			vma->vm_start = start;
 			vma->vm_end = start + len;
 
@@ -1190,7 +1190,7 @@ unsigned long do_mmap(struct file *file,
 	/* okay... we have a mapping; now we have to register it */
 	result = vma->vm_start;
 
-	current->mm->total_vm += len >> PAGE_SHIFT;
+	current->mm->total_vm += len >> PG_SHIFT;
 
 share:
 	BUG_ON(!vma->vm_region);
@@ -1291,11 +1291,11 @@ SYSCALL_DEFINE1(old_mmap, struct mmap_arg_struct __user *, arg)
 
 	if (copy_from_user(&a, arg, sizeof(a)))
 		return -EFAULT;
-	if (offset_in_page(a.offset))
+	if (offset_in_pg(a.offset))
 		return -EINVAL;
 
 	return ksys_mmap_pgoff(a.addr, a.len, a.prot, a.flags, a.fd,
-			       a.offset >> PAGE_SHIFT);
+			       a.offset >> PG_SHIFT);
 }
 #endif /* __ARCH_WANT_SYS_OLD_MMAP */
 
@@ -1332,7 +1332,7 @@ static int split_vma(struct vma_iterator *vmi, struct vm_area_struct *vma,
 	*region = *vma->vm_region;
 	new->vm_region = region;
 
-	npages = (addr - vma->vm_start) >> PAGE_SHIFT;
+	npages = (addr - vma->vm_start) >> PG_SHIFT;
 
 	if (new_below) {
 		region->vm_top = region->vm_end = new->vm_end = addr;
@@ -1430,7 +1430,7 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len, struct list
 	unsigned long end;
 	int ret = 0;
 
-	len = PAGE_ALIGN(len);
+	len = PG_ALIGN(len);
 	if (len == 0)
 		return -EINVAL;
 
@@ -1465,9 +1465,9 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len, struct list
 			goto erase_whole_vma;
 		if (start < vma->vm_start || end > vma->vm_end)
 			return -EINVAL;
-		if (offset_in_page(start))
+		if (offset_in_pg(start))
 			return -EINVAL;
-		if (end != vma->vm_end && offset_in_page(end))
+		if (end != vma->vm_end && offset_in_pg(end))
 			return -EINVAL;
 		if (start != vma->vm_start && end != vma->vm_end) {
 			ret = split_vma(&vmi, vma, start, 1);
@@ -1546,12 +1546,12 @@ static unsigned long do_mremap(unsigned long addr,
 	struct vm_area_struct *vma;
 
 	/* insanity checks first */
-	old_len = PAGE_ALIGN(old_len);
-	new_len = PAGE_ALIGN(new_len);
+	old_len = PG_ALIGN(old_len);
+	new_len = PG_ALIGN(new_len);
 	if (old_len == 0 || new_len == 0)
 		return (unsigned long) -EINVAL;
 
-	if (offset_in_page(addr))
+	if (offset_in_pg(addr))
 		return -EINVAL;
 
 	if (flags & MREMAP_FIXED && new_addr != addr)
@@ -1590,7 +1590,7 @@ SYSCALL_DEFINE5(mremap, unsigned long, addr, unsigned long, old_len,
 int remap_pfn_range(struct vm_area_struct *vma, unsigned long addr,
 		unsigned long pfn, unsigned long size, pgprot_t prot)
 {
-	if (addr != (pfn << PAGE_SHIFT))
+	if (addr != (pfn << PG_SHIFT))
 		return -EINVAL;
 
 	vm_flags_set(vma, VM_IO | VM_PFNMAP | VM_DONTEXPAND | VM_DONTDUMP);
@@ -1600,7 +1600,7 @@ EXPORT_SYMBOL(remap_pfn_range);
 
 int vm_iomap_memory(struct vm_area_struct *vma, phys_addr_t start, unsigned long len)
 {
-	unsigned long pfn = start >> PAGE_SHIFT;
+	unsigned long pfn = start >> PG_SHIFT;
 	unsigned long vm_len = vma->vm_end - vma->vm_start;
 
 	pfn += vma->vm_pgoff;
@@ -1616,7 +1616,7 @@ int remap_vmalloc_range(struct vm_area_struct *vma, void *addr,
 	if (!(vma->vm_flags & VM_USERMAP))
 		return -EINVAL;
 
-	vma->vm_start = (unsigned long)(addr + (pgoff << PAGE_SHIFT));
+	vma->vm_start = (unsigned long)(addr + (pgoff << PG_SHIFT));
 	vma->vm_end = vma->vm_start + size;
 
 	return 0;
@@ -1809,8 +1809,8 @@ int nommu_shrink_inode_mappings(struct inode *inode, size_t size,
 	pgoff_t low, high;
 	size_t r_size, r_top;
 
-	low = newsize >> PAGE_SHIFT;
-	high = (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	low = newsize >> PG_SHIFT;
+	high = (size + PG_SIZE - 1) >> PG_SHIFT;
 
 	down_write(&nommu_region_sem);
 	i_mmap_lock_read(inode->i_mapping);
@@ -1838,7 +1838,7 @@ int nommu_shrink_inode_mappings(struct inode *inode, size_t size,
 
 		region = vma->vm_region;
 		r_size = region->vm_top - region->vm_start;
-		r_top = (region->vm_pgoff << PAGE_SHIFT) + r_size;
+		r_top = (region->vm_pgoff << PG_SHIFT) + r_size;
 
 		if (r_top > newsize) {
 			region->vm_top -= r_top - newsize;

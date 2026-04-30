@@ -91,13 +91,13 @@ static void check_element(struct mempool *pool, void *element)
 			struct page *page = (struct page *)element;
 			void *addr = kmap_local_page(page + i);
 
-			__check_element(pool, addr, PAGE_SIZE);
+			__check_element(pool, addr, PG_SIZE);
 			kunmap_local(addr);
 		}
 #else
 		void *addr = page_address((struct page *)element);
 
-		__check_element(pool, addr, PAGE_SIZE << order);
+		__check_element(pool, addr, PG_SIZE << order);
 #endif
 	}
 }
@@ -130,13 +130,13 @@ static void poison_element(struct mempool *pool, void *element)
 			struct page *page = (struct page *)element;
 			void *addr = kmap_local_page(page + i);
 
-			__poison_element(addr, PAGE_SIZE);
+			__poison_element(addr, PG_SIZE);
 			kunmap_local(addr);
 		}
 #else
 		void *addr = page_address((struct page *)element);
 
-		__poison_element(addr, PAGE_SIZE << order);
+		__poison_element(addr, PG_SIZE << order);
 #endif
 	}
 }

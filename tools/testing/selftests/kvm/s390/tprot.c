@@ -14,7 +14,7 @@
 #define CR0_FETCH_PROTECTION_OVERRIDE	(1UL << (63 - 38))
 #define CR0_STORAGE_PROTECTION_OVERRIDE	(1UL << (63 - 39))
 
-static __aligned(PAGE_SIZE) uint8_t pages[2][PAGE_SIZE];
+static __aligned(PG_SIZE) uint8_t pages[2][PG_SIZE];
 static uint8_t *const page_store_prot = pages[0];
 static uint8_t *const page_fetch_prot = pages[1];
 
@@ -150,7 +150,7 @@ static enum stage perform_next_stage(int *i, bool mapped_0)
 		 * instead.
 		 * In order to skip these tests we detect this inside the guest
 		 */
-		skip = tests[*i].addr < (void *)PAGE_SIZE &&
+		skip = tests[*i].addr < (void *) PG_SIZE &&
 		       tests[*i].expected != TRANSL_UNAVAIL &&
 		       !mapped_0;
 		if (!skip) {
@@ -216,10 +216,10 @@ int main(int argc, char *argv[])
 	run = vcpu->run;
 
 	HOST_SYNC(vcpu, STAGE_INIT_SIMPLE);
-	mprotect(addr_gva2hva(vm, (vm_vaddr_t)pages), PAGE_SIZE * 2, PROT_READ);
+	mprotect(addr_gva2hva(vm, (vm_vaddr_t)pages), PG_SIZE * 2, PROT_READ);
 	HOST_SYNC(vcpu, TEST_SIMPLE);
 
-	guest_0_page = vm_vaddr_alloc(vm, PAGE_SIZE, 0);
+	guest_0_page = vm_vaddr_alloc(vm, PG_SIZE, 0);
 	if (guest_0_page != 0) {
 		/* Use NO_TAP so we don't get a PASS print */
 		HOST_SYNC_NO_TAP(vcpu, STAGE_INIT_FETCH_PROT_OVERRIDE);
@@ -229,7 +229,7 @@ int main(int argc, char *argv[])
 		HOST_SYNC(vcpu, STAGE_INIT_FETCH_PROT_OVERRIDE);
 	}
 	if (guest_0_page == 0)
-		mprotect(addr_gva2hva(vm, (vm_vaddr_t)0), PAGE_SIZE, PROT_READ);
+		mprotect(addr_gva2hva(vm, (vm_vaddr_t)0), PG_SIZE, PROT_READ);
 	run->s.regs.crs[0] |= CR0_FETCH_PROTECTION_OVERRIDE;
 	run->kvm_dirty_regs = KVM_SYNC_CRS;
 	HOST_SYNC(vcpu, TEST_FETCH_PROT_OVERRIDE);

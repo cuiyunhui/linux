@@ -24,7 +24,7 @@
 				  size) - 1))
 
 #define MAX_CSUM_ITEMS(r, size) (min_t(u32, __MAX_CSUM_ITEMS(r, size), \
-				       PAGE_SIZE))
+				       PG_SIZE))
 
 /*
  * Set inode's size according to filesystem options.
@@ -141,7 +141,7 @@ static size_t csum_size_to_bytes(const struct btrfs_fs_info *fs_info, u32 csum_s
 
 static inline u32 max_ordered_sum_bytes(const struct btrfs_fs_info *fs_info)
 {
-	u32 max_csum_size = round_down(PAGE_SIZE - sizeof(struct btrfs_ordered_sum),
+	u32 max_csum_size = round_down(PG_SIZE - sizeof(struct btrfs_ordered_sum),
 				       fs_info->csum_size);
 
 	return csum_size_to_bytes(fs_info, max_csum_size);
@@ -780,9 +780,9 @@ static void csum_one_bio(struct btrfs_bio *bbio, struct bvec_iter *src)
 	struct bvec_iter iter = *src;
 	phys_addr_t paddr;
 	const u32 blocksize = fs_info->sectorsize;
-	const u32 step = min(blocksize, PAGE_SIZE);
+	const u32 step = min(blocksize, PG_SIZE);
 	const u32 nr_steps = blocksize / step;
-	phys_addr_t paddrs[BTRFS_MAX_BLOCKSIZE / PAGE_SIZE];
+	phys_addr_t paddrs[BTRFS_MAX_BLOCKSIZE / PG_SIZE];
 	u32 offset = 0;
 	int index = 0;
 

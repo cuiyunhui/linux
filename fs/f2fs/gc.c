@@ -1429,7 +1429,7 @@ static int move_data_block(struct inode *inode, block_t bidx,
 	/* write target block */
 	f2fs_wait_on_page_writeback(fio.encrypted_page, DATA, true, true);
 	memcpy(page_address(fio.encrypted_page),
-				folio_address(mfolio), PAGE_SIZE);
+				folio_address(mfolio), PG_SIZE);
 	f2fs_folio_put(mfolio, true);
 
 	f2fs_invalidate_internal_cache(fio.sbi, fio.old_blkaddr, 1);

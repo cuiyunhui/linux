@@ -1008,22 +1008,21 @@ nfsd_splice_actor(struct pipe_inode_info *pipe, struct pipe_buffer *buf,
 	unsigned offset = buf->offset;
 	struct page *last_page;
 
-	last_page = page + (offset + sd->len - 1) / PAGE_SIZE;
-	for (page += offset / PAGE_SIZE; page <= last_page; page++) {
+	last_page = page + (offset + sd->len - 1) / PG_SIZE;
+	for (page += offset / PG_SIZE; page <= last_page; page++) {
 		/*
 		 * Skip page replacement when extending the contents of the
 		 * current page.  But note that we may get two zero_pages in a
 		 * row from shmem.
 		 */
 		if (page == *(rqstp->rq_next_page - 1) &&
-		    offset_in_page(rqstp->rq_res.page_base +
-				   rqstp->rq_res.page_len))
+		    offset_in_pg(rqstp->rq_res.page_base + rqstp->rq_res.page_len))
 			continue;
 		if (unlikely(!svc_rqst_replace_page(rqstp, page)))
 			return -EIO;
 	}
 	if (rqstp->rq_res.page_len == 0)	// first call
-		rqstp->rq_res.page_base = offset % PAGE_SIZE;
+		rqstp->rq_res.page_base = offset % PG_SIZE;
 	rqstp->rq_res.page_len += sd->len;
 	return sd->len;
 }
@@ -1133,7 +1132,7 @@ nfsd_direct_read(struct svc_rqst *rqstp, struct svc_fh *fhp,
 	total = dio_end - dio_start;
 	while (total && v < rqstp->rq_maxpages &&
 	       rqstp->rq_next_page < rqstp->rq_page_end) {
-		len = min_t(size_t, total, PAGE_SIZE);
+		len = min_t(size_t, total, PG_SIZE);
 		bvec_set_page(&rqstp->rq_bvec[v], *rqstp->rq_next_page,
 			      len, 0);
 
@@ -1222,7 +1221,7 @@ __be32 nfsd_iter_read(struct svc_rqst *rqstp, struct svc_fh *fhp,
 	total = *count;
 	while (total && v < rqstp->rq_maxpages &&
 	       rqstp->rq_next_page < rqstp->rq_page_end) {
-		len = min_t(size_t, total, PAGE_SIZE - base);
+		len = min_t(size_t, total, PG_SIZE - base);
 		bvec_set_page(&rqstp->rq_bvec[v], *rqstp->rq_next_page,
 			      len, base);
 
@@ -2382,7 +2381,7 @@ static bool nfsd_buffered_filldir(struct dir_context *ctx, const char *name,
 	unsigned int reclen;
 
 	reclen = ALIGN(sizeof(struct buffered_dirent) + namlen, sizeof(u64));
-	if (buf->used + reclen > PAGE_SIZE) {
+	if (buf->used + reclen > PG_SIZE) {
 		buf->full = 1;
 		return false;
 	}

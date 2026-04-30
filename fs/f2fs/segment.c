@@ -302,7 +302,7 @@ static void __complete_revoke_list(struct inode *inode, struct list_head *head,
 	}
 
 	if (!revoke && truncate)
-		f2fs_do_truncate_blocks(inode, start_index * PAGE_SIZE, false);
+		f2fs_do_truncate_blocks(inode, start_index * PG_SIZE, false);
 }
 
 static int __f2fs_commit_atomic_write(struct inode *inode)
@@ -314,7 +314,7 @@ static int __f2fs_commit_atomic_write(struct inode *inode)
 	struct list_head revoke_list;
 	block_t blkaddr;
 	struct dnode_of_data dn;
-	pgoff_t len = DIV_ROUND_UP(i_size_read(inode), PAGE_SIZE);
+	pgoff_t len = DIV_ROUND_UP(i_size_read(inode), PG_SIZE);
 	pgoff_t off = 0, blen, index;
 	int ret = 0, i;
 
@@ -2707,7 +2707,7 @@ void f2fs_update_meta_page(struct f2fs_sb_info *sbi,
 	if (IS_ERR(folio))
 		return;
 
-	memcpy(folio_address(folio), src, PAGE_SIZE);
+	memcpy(folio_address(folio), src, PG_SIZE);
 	folio_mark_dirty(folio);
 	f2fs_folio_put(folio, true);
 }
@@ -2740,7 +2740,7 @@ static void write_current_sum_page(struct f2fs_sb_info *sbi,
 	struct f2fs_summary_block *dst;
 
 	dst = folio_address(folio);
-	memset(dst, 0, PAGE_SIZE);
+	memset(dst, 0, PG_SIZE);
 
 	mutex_lock(&curseg->curseg_mutex);
 
@@ -4471,7 +4471,7 @@ static void write_compacted_summaries(struct f2fs_sb_info *sbi, block_t blkaddr)
 
 	folio = f2fs_grab_meta_folio(sbi, blkaddr++);
 	kaddr = folio_address(folio);
-	memset(kaddr, 0, PAGE_SIZE);
+	memset(kaddr, 0, PG_SIZE);
 
 	/* Step 1: write nat cache */
 	seg_i = CURSEG_I(sbi, CURSEG_HOT_DATA);
@@ -4490,7 +4490,7 @@ static void write_compacted_summaries(struct f2fs_sb_info *sbi, block_t blkaddr)
 			if (!folio) {
 				folio = f2fs_grab_meta_folio(sbi, blkaddr++);
 				kaddr = folio_address(folio);
-				memset(kaddr, 0, PAGE_SIZE);
+				memset(kaddr, 0, PG_SIZE);
 				written_size = 0;
 			}
 			summary = (struct f2fs_summary *)(kaddr + written_size);

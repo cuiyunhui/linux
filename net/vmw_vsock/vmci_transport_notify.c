@@ -33,11 +33,11 @@ static bool vmci_transport_notify_waiting_write(struct vsock_sock *vsk)
 
 	if (!PKT_FIELD(vsk, peer_waiting_write_detected)) {
 		PKT_FIELD(vsk, peer_waiting_write_detected) = true;
-		if (PKT_FIELD(vsk, write_notify_window) < PAGE_SIZE) {
+		if (PKT_FIELD(vsk, write_notify_window) < PG_SIZE) {
 			PKT_FIELD(vsk, write_notify_window) =
 			    PKT_FIELD(vsk, write_notify_min_window);
 		} else {
-			PKT_FIELD(vsk, write_notify_window) -= PAGE_SIZE;
+			PKT_FIELD(vsk, write_notify_window) -= PG_SIZE;
 			if (PKT_FIELD(vsk, write_notify_window) <
 			    PKT_FIELD(vsk, write_notify_min_window))
 				PKT_FIELD(vsk, write_notify_window) =
@@ -195,7 +195,7 @@ static bool send_waiting_read(struct sock *sk, u64 room_needed)
 	if (PKT_FIELD(vsk, write_notify_window) <
 			vmci_trans(vsk)->consume_size)
 		PKT_FIELD(vsk, write_notify_window) =
-		    min(PKT_FIELD(vsk, write_notify_window) + PAGE_SIZE,
+		    min(PKT_FIELD(vsk, write_notify_window) + PG_SIZE,
 			vmci_trans(vsk)->consume_size);
 
 	vmci_qpair_get_consume_indexes(vmci_trans(vsk)->qpair, &tail, &head);
@@ -314,8 +314,8 @@ static void vmci_transport_notify_pkt_socket_init(struct sock *sk)
 {
 	struct vsock_sock *vsk = vsock_sk(sk);
 
-	PKT_FIELD(vsk, write_notify_window) = PAGE_SIZE;
-	PKT_FIELD(vsk, write_notify_min_window) = PAGE_SIZE;
+	PKT_FIELD(vsk, write_notify_window) = PG_SIZE;
+	PKT_FIELD(vsk, write_notify_min_window) = PG_SIZE;
 	PKT_FIELD(vsk, peer_waiting_read) = false;
 	PKT_FIELD(vsk, peer_waiting_write) = false;
 	PKT_FIELD(vsk, peer_waiting_write_detected) = false;

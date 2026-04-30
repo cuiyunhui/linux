@@ -74,11 +74,11 @@
 #define MBOCHS_NUM_REGIONS        (MBOCHS_EDID_REGION_INDEX+1)
 
 #define MBOCHS_CONFIG_SPACE_SIZE  0xff
-#define MBOCHS_MMIO_BAR_OFFSET	  PAGE_SIZE
-#define MBOCHS_MMIO_BAR_SIZE	  PAGE_SIZE
+#define MBOCHS_MMIO_BAR_OFFSET	  PG_SIZE
+#define MBOCHS_MMIO_BAR_SIZE	  PG_SIZE
 #define MBOCHS_EDID_OFFSET	  (MBOCHS_MMIO_BAR_OFFSET +	\
 				   MBOCHS_MMIO_BAR_SIZE)
-#define MBOCHS_EDID_SIZE	  PAGE_SIZE
+#define MBOCHS_EDID_SIZE	  PG_SIZE
 #define MBOCHS_MEMORY_BAR_OFFSET  (MBOCHS_EDID_OFFSET + \
 				   MBOCHS_EDID_SIZE)
 
@@ -473,8 +473,8 @@ static ssize_t mdev_access(struct mdev_state *mdev_state, char *buf,
 		   pos + count <=
 		   MBOCHS_MEMORY_BAR_OFFSET + mdev_state->memsize) {
 		pos -= MBOCHS_MMIO_BAR_OFFSET;
-		poff = pos & ~PAGE_MASK;
-		pg = __mbochs_get_page(mdev_state, pos >> PAGE_SHIFT);
+		poff = pos & ~PG_MASK;
+		pg = __mbochs_get_page(mdev_state, pos >> PG_SHIFT);
 		map = kmap(pg);
 		if (is_write)
 			memcpy(map + poff, buf, count);
@@ -532,7 +532,7 @@ static int mbochs_init_dev(struct vfio_device *vdev)
 		goto err_avail;
 
 	mdev_state->memsize = type->mbytes * 1024 * 1024;
-	mdev_state->pagecount = mdev_state->memsize >> PAGE_SHIFT;
+	mdev_state->pagecount = mdev_state->memsize >> PG_SHIFT;
 	mdev_state->pages = kcalloc(mdev_state->pagecount,
 				    sizeof(struct page *),
 				    GFP_KERNEL);
@@ -774,7 +774,7 @@ static vm_fault_t mbochs_region_vm_fault(struct vm_fault *vmf)
 {
 	struct vm_area_struct *vma = vmf->vma;
 	struct mdev_state *mdev_state = vma->vm_private_data;
-	pgoff_t page_offset = (vmf->address - vma->vm_start) >> PAGE_SHIFT;
+	pgoff_t page_offset = (vmf->address - vma->vm_start) >> PG_SHIFT;
 
 	if (page_offset >= mdev_state->pagecount)
 		return VM_FAULT_SIGBUS;
@@ -795,7 +795,7 @@ static int mbochs_mmap(struct vfio_device *vdev, struct vm_area_struct *vma)
 	struct mdev_state *mdev_state =
 		container_of(vdev, struct mdev_state, vdev);
 
-	if (vma->vm_pgoff != MBOCHS_MEMORY_BAR_OFFSET >> PAGE_SHIFT)
+	if (vma->vm_pgoff != MBOCHS_MEMORY_BAR_OFFSET >> PG_SHIFT)
 		return -EINVAL;
 	if (vma->vm_end < vma->vm_start)
 		return -EINVAL;
@@ -939,13 +939,13 @@ static struct mbochs_dmabuf *mbochs_dmabuf_alloc(struct mdev_state *mdev_state,
 
 	dmabuf->mode = *mode;
 	dmabuf->id = mdev_state->next_id++;
-	dmabuf->pagecount = DIV_ROUND_UP(mode->size, PAGE_SIZE);
+	dmabuf->pagecount = DIV_ROUND_UP(mode->size, PG_SIZE);
 	dmabuf->pages = kcalloc(dmabuf->pagecount, sizeof(struct page *),
 				GFP_KERNEL);
 	if (!dmabuf->pages)
 		goto err_free_dmabuf;
 
-	page_offset = dmabuf->mode.offset >> PAGE_SHIFT;
+	page_offset = dmabuf->mode.offset >> PG_SHIFT;
 	for (pg = 0; pg < dmabuf->pagecount; pg++) {
 		dmabuf->pages[pg] = __mbochs_get_page(mdev_state,
 						      page_offset + pg);
@@ -1006,7 +1006,7 @@ static int mbochs_dmabuf_export(struct mbochs_dmabuf *dmabuf)
 
 	WARN_ON(!mutex_is_locked(&mdev_state->ops_lock));
 
-	if (!IS_ALIGNED(dmabuf->mode.offset, PAGE_SIZE)) {
+	if (!IS_ALIGNED(dmabuf->mode.offset, PG_SIZE)) {
 		dev_info_ratelimited(dev, "%s: framebuffer not page-aligned\n",
 				     __func__);
 		return -EINVAL;

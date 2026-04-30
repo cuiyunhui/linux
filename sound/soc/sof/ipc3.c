@@ -588,7 +588,7 @@ static int ipc3_fw_parse_ext_data(struct snd_sof_dev *sdev, u32 offset)
 	void *ext_data;
 	int ret = 0;
 
-	ext_data = kzalloc(PAGE_SIZE, GFP_KERNEL);
+	ext_data = kzalloc(PG_SIZE, GFP_KERNEL);
 	if (!ext_data)
 		return -ENOMEM;
 

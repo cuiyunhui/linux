@@ -56,7 +56,7 @@ static int virtsnd_pcm_sg_num(u8 *data, unsigned int length)
 		phys_addr_t pg_address = page_to_phys(pg);
 		size_t pg_length;
 
-		pg_length = PAGE_SIZE - offset_in_page(data);
+		pg_length = PG_SIZE - offset_in_pg(data);
 		if (pg_length > length)
 			pg_length = length;
 
@@ -96,7 +96,7 @@ static void virtsnd_pcm_sg_from(struct scatterlist *sgs, int nsgs, u8 *data,
 		struct page *pg = vmalloc_to_page(data);
 		size_t pg_length;
 
-		pg_length = PAGE_SIZE - offset_in_page(data);
+		pg_length = PG_SIZE - offset_in_pg(data);
 		if (pg_length > length)
 			pg_length = length;
 
@@ -105,7 +105,7 @@ static void virtsnd_pcm_sg_from(struct scatterlist *sgs, int nsgs, u8 *data,
 			if (idx + 1 == nsgs)
 				break;
 			sg_set_page(&sgs[++idx], pg, pg_length,
-				    offset_in_page(data));
+				    offset_in_pg(data));
 		} else {
 			sgs[idx].length += pg_length;
 		}

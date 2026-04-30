@@ -44,7 +44,7 @@ static int ceph_tcp_recvpage(struct socket *sock, struct page *page,
 	struct msghdr msg = { .msg_flags = MSG_DONTWAIT | MSG_NOSIGNAL };
 	int r;
 
-	BUG_ON(page_offset + length > PAGE_SIZE);
+	BUG_ON(page_offset + length > PG_SIZE);
 	bvec_set_page(&bvec, page, length, page_offset);
 	iov_iter_bvec(&msg.msg_iter, ITER_DEST, &bvec, 1, length);
 	r = sock_recvmsg(sock, &msg, msg.msg_flags);
@@ -526,7 +526,7 @@ static int write_partial_skip(struct ceph_connection *con)
 
 	dout("%s %p %d left\n", __func__, con, con->v1.out_skip);
 	while (con->v1.out_skip > 0) {
-		size_t size = min(con->v1.out_skip, (int)PAGE_SIZE);
+		size_t size = min(con->v1.out_skip, (int) PG_SIZE);
 
 		ret = ceph_tcp_sendpage(con->sock, ceph_zero_page, 0, size,
 					MSG_MORE);

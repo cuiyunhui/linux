@@ -1353,7 +1353,7 @@ static int xt_jumpstack_alloc(struct xt_table_info *i)
 	int cpu;
 
 	size = sizeof(void **) * nr_cpu_ids;
-	if (size > PAGE_SIZE)
+	if (size > PG_SIZE)
 		i->jumpstack = kvzalloc(size, GFP_KERNEL);
 	else
 		i->jumpstack = kzalloc(size, GFP_KERNEL);

@@ -67,7 +67,7 @@ static inline void __btrfs_debug_check_extent_io_range(const char *caller,
 		return;
 
 	isize = i_size_read(&inode->vfs_inode);
-	if (end >= PAGE_SIZE && (end % 2) == 0 && end != isize - 1) {
+	if (end >= PG_SIZE && (end % 2) == 0 && end != isize - 1) {
 		btrfs_debug_rl(inode->root->fs_info,
 		    "%s: ino %llu isize %llu odd range [%llu,%llu]",
 			caller, btrfs_ino(inode), isize, start, end);

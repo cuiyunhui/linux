@@ -80,7 +80,7 @@ int fsverity_init_merkle_tree_params(struct merkle_tree_params *params,
 	 * block size be at least 1024 bytes.  That's small enough to test the
 	 * sub-page block case on systems with 4K pages, but not too small.
 	 */
-	if (log_blocksize < 10 || log_blocksize > PAGE_SHIFT ||
+	if (log_blocksize < 10 || log_blocksize > PG_SHIFT ||
 	    log_blocksize > inode->i_blkbits) {
 		fsverity_warn(inode, "Unsupported log_blocksize: %u",
 			      log_blocksize);
@@ -89,7 +89,7 @@ int fsverity_init_merkle_tree_params(struct merkle_tree_params *params,
 	}
 	params->log_blocksize = log_blocksize;
 	params->block_size = 1 << log_blocksize;
-	params->log_blocks_per_page = PAGE_SHIFT - log_blocksize;
+	params->log_blocks_per_page = PG_SHIFT - log_blocksize;
 	params->blocks_per_page = 1 << params->log_blocks_per_page;
 
 	if (WARN_ON_ONCE(!is_power_of_2(params->digest_size))) {
@@ -146,7 +146,7 @@ int fsverity_init_merkle_tree_params(struct merkle_tree_params *params,
 	 * explicitly check for that too.  Note, this is only for hash block
 	 * indices; data block indices might not fit in an 'unsigned long'.
 	 */
-	if ((params->block_size != PAGE_SIZE && offset > 1 << 23) ||
+	if ((params->block_size != PG_SIZE && offset > 1 << 23) ||
 	    offset > ULONG_MAX) {
 		fsverity_err(inode, "Too many blocks in Merkle tree");
 		err = -EFBIG;
@@ -154,7 +154,7 @@ int fsverity_init_merkle_tree_params(struct merkle_tree_params *params,
 	}
 
 	params->tree_size = offset << log_blocksize;
-	params->tree_pages = PAGE_ALIGN(params->tree_size) >> PAGE_SHIFT;
+	params->tree_pages = PG_ALIGN(params->tree_size) >> PG_SHIFT;
 	return 0;
 
 out_err:
@@ -214,7 +214,7 @@ struct fsverity_info *fsverity_create_info(struct inode *inode,
 	if (err)
 		goto fail;
 
-	if (vi->tree_params.block_size != PAGE_SIZE) {
+	if (vi->tree_params.block_size != PG_SIZE) {
 		/*
 		 * When the Merkle tree block size and page size differ, we use
 		 * a bitmap to keep track of which hash blocks have been

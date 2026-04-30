@@ -323,7 +323,7 @@ static void acp_pte_config(void __iomem *acp_mmio, dma_addr_t addr,
 		acp_reg_write(high, acp_mmio, mmACP_SRBM_Targ_Idx_Data);
 
 		/* Move to next physically contiguous page */
-		addr += PAGE_SIZE;
+		addr += PG_SIZE;
 	}
 }
 
@@ -1009,7 +1009,7 @@ static int acp_dma_hw_params(struct snd_soc_component *component,
 
 	/* Fill the page table entries in ACP SRAM */
 	rtd->size = size;
-	rtd->num_of_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
+	rtd->num_of_pages = PG_ALIGN(size) >> PG_SHIFT;
 	rtd->direction = substream->stream;
 
 	config_acp_dma(rtd->acp_mmio, rtd, adata->asic_type);

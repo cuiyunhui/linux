@@ -299,9 +299,9 @@ static void *test_alloc(struct kunit *test, size_t size, gfp_t gfp, enum allocat
 
 			if (policy == ALLOCATE_ANY)
 				return alloc;
-			if (policy == ALLOCATE_LEFT && PAGE_ALIGNED(alloc))
+			if (policy == ALLOCATE_LEFT && PG_ALIGNED(alloc))
 				return alloc;
-			if (policy == ALLOCATE_RIGHT && !PAGE_ALIGNED(alloc))
+			if (policy == ALLOCATE_RIGHT && !PG_ALIGNED(alloc))
 				return alloc;
 		} else if (policy == ALLOCATE_NONE)
 			return alloc;
@@ -621,7 +621,7 @@ static void test_memcache_ctor(struct kunit *test)
 /* Test that memory is zeroed if requested. */
 static void test_gfpzero(struct kunit *test)
 {
-	const size_t size = PAGE_SIZE; /* PAGE_SIZE so we can use ALLOCATE_ANY. */
+	const size_t size = PG_SIZE; /* PAGE_SIZE so we can use ALLOCATE_ANY. */
 	char *buf1, *buf2;
 	int i;
 

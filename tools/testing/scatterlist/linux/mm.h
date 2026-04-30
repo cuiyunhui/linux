@@ -28,16 +28,16 @@ typedef unsigned long dma_addr_t;
 
 #define PAGE_SIZE	(4096)
 #define PAGE_SHIFT	(12)
-#define PAGE_MASK	(~(PAGE_SIZE-1))
+#define PAGE_MASK	(~(PG_SIZE-1))
 
 #define __ALIGN_KERNEL(x, a)		__ALIGN_KERNEL_MASK(x, (typeof(x))(a) - 1)
 #define __ALIGN_KERNEL_MASK(x, mask)	(((x) + (mask)) & ~(mask))
 #define ALIGN(x, a)			__ALIGN_KERNEL((x), (a))
 #define ALIGN_DOWN(x, a)		__ALIGN_KERNEL((x) - ((a) - 1), (a))
 
-#define PAGE_ALIGN(addr) ALIGN(addr, PAGE_SIZE)
+#define PAGE_ALIGN(addr) ALIGN(addr, PG_SIZE)
 
-#define offset_in_page(p)	((unsigned long)(p) & ~PAGE_MASK)
+#define offset_in_page(p)	((unsigned long)(p) & ~PG_MASK)
 
 #define virt_to_page(x)	((void *)x)
 #define page_address(x)	((void *)x)
@@ -49,8 +49,8 @@ static inline unsigned long page_to_phys(struct page *page)
 	return 0;
 }
 
-#define page_to_pfn(page) ((unsigned long)(page) / PAGE_SIZE)
-#define pfn_to_page(pfn) (void *)((pfn) * PAGE_SIZE)
+#define page_to_pfn(page) ((unsigned long)(page) / PG_SIZE)
+#define pfn_to_page(pfn) (void *)((pfn) * PG_SIZE)
 
 #define __min(t1, t2, min1, min2, x, y) ({              \
 	t1 min1 = (x);                                  \
@@ -101,7 +101,7 @@ static inline void kunmap_atomic(void *addr)
 
 static inline unsigned long __get_free_page(unsigned int flags)
 {
-	return (unsigned long)malloc(PAGE_SIZE);
+	return (unsigned long)malloc(PG_SIZE);
 }
 
 static inline void free_page(unsigned long page)

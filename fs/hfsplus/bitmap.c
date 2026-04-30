@@ -14,7 +14,7 @@
 #include "hfsplus_fs.h"
 #include "hfsplus_raw.h"
 
-#define PAGE_CACHE_BITS	(PAGE_SIZE * 8)
+#define PAGE_CACHE_BITS	(PG_SIZE * 8)
 
 int hfsplus_block_allocate(struct super_block *sb, u32 size,
 		u32 offset, u32 *max)

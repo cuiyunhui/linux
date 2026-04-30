@@ -107,7 +107,7 @@ static void __init iov_kunit_copy_to_kvec(struct kunit *test)
 	int i, patt;
 
 	bufsize = 0x100000;
-	npages = bufsize / PAGE_SIZE;
+	npages = bufsize / PG_SIZE;
 
 	scratch = iov_kunit_create_buffer(test, &spages, npages);
 	for (i = 0; i < bufsize; i++)
@@ -157,7 +157,7 @@ static void __init iov_kunit_copy_from_kvec(struct kunit *test)
 	int i, j;
 
 	bufsize = 0x100000;
-	npages = bufsize / PAGE_SIZE;
+	npages = bufsize / PG_SIZE;
 
 	buffer = iov_kunit_create_buffer(test, &bpages, npages);
 	for (i = 0; i < bufsize; i++)
@@ -229,10 +229,10 @@ static void __init iov_kunit_load_bvec(struct kunit *test,
 		if (pr->from < 0)
 			break;
 		KUNIT_ASSERT_LT(test, pr->page, npages);
-		KUNIT_ASSERT_LT(test, pr->page * PAGE_SIZE, bufsize);
+		KUNIT_ASSERT_LT(test, pr->page * PG_SIZE, bufsize);
 		KUNIT_ASSERT_GE(test, pr->from, 0);
 		KUNIT_ASSERT_GE(test, pr->to, pr->from);
-		KUNIT_ASSERT_LE(test, pr->to, PAGE_SIZE);
+		KUNIT_ASSERT_LE(test, pr->to, PG_SIZE);
 
 		page = pages[pr->page];
 		if (pr->from == 0 && pr->from != pr->to && page == can_merge) {
@@ -243,8 +243,8 @@ static void __init iov_kunit_load_bvec(struct kunit *test,
 		}
 
 		size += pr->to - pr->from;
-		if ((pr->to & ~PAGE_MASK) == 0)
-			can_merge = page + pr->to / PAGE_SIZE;
+		if ((pr->to & ~PG_MASK) == 0)
+			can_merge = page + pr->to / PG_SIZE;
 		else
 			can_merge = NULL;
 	}
@@ -266,7 +266,7 @@ static void __init iov_kunit_copy_to_bvec(struct kunit *test)
 	int i, b, patt;
 
 	bufsize = 0x100000;
-	npages = bufsize / PAGE_SIZE;
+	npages = bufsize / PG_SIZE;
 
 	scratch = iov_kunit_create_buffer(test, &spages, npages);
 	for (i = 0; i < bufsize; i++)
@@ -290,7 +290,7 @@ static void __init iov_kunit_copy_to_bvec(struct kunit *test)
 	patt = 0;
 	memset(scratch, 0, bufsize);
 	for (pr = bvec_test_ranges; pr->from >= 0; pr++, b++) {
-		u8 *p = scratch + pr->page * PAGE_SIZE;
+		u8 *p = scratch + pr->page * PG_SIZE;
 
 		for (i = pr->from; i < pr->to; i++)
 			p[i] = pattern(patt++);
@@ -320,7 +320,7 @@ static void __init iov_kunit_copy_from_bvec(struct kunit *test)
 	int i, j;
 
 	bufsize = 0x100000;
-	npages = bufsize / PAGE_SIZE;
+	npages = bufsize / PG_SIZE;
 
 	buffer = iov_kunit_create_buffer(test, &bpages, npages);
 	for (i = 0; i < bufsize; i++)
@@ -343,7 +343,7 @@ static void __init iov_kunit_copy_from_bvec(struct kunit *test)
 	i = 0;
 	memset(buffer, 0, bufsize);
 	for (pr = bvec_test_ranges; pr->from >= 0; pr++) {
-		size_t patt = pr->page * PAGE_SIZE;
+		size_t patt = pr->page * PG_SIZE;
 
 		for (j = pr->from; j < pr->to; j++) {
 			buffer[i++] = pattern(patt + j);
@@ -394,7 +394,7 @@ static void __init iov_kunit_load_folioq(struct kunit *test,
 			p = p->next;
 		}
 		folioq_append(p, page_folio(pages[i]));
-		size += PAGE_SIZE;
+		size += PG_SIZE;
 	}
 	iov_iter_folio_queue(iter, dir, folioq, 0, 0, size);
 }
@@ -424,7 +424,7 @@ static void __init iov_kunit_copy_to_folioq(struct kunit *test)
 	int i, patt;
 
 	bufsize = 0x100000;
-	npages = bufsize / PAGE_SIZE;
+	npages = bufsize / PG_SIZE;
 
 	folioq = iov_kunit_create_folioq(test);
 
@@ -448,7 +448,7 @@ static void __init iov_kunit_copy_to_folioq(struct kunit *test)
 
 		KUNIT_EXPECT_EQ(test, copied, size);
 		KUNIT_EXPECT_EQ(test, iter.count, 0);
-		KUNIT_EXPECT_EQ(test, iter.iov_offset, pr->to % PAGE_SIZE);
+		KUNIT_EXPECT_EQ(test, iter.iov_offset, pr->to % PG_SIZE);
 		i += size;
 		if (test->status == KUNIT_FAILURE)
 			goto stop;
@@ -486,7 +486,7 @@ static void __init iov_kunit_copy_from_folioq(struct kunit *test)
 	int i, j;
 
 	bufsize = 0x100000;
-	npages = bufsize / PAGE_SIZE;
+	npages = bufsize / PG_SIZE;
 
 	folioq = iov_kunit_create_folioq(test);
 
@@ -510,7 +510,7 @@ static void __init iov_kunit_copy_from_folioq(struct kunit *test)
 
 		KUNIT_EXPECT_EQ(test, copied, size);
 		KUNIT_EXPECT_EQ(test, iter.count, 0);
-		KUNIT_EXPECT_EQ(test, iter.iov_offset, pr->to % PAGE_SIZE);
+		KUNIT_EXPECT_EQ(test, iter.iov_offset, pr->to % PG_SIZE);
 		i += size;
 	}
 
@@ -556,7 +556,7 @@ static void __init iov_kunit_load_xarray(struct kunit *test,
 		void *x = xa_store(xarray, i, pages[i], GFP_KERNEL);
 
 		KUNIT_ASSERT_FALSE(test, xa_is_err(x));
-		size += PAGE_SIZE;
+		size += PG_SIZE;
 	}
 	iov_iter_xarray(iter, dir, xarray, 0, size);
 }
@@ -586,7 +586,7 @@ static void __init iov_kunit_copy_to_xarray(struct kunit *test)
 	int i, patt;
 
 	bufsize = 0x100000;
-	npages = bufsize / PAGE_SIZE;
+	npages = bufsize / PG_SIZE;
 
 	xarray = iov_kunit_create_xarray(test);
 
@@ -644,7 +644,7 @@ static void __init iov_kunit_copy_from_xarray(struct kunit *test)
 	int i, j;
 
 	bufsize = 0x100000;
-	npages = bufsize / PAGE_SIZE;
+	npages = bufsize / PG_SIZE;
 
 	xarray = iov_kunit_create_xarray(test);
 
@@ -708,7 +708,7 @@ static void __init iov_kunit_extract_pages_kvec(struct kunit *test)
 	int i, from;
 
 	bufsize = 0x100000;
-	npages = bufsize / PAGE_SIZE;
+	npages = bufsize / PG_SIZE;
 
 	buffer = iov_kunit_create_buffer(test, &bpages, npages);
 
@@ -730,7 +730,7 @@ static void __init iov_kunit_extract_pages_kvec(struct kunit *test)
 		if (len < 0)
 			break;
 		KUNIT_EXPECT_GE(test, (ssize_t)offset0, 0);
-		KUNIT_EXPECT_LT(test, offset0, PAGE_SIZE);
+		KUNIT_EXPECT_LT(test, offset0, PG_SIZE);
 		KUNIT_EXPECT_LE(test, len, size);
 		KUNIT_EXPECT_EQ(test, iter.count, size - len);
 		size -= len;
@@ -740,7 +740,7 @@ static void __init iov_kunit_extract_pages_kvec(struct kunit *test)
 
 		for (i = 0; i < ARRAY_SIZE(pagelist); i++) {
 			struct page *p;
-			ssize_t part = min_t(ssize_t, len, PAGE_SIZE - offset0);
+			ssize_t part = min_t(ssize_t, len, PG_SIZE - offset0);
 			int ix;
 
 			KUNIT_ASSERT_GE(test, part, 0);
@@ -750,11 +750,11 @@ static void __init iov_kunit_extract_pages_kvec(struct kunit *test)
 				if (from < 0)
 					goto stop;
 			}
-			ix = from / PAGE_SIZE;
+			ix = from / PG_SIZE;
 			KUNIT_ASSERT_LT(test, ix, npages);
 			p = bpages[ix];
 			KUNIT_EXPECT_PTR_EQ(test, pagelist[i], p);
-			KUNIT_EXPECT_EQ(test, offset0, from % PAGE_SIZE);
+			KUNIT_EXPECT_EQ(test, offset0, from % PG_SIZE);
 			from += part;
 			len -= part;
 			KUNIT_ASSERT_GE(test, len, 0);
@@ -787,7 +787,7 @@ static void __init iov_kunit_extract_pages_bvec(struct kunit *test)
 	int i, from;
 
 	bufsize = 0x100000;
-	npages = bufsize / PAGE_SIZE;
+	npages = bufsize / PG_SIZE;
 
 	iov_kunit_create_buffer(test, &bpages, npages);
 	iov_kunit_load_bvec(test, &iter, READ, bvec, ARRAY_SIZE(bvec),
@@ -808,7 +808,7 @@ static void __init iov_kunit_extract_pages_bvec(struct kunit *test)
 		if (len < 0)
 			break;
 		KUNIT_EXPECT_GE(test, (ssize_t)offset0, 0);
-		KUNIT_EXPECT_LT(test, offset0, PAGE_SIZE);
+		KUNIT_EXPECT_LT(test, offset0, PG_SIZE);
 		KUNIT_EXPECT_LE(test, len, size);
 		KUNIT_EXPECT_EQ(test, iter.count, size - len);
 		size -= len;
@@ -818,7 +818,7 @@ static void __init iov_kunit_extract_pages_bvec(struct kunit *test)
 
 		for (i = 0; i < ARRAY_SIZE(pagelist); i++) {
 			struct page *p;
-			ssize_t part = min_t(ssize_t, len, PAGE_SIZE - offset0);
+			ssize_t part = min_t(ssize_t, len, PG_SIZE - offset0);
 			int ix;
 
 			KUNIT_ASSERT_GE(test, part, 0);
@@ -828,11 +828,11 @@ static void __init iov_kunit_extract_pages_bvec(struct kunit *test)
 				if (from < 0)
 					goto stop;
 			}
-			ix = pr->page + from / PAGE_SIZE;
+			ix = pr->page + from / PG_SIZE;
 			KUNIT_ASSERT_LT(test, ix, npages);
 			p = bpages[ix];
 			KUNIT_EXPECT_PTR_EQ(test, pagelist[i], p);
-			KUNIT_EXPECT_EQ(test, offset0, from % PAGE_SIZE);
+			KUNIT_EXPECT_EQ(test, offset0, from % PG_SIZE);
 			from += part;
 			len -= part;
 			KUNIT_ASSERT_GE(test, len, 0);
@@ -865,7 +865,7 @@ static void __init iov_kunit_extract_pages_folioq(struct kunit *test)
 	int i, from;
 
 	bufsize = 0x100000;
-	npages = bufsize / PAGE_SIZE;
+	npages = bufsize / PG_SIZE;
 
 	folioq = iov_kunit_create_folioq(test);
 
@@ -897,19 +897,20 @@ static void __init iov_kunit_extract_pages_folioq(struct kunit *test)
 				break;
 			size -= len;
 			KUNIT_EXPECT_GE(test, (ssize_t)offset0, 0);
-			KUNIT_EXPECT_LT(test, offset0, PAGE_SIZE);
+			KUNIT_EXPECT_LT(test, offset0, PG_SIZE);
 
 			for (i = 0; i < ARRAY_SIZE(pagelist); i++) {
 				struct page *p;
-				ssize_t part = min_t(ssize_t, len, PAGE_SIZE - offset0);
+				ssize_t part = min_t(ssize_t, len,
+						     PG_SIZE - offset0);
 				int ix;
 
 				KUNIT_ASSERT_GE(test, part, 0);
-				ix = from / PAGE_SIZE;
+				ix = from / PG_SIZE;
 				KUNIT_ASSERT_LT(test, ix, npages);
 				p = bpages[ix];
 				KUNIT_EXPECT_PTR_EQ(test, pagelist[i], p);
-				KUNIT_EXPECT_EQ(test, offset0, from % PAGE_SIZE);
+				KUNIT_EXPECT_EQ(test, offset0, from % PG_SIZE);
 				from += part;
 				len -= part;
 				KUNIT_ASSERT_GE(test, len, 0);
@@ -944,7 +945,7 @@ static void __init iov_kunit_extract_pages_xarray(struct kunit *test)
 	int i, from;
 
 	bufsize = 0x100000;
-	npages = bufsize / PAGE_SIZE;
+	npages = bufsize / PG_SIZE;
 
 	xarray = iov_kunit_create_xarray(test);
 
@@ -975,19 +976,20 @@ static void __init iov_kunit_extract_pages_xarray(struct kunit *test)
 				break;
 			size -= len;
 			KUNIT_EXPECT_GE(test, (ssize_t)offset0, 0);
-			KUNIT_EXPECT_LT(test, offset0, PAGE_SIZE);
+			KUNIT_EXPECT_LT(test, offset0, PG_SIZE);
 
 			for (i = 0; i < ARRAY_SIZE(pagelist); i++) {
 				struct page *p;
-				ssize_t part = min_t(ssize_t, len, PAGE_SIZE - offset0);
+				ssize_t part = min_t(ssize_t, len,
+						     PG_SIZE - offset0);
 				int ix;
 
 				KUNIT_ASSERT_GE(test, part, 0);
-				ix = from / PAGE_SIZE;
+				ix = from / PG_SIZE;
 				KUNIT_ASSERT_LT(test, ix, npages);
 				p = bpages[ix];
 				KUNIT_EXPECT_PTR_EQ(test, pagelist[i], p);
-				KUNIT_EXPECT_EQ(test, offset0, from % PAGE_SIZE);
+				KUNIT_EXPECT_EQ(test, offset0, from % PG_SIZE);
 				from += part;
 				len -= part;
 				KUNIT_ASSERT_GE(test, len, 0);

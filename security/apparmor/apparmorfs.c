@@ -908,7 +908,7 @@ struct multi_transaction {
 	char data[];
 };
 
-#define MULTI_TRANSACTION_LIMIT (PAGE_SIZE - sizeof(struct multi_transaction))
+#define MULTI_TRANSACTION_LIMIT (PG_SIZE - sizeof(struct multi_transaction))
 
 static void multi_transaction_kref(struct kref *kref)
 {

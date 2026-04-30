@@ -18,19 +18,19 @@
 
 #define NDISKS		16	/* Including P and Q */
 
-const char raid6_empty_zero_page[PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
+const char raid6_empty_zero_page[PG_SIZE] __attribute__((aligned(PG_SIZE)));
 
 char *dataptrs[NDISKS];
-char data[NDISKS][PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
-char recovi[PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
-char recovj[PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
+char data[NDISKS][PG_SIZE] __attribute__((aligned(PG_SIZE)));
+char recovi[PG_SIZE] __attribute__((aligned(PG_SIZE)));
+char recovj[PG_SIZE] __attribute__((aligned(PG_SIZE)));
 
 static void makedata(int start, int stop)
 {
 	int i, j;
 
 	for (i = start; i <= stop; i++) {
-		for (j = 0; j < PAGE_SIZE; j++)
+		for (j = 0; j < PG_SIZE; j++)
 			data[i][j] = rand();
 
 		dataptrs[i] = data[i];
@@ -53,16 +53,16 @@ static int test_disks(int i, int j)
 {
 	int erra, errb;
 
-	memset(recovi, 0xf0, PAGE_SIZE);
-	memset(recovj, 0xba, PAGE_SIZE);
+	memset(recovi, 0xf0, PG_SIZE);
+	memset(recovj, 0xba, PG_SIZE);
 
 	dataptrs[i] = recovi;
 	dataptrs[j] = recovj;
 
-	raid6_dual_recov(NDISKS, PAGE_SIZE, i, j, (void **)&dataptrs);
+	raid6_dual_recov(NDISKS, PG_SIZE, i, j, (void **)&dataptrs);
 
-	erra = memcmp(data[i], recovi, PAGE_SIZE);
-	errb = memcmp(data[j], recovj, PAGE_SIZE);
+	erra = memcmp(data[i], recovi, PG_SIZE);
+	errb = memcmp(data[j], recovj, PG_SIZE);
 
 	if (i < NDISKS-2 && j == NDISKS-1) {
 		/* We don't implement the DQ failure scenario, since it's
@@ -109,10 +109,10 @@ int main(int argc, char *argv[])
 			raid6_call = **algo;
 
 			/* Nuke syndromes */
-			memset(data[NDISKS-2], 0xee, 2*PAGE_SIZE);
+			memset(data[NDISKS-2], 0xee, 2*PG_SIZE);
 
 			/* Generate assumed good syndrome */
-			raid6_call.gen_syndrome(NDISKS, PAGE_SIZE,
+			raid6_call.gen_syndrome(NDISKS, PG_SIZE,
 						(void **)&dataptrs);
 
 			for (i = 0; i < NDISKS-1; i++)
@@ -126,10 +126,12 @@ int main(int argc, char *argv[])
 				for (p2 = p1; p2 < NDISKS-2; p2++) {
 
 					/* Simulate rmw run */
-					raid6_call.xor_syndrome(NDISKS, p1, p2, PAGE_SIZE,
+					raid6_call.xor_syndrome(NDISKS, p1, p2,
+								PG_SIZE,
 								(void **)&dataptrs);
 					makedata(p1, p2);
-					raid6_call.xor_syndrome(NDISKS, p1, p2, PAGE_SIZE,
+					raid6_call.xor_syndrome(NDISKS, p1, p2,
+                                                                PG_SIZE,
                                                                 (void **)&dataptrs);
 
 					for (i = 0; i < NDISKS-1; i++)

@@ -69,7 +69,8 @@ static bool page_idle_clear_pte_refs_one(struct folio *folio,
 			 */
 			if (likely(pte_present(ptep_get(pvmw.pte))))
 				referenced |= ptep_test_and_clear_young(vma, addr, pvmw.pte);
-			referenced |= mmu_notifier_clear_young(vma->vm_mm, addr, addr + PAGE_SIZE);
+			referenced |= mmu_notifier_clear_young(vma->vm_mm, addr,
+							       addr + PG_SIZE);
 		} else if (IS_ENABLED(CONFIG_TRANSPARENT_HUGEPAGE)) {
 			pmd_t pmdval = pmdp_get(pvmw.pmd);
 

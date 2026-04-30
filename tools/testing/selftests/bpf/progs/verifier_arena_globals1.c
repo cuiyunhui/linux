@@ -26,7 +26,7 @@ struct {
 /*
  * Global data, to be placed at the end of the arena.
  */
-volatile char __arena global_data[GLOBAL_PAGES][PAGE_SIZE];
+volatile char __arena global_data[GLOBAL_PAGES][PG_SIZE];
 
 SEC("syscall")
 __success __retval(0)

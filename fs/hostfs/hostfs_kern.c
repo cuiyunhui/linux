@@ -434,7 +434,7 @@ static int hostfs_read_folio(struct file *file, struct folio *folio)
 
 	buffer = kmap_local_folio(folio, 0);
 	bytes_read = read_file(FILE_HOSTFS_I(file)->fd, &start, buffer,
-			PAGE_SIZE);
+			PG_SIZE);
 	if (bytes_read < 0)
 		ret = bytes_read;
 	else
@@ -450,7 +450,7 @@ static int hostfs_write_begin(const struct kiocb *iocb,
 			      loff_t pos, unsigned len,
 			      struct folio **foliop, void **fsdata)
 {
-	pgoff_t index = pos >> PAGE_SHIFT;
+	pgoff_t index = pos >> PG_SHIFT;
 
 	*foliop = __filemap_get_folio(mapping, index, FGP_WRITEBEGIN,
 			mapping_gfp_mask(mapping));

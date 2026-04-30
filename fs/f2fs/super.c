@@ -3133,8 +3133,8 @@ static ssize_t f2fs_quota_read(struct super_block *sb, int type, char *data,
 		size_t offset;
 
 repeat:
-		folio = mapping_read_folio_gfp(mapping, off >> PAGE_SHIFT,
-				GFP_NOFS);
+		folio = mapping_read_folio_gfp(mapping, off >> PG_SHIFT,
+					       GFP_NOFS);
 		if (IS_ERR(folio)) {
 			if (PTR_ERR(folio) == -ENOMEM) {
 				memalloc_retry_wait(GFP_NOFS);

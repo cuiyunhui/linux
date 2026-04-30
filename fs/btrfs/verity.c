@@ -704,15 +704,15 @@ static struct page *btrfs_read_merkle_tree_page(struct inode *inode,
 						pgoff_t index)
 {
 	struct folio *folio;
-	u64 off = (u64)index << PAGE_SHIFT;
+	u64 off = (u64)index << PG_SHIFT;
 	loff_t merkle_pos = merkle_file_pos(inode);
 	int ret;
 
 	if (merkle_pos < 0)
 		return ERR_PTR(merkle_pos);
-	if (merkle_pos > inode->i_sb->s_maxbytes - off - PAGE_SIZE)
+	if (merkle_pos > inode->i_sb->s_maxbytes - off - PG_SIZE)
 		return ERR_PTR(-EFBIG);
-	index += merkle_pos >> PAGE_SHIFT;
+	index += merkle_pos >> PG_SHIFT;
 again:
 	folio = __filemap_get_folio(inode->i_mapping, index, FGP_ACCESSED, 0);
 	if (!IS_ERR(folio)) {
@@ -751,13 +751,13 @@ again:
 	 * [ inode objectid, BTRFS_MERKLE_ITEM_KEY, offset in bytes ]
 	 */
 	ret = read_key_bytes(BTRFS_I(inode), BTRFS_VERITY_MERKLE_ITEM_KEY, off,
-			     folio_address(folio), PAGE_SIZE, folio);
+			     folio_address(folio), PG_SIZE, folio);
 	if (ret < 0) {
 		folio_put(folio);
 		return ERR_PTR(ret);
 	}
-	if (ret < PAGE_SIZE)
-		folio_zero_segment(folio, ret, PAGE_SIZE);
+	if (ret < PG_SIZE)
+		folio_zero_segment(folio, ret, PG_SIZE);
 
 	folio_mark_uptodate(folio);
 	folio_unlock(folio);

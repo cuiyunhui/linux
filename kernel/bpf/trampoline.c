@@ -162,14 +162,14 @@ void bpf_image_ksym_add(struct bpf_ksym *ksym)
 {
 	bpf_ksym_add(ksym);
 	perf_event_ksymbol(PERF_RECORD_KSYMBOL_TYPE_BPF, ksym->start,
-			   PAGE_SIZE, false, ksym->name);
+			   PG_SIZE, false, ksym->name);
 }
 
 void bpf_image_ksym_del(struct bpf_ksym *ksym)
 {
 	bpf_ksym_del(ksym);
 	perf_event_ksymbol(PERF_RECORD_KSYMBOL_TYPE_BPF, ksym->start,
-			   PAGE_SIZE, true, ksym->name);
+			   PG_SIZE, true, ksym->name);
 }
 
 #ifdef CONFIG_DYNAMIC_FTRACE_WITH_DIRECT_CALLS
@@ -664,7 +664,7 @@ again:
 		goto out;
 	}
 
-	if (size > PAGE_SIZE) {
+	if (size > PG_SIZE) {
 		err = -E2BIG;
 		goto out;
 	}
@@ -1343,9 +1343,9 @@ void * __weak arch_alloc_bpf_trampoline(unsigned int size)
 {
 	void *image;
 
-	if (WARN_ON_ONCE(size > PAGE_SIZE))
+	if (WARN_ON_ONCE(size > PG_SIZE))
 		return NULL;
-	image = bpf_jit_alloc_exec(PAGE_SIZE);
+	image = bpf_jit_alloc_exec(PG_SIZE);
 	if (image)
 		set_vm_flush_reset_perms(image);
 	return image;
@@ -1353,7 +1353,7 @@ void * __weak arch_alloc_bpf_trampoline(unsigned int size)
 
 void __weak arch_free_bpf_trampoline(void *image, unsigned int size)
 {
-	WARN_ON_ONCE(size > PAGE_SIZE);
+	WARN_ON_ONCE(size > PG_SIZE);
 	/* bpf_jit_free_exec doesn't need "size", but
 	 * bpf_prog_pack_free() needs it.
 	 */
@@ -1362,7 +1362,7 @@ void __weak arch_free_bpf_trampoline(void *image, unsigned int size)
 
 int __weak arch_protect_bpf_trampoline(void *image, unsigned int size)
 {
-	WARN_ON_ONCE(size > PAGE_SIZE);
+	WARN_ON_ONCE(size > PG_SIZE);
 	return set_memory_rox((long)image, 1);
 }
 

@@ -1051,13 +1051,13 @@ static int ufs_alloc_lastblock(struct inode *inode, loff_t size)
 	lastfrag--;
 
 	folio = ufs_get_locked_folio(mapping, lastfrag >>
-				       (PAGE_SHIFT - inode->i_blkbits));
+				       (PG_SHIFT - inode->i_blkbits));
 	if (IS_ERR(folio)) {
 		err = -EIO;
 		goto out;
 	}
 
-	end = lastfrag & ((1 << (PAGE_SHIFT - inode->i_blkbits)) - 1);
+	end = lastfrag & ((1 << (PG_SHIFT - inode->i_blkbits)) - 1);
 	bh = folio_buffers(folio);
 	for (i = 0; i < end; ++i)
 		bh = bh->b_this_page;

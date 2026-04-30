@@ -454,8 +454,8 @@ static int afs_fill_super(struct super_block *sb, struct afs_fs_context *ctx)
 	_enter("");
 
 	/* fill in the superblock */
-	sb->s_blocksize		= PAGE_SIZE;
-	sb->s_blocksize_bits	= PAGE_SHIFT;
+	sb->s_blocksize		= PG_SIZE;
+	sb->s_blocksize_bits	= PG_SHIFT;
 	sb->s_maxbytes		= MAX_LFS_FILESIZE;
 	sb->s_magic		= AFS_FS_MAGIC;
 	sb->s_op		= &afs_super_ops;

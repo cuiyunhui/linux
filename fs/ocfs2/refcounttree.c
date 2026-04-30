@@ -2922,16 +2922,16 @@ int ocfs2_duplicate_clusters_by_page(handle_t *handle,
 
 	while (offset < end) {
 		struct folio *folio;
-		page_index = offset >> PAGE_SHIFT;
-		map_end = ((loff_t)page_index + 1) << PAGE_SHIFT;
+		page_index = offset >> PG_SHIFT;
+		map_end = ((loff_t)page_index + 1) << PG_SHIFT;
 		if (map_end > end)
 			map_end = end;
 
 		/* from, to is the offset within the page. */
-		from = offset & (PAGE_SIZE - 1);
-		to = PAGE_SIZE;
-		if (map_end & (PAGE_SIZE - 1))
-			to = map_end & (PAGE_SIZE - 1);
+		from = offset & (PG_SIZE - 1);
+		to = PG_SIZE;
+		if (map_end & (PG_SIZE - 1))
+			to = map_end & (PG_SIZE - 1);
 
 retry:
 		folio = __filemap_get_folio(mapping, page_index,
@@ -2946,7 +2946,7 @@ retry:
 		 * In case PAGE_SIZE <= CLUSTER_SIZE, we do not expect a dirty
 		 * page, so write it back.
 		 */
-		if (PAGE_SIZE <= OCFS2_SB(sb)->s_clustersize) {
+		if (PG_SIZE <= OCFS2_SB(sb)->s_clustersize) {
 			if (folio_test_dirty(folio)) {
 				folio_unlock(folio);
 				folio_put(folio);

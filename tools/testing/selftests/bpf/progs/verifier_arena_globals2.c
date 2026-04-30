@@ -26,7 +26,7 @@ struct {
  * Fill the entire arena with global data.
  * The offset into the arena should be 0.
  */
-char __arena global_data[ARENA_PAGES][PAGE_SIZE];
+char __arena global_data[ARENA_PAGES][PG_SIZE];
 
 SEC("syscall")
 __success __retval(0)

@@ -271,7 +271,7 @@ static int erofs_read_superblock(struct super_block *sb)
 	}
 
 	sbi->blkszbits = dsb->blkszbits;
-	if (sbi->blkszbits < 9 || sbi->blkszbits > PAGE_SHIFT) {
+	if (sbi->blkszbits < 9 || sbi->blkszbits > PG_SHIFT) {
 		erofs_err(sb, "blkszbits %u isn't supported", sbi->blkszbits);
 		goto out;
 	}
@@ -296,7 +296,7 @@ static int erofs_read_superblock(struct super_block *sb)
 	}
 
 	sbi->sb_size = 128 + dsb->sb_extslots * EROFS_SB_EXTSLOT_SIZE;
-	if (sbi->sb_size > PAGE_SIZE - EROFS_SUPER_OFFSET) {
+	if (sbi->sb_size > PG_SIZE - EROFS_SUPER_OFFSET) {
 		erofs_err(sb, "invalid sb_extslots %u (more than a fs block)",
 			  sbi->sb_size);
 		goto out;
@@ -648,7 +648,7 @@ static int erofs_fc_fill_super(struct super_block *sb, struct fs_context *fc)
 		return -EINVAL;
 	}
 
-	sbi->blkszbits = PAGE_SHIFT;
+	sbi->blkszbits = PG_SHIFT;
 	if (!sb->s_bdev) {
 		/*
 		 * (File-backed mounts) EROFS claims it's safe to nest other
@@ -673,8 +673,8 @@ static int erofs_fc_fill_super(struct super_block *sb, struct fs_context *fc)
 				return -ENOTBLK;
 			}
 		}
-		sb->s_blocksize = PAGE_SIZE;
-		sb->s_blocksize_bits = PAGE_SHIFT;
+		sb->s_blocksize = PG_SIZE;
+		sb->s_blocksize_bits = PG_SHIFT;
 
 		if (erofs_is_fscache_mode(sb)) {
 			err = erofs_fscache_register_fs(sb);
@@ -685,7 +685,7 @@ static int erofs_fc_fill_super(struct super_block *sb, struct fs_context *fc)
 		if (err)
 			return err;
 	} else {
-		if (!sb_set_blocksize(sb, PAGE_SIZE)) {
+		if (!sb_set_blocksize(sb, PG_SIZE)) {
 			errorfc(fc, "failed to set initial blksize");
 			return -EINVAL;
 		}
@@ -721,7 +721,7 @@ static int erofs_fc_fill_super(struct super_block *sb, struct fs_context *fc)
 			return invalfc(fc, "cannot use fsoffset in fscache mode");
 	}
 
-	if (test_opt(&sbi->opt, DAX_ALWAYS) && sbi->blkszbits != PAGE_SHIFT) {
+	if (test_opt(&sbi->opt, DAX_ALWAYS) && sbi->blkszbits != PG_SHIFT) {
 		erofs_info(sb, "unsupported blocksize for DAX");
 		clear_opt(&sbi->opt, DAX_ALWAYS);
 	}

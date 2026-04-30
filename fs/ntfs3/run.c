@@ -375,14 +375,14 @@ requires_new_range:
 			/* Use power of 2 for 'bytes'. */
 			if (!used) {
 				bytes = 64;
-			} else if (used <= 16 * PAGE_SIZE) {
+			} else if (used <= 16 * PG_SIZE) {
 				if (is_power_of_2(run->allocated))
 					bytes = run->allocated << 1;
 				else
 					bytes = (size_t)1
 						<< (2 + blksize_bits(used));
 			} else {
-				bytes = run->allocated + (16 * PAGE_SIZE);
+				bytes = run->allocated + (16 * PG_SIZE);
 			}
 
 			WARN_ON(!is_mft && bytes > NTFS3_RUN_MAX_BYTES);

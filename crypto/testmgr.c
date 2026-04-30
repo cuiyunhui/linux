@@ -385,10 +385,10 @@ static const struct testvec_config default_cipher_testvec_configs[] = {
 		.src_divs = {
 			{
 				.proportion_of_total = 7500,
-				.offset = PAGE_SIZE - 32
+				.offset = PG_SIZE - 32
 			}, {
 				.proportion_of_total = 2500,
-				.offset = PAGE_SIZE - 7
+				.offset = PG_SIZE - 7
 			},
 		},
 	}
@@ -446,10 +446,10 @@ static const struct testvec_config default_hash_testvec_configs[] = {
 		.src_divs = {
 			{
 				.proportion_of_total = 7500,
-				.offset = PAGE_SIZE - 32,
+				.offset = PG_SIZE - 32,
 			}, {
 				.proportion_of_total = 2500,
-				.offset = PAGE_SIZE - 7,
+				.offset = PG_SIZE - 7,
 			},
 		},
 		.finalization_type = FINALIZATION_TYPE_DIGEST,
@@ -633,7 +633,7 @@ static int build_test_sglist(struct test_sglist *tsgl,
 			offset += alignmask;
 
 		while (offset + partitions[i].length + TESTMGR_POISON_LEN >
-		       2 * PAGE_SIZE) {
+		       2 * PG_SIZE) {
 			if (WARN_ON(offset <= 0))
 				return -EINVAL;
 			offset /= 2;
@@ -1031,12 +1031,12 @@ static char *generate_random_sgl_divisions(struct rnd_state *rng,
 
 		if (prandom_u32_below(rng, 4) == 0)
 			div->offset = prandom_u32_inclusive(rng,
-							    PAGE_SIZE - 128,
-							    PAGE_SIZE - 1);
+							    PG_SIZE - 128,
+							    PG_SIZE - 1);
 		else if (prandom_bool(rng))
 			div->offset = prandom_u32_below(rng, 32);
 		else
-			div->offset = prandom_u32_below(rng, PAGE_SIZE);
+			div->offset = prandom_u32_below(rng, PG_SIZE);
 		if (prandom_u32_below(rng, 8) == 0)
 			div->offset_relative_to_alignmask = true;
 
@@ -1754,7 +1754,7 @@ static int test_hash_vs_generic_impl(const char *generic_driver,
 	struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
 	const unsigned int digestsize = crypto_ahash_digestsize(tfm);
 	const unsigned int blocksize = crypto_ahash_blocksize(tfm);
-	const unsigned int maxdatasize = (2 * PAGE_SIZE) - TESTMGR_POISON_LEN;
+	const unsigned int maxdatasize = (2 * PG_SIZE) - TESTMGR_POISON_LEN;
 	const char *algname = crypto_hash_alg_common(tfm)->base.cra_name;
 	const char *driver = crypto_ahash_driver_name(tfm);
 	struct rnd_state rng;
@@ -2606,7 +2606,7 @@ static int test_aead_slow(const struct alg_test_desc *test_desc,
 	ctx->tfm = crypto_aead_reqtfm(req);
 	ctx->test_desc = test_desc;
 	ctx->tsgls = tsgls;
-	ctx->maxdatasize = (2 * PAGE_SIZE) - TESTMGR_POISON_LEN;
+	ctx->maxdatasize = (2 * PG_SIZE) - TESTMGR_POISON_LEN;
 	ctx->maxkeysize = 0;
 	for (i = 0; i < test_desc->suite.aead.count; i++)
 		ctx->maxkeysize = max_t(unsigned int, ctx->maxkeysize,
@@ -2742,7 +2742,7 @@ static int test_cipher(struct crypto_cipher *tfm, int enc,
 		j++;
 
 		ret = -EINVAL;
-		if (WARN_ON(template[i].len > PAGE_SIZE))
+		if (WARN_ON(template[i].len > PG_SIZE))
 			goto out;
 
 		data = xbuf[0];
@@ -3064,7 +3064,7 @@ static int test_skcipher_vs_generic_impl(const char *generic_driver,
 	const unsigned int maxkeysize = crypto_skcipher_max_keysize(tfm);
 	const unsigned int ivsize = crypto_skcipher_ivsize(tfm);
 	const unsigned int blocksize = crypto_skcipher_blocksize(tfm);
-	const unsigned int maxdatasize = (2 * PAGE_SIZE) - TESTMGR_POISON_LEN;
+	const unsigned int maxdatasize = (2 * PG_SIZE) - TESTMGR_POISON_LEN;
 	const char *algname = crypto_skcipher_alg(tfm)->base.cra_name;
 	const char *driver = crypto_skcipher_driver_name(tfm);
 	struct rnd_state rng;
@@ -3806,7 +3806,7 @@ static int test_akcipher_one(struct crypto_akcipher *tfm,
 	c_size = vecs->c_size;
 
 	err = -E2BIG;
-	if (WARN_ON(vecs->m_size > PAGE_SIZE))
+	if (WARN_ON(vecs->m_size > PG_SIZE))
 		goto free_all;
 	memcpy(xbuf[0], vecs->m, vecs->m_size);
 
@@ -3859,7 +3859,7 @@ static int test_akcipher_one(struct crypto_akcipher *tfm,
 	}
 
 	err = -E2BIG;
-	if (WARN_ON(c_size > PAGE_SIZE))
+	if (WARN_ON(c_size > PG_SIZE))
 		goto free_all;
 	memcpy(xbuf[0], c, c_size);
 

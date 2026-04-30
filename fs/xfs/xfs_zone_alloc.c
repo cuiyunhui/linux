@@ -1296,7 +1296,7 @@ xfs_mount_zones(
 	 */
 	mp->m_super->s_min_writeback_pages =
 		XFS_FSB_TO_B(mp, min(iz.zone_capacity, XFS_MAX_BMBT_EXTLEN)) >>
-			PAGE_SHIFT;
+			PG_SHIFT;
 
 	while ((rtg = xfs_rtgroup_next(mp, rtg))) {
 		xfs_rgblock_t		write_pointer;

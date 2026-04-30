@@ -164,7 +164,7 @@ static inline bool xsk_buff_add_frag(struct xdp_buff *head,
 	struct xdp_buff_xsk *frag;
 
 	if (!__xdp_buff_add_frag(head, virt_to_netmem(data),
-				 offset_in_page(data), xdp->data_end - data,
+				 offset_in_pg(data), xdp->data_end - data,
 				 xdp->frame_sz, false))
 		return false;
 

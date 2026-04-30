@@ -102,7 +102,7 @@ enum btrfs_folio_type {
  */
 static inline bool btrfs_meta_is_subpage(const struct btrfs_fs_info *fs_info)
 {
-	return fs_info->nodesize < PAGE_SIZE;
+	return fs_info->nodesize < PG_SIZE;
 }
 static inline bool btrfs_is_subpage(const struct btrfs_fs_info *fs_info,
 				    struct folio *folio)

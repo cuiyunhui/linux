@@ -793,14 +793,14 @@ static inline bool should_fault_in_pages(struct iov_iter *i,
 	 * Try to fault in multiple pages initially.  When that doesn't result
 	 * in any progress, fall back to a single page.
 	 */
-	size = PAGE_SIZE;
-	offs = offset_in_page(iocb->ki_pos);
+	size = PG_SIZE;
+	offs = offset_in_pg(iocb->ki_pos);
 	if (*prev_count != count) {
 		size_t nr_dirtied;
 
 		nr_dirtied = max(current->nr_dirtied_pause -
 				 current->nr_dirtied, 8);
-		size = min_t(size_t, SZ_1M, nr_dirtied << PAGE_SHIFT);
+		size = min_t(size_t, SZ_1M, nr_dirtied << PG_SHIFT);
 	}
 
 	*prev_count = count;
@@ -924,7 +924,7 @@ retry:
 		written = ret;
 
 	enough_retries = prev_count == iov_iter_count(from) &&
-			 window_size <= PAGE_SIZE;
+			 window_size <= PG_SIZE;
 	if (should_fault_in_pages(from, iocb, &prev_count, &window_size)) {
 		gfs2_glock_dq(gh);
 		window_size -= fault_in_iov_iter_readable(from, window_size);
@@ -1154,8 +1154,8 @@ static ssize_t gfs2_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 		 */
 		ret2 = generic_write_sync(iocb, buffered);
 		invalidate_mapping_pages(mapping,
-				(iocb->ki_pos - buffered) >> PAGE_SHIFT,
-				(iocb->ki_pos - 1) >> PAGE_SHIFT);
+				(iocb->ki_pos - buffered) >> PG_SHIFT,
+				(iocb->ki_pos - 1) >> PG_SHIFT);
 		if (!ret || ret2 > 0)
 			ret += ret2;
 	} else {
@@ -1278,7 +1278,7 @@ static long __gfs2_fallocate(struct file *file, int mode, loff_t offset, loff_t 
 
 	gfs2_size_hint(file, offset, len);
 
-	gfs2_write_calc_reserv(ip, PAGE_SIZE, &data_blocks, &ind_blocks);
+	gfs2_write_calc_reserv(ip, PG_SIZE, &data_blocks, &ind_blocks);
 	ap.min_target = data_blocks + ind_blocks;
 
 	while (len > 0) {
@@ -1332,7 +1332,7 @@ static long __gfs2_fallocate(struct file *file, int mode, loff_t offset, loff_t 
 			rblocks += data_blocks ? data_blocks : 1;
 
 		error = gfs2_trans_begin(sdp, rblocks,
-					 PAGE_SIZE >> inode->i_blkbits);
+					 PG_SIZE >> inode->i_blkbits);
 		if (error)
 			goto out_trans_fail;
 

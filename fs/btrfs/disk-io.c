@@ -83,7 +83,7 @@ static void csum_tree_block(struct extent_buffer *buf, u8 *result)
 		num_pages = 1;
 	} else {
 		kaddr = folio_address(buf->folios[0]);
-		first_page_part = min_t(u32, PAGE_SIZE, fs_info->nodesize);
+		first_page_part = min_t(u32, PG_SIZE, fs_info->nodesize);
 		num_pages = num_extent_pages(buf);
 	}
 
@@ -98,7 +98,7 @@ static void csum_tree_block(struct extent_buffer *buf, u8 *result)
 	 */
 	for (i = 1; i < num_pages && INLINE_EXTENT_BUFFER_PAGES > 1; i++) {
 		kaddr = folio_address(buf->folios[i]);
-		btrfs_csum_update(&csum, kaddr, PAGE_SIZE);
+		btrfs_csum_update(&csum, kaddr, PG_SIZE);
 	}
 	memset(result, 0, BTRFS_CSUM_SIZE);
 	btrfs_csum_final(&csum, result);
@@ -173,9 +173,9 @@ static int btrfs_repair_eb_io_failure(const struct extent_buffer *eb,
 				      int mirror_num)
 {
 	struct btrfs_fs_info *fs_info = eb->fs_info;
-	const u32 step = min(fs_info->nodesize, PAGE_SIZE);
+	const u32 step = min(fs_info->nodesize, PG_SIZE);
 	const u32 nr_steps = eb->len / step;
-	phys_addr_t paddrs[BTRFS_MAX_BLOCKSIZE / PAGE_SIZE];
+	phys_addr_t paddrs[BTRFS_MAX_BLOCKSIZE / PG_SIZE];
 
 	if (sb_rdonly(fs_info->sb))
 		return -EROFS;
@@ -194,7 +194,7 @@ static int btrfs_repair_eb_io_failure(const struct extent_buffer *eb,
 		 * For nodesize >= page size, it's one or more paddrs, and eb->start
 		 * must be aligned to page boundary.
 		 */
-		paddrs[i] = page_to_phys(&folio->page) + offset_in_page(eb->start);
+		paddrs[i] = page_to_phys(&folio->page) + offset_in_pg(eb->start);
 	}
 
 	return btrfs_repair_io_failure(fs_info, 0, eb->start, eb->len,
@@ -512,7 +512,7 @@ static bool btree_dirty_folio(struct address_space *mapping,
 	int cur_bit = 0;
 	u64 page_start = folio_pos(folio);
 
-	if (fs_info->sectorsize == PAGE_SIZE) {
+	if (fs_info->sectorsize == PG_SIZE) {
 		eb = folio_get_private(folio);
 		BUG_ON(!eb);
 		BUG_ON(!test_bit(EXTENT_BUFFER_DIRTY, &eb->bflags));
@@ -2410,7 +2410,7 @@ int btrfs_validate_super(const struct btrfs_fs_info *fs_info,
 	if (!btrfs_supported_blocksize(sectorsize)) {
 		btrfs_err(fs_info,
 			"sectorsize %llu not yet supported for page size %lu",
-			sectorsize, PAGE_SIZE);
+			sectorsize, PG_SIZE);
 		ret = -EINVAL;
 	}
 
@@ -2501,7 +2501,7 @@ int btrfs_validate_super(const struct btrfs_fs_info *fs_info,
 			ret = -EINVAL;
 		}
 
-		if (sectorsize > PAGE_SIZE) {
+		if (sectorsize > PG_SIZE) {
 			btrfs_err(fs_info, "remap-tree not supported when block size > page size");
 			ret = -EINVAL;
 		}
@@ -2932,7 +2932,7 @@ static int init_mount_fs_info(struct btrfs_fs_info *fs_info, struct super_block 
 	if (ret)
 		return ret;
 
-	fs_info->dirty_metadata_batch = PAGE_SIZE *
+	fs_info->dirty_metadata_batch = PG_SIZE *
 					(1 + ilog2(nr_cpu_ids));
 
 	ret = percpu_counter_init(&fs_info->delalloc_bytes, 0, GFP_KERNEL);
@@ -3224,7 +3224,7 @@ int btrfs_check_features(struct btrfs_fs_info *fs_info, bool is_rw_mount)
 	 * An ancient flag, which should really be marked deprecated.
 	 * Such runtime limitation doesn't really need a incompat flag.
 	 */
-	if (btrfs_super_nodesize(disk_super) > PAGE_SIZE)
+	if (btrfs_super_nodesize(disk_super) > PG_SIZE)
 		incompat |= BTRFS_FEATURE_INCOMPAT_BIG_METADATA;
 
 	if (compat_ro_unsupp && is_rw_mount) {
@@ -3266,10 +3266,10 @@ int btrfs_check_features(struct btrfs_fs_info *fs_info, bool is_rw_mount)
 	 * we're already defaulting to v2 cache, no need to bother v1 as it's
 	 * going to be deprecated anyway.
 	 */
-	if (fs_info->sectorsize != PAGE_SIZE && btrfs_test_opt(fs_info, SPACE_CACHE)) {
+	if (fs_info->sectorsize != PG_SIZE && btrfs_test_opt(fs_info, SPACE_CACHE)) {
 		btrfs_warn(fs_info,
 	"v1 space cache is not supported for page size %lu with sectorsize %u",
-			   PAGE_SIZE, fs_info->sectorsize);
+			   PG_SIZE, fs_info->sectorsize);
 		return -EINVAL;
 	}
 
@@ -3411,16 +3411,16 @@ int __cold open_ctree(struct super_block *sb, struct btrfs_fs_devices *fs_device
 	fs_info->nodesize_bits = ilog2(nodesize);
 	fs_info->sectorsize = sectorsize;
 	fs_info->sectorsize_bits = ilog2(sectorsize);
-	fs_info->block_min_order = ilog2(round_up(sectorsize, PAGE_SIZE) >> PAGE_SHIFT);
-	fs_info->block_max_order = ilog2((BITS_PER_LONG << fs_info->sectorsize_bits) >> PAGE_SHIFT);
+	fs_info->block_min_order = ilog2(round_up(sectorsize, PG_SIZE) >> PG_SHIFT);
+	fs_info->block_max_order = ilog2((BITS_PER_LONG << fs_info->sectorsize_bits) >> PG_SHIFT);
 	fs_info->csums_per_leaf = BTRFS_MAX_ITEM_SIZE(fs_info) / fs_info->csum_size;
 	fs_info->stripesize = stripesize;
 	fs_info->fs_devices->fs_info = fs_info;
 
-	if (fs_info->sectorsize > PAGE_SIZE)
+	if (fs_info->sectorsize > PG_SIZE)
 		btrfs_warn(fs_info,
 			   "support for block size %u with page size %lu is experimental, some features may be missing",
-			   fs_info->sectorsize, PAGE_SIZE);
+			   fs_info->sectorsize, PG_SIZE);
 	/*
 	 * Handle the space caching options appropriately now that we have the
 	 * super block loaded and validated.
@@ -3460,7 +3460,7 @@ int __cold open_ctree(struct super_block *sb, struct btrfs_fs_devices *fs_device
 		goto fail_sb_buffer;
 
 	sb->s_bdi->ra_pages *= btrfs_super_num_devices(disk_super);
-	sb->s_bdi->ra_pages = max(sb->s_bdi->ra_pages, SZ_4M / PAGE_SIZE);
+	sb->s_bdi->ra_pages = max(sb->s_bdi->ra_pages, SZ_4M / PG_SIZE);
 
 	/* Update the values for the current filesystem. */
 	sb->s_blocksize = sectorsize;
@@ -3812,7 +3812,7 @@ static int write_dev_supers(struct btrfs_device *device,
 		btrfs_csum(fs_info->csum_type, (const u8 *)sb + BTRFS_CSUM_SIZE,
 			   BTRFS_SUPER_INFO_SIZE - BTRFS_CSUM_SIZE, sb->csum);
 
-		folio = __filemap_get_folio(mapping, bytenr >> PAGE_SHIFT,
+		folio = __filemap_get_folio(mapping, bytenr >> PG_SHIFT,
 					    FGP_LOCK | FGP_ACCESSED | FGP_CREAT,
 					    GFP_NOFS);
 		if (IS_ERR(folio)) {
@@ -3890,7 +3890,7 @@ static int wait_dev_supers(struct btrfs_device *device, int max_mirrors)
 			break;
 
 		folio = filemap_get_folio(device->bdev->bd_mapping,
-					  bytenr >> PAGE_SHIFT);
+					  bytenr >> PG_SHIFT);
 		/* If the folio has been removed, then we know it completed. */
 		if (IS_ERR(folio))
 			continue;

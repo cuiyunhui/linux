@@ -260,7 +260,7 @@ int btrfs_run_sanity_tests(void)
 	int ret, i;
 	u32 sectorsize, nodesize;
 	u32 test_sectorsize[] = {
-		PAGE_SIZE,
+		PG_SIZE,
 	};
 	ret = btrfs_init_test_fs();
 	if (ret)

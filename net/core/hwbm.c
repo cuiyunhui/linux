@@ -12,7 +12,7 @@
 
 void hwbm_buf_free(struct hwbm_pool *bm_pool, void *buf)
 {
-	if (likely(bm_pool->frag_size <= PAGE_SIZE))
+	if (likely(bm_pool->frag_size <= PG_SIZE))
 		skb_free_frag(buf);
 	else
 		kfree(buf);
@@ -25,7 +25,7 @@ int hwbm_pool_refill(struct hwbm_pool *bm_pool, gfp_t gfp)
 	int frag_size = bm_pool->frag_size;
 	void *buf;
 
-	if (likely(frag_size <= PAGE_SIZE))
+	if (likely(frag_size <= PG_SIZE))
 		buf = netdev_alloc_frag(frag_size);
 	else
 		buf = kmalloc(frag_size, gfp);

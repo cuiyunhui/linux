@@ -54,7 +54,7 @@
 #include "luo_internal.h"
 
 #define LUO_FLB_PGCNT		1ul
-#define LUO_FLB_MAX		(((LUO_FLB_PGCNT << PAGE_SHIFT) -	\
+#define LUO_FLB_MAX		(((LUO_FLB_PGCNT << PG_SHIFT) -	\
 		sizeof(struct luo_flb_header_ser)) / sizeof(struct luo_flb_ser))
 
 struct luo_flb_header {
@@ -547,7 +547,7 @@ int __init luo_flb_setup_outgoing(void *fdt_out)
 	u64 header_ser_pa;
 	int err;
 
-	header_ser = kho_alloc_preserve(LUO_FLB_PGCNT << PAGE_SHIFT);
+	header_ser = kho_alloc_preserve(LUO_FLB_PGCNT << PG_SHIFT);
 	if (IS_ERR(header_ser))
 		return PTR_ERR(header_ser);
 

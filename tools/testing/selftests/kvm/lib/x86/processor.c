@@ -332,7 +332,7 @@ void virt_map_level(struct kvm_vm *vm, uint64_t vaddr, uint64_t paddr,
 	for (i = 0; i < nr_pages; i++) {
 		__virt_pg_map(vm, &vm->mmu, vaddr, paddr, level);
 		sparsebit_set_num(vm->vpages_mapped, vaddr >> vm->page_shift,
-				  nr_bytes / PAGE_SIZE);
+				  nr_bytes / PG_SIZE);
 
 		vaddr += pg_size;
 		paddr += pg_size;
@@ -839,7 +839,7 @@ struct kvm_vcpu *vm_arch_vcpu_add(struct kvm_vm *vm, uint32_t vcpu_id)
 	 * If this code is ever used to launch a vCPU with 32-bit entry point it
 	 * may need to subtract 4 bytes instead of 8 bytes.
 	 */
-	TEST_ASSERT(IS_ALIGNED(stack_vaddr, PAGE_SIZE),
+	TEST_ASSERT(IS_ALIGNED(stack_vaddr, PG_SIZE),
 		    "__vm_vaddr_alloc() did not provide a page-aligned address");
 	stack_vaddr -= 8;
 

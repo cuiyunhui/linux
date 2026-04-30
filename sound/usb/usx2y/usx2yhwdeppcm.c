@@ -486,7 +486,7 @@ static int usx2y_usbpcm_urbs_start(struct snd_usx2y_substream *subs)
 }
 
 #define USX2Y_HWDEP_PCM_PAGES	\
-	PAGE_ALIGN(sizeof(struct snd_usx2y_hwdep_pcm_shm))
+	PG_ALIGN(sizeof(struct snd_usx2y_hwdep_pcm_shm))
 
 /*
  * prepare callback
@@ -671,7 +671,7 @@ static vm_fault_t snd_usx2y_hwdep_pcm_vm_fault(struct vm_fault *vmf)
 	unsigned long offset;
 	void *vaddr;
 
-	offset = vmf->pgoff << PAGE_SHIFT;
+	offset = vmf->pgoff << PG_SHIFT;
 	vaddr = (char *)((struct usx2ydev *)vmf->vma->vm_private_data)->hwdep_pcm_shm + offset;
 	vmf->page = virt_to_page(vaddr);
 	get_page(vmf->page);

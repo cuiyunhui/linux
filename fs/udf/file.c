@@ -59,10 +59,10 @@ static vm_fault_t udf_page_mkwrite(struct vm_fault *vmf)
 	/* Space is already allocated for in-ICB file */
 	if (UDF_I(inode)->i_alloc_type == ICBTAG_FLAG_AD_IN_ICB)
 		goto out_dirty;
-	if (folio->index == size >> PAGE_SHIFT)
-		end = size & ~PAGE_MASK;
+	if (folio->index == size >> PG_SHIFT)
+		end = size & ~PG_MASK;
 	else
-		end = PAGE_SIZE;
+		end = PG_SIZE;
 	err = __block_write_begin(folio, 0, end, udf_get_block);
 	if (err) {
 		folio_unlock(folio);

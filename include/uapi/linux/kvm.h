@@ -547,7 +547,7 @@ struct kvm_coalesced_mmio_ring {
 };
 
 #define KVM_COALESCED_MMIO_MAX \
-	((PAGE_SIZE - sizeof(struct kvm_coalesced_mmio_ring)) / \
+	((PG_SIZE - sizeof(struct kvm_coalesced_mmio_ring)) / \
 	 sizeof(struct kvm_coalesced_mmio))
 
 /* for KVM_TRANSLATE */

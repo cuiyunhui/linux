@@ -89,13 +89,13 @@ static int jffs2_do_readpage_nolock(struct inode *inode, struct folio *folio)
 	int ret;
 
 	jffs2_dbg(2, "%s(): ino #%lu, page at offset 0x%lx\n",
-		  __func__, inode->i_ino, folio->index << PAGE_SHIFT);
+		  __func__, inode->i_ino, folio->index << PG_SHIFT);
 
 	BUG_ON(!folio_test_locked(folio));
 
 	kaddr = kmap_local_folio(folio, 0);
-	ret = jffs2_read_inode_range(c, f, kaddr, folio->index << PAGE_SHIFT,
-				     PAGE_SIZE);
+	ret = jffs2_read_inode_range(c, f, kaddr, folio->index << PG_SHIFT,
+				     PG_SIZE);
 	kunmap_local(kaddr);
 
 	if (!ret)
@@ -134,7 +134,7 @@ static int jffs2_write_begin(const struct kiocb *iocb,
 	struct inode *inode = mapping->host;
 	struct jffs2_inode_info *f = JFFS2_INODE_INFO(inode);
 	struct jffs2_sb_info *c = JFFS2_SB_INFO(inode->i_sb);
-	pgoff_t index = pos >> PAGE_SHIFT;
+	pgoff_t index = pos >> PG_SHIFT;
 	int ret = 0;
 
 	jffs2_dbg(1, "%s()\n", __func__);
@@ -252,7 +252,7 @@ static int jffs2_write_end(const struct kiocb *iocb,
 	struct jffs2_inode_info *f = JFFS2_INODE_INFO(inode);
 	struct jffs2_sb_info *c = JFFS2_SB_INFO(inode->i_sb);
 	struct jffs2_raw_inode *ri;
-	unsigned start = pos & (PAGE_SIZE - 1);
+	unsigned start = pos & (PG_SIZE - 1);
 	unsigned end = start + copied;
 	unsigned aligned_start = start & ~3;
 	int ret = 0;
@@ -269,7 +269,7 @@ static int jffs2_write_end(const struct kiocb *iocb,
 	   to re-lock it. */
 	BUG_ON(!folio_test_uptodate(folio));
 
-	if (end == PAGE_SIZE) {
+	if (end == PG_SIZE) {
 		/* When writing out the end of a page, write out the
 		   _whole_ page. This helps to reduce the number of
 		   nodes in files which have many short writes, like

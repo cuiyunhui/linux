@@ -29,9 +29,9 @@ void __iomem *generic_ioremap_prot(phys_addr_t phys_addr, size_t size,
 		return NULL;
 
 	/* Page-align mappings */
-	offset = phys_addr & (~PAGE_MASK);
+	offset = phys_addr & (~PG_MASK);
 	phys_addr -= offset;
-	size = PAGE_ALIGN(size + offset);
+	size = PG_ALIGN(size + offset);
 
 	area = __get_vm_area_caller(size, VM_IOREMAP, IOREMAP_START,
 				    IOREMAP_END, __builtin_return_address(0));
@@ -59,7 +59,7 @@ EXPORT_SYMBOL(ioremap_prot);
 
 void generic_iounmap(volatile void __iomem *addr)
 {
-	void *vaddr = (void *)((unsigned long)addr & PAGE_MASK);
+	void *vaddr = (void *)((unsigned long)addr & PG_MASK);
 
 	if (is_ioremap_addr(vaddr))
 		vunmap(vaddr);

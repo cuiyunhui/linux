@@ -7,7 +7,7 @@
 #include "compress.h"
 #include <linux/lz4.h>
 
-#define LZ4_MAX_DISTANCE_PAGES	(DIV_ROUND_UP(LZ4_DISTANCE_MAX, PAGE_SIZE) + 1)
+#define LZ4_MAX_DISTANCE_PAGES	(DIV_ROUND_UP(LZ4_DISTANCE_MAX, PG_SIZE) + 1)
 
 static int z_erofs_load_lz4_config(struct super_block *sb,
 			    struct erofs_super_block *dsb, void *data, int size)
@@ -41,7 +41,7 @@ static int z_erofs_load_lz4_config(struct super_block *sb,
 	}
 
 	sbi->lz4.max_distance_pages = distance ?
-					DIV_ROUND_UP(distance, PAGE_SIZE) + 1 :
+					DIV_ROUND_UP(distance, PG_SIZE) + 1 :
 					LZ4_MAX_DISTANCE_PAGES;
 	return z_erofs_gbuf_growsize(sbi->lz4.max_pclusterblks);
 }
@@ -84,8 +84,8 @@ static int z_erofs_lz4_prepare_dstpages(struct z_erofs_decompress_req *rq,
 					continue;
 				}
 				if (kaddr &&
-				    kaddr + PAGE_SIZE == page_address(page)) {
-					kaddr += PAGE_SIZE;
+				    kaddr + PG_SIZE == page_address(page)) {
+					kaddr += PG_SIZE;
 					continue;
 				}
 			}
@@ -143,7 +143,7 @@ static void *z_erofs_lz4_handle_overlap(const struct z_erofs_decompress_req *rq,
 	 * for extreme performance.
 	 */
 	oend = rq->pageofs_out + rq->outputsize;
-	omargin = PAGE_ALIGN(oend) - oend;
+	omargin = PG_ALIGN(oend) - oend;
 	if (!rq->partial_decoding && may_inplace &&
 	    omargin >= LZ4_DECOMPRESS_INPLACE_MARGIN(rq->inputsize)) {
 		for (i = 0; i < rq->inpages; ++i)
@@ -153,7 +153,7 @@ static void *z_erofs_lz4_handle_overlap(const struct z_erofs_decompress_req *rq,
 		if (i >= rq->inpages) {
 			kunmap_local(inpage);
 			*maptype = 3;
-			return out + ((rq->outpages - rq->inpages) << PAGE_SHIFT);
+			return out + ((rq->outpages - rq->inpages) << PG_SHIFT);
 		}
 	}
 	/*
@@ -168,7 +168,7 @@ static void *z_erofs_lz4_handle_overlap(const struct z_erofs_decompress_req *rq,
 	}
 
 	for (i = 0, in = rq->in; i < rq->inputsize; i += cnt, ++in) {
-		cnt = min_t(u32, rq->inputsize - i, PAGE_SIZE - *inputmargin);
+		cnt = min_t(u32, rq->inputsize - i, PG_SIZE - *inputmargin);
 		if (!inpage)
 			inpage = kmap_local_page(*in);
 		memcpy(src + i, inpage + *inputmargin, cnt);
@@ -299,7 +299,7 @@ static const char *z_erofs_transform_plain(struct z_erofs_decompress_req *rq,
 		return ERR_PTR(-EOPNOTSUPP);
 	if (rq->alg == Z_EROFS_COMPRESSION_INTERLACED) {
 		cur = bs - (rq->pageofs_out & (bs - 1));
-		pi = (rq->pageofs_in + rq->inputsize - cur) & ~PAGE_MASK;
+		pi = (rq->pageofs_in + rq->inputsize - cur) & ~PG_MASK;
 		cur = min(cur, rq->outputsize);
 		if (cur && rq->out[0]) {
 			kin = kmap_local_page(rq->in[nrpages_in - 1]);
@@ -314,17 +314,17 @@ static const char *z_erofs_transform_plain(struct z_erofs_decompress_req *rq,
 	}
 
 	for (; rq->outputsize; rq->pageofs_in = 0, cur += insz, ni++) {
-		insz = min(PAGE_SIZE - rq->pageofs_in, rq->outputsize);
+		insz = min(PG_SIZE - rq->pageofs_in, rq->outputsize);
 		rq->outputsize -= insz;
 		if (!rq->in[ni])
 			continue;
 		kin = kmap_local_page(rq->in[ni]);
 		pi = 0;
 		do {
-			no = (rq->pageofs_out + cur + pi) >> PAGE_SHIFT;
-			po = (rq->pageofs_out + cur + pi) & ~PAGE_MASK;
+			no = (rq->pageofs_out + cur + pi) >> PG_SHIFT;
+			po = (rq->pageofs_out + cur + pi) & ~PG_MASK;
 			DBG_BUGON(no >= nrpages_out);
-			cnt = min(insz - pi, PAGE_SIZE - po);
+			cnt = min(insz - pi, PG_SIZE - po);
 			if (rq->out[no] == rq->in[ni])
 				memmove(kin + po,
 					kin + rq->pageofs_in + pi, cnt);
@@ -352,7 +352,8 @@ const char *z_erofs_stream_switch_bufs(struct z_erofs_stream_dctx *dctx,
 
 		if (dctx->kout)
 			kunmap_local(dctx->kout);
-		dctx->avail_out = min(rq->outputsize, PAGE_SIZE - rq->pageofs_out);
+		dctx->avail_out = min(rq->outputsize,
+				      PG_SIZE - rq->pageofs_out);
 		rq->outputsize -= dctx->avail_out;
 		pgo = &rq->out[dctx->no];
 		if (!*pgo && rq->fillgaps) {		/* deduped */
@@ -379,7 +380,7 @@ const char *z_erofs_stream_switch_bufs(struct z_erofs_stream_dctx *dctx,
 			kunmap_local(dctx->kout);
 		kunmap_local(dctx->kin);
 
-		dctx->inbuf_sz = min_t(u32, rq->inputsize, PAGE_SIZE);
+		dctx->inbuf_sz = min_t(u32, rq->inputsize, PG_SIZE);
 		rq->inputsize -= dctx->inbuf_sz;
 		dctx->kin = kmap_local_page(rq->in[dctx->ni]);
 		*src = dctx->kin;

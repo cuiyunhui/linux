@@ -109,7 +109,7 @@ static void bpf_dispatcher_update(struct bpf_dispatcher *d, int prev_num_progs)
 	u32 noff = 0;
 
 	if (prev_num_progs)
-		noff = d->image_off ^ (PAGE_SIZE / 2);
+		noff = d->image_off ^ (PG_SIZE / 2);
 
 	new = d->num_progs ? d->image + noff : NULL;
 	tmp = d->num_progs ? d->rw_image + noff : NULL;
@@ -119,7 +119,7 @@ static void bpf_dispatcher_update(struct bpf_dispatcher *d, int prev_num_progs)
 		 */
 		if (bpf_dispatcher_prepare(d, new, tmp))
 			return;
-		if (IS_ERR(bpf_arch_text_copy(new, tmp, PAGE_SIZE / 2)))
+		if (IS_ERR(bpf_arch_text_copy(new, tmp, PG_SIZE / 2)))
 			return;
 	}
 
@@ -145,16 +145,17 @@ void bpf_dispatcher_change_prog(struct bpf_dispatcher *d, struct bpf_prog *from,
 
 	mutex_lock(&d->mutex);
 	if (!d->image) {
-		d->image = bpf_prog_pack_alloc(PAGE_SIZE, bpf_jit_fill_hole_with_zero);
+		d->image = bpf_prog_pack_alloc(PG_SIZE,
+					       bpf_jit_fill_hole_with_zero);
 		if (!d->image)
 			goto out;
-		d->rw_image = bpf_jit_alloc_exec(PAGE_SIZE);
+		d->rw_image = bpf_jit_alloc_exec(PG_SIZE);
 		if (!d->rw_image) {
-			bpf_prog_pack_free(d->image, PAGE_SIZE);
+			bpf_prog_pack_free(d->image, PG_SIZE);
 			d->image = NULL;
 			goto out;
 		}
-		bpf_image_ksym_init(d->image, PAGE_SIZE, &d->ksym);
+		bpf_image_ksym_init(d->image, PG_SIZE, &d->ksym);
 		bpf_image_ksym_add(&d->ksym);
 	}
 

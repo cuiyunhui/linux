@@ -70,54 +70,54 @@ static ssize_t audmux_read_file(struct file *file, char __user *user_buf,
 
 	clk_disable_unprepare(audmux_clk);
 
-	buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	buf = kmalloc(PG_SIZE, GFP_KERNEL);
 	if (!buf)
 		return -ENOMEM;
 
 	ret = sysfs_emit(buf, "PDCR: %08x\nPTCR: %08x\n", pdcr, ptcr);
 
 	if (ptcr & IMX_AUDMUX_V2_PTCR_TFSDIR)
-		ret += scnprintf(buf + ret, PAGE_SIZE - ret,
-				"TxFS output from %s, ",
-				audmux_port_string((ptcr >> 27) & 0x7));
+		ret += scnprintf(buf + ret, PG_SIZE - ret,
+				 "TxFS output from %s, ",
+				 audmux_port_string((ptcr >> 27) & 0x7));
 	else
-		ret += scnprintf(buf + ret, PAGE_SIZE - ret,
-				"TxFS input, ");
+		ret += scnprintf(buf + ret, PG_SIZE - ret,
+				 "TxFS input, ");
 
 	if (ptcr & IMX_AUDMUX_V2_PTCR_TCLKDIR)
-		ret += scnprintf(buf + ret, PAGE_SIZE - ret,
-				"TxClk output from %s",
-				audmux_port_string((ptcr >> 22) & 0x7));
+		ret += scnprintf(buf + ret, PG_SIZE - ret,
+				 "TxClk output from %s",
+				 audmux_port_string((ptcr >> 22) & 0x7));
 	else
-		ret += scnprintf(buf + ret, PAGE_SIZE - ret,
-				"TxClk input");
+		ret += scnprintf(buf + ret, PG_SIZE - ret,
+				 "TxClk input");
 
-	ret += scnprintf(buf + ret, PAGE_SIZE - ret, "\n");
+	ret += scnprintf(buf + ret, PG_SIZE - ret, "\n");
 
 	if (ptcr & IMX_AUDMUX_V2_PTCR_SYN) {
-		ret += scnprintf(buf + ret, PAGE_SIZE - ret,
-				"Port is symmetric");
+		ret += scnprintf(buf + ret, PG_SIZE - ret,
+				 "Port is symmetric");
 	} else {
 		if (ptcr & IMX_AUDMUX_V2_PTCR_RFSDIR)
-			ret += scnprintf(buf + ret, PAGE_SIZE - ret,
-					"RxFS output from %s, ",
-					audmux_port_string((ptcr >> 17) & 0x7));
+			ret += scnprintf(buf + ret, PG_SIZE - ret,
+					 "RxFS output from %s, ",
+					 audmux_port_string((ptcr >> 17) & 0x7));
 		else
-			ret += scnprintf(buf + ret, PAGE_SIZE - ret,
-					"RxFS input, ");
+			ret += scnprintf(buf + ret, PG_SIZE - ret,
+					 "RxFS input, ");
 
 		if (ptcr & IMX_AUDMUX_V2_PTCR_RCLKDIR)
-			ret += scnprintf(buf + ret, PAGE_SIZE - ret,
-					"RxClk output from %s",
-					audmux_port_string((ptcr >> 12) & 0x7));
+			ret += scnprintf(buf + ret, PG_SIZE - ret,
+					 "RxClk output from %s",
+					 audmux_port_string((ptcr >> 12) & 0x7));
 		else
-			ret += scnprintf(buf + ret, PAGE_SIZE - ret,
-					"RxClk input");
+			ret += scnprintf(buf + ret, PG_SIZE - ret,
+					 "RxClk input");
 	}
 
-	ret += scnprintf(buf + ret, PAGE_SIZE - ret,
-			"\nData received from %s\n",
-			audmux_port_string((pdcr >> 13) & 0x7));
+	ret += scnprintf(buf + ret, PG_SIZE - ret,
+			 "\nData received from %s\n",
+			 audmux_port_string((pdcr >> 13) & 0x7));
 
 	ret = simple_read_from_buffer(user_buf, count, ppos, buf, ret);
 

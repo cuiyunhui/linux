@@ -31,7 +31,7 @@
 #include "super.h"
 #include "relocation.h"
 
-#define BITS_PER_BITMAP		(PAGE_SIZE * 8UL)
+#define BITS_PER_BITMAP		(PG_SIZE * 8UL)
 #define MAX_CACHE_BYTES_PER_GIG	SZ_64K
 #define FORCE_EXTENT_THRESHOLD	SZ_1M
 
@@ -370,7 +370,7 @@ static void readahead_cache(struct inode *inode)
 	pgoff_t last_index;
 
 	file_ra_state_init(&ra, inode->i_mapping);
-	last_index = (i_size_read(inode) - 1) >> PAGE_SHIFT;
+	last_index = (i_size_read(inode) - 1) >> PG_SHIFT;
 
 	page_cache_sync_readahead(inode->i_mapping, &ra, NULL, 0, last_index);
 }
@@ -380,10 +380,10 @@ static int io_ctl_init(struct btrfs_io_ctl *io_ctl, struct inode *inode,
 {
 	int num_pages;
 
-	num_pages = DIV_ROUND_UP(i_size_read(inode), PAGE_SIZE);
+	num_pages = DIV_ROUND_UP(i_size_read(inode), PG_SIZE);
 
 	/* Make sure we can fit our crcs and generation into the first page */
-	if (write && (num_pages * sizeof(u32) + sizeof(u64)) > PAGE_SIZE)
+	if (write && (num_pages * sizeof(u32) + sizeof(u64)) > PG_SIZE)
 		return -ENOSPC;
 
 	memset(io_ctl, 0, sizeof(struct btrfs_io_ctl));
@@ -420,7 +420,7 @@ static void io_ctl_map_page(struct btrfs_io_ctl *io_ctl, int clear)
 	io_ctl->page = io_ctl->pages[io_ctl->index++];
 	io_ctl->cur = page_address(io_ctl->page);
 	io_ctl->orig = io_ctl->cur;
-	io_ctl->size = PAGE_SIZE;
+	io_ctl->size = PG_SIZE;
 	if (clear)
 		clear_page(io_ctl->cur);
 }
@@ -436,7 +436,7 @@ static void io_ctl_drop_pages(struct btrfs_io_ctl *io_ctl)
 			btrfs_folio_clear_checked(io_ctl->fs_info,
 					page_folio(io_ctl->pages[i]),
 					page_offset(io_ctl->pages[i]),
-					PAGE_SIZE);
+					PG_SIZE);
 			unlock_page(io_ctl->pages[i]);
 			put_page(io_ctl->pages[i]);
 		}
@@ -541,7 +541,7 @@ static void io_ctl_set_crc(struct btrfs_io_ctl *io_ctl, int index)
 	if (index == 0)
 		offset = sizeof(u32) * io_ctl->num_pages;
 
-	crc = crc32c(crc, io_ctl->orig + offset, PAGE_SIZE - offset);
+	crc = crc32c(crc, io_ctl->orig + offset, PG_SIZE - offset);
 	btrfs_crc32c_final(crc, (u8 *)&crc);
 	io_ctl_unmap_page(io_ctl);
 	tmp = page_address(io_ctl->pages[0]);
@@ -563,7 +563,7 @@ static int io_ctl_check_crc(struct btrfs_io_ctl *io_ctl, int index)
 	val = *tmp;
 
 	io_ctl_map_page(io_ctl, 0);
-	crc = crc32c(crc, io_ctl->orig + offset, PAGE_SIZE - offset);
+	crc = crc32c(crc, io_ctl->orig + offset, PG_SIZE - offset);
 	btrfs_crc32c_final(crc, (u8 *)&crc);
 	if (val != crc) {
 		btrfs_err_rl(io_ctl->fs_info,
@@ -1450,9 +1450,9 @@ static int __btrfs_write_out_cache(struct inode *inode,
 
 	/* Everything is written out, now we dirty the pages in the file. */
 	i_size = i_size_read(inode);
-	for (int i = 0; i < round_up(i_size, PAGE_SIZE) / PAGE_SIZE; i++) {
-		u64 dirty_start = i * PAGE_SIZE;
-		u64 dirty_len = min_t(u64, dirty_start + PAGE_SIZE, i_size) - dirty_start;
+	for (int i = 0; i < round_up(i_size, PG_SIZE) / PG_SIZE; i++) {
+		u64 dirty_start = i * PG_SIZE;
+		u64 dirty_len = min_t(u64, dirty_start + PG_SIZE, i_size) - dirty_start;
 
 		ret = btrfs_dirty_folio(BTRFS_I(inode), page_folio(io_ctl->pages[i]),
 					dirty_start, dirty_len, &cached_state, false);
@@ -4213,7 +4213,7 @@ int __init btrfs_free_space_init(void)
 		return -ENOMEM;
 
 	btrfs_free_space_bitmap_cachep = kmem_cache_create("btrfs_free_space_bitmap",
-							PAGE_SIZE, PAGE_SIZE,
+							PG_SIZE, PG_SIZE,
 							0, NULL);
 	if (!btrfs_free_space_bitmap_cachep) {
 		kmem_cache_destroy(btrfs_free_space_cachep);

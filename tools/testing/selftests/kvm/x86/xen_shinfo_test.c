@@ -19,20 +19,20 @@
 #define SHINFO_REGION_GPA	0xc0000000ULL
 #define SHINFO_REGION_SLOT	10
 
-#define DUMMY_REGION_GPA	(SHINFO_REGION_GPA + (3 * PAGE_SIZE))
+#define DUMMY_REGION_GPA	(SHINFO_REGION_GPA + (3 * PG_SIZE))
 #define DUMMY_REGION_SLOT	11
 
-#define DUMMY_REGION_GPA_2	(SHINFO_REGION_GPA + (4 * PAGE_SIZE))
+#define DUMMY_REGION_GPA_2	(SHINFO_REGION_GPA + (4 * PG_SIZE))
 #define DUMMY_REGION_SLOT_2	12
 
 #define SHINFO_ADDR	(SHINFO_REGION_GPA)
 #define VCPU_INFO_ADDR	(SHINFO_REGION_GPA + 0x40)
-#define PVTIME_ADDR	(SHINFO_REGION_GPA + PAGE_SIZE)
-#define RUNSTATE_ADDR	(SHINFO_REGION_GPA + PAGE_SIZE + PAGE_SIZE - 15)
+#define PVTIME_ADDR	(SHINFO_REGION_GPA + PG_SIZE)
+#define RUNSTATE_ADDR	(SHINFO_REGION_GPA + PG_SIZE + PG_SIZE - 15)
 
 #define SHINFO_VADDR	(SHINFO_REGION_GVA)
 #define VCPU_INFO_VADDR	(SHINFO_REGION_GVA + 0x40)
-#define RUNSTATE_VADDR	(SHINFO_REGION_GVA + PAGE_SIZE + PAGE_SIZE - 15)
+#define RUNSTATE_VADDR	(SHINFO_REGION_GVA + PG_SIZE + PG_SIZE - 15)
 
 #define EVTCHN_VECTOR	0x10
 
@@ -396,7 +396,7 @@ static void *juggle_shinfo_state(void *arg)
 
 	struct kvm_xen_hvm_attr cache_activate_gfn = {
 		.type = KVM_XEN_ATTR_TYPE_SHARED_INFO,
-		.u.shared_info.gfn = SHINFO_REGION_GPA / PAGE_SIZE
+		.u.shared_info.gfn = SHINFO_REGION_GPA / PG_SIZE
 	};
 
 	struct kvm_xen_hvm_attr cache_deactivate_gfn = {
@@ -501,7 +501,7 @@ int main(int argc, char *argv[])
 		ha.u.shared_info.hva = (unsigned long)shinfo;
 	} else {
 		ha.type = KVM_XEN_ATTR_TYPE_SHARED_INFO;
-		ha.u.shared_info.gfn = SHINFO_ADDR / PAGE_SIZE;
+		ha.u.shared_info.gfn = SHINFO_ADDR / PG_SIZE;
 	}
 
 	vm_ioctl(vm, KVM_XEN_HVM_SET_ATTR, &ha);
@@ -512,7 +512,8 @@ int main(int argc, char *argv[])
 	 * info over since that's only set at setup time, and we test it later.
 	 */
 	struct pvclock_wall_clock wc_copy = shinfo->wc;
-	void *m = mmap(shinfo, PAGE_SIZE, PROT_READ|PROT_WRITE, MAP_FIXED|MAP_PRIVATE, zero_fd, 0);
+	void *m = mmap(shinfo, PG_SIZE, PROT_READ|PROT_WRITE,
+		       MAP_FIXED|MAP_PRIVATE, zero_fd, 0);
 	TEST_ASSERT(m == shinfo, "Failed to map /dev/zero over shared info");
 	shinfo->wc = wc_copy;
 
@@ -1064,8 +1065,8 @@ int main(int argc, char *argv[])
 		 */
 		unsigned long runstate_addr;
 		struct compat_vcpu_runstate_info *crs;
-		for (runstate_addr = SHINFO_REGION_GPA + PAGE_SIZE + PAGE_SIZE - sizeof(*rs) - 4;
-		     runstate_addr < SHINFO_REGION_GPA + PAGE_SIZE + PAGE_SIZE + 4; runstate_addr++) {
+		for (runstate_addr = SHINFO_REGION_GPA + PG_SIZE + PG_SIZE - sizeof(*rs) - 4;
+		     runstate_addr < SHINFO_REGION_GPA + PG_SIZE + PG_SIZE + 4; runstate_addr++) {
 
 			rs = addr_gpa2hva(vm, runstate_addr);
 			crs = (void *)rs;

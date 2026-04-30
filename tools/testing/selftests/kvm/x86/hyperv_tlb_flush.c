@@ -72,7 +72,7 @@ static void worker_guest_code(vm_vaddr_t test_data)
 {
 	struct test_data *data = (struct test_data *)test_data;
 	u32 vcpu_id = rdmsr(HV_X64_MSR_VP_INDEX);
-	void *exp_page = (void *)data->test_pages + PAGE_SIZE * NTEST_PAGES;
+	void *exp_page = (void *)data->test_pages + PG_SIZE * NTEST_PAGES;
 	u64 *this_cpu = (u64 *)(exp_page + vcpu_id * sizeof(u64));
 	u64 expected, val;
 
@@ -124,7 +124,7 @@ static void worker_guest_code(vm_vaddr_t test_data)
  */
 static void set_expected_val(void *addr, u64 val, int vcpu_id)
 {
-	void *exp_page = addr + PAGE_SIZE * NTEST_PAGES;
+	void *exp_page = addr + PG_SIZE * NTEST_PAGES;
 
 	*(u64 *)(exp_page + vcpu_id * sizeof(u64)) = val;
 }
@@ -159,7 +159,7 @@ static inline void do_delay(void)
 static inline void prepare_to_test(struct test_data *data)
 {
 	/* Clear hypercall input page */
-	memset((void *)data->hcall_gva, 0, PAGE_SIZE);
+	memset((void *)data->hcall_gva, 0, PG_SIZE);
 
 	/* 'Disable' workers */
 	set_expected_val((void *)data->test_pages, 0x0, WORKER_VCPU_ID_1);
@@ -217,7 +217,7 @@ static void sender_guest_code(vm_vaddr_t test_data)
 		flush->flags = HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES;
 		flush->processor_mask = BIT(WORKER_VCPU_ID_1);
 		hyperv_hypercall(HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE, hcall_gpa,
-				 hcall_gpa + PAGE_SIZE);
+				 hcall_gpa + PG_SIZE);
 		post_test(data, i % 2 ? TESTVAL1 : TESTVAL2, 0x0);
 	}
 
@@ -231,7 +231,7 @@ static void sender_guest_code(vm_vaddr_t test_data)
 		flush->gva_list[0] = (u64)data->test_pages;
 		hyperv_hypercall(HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST |
 				 (1UL << HV_HYPERCALL_REP_COMP_OFFSET),
-				 hcall_gpa, hcall_gpa + PAGE_SIZE);
+				 hcall_gpa, hcall_gpa + PG_SIZE);
 		post_test(data, i % 2 ? TESTVAL1 : TESTVAL2, 0x0);
 	}
 
@@ -244,7 +244,7 @@ static void sender_guest_code(vm_vaddr_t test_data)
 			HV_FLUSH_ALL_PROCESSORS;
 		flush->processor_mask = 0;
 		hyperv_hypercall(HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE, hcall_gpa,
-				 hcall_gpa + PAGE_SIZE);
+				 hcall_gpa + PG_SIZE);
 		post_test(data, i % 2 ? TESTVAL1 : TESTVAL2, i % 2 ? TESTVAL1 : TESTVAL2);
 	}
 
@@ -258,7 +258,7 @@ static void sender_guest_code(vm_vaddr_t test_data)
 		flush->gva_list[0] = (u64)data->test_pages;
 		hyperv_hypercall(HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST |
 				 (1UL << HV_HYPERCALL_REP_COMP_OFFSET),
-				 hcall_gpa, hcall_gpa + PAGE_SIZE);
+				 hcall_gpa, hcall_gpa + PG_SIZE);
 		post_test(data, i % 2 ? TESTVAL1 : TESTVAL2,
 			  i % 2 ? TESTVAL1 : TESTVAL2);
 	}
@@ -274,7 +274,7 @@ static void sender_guest_code(vm_vaddr_t test_data)
 		flush_ex->hv_vp_set.bank_contents[0] = BIT_ULL(WORKER_VCPU_ID_2 % 64);
 		hyperv_hypercall(HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE_EX |
 				 (1 << HV_HYPERCALL_VARHEAD_OFFSET),
-				 hcall_gpa, hcall_gpa + PAGE_SIZE);
+				 hcall_gpa, hcall_gpa + PG_SIZE);
 		post_test(data, 0x0, i % 2 ? TESTVAL1 : TESTVAL2);
 	}
 
@@ -292,7 +292,7 @@ static void sender_guest_code(vm_vaddr_t test_data)
 		hyperv_hypercall(HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST_EX |
 				 (1 << HV_HYPERCALL_VARHEAD_OFFSET) |
 				 (1UL << HV_HYPERCALL_REP_COMP_OFFSET),
-				 hcall_gpa, hcall_gpa + PAGE_SIZE);
+				 hcall_gpa, hcall_gpa + PG_SIZE);
 		post_test(data, 0x0, i % 2 ? TESTVAL1 : TESTVAL2);
 	}
 
@@ -309,7 +309,7 @@ static void sender_guest_code(vm_vaddr_t test_data)
 		flush_ex->hv_vp_set.bank_contents[1] = BIT_ULL(WORKER_VCPU_ID_2 % 64);
 		hyperv_hypercall(HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE_EX |
 				 (2 << HV_HYPERCALL_VARHEAD_OFFSET),
-				 hcall_gpa, hcall_gpa + PAGE_SIZE);
+				 hcall_gpa, hcall_gpa + PG_SIZE);
 		post_test(data, i % 2 ? TESTVAL1 : TESTVAL2,
 			  i % 2 ? TESTVAL1 : TESTVAL2);
 	}
@@ -330,7 +330,7 @@ static void sender_guest_code(vm_vaddr_t test_data)
 		hyperv_hypercall(HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST_EX |
 				 (2 << HV_HYPERCALL_VARHEAD_OFFSET) |
 				 (1UL << HV_HYPERCALL_REP_COMP_OFFSET),
-				 hcall_gpa, hcall_gpa + PAGE_SIZE);
+				 hcall_gpa, hcall_gpa + PG_SIZE);
 		post_test(data, i % 2 ? TESTVAL1 : TESTVAL2,
 			  i % 2 ? TESTVAL1 : TESTVAL2);
 	}
@@ -343,7 +343,7 @@ static void sender_guest_code(vm_vaddr_t test_data)
 		flush_ex->flags = HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES;
 		flush_ex->hv_vp_set.format = HV_GENERIC_SET_ALL;
 		hyperv_hypercall(HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE_EX,
-				 hcall_gpa, hcall_gpa + PAGE_SIZE);
+				 hcall_gpa, hcall_gpa + PG_SIZE);
 		post_test(data, i % 2 ? TESTVAL1 : TESTVAL2,
 			  i % 2 ? TESTVAL1 : TESTVAL2);
 	}
@@ -358,7 +358,7 @@ static void sender_guest_code(vm_vaddr_t test_data)
 		flush_ex->gva_list[0] = (u64)data->test_pages;
 		hyperv_hypercall(HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST_EX |
 				 (1UL << HV_HYPERCALL_REP_COMP_OFFSET),
-				 hcall_gpa, hcall_gpa + PAGE_SIZE);
+				 hcall_gpa, hcall_gpa + PG_SIZE);
 		post_test(data, i % 2 ? TESTVAL1 : TESTVAL2,
 			  i % 2 ? TESTVAL1 : TESTVAL2);
 	}
@@ -599,7 +599,7 @@ int main(int argc, char *argv[])
 	/* Hypercall input/output */
 	data->hcall_gva = vm_vaddr_alloc_pages(vm, 2);
 	data->hcall_gpa = addr_gva2gpa(vm, data->hcall_gva);
-	memset(addr_gva2hva(vm, data->hcall_gva), 0x0, 2 * PAGE_SIZE);
+	memset(addr_gva2hva(vm, data->hcall_gva), 0x0, 2 * PG_SIZE);
 
 	/*
 	 * Test pages: the first one is filled with '0x01's, the second with '0x02's
@@ -608,8 +608,8 @@ int main(int argc, char *argv[])
 	 */
 	data->test_pages = vm_vaddr_alloc_pages(vm, NTEST_PAGES + 1);
 	for (i = 0; i < NTEST_PAGES; i++)
-		memset(addr_gva2hva(vm, data->test_pages + PAGE_SIZE * i),
-		       (u8)(i + 1), PAGE_SIZE);
+		memset(addr_gva2hva(vm, data->test_pages + PG_SIZE * i),
+		       (u8)(i + 1), PG_SIZE);
 	set_expected_val(addr_gva2hva(vm, data->test_pages), 0x0, WORKER_VCPU_ID_1);
 	set_expected_val(addr_gva2hva(vm, data->test_pages), 0x0, WORKER_VCPU_ID_2);
 
@@ -617,12 +617,13 @@ int main(int argc, char *argv[])
 	 * Get PTE pointers for test pages and map them inside the guest.
 	 * Use separate page for each PTE for simplicity.
 	 */
-	gva = vm_vaddr_unused_gap(vm, NTEST_PAGES * PAGE_SIZE, KVM_UTIL_MIN_VADDR);
+	gva = vm_vaddr_unused_gap(vm, NTEST_PAGES * PG_SIZE,
+				  KVM_UTIL_MIN_VADDR);
 	for (i = 0; i < NTEST_PAGES; i++) {
-		pte = vm_get_pte(vm, data->test_pages + i * PAGE_SIZE);
+		pte = vm_get_pte(vm, data->test_pages + i * PG_SIZE);
 		gpa = addr_hva2gpa(vm, pte);
-		virt_pg_map(vm, gva + PAGE_SIZE * i, gpa & PAGE_MASK);
-		data->test_pages_pte[i] = gva + (gpa & ~PAGE_MASK);
+		virt_pg_map(vm, gva + PG_SIZE * i, gpa & PG_MASK);
+		data->test_pages_pte[i] = gva + (gpa & ~PG_MASK);
 	}
 
 	/*

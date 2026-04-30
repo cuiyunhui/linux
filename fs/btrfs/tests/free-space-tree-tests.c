@@ -565,7 +565,7 @@ int btrfs_test_free_space_tree(u32 sectorsize, u32 nodesize)
 	 * Align some operations to a page to flush out bugs in the extent
 	 * buffer bitmap handling of highmem.
 	 */
-	bitmap_alignment = BTRFS_FREE_SPACE_BITMAP_BITS * PAGE_SIZE;
+	bitmap_alignment = BTRFS_FREE_SPACE_BITMAP_BITS * PG_SIZE;
 
 	test_msg("running free space tree tests");
 	for (i = 0; i < ARRAY_SIZE(tests); i++) {

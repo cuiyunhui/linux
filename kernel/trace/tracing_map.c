@@ -292,7 +292,7 @@ static void tracing_map_array_clear(struct tracing_map_array *a)
 		return;
 
 	for (i = 0; i < a->n_pages; i++)
-		memset(a->pages[i], 0, PAGE_SIZE);
+		memset(a->pages[i], 0, PG_SIZE);
 }
 
 static void tracing_map_array_free(struct tracing_map_array *a)
@@ -329,7 +329,7 @@ static struct tracing_map_array *tracing_map_array_alloc(unsigned int n_elts,
 		return NULL;
 
 	a->entry_size_shift = fls(roundup_pow_of_two(entry_size) - 1);
-	a->entries_per_page = PAGE_SIZE / (1 << a->entry_size_shift);
+	a->entries_per_page = PG_SIZE / (1 << a->entry_size_shift);
 	a->n_pages = n_elts / a->entries_per_page;
 	if (!a->n_pages)
 		a->n_pages = 1;
@@ -344,7 +344,7 @@ static struct tracing_map_array *tracing_map_array_alloc(unsigned int n_elts,
 		a->pages[i] = (void *)get_zeroed_page(GFP_KERNEL);
 		if (!a->pages[i])
 			goto free;
-		kmemleak_alloc(a->pages[i], PAGE_SIZE, 1, GFP_KERNEL);
+		kmemleak_alloc(a->pages[i], PG_SIZE, 1, GFP_KERNEL);
 	}
  out:
 	return a;

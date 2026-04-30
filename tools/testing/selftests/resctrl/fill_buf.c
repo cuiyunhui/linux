@@ -109,7 +109,7 @@ unsigned char *alloc_buffer(size_t buf_size, bool memflush)
 	ssize_t s64;
 	int ret;
 
-	ret = posix_memalign(&buf, PAGE_SIZE, buf_size);
+	ret = posix_memalign(&buf, PG_SIZE, buf_size);
 	if (ret < 0)
 		return NULL;
 

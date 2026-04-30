@@ -49,7 +49,7 @@ static inline struct ib_umem_dmabuf *to_ib_umem_dmabuf(struct ib_umem *umem)
 /* Returns the offset of the umem start relative to the first page. */
 static inline int ib_umem_offset(struct ib_umem *umem)
 {
-	return umem->address & ~PAGE_MASK;
+	return umem->address & ~PG_MASK;
 }
 
 static inline dma_addr_t ib_umem_start_dma_addr(struct ib_umem *umem)
@@ -73,7 +73,7 @@ static inline size_t ib_umem_num_dma_blocks(struct ib_umem *umem,
 
 static inline size_t ib_umem_num_pages(struct ib_umem *umem)
 {
-	return ib_umem_num_dma_blocks(umem, PAGE_SIZE);
+	return ib_umem_num_dma_blocks(umem, PG_SIZE);
 }
 
 static inline void __rdma_umem_block_iter_start(struct ib_block_iter *biter,

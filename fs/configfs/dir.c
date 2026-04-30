@@ -493,7 +493,7 @@ static struct dentry * configfs_lookup(struct inode *dir,
 				inode->i_size = 0;
 				inode->i_fop = &configfs_bin_file_operations;
 			} else {
-				inode->i_size = PAGE_SIZE;
+				inode->i_size = PG_SIZE;
 				inode->i_fop = &configfs_file_operations;
 			}
 			goto done;

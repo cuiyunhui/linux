@@ -125,12 +125,12 @@ static void *bpf_struct_ops_image_alloc(void)
 	void *image;
 	int err;
 
-	err = bpf_jit_charge_modmem(PAGE_SIZE);
+	err = bpf_jit_charge_modmem(PG_SIZE);
 	if (err)
 		return ERR_PTR(err);
-	image = arch_alloc_bpf_trampoline(PAGE_SIZE);
+	image = arch_alloc_bpf_trampoline(PG_SIZE);
 	if (!image) {
-		bpf_jit_uncharge_modmem(PAGE_SIZE);
+		bpf_jit_uncharge_modmem(PG_SIZE);
 		return ERR_PTR(-ENOMEM);
 	}
 
@@ -140,8 +140,8 @@ static void *bpf_struct_ops_image_alloc(void)
 void bpf_struct_ops_image_free(void *image)
 {
 	if (image) {
-		arch_free_bpf_trampoline(image, PAGE_SIZE);
-		bpf_jit_uncharge_modmem(PAGE_SIZE);
+		arch_free_bpf_trampoline(image, PG_SIZE);
+		bpf_jit_uncharge_modmem(PG_SIZE);
 	}
 }
 
@@ -616,7 +616,7 @@ int bpf_struct_ops_prepare_trampoline(struct bpf_tramp_links *tlinks,
 		return size ? : -EFAULT;
 
 	/* Allocate image buffer if necessary */
-	if (!image || size > PAGE_SIZE - image_off) {
+	if (!image || size > PG_SIZE - image_off) {
 		if (!allow_alloc)
 			return -E2BIG;
 
@@ -865,7 +865,7 @@ static long bpf_struct_ops_map_update_elem(struct bpf_map *map, void *key,
 	}
 	for (i = 0; i < st_map->image_pages_cnt; i++) {
 		err = arch_protect_bpf_trampoline(st_map->image_pages[i],
-						  PAGE_SIZE);
+						  PG_SIZE);
 		if (err)
 			goto reset_unlock;
 	}
@@ -1144,7 +1144,7 @@ static u64 bpf_struct_ops_map_mem_usage(const struct bpf_map *map)
 	usage += vt->size;
 	usage += st_map->funcs_cnt * sizeof(struct bpf_link *);
 	usage += st_map->funcs_cnt * sizeof(struct bpf_ksym *);
-	usage += PAGE_SIZE;
+	usage += PG_SIZE;
 	return usage;
 }
 

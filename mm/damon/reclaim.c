@@ -164,7 +164,7 @@ static struct damos *damon_reclaim_new_scheme(void)
 {
 	struct damos_access_pattern pattern = {
 		/* Find regions having PAGE_SIZE or larger size */
-		.min_sz_region = PAGE_SIZE,
+		.min_sz_region = PG_SIZE,
 		.max_sz_region = ULONG_MAX,
 		/* and not accessed at all */
 		.min_nr_accesses = 0,

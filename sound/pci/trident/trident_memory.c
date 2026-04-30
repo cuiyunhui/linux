@@ -26,7 +26,7 @@
 
 #if PAGE_SIZE == 4096
 /* page size == SNDRV_TRIDENT_PAGE_SIZE */
-#define ALIGN_PAGE_SIZE		PAGE_SIZE	/* minimum page size for allocation */
+#define ALIGN_PAGE_SIZE		PG_SIZE	/* minimum page size for allocation */
 #define MAX_ALIGN_PAGES		SNDRV_TRIDENT_MAX_PAGES	/* maxmium aligned pages */
 /* fill TLB entrie(s) corresponding to page with ptr */
 #define set_tlb_bus(trident,page,addr) __set_tlb_bus(trident,page,addr)
@@ -41,7 +41,7 @@
 
 #elif PAGE_SIZE == 8192
 /* page size == SNDRV_TRIDENT_PAGE_SIZE x 2*/
-#define ALIGN_PAGE_SIZE		PAGE_SIZE
+#define ALIGN_PAGE_SIZE		PG_SIZE
 #define MAX_ALIGN_PAGES		(SNDRV_TRIDENT_MAX_PAGES / 2)
 #define get_aligned_page(offset)	((offset) >> 13)
 #define aligned_page_offset(page)	((page) << 13)
@@ -64,7 +64,7 @@ static inline void set_silent_tlb(struct snd_trident *trident, int page)
 
 #else
 /* arbitrary size */
-#define UNIT_PAGES		(PAGE_SIZE / SNDRV_TRIDENT_PAGE_SIZE)
+#define UNIT_PAGES		(PG_SIZE / SNDRV_TRIDENT_PAGE_SIZE)
 #define ALIGN_PAGE_SIZE		(SNDRV_TRIDENT_PAGE_SIZE * UNIT_PAGES)
 #define MAX_ALIGN_PAGES		(SNDRV_TRIDENT_MAX_PAGES / UNIT_PAGES)
 /* Note: if alignment doesn't match to the maximum size, the last few blocks
@@ -180,7 +180,7 @@ snd_trident_alloc_sg_pages(struct snd_trident *trident,
 	/* set TLB entries */
 	idx = 0;
 	for (page = firstpg(blk); page <= lastpg(blk); page++, idx++) {
-		unsigned long ofs = idx << PAGE_SHIFT;
+		unsigned long ofs = idx << PG_SHIFT;
 		dma_addr_t addr = snd_pcm_sgbuf_get_addr(substream, ofs);
 		if (!is_valid_page(trident, addr)) {
 			__snd_util_mem_free(hdr, blk);

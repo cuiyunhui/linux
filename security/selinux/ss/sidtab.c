@@ -141,7 +141,7 @@ int sidtab_hash_stats(struct sidtab *sidtab, char *page)
 	if (chain_len > max_chain_len)
 		max_chain_len = chain_len;
 
-	return scnprintf(page, PAGE_SIZE,
+	return scnprintf(page, PG_SIZE,
 			 "entries: %d\nbuckets used: %d/%d\n"
 			 "longest chain: %d\n",
 			 entries, slots_used, SIDTAB_HASH_BUCKETS,

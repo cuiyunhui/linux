@@ -136,7 +136,7 @@ struct buffer_head *gfs2_getbuf(struct gfs2_glock *gl, u64 blkno, int create)
 	if (mapping == NULL)
 		mapping = gfs2_aspace(sdp);
 
-	shift = PAGE_SHIFT - sdp->sd_sb.sb_bsize_shift;
+	shift = PG_SHIFT - sdp->sd_sb.sb_bsize_shift;
 	index = blkno >> shift;             /* convert block to page */
 	bufnum = blkno - (index << shift);  /* block buf index within page */
 
@@ -413,7 +413,7 @@ static struct buffer_head *gfs2_getjdatabuf(struct gfs2_inode *ip, u64 blkno)
 	struct gfs2_sbd *sdp = GFS2_SB(&ip->i_inode);
 	struct folio *folio;
 	struct buffer_head *bh;
-	unsigned int shift = PAGE_SHIFT - sdp->sd_sb.sb_bsize_shift;
+	unsigned int shift = PG_SHIFT - sdp->sd_sb.sb_bsize_shift;
 	unsigned long index = blkno >> shift; /* convert block to page */
 	unsigned int bufnum = blkno - (index << shift);
 

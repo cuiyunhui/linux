@@ -22,7 +22,7 @@ struct rvt_seg {
 };
 
 /* The number of rvt_segs that fit in a page. */
-#define RVT_SEGSZ     (PAGE_SIZE / sizeof(struct rvt_seg))
+#define RVT_SEGSZ     (PG_SIZE / sizeof(struct rvt_seg))
 
 struct rvt_segarray {
 	struct rvt_seg segs[RVT_SEGSZ];

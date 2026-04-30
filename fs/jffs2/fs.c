@@ -213,8 +213,8 @@ int jffs2_statfs(struct dentry *dentry, struct kstatfs *buf)
 	unsigned long avail;
 
 	buf->f_type = JFFS2_SUPER_MAGIC;
-	buf->f_bsize = 1 << PAGE_SHIFT;
-	buf->f_blocks = c->flash_size >> PAGE_SHIFT;
+	buf->f_bsize = 1 << PG_SHIFT;
+	buf->f_blocks = c->flash_size >> PG_SHIFT;
 	buf->f_files = 0;
 	buf->f_ffree = 0;
 	buf->f_namelen = JFFS2_MAX_NAME_LEN;
@@ -229,7 +229,7 @@ int jffs2_statfs(struct dentry *dentry, struct kstatfs *buf)
 		avail = 0;
 	spin_unlock(&c->erase_completion_lock);
 
-	buf->f_bavail = buf->f_bfree = avail >> PAGE_SHIFT;
+	buf->f_bavail = buf->f_bfree = avail >> PG_SHIFT;
 
 	return 0;
 }
@@ -590,8 +590,8 @@ int jffs2_do_fill_super(struct super_block *sb, struct fs_context *fc)
 		goto out_root;
 
 	sb->s_maxbytes = 0xFFFFFFFF;
-	sb->s_blocksize = PAGE_SIZE;
-	sb->s_blocksize_bits = PAGE_SHIFT;
+	sb->s_blocksize = PG_SIZE;
+	sb->s_blocksize_bits = PG_SHIFT;
 	sb->s_magic = JFFS2_SUPER_MAGIC;
 	sb->s_time_min = 0;
 	sb->s_time_max = U32_MAX;

@@ -74,7 +74,7 @@ static unsigned long pfn_end(struct dev_pagemap *pgmap, int range_id)
 {
 	const struct range *range = &pgmap->ranges[range_id];
 
-	return (range->start + range_len(range)) >> PAGE_SHIFT;
+	return (range->start + range_len(range)) >> PG_SHIFT;
 }
 
 static unsigned long pfn_len(struct dev_pagemap *pgmap, unsigned long range_id)

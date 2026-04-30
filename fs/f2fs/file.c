@@ -124,7 +124,7 @@ static vm_fault_t f2fs_vm_page_mkwrite(struct vm_fault *vmf)
 
 	f2fs_bug_on(sbi, f2fs_has_inline_data(inode));
 
-	f2fs_zero_post_eof_page(inode, (folio->index + 1) << PAGE_SHIFT, true);
+	f2fs_zero_post_eof_page(inode, (folio->index + 1) << PG_SHIFT, true);
 
 	file_update_time(vmf->vma->vm_file);
 	filemap_invalidate_lock_shared(inode->i_mapping);
@@ -167,11 +167,11 @@ static vm_fault_t f2fs_vm_page_mkwrite(struct vm_fault *vmf)
 		goto out_sem;
 
 	/* page is wholly or partially inside EOF */
-	if (((loff_t)(folio->index + 1) << PAGE_SHIFT) >
+	if (((loff_t)(folio->index + 1) << PG_SHIFT) >
 						i_size_read(inode)) {
 		loff_t offset;
 
-		offset = i_size_read(inode) & ~PAGE_MASK;
+		offset = i_size_read(inode) & ~PG_MASK;
 		folio_zero_segment(folio, offset, folio_size(folio));
 	}
 	folio_mark_dirty(folio);
@@ -480,9 +480,9 @@ static loff_t f2fs_seek_block(struct file *file, loff_t offset, int whence)
 		}
 	}
 
-	pgofs = (pgoff_t)(offset >> PAGE_SHIFT);
+	pgofs = (pgoff_t)(offset >> PG_SHIFT);
 
-	for (; data_ofs < isize; data_ofs = (loff_t)pgofs << PAGE_SHIFT) {
+	for (; data_ofs < isize; data_ofs = (loff_t)pgofs << PG_SHIFT) {
 		set_new_dnode(&dn, inode, NULL, NULL, 0);
 		err = f2fs_get_dnode_of_data(&dn, pgofs, LOOKUP_NODE);
 		if (err && err != -ENOENT) {
@@ -502,7 +502,7 @@ static loff_t f2fs_seek_block(struct file *file, loff_t offset, int whence)
 		/* find data/hole in dnode block */
 		for (; dn.ofs_in_node < end_offset;
 				dn.ofs_in_node++, pgofs++,
-				data_ofs = (loff_t)pgofs << PAGE_SHIFT) {
+				data_ofs = (loff_t)pgofs << PG_SHIFT) {
 			block_t blkaddr;
 
 			blkaddr = f2fs_data_blkaddr(&dn);
@@ -739,8 +739,8 @@ next:
 static int truncate_partial_data_page(struct inode *inode, u64 from,
 								bool cache_only)
 {
-	loff_t offset = from & (PAGE_SIZE - 1);
-	pgoff_t index = from >> PAGE_SHIFT;
+	loff_t offset = from & (PG_SIZE - 1);
+	pgoff_t index = from >> PG_SHIFT;
 	struct address_space *mapping = inode->i_mapping;
 	struct folio *folio;
 
@@ -868,7 +868,7 @@ int f2fs_truncate_blocks(struct inode *inode, u64 from, bool lock)
 	 */
 	if (f2fs_compressed_file(inode))
 		free_from = round_up(from,
-				F2FS_I(inode)->i_cluster_size << PAGE_SHIFT);
+				F2FS_I(inode)->i_cluster_size << PG_SHIFT);
 #endif
 
 	err = f2fs_do_truncate_blocks(inode, free_from, lock);
@@ -1282,11 +1282,11 @@ static int f2fs_punch_hole(struct inode *inode, loff_t offset, loff_t len)
 
 	f2fs_zero_post_eof_page(inode, offset + len, true);
 
-	pg_start = ((unsigned long long) offset) >> PAGE_SHIFT;
-	pg_end = ((unsigned long long) offset + len) >> PAGE_SHIFT;
+	pg_start = ((unsigned long long) offset) >> PG_SHIFT;
+	pg_end = ((unsigned long long) offset + len) >> PG_SHIFT;
 
-	off_start = offset & (PAGE_SIZE - 1);
-	off_end = (offset + len) & (PAGE_SIZE - 1);
+	off_start = offset & (PG_SIZE - 1);
+	off_end = (offset + len) & (PG_SIZE - 1);
 
 	if (pg_start == pg_end) {
 		ret = fill_zero(inode, pg_start, off_start,
@@ -1296,7 +1296,7 @@ static int f2fs_punch_hole(struct inode *inode, loff_t offset, loff_t len)
 	} else {
 		if (off_start) {
 			ret = fill_zero(inode, pg_start++, off_start,
-						PAGE_SIZE - off_start);
+						PG_SIZE - off_start);
 			if (ret)
 				return ret;
 		}
@@ -1313,8 +1313,8 @@ static int f2fs_punch_hole(struct inode *inode, loff_t offset, loff_t len)
 
 			f2fs_balance_fs(sbi, true);
 
-			blk_start = (loff_t)pg_start << PAGE_SHIFT;
-			blk_end = (loff_t)pg_end << PAGE_SHIFT;
+			blk_start = (loff_t)pg_start << PG_SHIFT;
+			blk_end = (loff_t)pg_end << PG_SHIFT;
 
 			f2fs_down_write(&F2FS_I(inode)->i_gc_rwsem[WRITE]);
 			filemap_invalidate_lock(inode->i_mapping);
@@ -1462,7 +1462,7 @@ static int __clone_blkaddrs(struct inode *src_inode, struct inode *dst_inode,
 				}
 				dn.ofs_in_node++;
 				i++;
-				new_size = (loff_t)(dst + i) << PAGE_SHIFT;
+				new_size = (loff_t)(dst + i) << PG_SHIFT;
 				if (dst_inode->i_size < new_size)
 					f2fs_i_size_write(dst_inode, new_size);
 			} while (--ilen && (do_replace[i] || blkaddr[i] == NULL_ADDR));
@@ -1484,7 +1484,7 @@ static int __clone_blkaddrs(struct inode *src_inode, struct inode *dst_inode,
 
 			f2fs_folio_wait_writeback(fdst, DATA, true, true);
 
-			memcpy_folio(fdst, 0, fsrc, 0, PAGE_SIZE);
+			memcpy_folio(fdst, 0, fsrc, 0, PG_SIZE);
 			folio_mark_dirty(fdst);
 			folio_set_f2fs_gcing(fdst);
 			f2fs_folio_put(fdst, true);
@@ -1556,9 +1556,9 @@ static int f2fs_do_collapse(struct inode *inode, loff_t offset, loff_t len)
 {
 	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
 	struct f2fs_lock_context lc;
-	pgoff_t nrpages = DIV_ROUND_UP(i_size_read(inode), PAGE_SIZE);
-	pgoff_t start = offset >> PAGE_SHIFT;
-	pgoff_t end = (offset + len) >> PAGE_SHIFT;
+	pgoff_t nrpages = DIV_ROUND_UP(i_size_read(inode), PG_SIZE);
+	pgoff_t start = offset >> PG_SHIFT;
+	pgoff_t end = (offset + len) >> PG_SHIFT;
 	int ret;
 
 	f2fs_balance_fs(sbi, true);
@@ -1695,11 +1695,11 @@ static int f2fs_zero_range(struct inode *inode, loff_t offset, loff_t len,
 
 	f2fs_zero_post_eof_page(inode, offset + len, true);
 
-	pg_start = ((unsigned long long) offset) >> PAGE_SHIFT;
-	pg_end = ((unsigned long long) offset + len) >> PAGE_SHIFT;
+	pg_start = ((unsigned long long) offset) >> PG_SHIFT;
+	pg_end = ((unsigned long long) offset + len) >> PG_SHIFT;
 
-	off_start = offset & (PAGE_SIZE - 1);
-	off_end = (offset + len) & (PAGE_SIZE - 1);
+	off_start = offset & (PG_SIZE - 1);
+	off_end = (offset + len) & (PG_SIZE - 1);
 
 	if (pg_start == pg_end) {
 		ret = fill_zero(inode, pg_start, off_start,
@@ -1711,12 +1711,12 @@ static int f2fs_zero_range(struct inode *inode, loff_t offset, loff_t len,
 	} else {
 		if (off_start) {
 			ret = fill_zero(inode, pg_start++, off_start,
-						PAGE_SIZE - off_start);
+						PG_SIZE - off_start);
 			if (ret)
 				return ret;
 
 			new_size = max_t(loff_t, new_size,
-					(loff_t)pg_start << PAGE_SHIFT);
+					(loff_t)pg_start << PG_SHIFT);
 		}
 
 		for (index = pg_start; index < pg_end;) {
@@ -1729,8 +1729,8 @@ static int f2fs_zero_range(struct inode *inode, loff_t offset, loff_t len,
 			filemap_invalidate_lock(mapping);
 
 			truncate_pagecache_range(inode,
-				(loff_t)index << PAGE_SHIFT,
-				((loff_t)pg_end << PAGE_SHIFT) - 1);
+				(loff_t)index << PG_SHIFT,
+				((loff_t)pg_end << PG_SHIFT) - 1);
 
 			f2fs_lock_op(sbi, &lc);
 
@@ -1760,7 +1760,7 @@ static int f2fs_zero_range(struct inode *inode, loff_t offset, loff_t len,
 
 			index = end;
 			new_size = max_t(loff_t, new_size,
-					(loff_t)index << PAGE_SHIFT);
+					(loff_t)index << PG_SHIFT);
 		}
 
 		if (off_end) {
@@ -1819,10 +1819,10 @@ static int f2fs_insert_range(struct inode *inode, loff_t offset, loff_t len)
 	if (ret)
 		return ret;
 
-	pg_start = offset >> PAGE_SHIFT;
-	pg_end = (offset + len) >> PAGE_SHIFT;
+	pg_start = offset >> PG_SHIFT;
+	pg_end = (offset + len) >> PG_SHIFT;
 	delta = pg_end - pg_start;
-	idx = DIV_ROUND_UP(i_size_read(inode), PAGE_SIZE);
+	idx = DIV_ROUND_UP(i_size_read(inode), PG_SIZE);
 
 	/* avoid gc operation during block exchange */
 	f2fs_down_write(&F2FS_I(inode)->i_gc_rwsem[WRITE]);
@@ -1892,9 +1892,9 @@ static int f2fs_expand_inode_data(struct inode *inode, loff_t offset,
 
 	f2fs_balance_fs(sbi, true);
 
-	pg_start = ((unsigned long long)offset) >> PAGE_SHIFT;
-	pg_end = ((unsigned long long)offset + len) >> PAGE_SHIFT;
-	off_end = (offset + len) & (PAGE_SIZE - 1);
+	pg_start = ((unsigned long long)offset) >> PG_SHIFT;
+	pg_end = ((unsigned long long)offset + len) >> PG_SHIFT;
+	off_end = (offset + len) & (PG_SIZE - 1);
 
 	map.m_lblk = pg_start;
 	map.m_len = pg_end - pg_start;
@@ -1969,9 +1969,9 @@ out_err:
 
 		/* update new size to the failed position */
 		new_size = (last_off == pg_end) ? offset + len :
-					(loff_t)(last_off + 1) << PAGE_SHIFT;
+					(loff_t)(last_off + 1) << PG_SHIFT;
 	} else {
-		new_size = ((loff_t)pg_end << PAGE_SHIFT) + off_end;
+		new_size = ((loff_t)pg_end << PG_SHIFT) + off_end;
 	}
 
 	if (new_size > i_size_read(inode)) {
@@ -2556,8 +2556,8 @@ static int f2fs_keep_noreuse_range(struct inode *inode,
 	    (offset + len) > max_bytes)
 		return 0;
 
-	start = offset >> PAGE_SHIFT;
-	end = DIV_ROUND_UP(offset + len, PAGE_SIZE);
+	start = offset >> PG_SHIFT;
+	end = DIV_ROUND_UP(offset + len, PG_SIZE);
 
 	inode_lock(inode);
 	if (f2fs_is_atomic_file(inode)) {
@@ -2902,10 +2902,10 @@ static int f2fs_defragment_range(struct f2fs_sb_info *sbi,
 	f2fs_balance_fs(sbi, true);
 
 	inode_lock(inode);
-	pg_start = range->start >> PAGE_SHIFT;
+	pg_start = range->start >> PG_SHIFT;
 	pg_end = min_t(pgoff_t,
-				(range->start + range->len) >> PAGE_SHIFT,
-				DIV_ROUND_UP(i_size_read(inode), PAGE_SIZE));
+				(range->start + range->len) >> PG_SHIFT,
+				DIV_ROUND_UP(i_size_read(inode), PG_SIZE));
 
 	if (is_inode_flag_set(inode, FI_COMPRESS_RELEASED) ||
 		f2fs_is_atomic_file(inode)) {
@@ -2922,8 +2922,8 @@ static int f2fs_defragment_range(struct f2fs_sb_info *sbi,
 
 	/* writeback all dirty pages in the range */
 	err = filemap_write_and_wait_range(inode->i_mapping,
-						pg_start << PAGE_SHIFT,
-						(pg_end << PAGE_SHIFT) - 1);
+						pg_start << PG_SHIFT,
+						(pg_end << PG_SHIFT) - 1);
 	if (err)
 		goto out;
 
@@ -3044,7 +3044,7 @@ out:
 unlock_out:
 	inode_unlock(inode);
 	if (!err)
-		range->len = (u64)total << PAGE_SHIFT;
+		range->len = (u64)total << PG_SHIFT;
 	return err;
 }
 
@@ -3072,7 +3072,7 @@ static int f2fs_ioc_defragment(struct file *filp, unsigned long arg)
 	if (range.start & (F2FS_BLKSIZE - 1) || range.len & (F2FS_BLKSIZE - 1))
 		return -EINVAL;
 
-	if (unlikely((range.start + range.len) >> PAGE_SHIFT >
+	if (unlikely((range.start + range.len) >> PG_SHIFT >
 					max_file_blocks(inode)))
 		return -EINVAL;
 
@@ -3898,7 +3898,7 @@ static int f2fs_release_compress_blocks(struct file *filp, unsigned long arg)
 	f2fs_down_write(&fi->i_gc_rwsem[WRITE]);
 	filemap_invalidate_lock(inode->i_mapping);
 
-	last_idx = DIV_ROUND_UP(i_size_read(inode), PAGE_SIZE);
+	last_idx = DIV_ROUND_UP(i_size_read(inode), PG_SIZE);
 
 	while (page_idx < last_idx) {
 		struct dnode_of_data dn;
@@ -4076,7 +4076,7 @@ static int f2fs_reserve_compress_blocks(struct file *filp, unsigned long arg)
 	f2fs_down_write(&fi->i_gc_rwsem[WRITE]);
 	filemap_invalidate_lock(inode->i_mapping);
 
-	last_idx = DIV_ROUND_UP(i_size_read(inode), PAGE_SIZE);
+	last_idx = DIV_ROUND_UP(i_size_read(inode), PG_SIZE);
 
 	while (page_idx < last_idx) {
 		struct dnode_of_data dn;
@@ -4510,7 +4510,7 @@ static int f2fs_ioc_decompress_file(struct file *filp)
 	if (!atomic_read(&fi->i_compr_blocks))
 		goto out;
 
-	last_idx = DIV_ROUND_UP(i_size_read(inode), PAGE_SIZE);
+	last_idx = DIV_ROUND_UP(i_size_read(inode), PG_SIZE);
 	last_idx >>= fi->i_log_cluster_size;
 
 	for (cluster_idx = 0; cluster_idx < last_idx; cluster_idx++) {
@@ -4590,7 +4590,7 @@ static int f2fs_ioc_compress_file(struct file *filp)
 
 	set_inode_flag(inode, FI_ENABLE_COMPRESS);
 
-	last_idx = DIV_ROUND_UP(i_size_read(inode), PAGE_SIZE);
+	last_idx = DIV_ROUND_UP(i_size_read(inode), PG_SIZE);
 	last_idx >>= fi->i_log_cluster_size;
 
 	for (cluster_idx = 0; cluster_idx < last_idx; cluster_idx++) {
@@ -5081,8 +5081,8 @@ static void f2fs_flush_buffered_write(struct address_space *mapping,
 	if (ret < 0)
 		return;
 	invalidate_mapping_pages(mapping,
-				 start_pos >> PAGE_SHIFT,
-				 end_pos >> PAGE_SHIFT);
+				 start_pos >> PG_SHIFT,
+				 end_pos >> PG_SHIFT);
 }
 
 static ssize_t f2fs_dio_write_iter(struct kiocb *iocb, struct iov_iter *from,

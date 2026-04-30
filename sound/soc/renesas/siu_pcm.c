@@ -114,7 +114,7 @@ static int siu_pcm_wr_set(struct siu_port *port_info,
 
 	sg_init_table(&sg, 1);
 	sg_set_page(&sg, pfn_to_page(PFN_DOWN(buff)),
-		    size, offset_in_page(buff));
+		    size, offset_in_pg(buff));
 	sg_dma_len(&sg) = size;
 	sg_dma_address(&sg) = buff;
 
@@ -164,7 +164,7 @@ static int siu_pcm_rd_set(struct siu_port *port_info,
 
 	sg_init_table(&sg, 1);
 	sg_set_page(&sg, pfn_to_page(PFN_DOWN(buff)),
-		    size, offset_in_page(buff));
+		    size, offset_in_pg(buff));
 	sg_dma_len(&sg) = size;
 	sg_dma_address(&sg) = buff;
 

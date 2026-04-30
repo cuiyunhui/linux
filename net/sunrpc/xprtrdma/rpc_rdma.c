@@ -135,11 +135,11 @@ static bool rpcrdma_args_inline(struct rpcrdma_xprt *r_xprt,
 
 	if (xdr->page_len) {
 		remaining = xdr->page_len;
-		offset = offset_in_page(xdr->page_base);
+		offset = offset_in_pg(xdr->page_base);
 		count = RPCRDMA_MIN_SEND_SGES;
 		while (remaining) {
 			remaining -= min_t(unsigned int,
-					   PAGE_SIZE - offset, remaining);
+					   PG_SIZE - offset, remaining);
 			offset = 0;
 			if (++count > ep->re_attr.cap.max_send_sge)
 				return false;
@@ -187,14 +187,14 @@ rpcrdma_alloc_sparse_pages(struct xdr_buf *buf)
 	int len;
 
 	len = buf->page_len;
-	ppages = buf->pages + (buf->page_base >> PAGE_SHIFT);
+	ppages = buf->pages + (buf->page_base >> PG_SHIFT);
 	while (len > 0) {
 		if (!*ppages)
 			*ppages = alloc_page(GFP_NOWAIT);
 		if (!*ppages)
 			return -ENOBUFS;
 		ppages++;
-		len -= PAGE_SIZE;
+		len -= PG_SIZE;
 	}
 
 	return 0;
@@ -210,7 +210,7 @@ rpcrdma_convert_kvec(struct kvec *vec, struct rpcrdma_mr_seg *seg,
 		     unsigned int *n)
 {
 	seg->mr_page = virt_to_page(vec->iov_base);
-	seg->mr_offset = offset_in_page(vec->iov_base);
+	seg->mr_offset = offset_in_pg(vec->iov_base);
 	seg->mr_len = vec->iov_len;
 	++seg;
 	++(*n);
@@ -238,12 +238,12 @@ rpcrdma_convert_iovs(struct rpcrdma_xprt *r_xprt, struct xdr_buf *xdrbuf,
 		seg = rpcrdma_convert_kvec(&xdrbuf->head[0], seg, &n);
 
 	len = xdrbuf->page_len;
-	ppages = xdrbuf->pages + (xdrbuf->page_base >> PAGE_SHIFT);
-	page_base = offset_in_page(xdrbuf->page_base);
+	ppages = xdrbuf->pages + (xdrbuf->page_base >> PG_SHIFT);
+	page_base = offset_in_pg(xdrbuf->page_base);
 	while (len) {
 		seg->mr_page = *ppages;
 		seg->mr_offset = page_base;
-		seg->mr_len = min_t(u32, PAGE_SIZE - page_base, len);
+		seg->mr_len = min_t(u32, PG_SIZE - page_base, len);
 		len -= seg->mr_len;
 		++ppages;
 		++seg;
@@ -602,12 +602,12 @@ static bool rpcrdma_prepare_pagelist(struct rpcrdma_req *req,
 	struct page **ppages;
 	struct ib_sge *sge;
 
-	ppages = xdr->pages + (xdr->page_base >> PAGE_SHIFT);
-	page_base = offset_in_page(xdr->page_base);
+	ppages = xdr->pages + (xdr->page_base >> PG_SHIFT);
+	page_base = offset_in_pg(xdr->page_base);
 	remaining = xdr->page_len;
 	while (remaining) {
 		sge = &sc->sc_sges[req->rl_wr.num_sge++];
-		len = min_t(unsigned int, PAGE_SIZE - page_base, remaining);
+		len = min_t(unsigned int, PG_SIZE - page_base, remaining);
 		sge->addr = ib_dma_map_page(rdmab_device(rb), *ppages,
 					    page_base, len, DMA_TO_DEVICE);
 		if (ib_dma_mapping_error(rdmab_device(rb), sge->addr))
@@ -683,13 +683,13 @@ static void rpcrdma_pullup_pagelist(struct rpcrdma_xprt *r_xprt,
 
 	dst = (unsigned char *)xdr->head[0].iov_base;
 	dst += xdr->head[0].iov_len;
-	ppages = xdr->pages + (xdr->page_base >> PAGE_SHIFT);
-	page_base = offset_in_page(xdr->page_base);
+	ppages = xdr->pages + (xdr->page_base >> PG_SHIFT);
+	page_base = offset_in_pg(xdr->page_base);
 	remaining = xdr->page_len;
 	while (remaining) {
 		src = page_address(*ppages);
 		src += page_base;
-		len = min_t(unsigned int, PAGE_SIZE - page_base, remaining);
+		len = min_t(unsigned int, PG_SIZE - page_base, remaining);
 		memcpy(dst, src, len);
 		r_xprt->rx_stats.pullup_copy_count += len;
 
@@ -736,7 +736,7 @@ static bool rpcrdma_prepare_noch_mapped(struct rpcrdma_xprt *r_xprt,
 			return false;
 	if (tail->iov_len)
 		if (!rpcrdma_prepare_tail_iov(req, xdr,
-					      offset_in_page(tail->iov_base),
+					      offset_in_pg(tail->iov_base),
 					      tail->iov_len))
 			return false;
 
@@ -765,7 +765,7 @@ static bool rpcrdma_prepare_readch(struct rpcrdma_xprt *r_xprt,
 		 * the tail iovec. Force the tail's non-pad content to
 		 * land at the next XDR position in the Send message.
 		 */
-		page_base = offset_in_page(xdr->tail[0].iov_base);
+		page_base = offset_in_pg(xdr->tail[0].iov_base);
 		len = xdr->tail[0].iov_len;
 		page_base += len & 3;
 		len -= len & 3;
@@ -1061,8 +1061,8 @@ rpcrdma_inline_fixup(struct rpc_rqst *rqst, char *srcp, int copy_len, int pad)
 	copy_len -= curlen;
 
 	ppages = rqst->rq_rcv_buf.pages +
-		(rqst->rq_rcv_buf.page_base >> PAGE_SHIFT);
-	page_base = offset_in_page(rqst->rq_rcv_buf.page_base);
+		(rqst->rq_rcv_buf.page_base >> PG_SHIFT);
+	page_base = offset_in_pg(rqst->rq_rcv_buf.page_base);
 	fixup_copy_count = 0;
 	if (copy_len && rqst->rq_rcv_buf.page_len) {
 		int pagelist_len;
@@ -1070,9 +1070,9 @@ rpcrdma_inline_fixup(struct rpc_rqst *rqst, char *srcp, int copy_len, int pad)
 		pagelist_len = rqst->rq_rcv_buf.page_len;
 		if (pagelist_len > copy_len)
 			pagelist_len = copy_len;
-		npages = PAGE_ALIGN(page_base + pagelist_len) >> PAGE_SHIFT;
+		npages = PG_ALIGN(page_base + pagelist_len) >> PG_SHIFT;
 		for (i = 0; i < npages; i++) {
-			curlen = PAGE_SIZE - page_base;
+			curlen = PG_SIZE - page_base;
 			if (curlen > pagelist_len)
 				curlen = pagelist_len;
 

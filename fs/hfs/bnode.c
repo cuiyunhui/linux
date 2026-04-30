@@ -79,14 +79,14 @@ void hfs_bnode_read(struct hfs_bnode *node, void *buf, u32 off, u32 len)
 	len = check_and_correct_requested_length(node, off, len);
 
 	off += node->page_offset;
-	pagenum = off >> PAGE_SHIFT;
-	off &= ~PAGE_MASK; /* compute page offset for the first page */
+	pagenum = off >> PG_SHIFT;
+	off &= ~PG_MASK; /* compute page offset for the first page */
 
 	for (bytes_read = 0; bytes_read < len; bytes_read += bytes_to_read) {
 		if (pagenum >= node->tree->pages_per_bnode)
 			break;
 		page = node->page[pagenum];
-		bytes_to_read = min_t(u32, len - bytes_read, PAGE_SIZE - off);
+		bytes_to_read = min_t(u32, len - bytes_read, PG_SIZE - off);
 
 		memcpy_from_page(buf + bytes_read, page, off, bytes_to_read);
 
@@ -382,8 +382,8 @@ static struct hfs_bnode *__hfs_bnode_create(struct hfs_btree *tree, u32 cnid)
 
 	mapping = tree->inode->i_mapping;
 	off = (loff_t)cnid * tree->node_size;
-	block = off >> PAGE_SHIFT;
-	node->page_offset = off & ~PAGE_MASK;
+	block = off >> PG_SHIFT;
+	node->page_offset = off & ~PG_MASK;
 	for (i = 0; i < tree->pages_per_bnode; i++) {
 		page = read_mapping_page(mapping, block++, NULL);
 		if (IS_ERR(page))
@@ -530,10 +530,10 @@ struct hfs_bnode *hfs_bnode_create(struct hfs_btree *tree, u32 num)
 
 	pagep = node->page;
 	memzero_page(*pagep, node->page_offset,
-		     min((int)PAGE_SIZE, (int)tree->node_size));
+		     min((int) PG_SIZE, (int)tree->node_size));
 	set_page_dirty(*pagep);
 	for (i = 1; i < tree->pages_per_bnode; i++) {
-		memzero_page(*++pagep, 0, PAGE_SIZE);
+		memzero_page(*++pagep, 0, PG_SIZE);
 		set_page_dirty(*pagep);
 	}
 	clear_bit(HFS_BNODE_NEW, &node->flags);

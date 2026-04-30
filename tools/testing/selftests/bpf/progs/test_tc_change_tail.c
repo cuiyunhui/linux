@@ -5,7 +5,7 @@
 #ifndef PAGE_SIZE
 #define PAGE_SIZE __PAGE_SIZE
 #endif
-#define BPF_SKB_MAX_LEN (PAGE_SIZE << 2)
+#define BPF_SKB_MAX_LEN (PG_SIZE << 2)
 
 long change_tail_ret = 1;
 

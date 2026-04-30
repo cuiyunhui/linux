@@ -1230,7 +1230,7 @@ static noinline int btrfs_ioctl_snap_create_v2(struct file *file,
 		struct btrfs_fs_info *fs_info = inode_to_fs_info(file_inode(file));
 
 		if (vol_args->size < sizeof(*inherit) ||
-		    vol_args->size > PAGE_SIZE) {
+		    vol_args->size > PG_SIZE) {
 			ret = -EINVAL;
 			goto free_args;
 		}
@@ -2893,7 +2893,7 @@ static long btrfs_ioctl_space_info(struct btrfs_fs_info *fs_info,
 	/* we generally have at most 6 or so space infos, one for each raid
 	 * level.  So, a whole page should be more than enough for everyone
 	 */
-	if (alloc_size > PAGE_SIZE)
+	if (alloc_size > PG_SIZE)
 		return -ENOMEM;
 
 	space_args.total_spaces = 0;
@@ -4556,12 +4556,13 @@ static void btrfs_uring_read_finished(struct io_tw_req tw_req, io_tw_token_t tw)
 		index = 0;
 		page_offset = 0;
 	} else {
-		index = (priv->iocb.ki_pos - priv->start) >> PAGE_SHIFT;
-		page_offset = offset_in_page(priv->iocb.ki_pos - priv->start);
+		index = (priv->iocb.ki_pos - priv->start) >> PG_SHIFT;
+		page_offset = offset_in_pg(priv->iocb.ki_pos - priv->start);
 	}
 	cur = 0;
 	while (cur < priv->count) {
-		size_t bytes = min_t(size_t, priv->count - cur, PAGE_SIZE - page_offset);
+		size_t bytes = min_t(size_t, priv->count - cur,
+				     PG_SIZE - page_offset);
 
 		if (copy_page_to_iter(priv->pages[index], page_offset, bytes,
 				      &priv->iter) != bytes) {
@@ -4616,7 +4617,7 @@ static int btrfs_uring_read_extent(struct kiocb *iocb, struct iov_iter *iter,
 	unsigned long nr_pages;
 	int ret;
 
-	nr_pages = DIV_ROUND_UP(disk_io_size, PAGE_SIZE);
+	nr_pages = DIV_ROUND_UP(disk_io_size, PG_SIZE);
 	pages = kzalloc_objs(struct page *, nr_pages, GFP_NOFS);
 	if (!pages)
 		return -ENOMEM;

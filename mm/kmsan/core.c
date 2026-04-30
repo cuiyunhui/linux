@@ -266,7 +266,7 @@ void kmsan_internal_check_memory(void *addr, size_t size,
 	KMSAN_WARN_ON(!kmsan_metadata_is_contiguous(addr, size));
 	while (pos < size) {
 		chunk_size = min(size - pos,
-				 PAGE_SIZE - ((addr64 + pos) % PAGE_SIZE));
+				 PG_SIZE - ((addr64 + pos) % PG_SIZE));
 		shadow = kmsan_get_metadata((void *)(addr64 + pos),
 					    KMSAN_META_SHADOW);
 		if (!shadow) {
@@ -330,7 +330,7 @@ bool kmsan_metadata_is_contiguous(void *addr, size_t size)
 {
 	char *cur_shadow = NULL, *next_shadow = NULL, *cur_origin = NULL,
 	     *next_origin = NULL;
-	u64 cur_addr = (u64)addr, next_addr = cur_addr + PAGE_SIZE;
+	u64 cur_addr = (u64)addr, next_addr = cur_addr + PG_SIZE;
 	depot_stack_handle_t *origin_p;
 	bool all_untracked = false;
 
@@ -338,8 +338,8 @@ bool kmsan_metadata_is_contiguous(void *addr, size_t size)
 		return true;
 
 	/* The whole range belongs to the same page. */
-	if (ALIGN_DOWN(cur_addr + size - 1, PAGE_SIZE) ==
-	    ALIGN_DOWN(cur_addr, PAGE_SIZE))
+	if (ALIGN_DOWN(cur_addr + size - 1, PG_SIZE) ==
+	    ALIGN_DOWN(cur_addr, PG_SIZE))
 		return true;
 
 	cur_shadow = kmsan_get_metadata((void *)cur_addr, /*is_origin*/ false);
@@ -351,7 +351,7 @@ bool kmsan_metadata_is_contiguous(void *addr, size_t size)
 
 	for (; next_addr < (u64)addr + size;
 	     cur_addr = next_addr, cur_shadow = next_shadow,
-	     cur_origin = next_origin, next_addr += PAGE_SIZE) {
+	     cur_origin = next_origin, next_addr += PG_SIZE) {
 		next_shadow = kmsan_get_metadata((void *)next_addr, false);
 		next_origin = kmsan_get_metadata((void *)next_addr, true);
 		if (all_untracked) {
@@ -360,8 +360,8 @@ bool kmsan_metadata_is_contiguous(void *addr, size_t size)
 			if (!next_shadow && !next_origin)
 				continue;
 		}
-		if (((u64)cur_shadow == ((u64)next_shadow - PAGE_SIZE)) &&
-		    ((u64)cur_origin == ((u64)next_origin - PAGE_SIZE)))
+		if (((u64)cur_shadow == ((u64)next_shadow - PG_SIZE)) &&
+		    ((u64)cur_origin == ((u64)next_origin - PG_SIZE)))
 			continue;
 		goto report;
 	}

@@ -10,7 +10,7 @@
 #include "../free-space-cache.h"
 #include "../block-group.h"
 
-#define BITS_PER_BITMAP		(PAGE_SIZE * 8UL)
+#define BITS_PER_BITMAP		(PG_SIZE * 8UL)
 
 /*
  * This test just does basic sanity checking, making sure we can add an extent
@@ -1022,7 +1022,7 @@ int btrfs_test_free_space_cache(u32 sectorsize, u32 nodesize)
 	 * alloc dummy block group whose size cross bitmaps.
 	 */
 	cache = btrfs_alloc_dummy_block_group(fs_info,
-				      BITS_PER_BITMAP * sectorsize + PAGE_SIZE);
+				      BITS_PER_BITMAP * sectorsize + PG_SIZE);
 	if (!cache) {
 		test_std_err(TEST_ALLOC_BLOCK_GROUP);
 		btrfs_free_dummy_fs_info(fs_info);

@@ -92,15 +92,15 @@ static int lzo_uncompress(struct squashfs_sb_info *msblk, void *strm,
 	data = squashfs_first_page(output);
 	buff = stream->output;
 	while (data) {
-		if (bytes <= PAGE_SIZE) {
+		if (bytes <= PG_SIZE) {
 			if (!IS_ERR(data))
 				memcpy(data, buff, bytes);
 			break;
 		} else {
 			if (!IS_ERR(data))
-				memcpy(data, buff, PAGE_SIZE);
-			buff += PAGE_SIZE;
-			bytes -= PAGE_SIZE;
+				memcpy(data, buff, PG_SIZE);
+			buff += PG_SIZE;
+			bytes -= PG_SIZE;
 			data = squashfs_next_page(output);
 		}
 	}

@@ -42,7 +42,7 @@ static const struct snd_pcm_hardware sprd_pcm_hardware = {
 	.period_bytes_min = 1,
 	.period_bytes_max = 64 * 1024,
 	.periods_min = 1,
-	.periods_max = PAGE_SIZE / SPRD_PCM_DMA_LINKLIST_SIZE,
+	.periods_max = PG_SIZE / SPRD_PCM_DMA_LINKLIST_SIZE,
 	.buffer_bytes_max = 64 * 1024,
 };
 

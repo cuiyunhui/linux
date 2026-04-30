@@ -88,7 +88,7 @@ static int atomic_pool_expand(struct gen_pool *pool, size_t pool_size,
 	order = min(get_order(pool_size), MAX_PAGE_ORDER);
 
 	do {
-		pool_size = 1 << (PAGE_SHIFT + order);
+		pool_size = 1 << (PG_SHIFT + order);
 		if (cma_in_zone(gfp))
 			page = dma_alloc_from_contiguous(NULL, 1 << order,
 							 order, false);
@@ -165,7 +165,7 @@ static __init struct gen_pool *__dma_atomic_pool_init(size_t pool_size,
 	struct gen_pool *pool;
 	int ret;
 
-	pool = gen_pool_create(PAGE_SHIFT, NUMA_NO_NODE);
+	pool = gen_pool_create(PG_SHIFT, NUMA_NO_NODE);
 	if (!pool)
 		return NULL;
 
@@ -201,7 +201,7 @@ static int __init dma_atomic_pool_init(void)
 	if (!atomic_pool_size) {
 		unsigned long pages = totalram_pages() / (SZ_1G / SZ_128K);
 		pages = min_t(unsigned long, pages, MAX_ORDER_NR_PAGES);
-		atomic_pool_size = max_t(size_t, pages << PAGE_SHIFT, SZ_128K);
+		atomic_pool_size = max_t(size_t, pages << PG_SHIFT, SZ_128K);
 	}
 	INIT_WORK(&atomic_pool_work, atomic_pool_work_fn);
 

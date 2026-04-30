@@ -51,13 +51,13 @@ static vm_fault_t __ocfs2_page_mkwrite(struct file *file,
 	struct inode *inode = file_inode(file);
 	struct address_space *mapping = inode->i_mapping;
 	loff_t pos = folio_pos(folio);
-	unsigned int len = PAGE_SIZE;
+	unsigned int len = PG_SIZE;
 	pgoff_t last_index;
 	struct folio *locked_folio = NULL;
 	void *fsdata;
 	loff_t size = i_size_read(inode);
 
-	last_index = (size - 1) >> PAGE_SHIFT;
+	last_index = (size - 1) >> PG_SHIFT;
 
 	/*
 	 * There are cases that lead to the page no longer belonging to the
@@ -88,7 +88,7 @@ static vm_fault_t __ocfs2_page_mkwrite(struct file *file,
 	 * because the "write" would invalidate their data.
 	 */
 	if (folio->index == last_index)
-		len = ((size - 1) & ~PAGE_MASK) + 1;
+		len = ((size - 1) & ~PG_MASK) + 1;
 
 	err = ocfs2_write_begin_nolock(mapping, pos, len, OCFS2_WRITE_MMAP,
 				       &locked_folio, &fsdata, di_bh, folio);

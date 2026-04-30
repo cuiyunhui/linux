@@ -298,7 +298,7 @@ static bool mrenclave_segment(EVP_MD_CTX *ctx, struct encl *encl,
 	uint64_t end = seg->size;
 	uint64_t offset;
 
-	for (offset = 0; offset < end; offset += PAGE_SIZE) {
+	for (offset = 0; offset < end; offset += PG_SIZE) {
 		if (!mrenclave_eadd(ctx, seg->offset + offset, seg->flags))
 			return false;
 

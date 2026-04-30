@@ -27,7 +27,7 @@
 #define KHO_TEST_FDT	"kho_test"
 #define KHO_TEST_COMPAT "kho-test-v1"
 
-static long max_mem = (PAGE_SIZE << MAX_PAGE_ORDER) * 2;
+static long max_mem = (PG_SIZE << MAX_PAGE_ORDER) * 2;
 module_param(max_mem, long, 0644);
 
 struct kho_test_state {
@@ -126,7 +126,7 @@ static int kho_test_preserve(struct kho_test_state *state)
 	ssize_t fdt_size;
 	int err;
 
-	fdt_size = state->nr_folios * sizeof(phys_addr_t) + PAGE_SIZE;
+	fdt_size = state->nr_folios * sizeof(phys_addr_t) + PG_SIZE;
 	state->fdt = folio_alloc(GFP_KERNEL, get_order(fdt_size));
 	if (!state->fdt)
 		return -ENOMEM;
@@ -173,12 +173,12 @@ static int kho_test_generate_data(struct kho_test_state *state)
 		 * Since get_order() rounds up, make sure that actual
 		 * allocation is smaller so that we won't exceed max_mem
 		 */
-		if (alloc_size + (PAGE_SIZE << order) > max_mem) {
+		if (alloc_size + (PG_SIZE << order) > max_mem) {
 			order = get_order(max_mem - alloc_size);
 			if (order)
 				order--;
 		}
-		size = PAGE_SIZE << order;
+		size = PG_SIZE << order;
 
 		folio = folio_alloc(GFP_KERNEL | __GFP_NORETRY, order);
 		if (!folio)
@@ -208,8 +208,8 @@ static int kho_test_save(void)
 	unsigned long max_nr;
 	int err;
 
-	max_mem = PAGE_ALIGN(max_mem);
-	max_nr = max_mem >> PAGE_SHIFT;
+	max_mem = PG_ALIGN(max_mem);
+	max_nr = max_mem >> PG_SHIFT;
 
 	folios = kvmalloc_objs(*state->folios, max_nr);
 	if (!folios)
@@ -259,9 +259,9 @@ static int kho_test_restore_data(const void *fdt, int node)
 		return -EINVAL;
 
 	for (int i = 0; i < *nr_folios; i++) {
-		unsigned int order = folios_info[i] & ~PAGE_MASK;
-		phys_addr_t phys = folios_info[i] & PAGE_MASK;
-		unsigned int size = PAGE_SIZE << order;
+		unsigned int order = folios_info[i] & ~PG_MASK;
+		phys_addr_t phys = folios_info[i] & PG_MASK;
+		unsigned int size = PG_SIZE << order;
 		struct folio *folio;
 
 		folio = kho_restore_folio(phys);

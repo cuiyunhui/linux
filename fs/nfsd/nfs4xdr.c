@@ -2311,7 +2311,7 @@ nfsd4_vbuf_from_vector(struct nfsd4_compoundargs *argp, struct xdr_buf *xdr,
 	dp += head->iov_len;
 
 	while (buflen > 0) {
-		len = min_t(u32, buflen, PAGE_SIZE);
+		len = min_t(u32, buflen, PG_SIZE);
 		memcpy(dp, page_address(*pages), len);
 
 		buflen -= len;
@@ -2693,7 +2693,7 @@ nfsd4_decode_compound(struct nfsd4_compoundargs *argp)
 	argp->rqstp->rq_cachetype = cachethis ? RC_REPLBUFF : RC_NOCACHE;
 
 	argp->splice_ok = nfsd_read_splice_ok(argp->rqstp);
-	if (readcount > 1 || max_reply > PAGE_SIZE - auth_slack)
+	if (readcount > 1 || max_reply > PG_SIZE - auth_slack)
 		argp->splice_ok = false;
 
 	return true;
@@ -4815,7 +4815,7 @@ static __be32 nfsd4_encode_readv(struct nfsd4_compoundres *resp,
 				 unsigned long maxcount)
 {
 	struct xdr_stream *xdr = resp->xdr;
-	unsigned int base = xdr->buf->page_len & ~PAGE_MASK;
+	unsigned int base = xdr->buf->page_len & ~PG_MASK;
 	unsigned int starting_len = xdr->buf->len;
 	__be32 zero = xdr_zero;
 	__be32 nfserr;
@@ -4910,7 +4910,7 @@ nfsd4_encode_readlink(struct nfsd4_compoundres *resp, __be32 nfserr,
 		return nfserr_resource;
 
 	/* linktext4.data */
-	maxcount = PAGE_SIZE;
+	maxcount = PG_SIZE;
 	p = xdr_reserve_space(xdr, maxcount);
 	if (!p)
 		return nfserr_resource;
@@ -5873,14 +5873,14 @@ nfsd4_vbuf_to_stream(struct xdr_stream *xdr, char *buf, u32 buflen)
 	buflen -= cplen;
 
 	while (buflen) {
-		cplen = min_t(u32, buflen, PAGE_SIZE);
+		cplen = min_t(u32, buflen, PG_SIZE);
 		p = xdr_reserve_space(xdr, cplen);
 		if (!p)
 			return nfserr_resource;
 
 		memcpy(p, buf, cplen);
 
-		if (cplen < PAGE_SIZE) {
+		if (cplen < PG_SIZE) {
 			/*
 			 * We're done, with a length that wasn't page
 			 * aligned, so possibly not word aligned. Pad
@@ -5890,8 +5890,8 @@ nfsd4_vbuf_to_stream(struct xdr_stream *xdr, char *buf, u32 buflen)
 			break;
 		}
 
-		buflen -= PAGE_SIZE;
-		buf += PAGE_SIZE;
+		buflen -= PG_SIZE;
+		buf += PG_SIZE;
 	}
 
 	return 0;

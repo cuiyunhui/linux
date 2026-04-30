@@ -72,7 +72,7 @@ static noinline void microbenchmark(unsigned long iters)
 
 	cycles = get_cycles();
 	while (iters--) {
-		unsigned long addr = iters & ((PAGE_SIZE << 8) - 1);
+		unsigned long addr = iters & ((PG_SIZE << 8) - 1);
 		int type = !(iters & 0x7f) ? KCSAN_ACCESS_ATOMIC :
 				(!(iters & 0xf) ? KCSAN_ACCESS_WRITE : 0);
 		__kcsan_check_access((void *)addr, sizeof(long), type);

@@ -287,7 +287,8 @@ int hda_dsp_cl_boot_firmware_iccmax(struct snd_sof_dev *sdev)
 	 * Prepare capture stream for ICCMAX. We do not need to store
 	 * the data, so use a buffer of PAGE_SIZE for receiving.
 	 */
-	iccmax_stream = hda_cl_prepare(sdev->dev, HDA_CL_STREAM_FORMAT, PAGE_SIZE,
+	iccmax_stream = hda_cl_prepare(sdev->dev, HDA_CL_STREAM_FORMAT,
+				       PG_SIZE,
 				       &hda->iccmax_dmab, persistent_cl_buffer,
 				       SNDRV_PCM_STREAM_CAPTURE, true);
 	if (IS_ERR(iccmax_stream)) {

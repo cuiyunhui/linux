@@ -97,7 +97,7 @@ static int random_size_align_alloc_test(void)
 		/*
 		 * Maximum 10 pages.
 		 */
-		size = ((rnd % 10) + 1) * PAGE_SIZE;
+		size = ((rnd % 10) + 1) * PG_SIZE;
 
 		ptr = __vmalloc_node(size, align, GFP_KERNEL | __GFP_ZERO, 0,
 				__builtin_return_address(0));
@@ -122,8 +122,8 @@ static int align_shift_alloc_test(void)
 	for (i = 0; i < BITS_PER_LONG; i++) {
 		align = 1UL << i;
 
-		ptr = __vmalloc_node(PAGE_SIZE, align, GFP_KERNEL|__GFP_ZERO, 0,
-				__builtin_return_address(0));
+		ptr = __vmalloc_node(PG_SIZE, align, GFP_KERNEL|__GFP_ZERO, 0,
+				     __builtin_return_address(0));
 		if (!ptr)
 			return -1;
 
@@ -139,9 +139,9 @@ static int fix_align_alloc_test(void)
 	int i;
 
 	for (i = 0; i < test_loop_count; i++) {
-		ptr = __vmalloc_node(5 * PAGE_SIZE, THREAD_ALIGN << 1,
-				GFP_KERNEL | __GFP_ZERO, 0,
-				__builtin_return_address(0));
+		ptr = __vmalloc_node(5 * PG_SIZE, THREAD_ALIGN << 1,
+				     GFP_KERNEL | __GFP_ZERO, 0,
+				     __builtin_return_address(0));
 		if (!ptr)
 			return -1;
 
@@ -159,7 +159,7 @@ static int random_size_alloc_test(void)
 
 	for (i = 0; i < test_loop_count; i++) {
 		n = get_random_u32_inclusive(1, 100);
-		p = vmalloc(n * PAGE_SIZE);
+		p = vmalloc(n * PG_SIZE);
 
 		if (!p)
 			return -1;
@@ -183,14 +183,14 @@ static int long_busy_list_alloc_test(void)
 		return rv;
 
 	for (i = 0; i < 15000; i++)
-		ptr[i] = vmalloc(1 * PAGE_SIZE);
+		ptr[i] = vmalloc(1 * PG_SIZE);
 
 	for (i = 0; i < test_loop_count; i++) {
-		ptr_1 = vmalloc(100 * PAGE_SIZE);
+		ptr_1 = vmalloc(100 * PG_SIZE);
 		if (!ptr_1)
 			goto leave;
 
-		ptr_2 = vmalloc(1 * PAGE_SIZE);
+		ptr_2 = vmalloc(1 * PG_SIZE);
 		if (!ptr_2) {
 			vfree(ptr_1);
 			goto leave;
@@ -222,7 +222,7 @@ static int full_fit_alloc_test(void)
 	int i;
 
 	junk_length = fls(num_online_cpus());
-	junk_length *= (32 * 1024 * 1024 / PAGE_SIZE);
+	junk_length *= (32 * 1024 * 1024 / PG_SIZE);
 
 	ptr = vmalloc(sizeof(void *) * junk_length);
 	if (!ptr)
@@ -235,15 +235,15 @@ static int full_fit_alloc_test(void)
 	}
 
 	for (i = 0; i < junk_length; i++) {
-		ptr[i] = vmalloc(1 * PAGE_SIZE);
-		junk_ptr[i] = vmalloc(1 * PAGE_SIZE);
+		ptr[i] = vmalloc(1 * PG_SIZE);
+		junk_ptr[i] = vmalloc(1 * PG_SIZE);
 	}
 
 	for (i = 0; i < junk_length; i++)
 		vfree(junk_ptr[i]);
 
 	for (i = 0; i < test_loop_count; i++) {
-		tmp = vmalloc(1 * PAGE_SIZE);
+		tmp = vmalloc(1 * PG_SIZE);
 
 		if (!tmp)
 			goto error;
@@ -272,9 +272,10 @@ static int fix_size_alloc_test(void)
 
 	for (i = 0; i < test_loop_count; i++) {
 		if (use_huge)
-			ptr = vmalloc_huge((nr_pages > 0 ? nr_pages:1) * PAGE_SIZE, GFP_KERNEL);
+			ptr = vmalloc_huge((nr_pages > 0 ? nr_pages:1) * PG_SIZE,
+					   GFP_KERNEL);
 		else
-			ptr = vmalloc((nr_pages > 0 ? nr_pages:1) * PAGE_SIZE);
+			ptr = vmalloc((nr_pages > 0 ? nr_pages:1) * PG_SIZE);
 
 		if (!ptr)
 			return -1;
@@ -295,7 +296,7 @@ static int no_block_alloc_test(void)
 	for (i = 0; i < test_loop_count; i++) {
 		bool use_atomic = !!(get_random_u8() % 2);
 		gfp_t gfp = use_atomic ? GFP_ATOMIC : GFP_NOWAIT;
-		unsigned long size = (nr_pages > 0 ? nr_pages : 1) * PAGE_SIZE;
+		unsigned long size = (nr_pages > 0 ? nr_pages : 1) * PG_SIZE;
 
 		preempt_disable();
 		ptr = __vmalloc(size, gfp);
@@ -325,12 +326,12 @@ pcpu_alloc_test(void)
 		return -1;
 
 	for (i = 0; i < nr_pcpu_objects; i++) {
-		size = get_random_u32_inclusive(1, PAGE_SIZE / 4);
+		size = get_random_u32_inclusive(1, PG_SIZE / 4);
 
 		/*
 		 * Maximum PAGE_SIZE
 		 */
-		align = 1 << get_random_u32_inclusive(1, PAGE_SHIFT - 1);
+		align = 1 << get_random_u32_inclusive(1, PG_SHIFT - 1);
 
 		pcpu[i] = __alloc_percpu(size, align);
 		if (!pcpu[i])
@@ -357,7 +358,7 @@ kvfree_rcu_1_arg_vmalloc_test(void)
 	int i;
 
 	for (i = 0; i < test_loop_count; i++) {
-		p = vmalloc(1 * PAGE_SIZE);
+		p = vmalloc(1 * PG_SIZE);
 		if (!p)
 			return -1;
 
@@ -375,7 +376,7 @@ kvfree_rcu_2_arg_vmalloc_test(void)
 	int i;
 
 	for (i = 0; i < test_loop_count; i++) {
-		p = vmalloc(1 * PAGE_SIZE);
+		p = vmalloc(1 * PG_SIZE);
 		if (!p)
 			return -1;
 

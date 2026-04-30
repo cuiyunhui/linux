@@ -97,7 +97,7 @@ static int read_kregion_bounds(struct region *kregion)
 	free(buf);
 
 	if (!(kregion->size && kregion->addr) ||
-	    (kregion->size > (PAGE_SIZE * MAX_PAGES))) {
+	    (kregion->size > (PG_SIZE * MAX_PAGES))) {
 		printf("Unexpected kregion bounds\n");
 		return RTAS_IO_ASSERT;
 	}

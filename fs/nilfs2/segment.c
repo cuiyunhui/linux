@@ -712,8 +712,8 @@ static size_t nilfs_lookup_dirty_data_buffers(struct inode *inode,
 		 * range is rounded to per-page; extra dirty buffers
 		 * may be included if blocksize < pagesize.
 		 */
-		index = start >> PAGE_SHIFT;
-		last = end >> PAGE_SHIFT;
+		index = start >> PG_SHIFT;
+		last = end >> PG_SHIFT;
 	}
 	folio_batch_init(&fbatch);
  repeat:
@@ -2159,7 +2159,7 @@ static int nilfs_segctor_do_construct(struct nilfs_sc_info *sci, int mode)
 			goto failed_to_write;
 
 		if (nilfs_sc_cstage_get(sci) == NILFS_ST_DONE ||
-		    nilfs->ns_blocksize_bits != PAGE_SHIFT) {
+		    nilfs->ns_blocksize_bits != PG_SHIFT) {
 			/*
 			 * At this point, we avoid double buffering
 			 * for blocksize < pagesize because page dirty

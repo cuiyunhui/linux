@@ -59,7 +59,7 @@
  * accounting is preserved.
  */
 
-#define CONGESTION_ON_THRESH(congestion_kb) (congestion_kb >> (PAGE_SHIFT-10))
+#define CONGESTION_ON_THRESH(congestion_kb) (congestion_kb >> (PG_SHIFT-10))
 #define CONGESTION_OFF_THRESH(congestion_kb)				\
 	(CONGESTION_ON_THRESH(congestion_kb) -				\
 	 (CONGESTION_ON_THRESH(congestion_kb) >> 2))
@@ -189,7 +189,7 @@ static void ceph_netfs_expand_readahead(struct netfs_io_request *rreq)
 	if (!max_pages)
 		return;
 
-	max_len = max_pages << PAGE_SHIFT;
+	max_len = max_pages << PG_SHIFT;
 
 	/*
 	 * Try to expand the length forward by rounding up it to the next
@@ -1093,8 +1093,8 @@ int ceph_define_writeback_range(struct address_space *mapping,
 				ceph_wbc->should_loop = true;
 			doutc(cl, " cyclic, start at %lu\n", ceph_wbc->index);
 		} else {
-			ceph_wbc->index = wbc->range_start >> PAGE_SHIFT;
-			ceph_wbc->end = wbc->range_end >> PAGE_SHIFT;
+			ceph_wbc->index = wbc->range_start >> PG_SHIFT;
+			ceph_wbc->end = wbc->range_end >> PG_SHIFT;
 			if (wbc->range_start == 0 && wbc->range_end == LLONG_MAX)
 				ceph_wbc->range_whole = true;
 			doutc(cl, " not cyclic, %lu to %lu\n",
@@ -1212,7 +1212,7 @@ void ceph_allocate_page_array(struct address_space *mapping,
 					&objnum, &objoff, &xlen);
 
 	ceph_wbc->num_ops = 1;
-	ceph_wbc->strip_unit_end = folio->index + ((xlen - 1) >> PAGE_SHIFT);
+	ceph_wbc->strip_unit_end = folio->index + ((xlen - 1) >> PG_SHIFT);
 
 	BUG_ON(ceph_wbc->pages);
 	ceph_wbc->max_pages = calc_pages_for(0, (u64)xlen);
@@ -1225,7 +1225,7 @@ static inline
 bool is_folio_index_contiguous(const struct ceph_writeback_ctl *ceph_wbc,
 			      const struct folio *folio)
 {
-	return folio->index == (ceph_wbc->offset + ceph_wbc->len) >> PAGE_SHIFT;
+	return folio->index == (ceph_wbc->offset + ceph_wbc->len) >> PG_SHIFT;
 }
 
 static inline
@@ -1255,7 +1255,7 @@ static inline int move_dirty_folio_in_page_array(struct address_space *mapping,
 
 	if (IS_ENCRYPTED(inode)) {
 		pages[index] = fscrypt_encrypt_pagecache_blocks(folio,
-								PAGE_SIZE,
+								PG_SIZE,
 								0,
 								gfp_flags);
 		if (IS_ERR(pages[index])) {
@@ -1663,7 +1663,7 @@ retry:
 		BUG_ON(ceph_wbc.locked_pages);
 		BUG_ON(ceph_wbc.pages);
 
-		ceph_wbc.max_pages = ceph_wbc.wsize >> PAGE_SHIFT;
+		ceph_wbc.max_pages = ceph_wbc.wsize >> PG_SHIFT;
 
 get_more_pages:
 		ceph_folio_batch_reinit(&ceph_wbc);
@@ -1951,7 +1951,7 @@ static vm_fault_t ceph_filemap_fault(struct vm_fault *vmf)
 	struct ceph_inode_info *ci = ceph_inode(inode);
 	struct ceph_client *cl = ceph_inode_to_client(inode);
 	struct ceph_file_info *fi = vma->vm_file->private_data;
-	loff_t off = (loff_t)vmf->pgoff << PAGE_SHIFT;
+	loff_t off = (loff_t)vmf->pgoff << PG_SHIFT;
 	int want, got, err;
 	sigset_t oldset;
 	vm_fault_t ret = VM_FAULT_SIGBUS;
@@ -1993,7 +1993,7 @@ static vm_fault_t ceph_filemap_fault(struct vm_fault *vmf)
 		goto out_restore;
 
 	/* read inline data */
-	if (off >= PAGE_SIZE) {
+	if (off >= PG_SIZE) {
 		/* does not support inline data > PAGE_SIZE */
 		ret = VM_FAULT_SIGBUS;
 	} else {
@@ -2015,8 +2015,8 @@ static vm_fault_t ceph_filemap_fault(struct vm_fault *vmf)
 			ret = vmf_error(err);
 			goto out_inline;
 		}
-		if (err < PAGE_SIZE)
-			zero_user_segment(page, err, PAGE_SIZE);
+		if (err < PG_SIZE)
+			zero_user_segment(page, err, PG_SIZE);
 		else
 			flush_dcache_page(page);
 		SetPageUptodate(page);
@@ -2173,8 +2173,8 @@ void ceph_fill_inline_data(struct inode *inode, struct page *locked_page,
 	}
 
 	if (page != locked_page) {
-		if (len < PAGE_SIZE)
-			zero_user_segment(page, len, PAGE_SIZE);
+		if (len < PG_SIZE)
+			zero_user_segment(page, len, PG_SIZE);
 		else
 			flush_dcache_page(page);
 
@@ -2475,7 +2475,7 @@ static int __ceph_pool_perm_get(struct ceph_inode_info *ci,
 		goto out_unlock;
 	}
 
-	osd_req_op_raw_data_in_pages(rd_req, 0, pages, PAGE_SIZE,
+	osd_req_op_raw_data_in_pages(rd_req, 0, pages, PG_SIZE,
 				     0, false, true);
 	ceph_osdc_start_request(&fsc->client->osdc, rd_req);
 

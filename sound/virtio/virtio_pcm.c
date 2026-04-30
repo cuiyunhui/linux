@@ -182,7 +182,7 @@ static int virtsnd_pcm_build_hw(struct virtio_pcm_substream *vss,
 	 *   Rmax = maximum supported frame rate.
 	 */
 	vss->hw.buffer_bytes_max =
-		PAGE_ALIGN(sample_max * vss->hw.channels_max * pcm_buffer_ms *
+		PG_ALIGN(sample_max * vss->hw.channels_max * pcm_buffer_ms *
 			   (vss->hw.rate_max / MSEC_PER_SEC));
 
 	/*

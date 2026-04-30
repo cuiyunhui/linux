@@ -174,12 +174,12 @@ static void dapm_pop_dbg(struct device *dev, u32 pop_time, const char *fmt, ...)
 	if (!pop_time)
 		return;
 
-	buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	buf = kmalloc(PG_SIZE, GFP_KERNEL);
 	if (buf == NULL)
 		return;
 
 	va_start(args, fmt);
-	vsnprintf(buf, PAGE_SIZE, fmt, args);
+	vsnprintf(buf, PG_SIZE, fmt, args);
 	dev_info(dev, "%s", buf);
 	va_end(args);
 
@@ -2450,7 +2450,7 @@ static ssize_t dapm_widget_power_read_file(struct file *file,
 
 	BUILD_BUG_ON(ARRAY_SIZE(dapm_type_name) != SND_SOC_DAPM_TYPE_COUNT);
 
-	buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	buf = kmalloc(PG_SIZE, GFP_KERNEL);
 	if (!buf)
 		return -ENOMEM;
 
@@ -2465,23 +2465,23 @@ static ssize_t dapm_widget_power_read_file(struct file *file,
 		out = dapm_is_connected_output_ep(w, NULL, NULL);
 	}
 
-	ret = scnprintf(buf, PAGE_SIZE, "%s: %s%s  in %d out %d",
-		       w->name, w->power ? "On" : "Off",
-		       w->force ? " (forced)" : "", in, out);
+	ret = scnprintf(buf, PG_SIZE, "%s: %s%s  in %d out %d",
+			w->name, w->power ? "On" : "Off",
+			w->force ? " (forced)" : "", in, out);
 
 	if (w->reg >= 0)
-		ret += scnprintf(buf + ret, PAGE_SIZE - ret,
-				" - R%d(0x%x) mask 0x%x",
-				w->reg, w->reg, w->mask << w->shift);
+		ret += scnprintf(buf + ret, PG_SIZE - ret,
+				 " - R%d(0x%x) mask 0x%x",
+				 w->reg, w->reg, w->mask << w->shift);
 
-	ret += scnprintf(buf + ret, PAGE_SIZE - ret, "\n");
+	ret += scnprintf(buf + ret, PG_SIZE - ret, "\n");
 
 	if (w->sname)
-		ret += scnprintf(buf + ret, PAGE_SIZE - ret, " stream %s %s\n",
-				w->sname,
-				w->active ? "active" : "inactive");
+		ret += scnprintf(buf + ret, PG_SIZE - ret, " stream %s %s\n",
+				 w->sname,
+				 w->active ? "active" : "inactive");
 
-	ret += scnprintf(buf + ret, PAGE_SIZE - ret, " widget-type %s\n",
+	ret += scnprintf(buf + ret, PG_SIZE - ret, " widget-type %s\n",
 			 dapm_type_name[w->id]);
 
 	dapm_for_each_direction(dir) {
@@ -2495,11 +2495,11 @@ static ssize_t dapm_widget_power_read_file(struct file *file,
 
 			c_name = p->node[rdir]->dapm->component ?
 				p->node[rdir]->dapm->component->name : NULL;
-			ret += scnprintf(buf + ret, PAGE_SIZE - ret,
-					" %s  \"%s\" \"%s\" \"%s\"\n",
-					(rdir == SND_SOC_DAPM_DIR_IN) ? "in" : "out",
-					p->name ? p->name : "static",
-					p->node[rdir]->name, c_name);
+			ret += scnprintf(buf + ret, PG_SIZE - ret,
+					 " %s  \"%s\" \"%s\" \"%s\"\n",
+					 (rdir == SND_SOC_DAPM_DIR_IN) ? "in" : "out",
+					 p->name ? p->name : "static",
+					 p->node[rdir]->name, c_name);
 		}
 	}
 

@@ -71,7 +71,7 @@
 
 /* 16 4K pages, give space for 744 sessions */
 #define LUO_SESSION_PGCNT	16ul
-#define LUO_SESSION_MAX		(((LUO_SESSION_PGCNT << PAGE_SHIFT) -	\
+#define LUO_SESSION_MAX		(((LUO_SESSION_PGCNT << PG_SHIFT) -	\
 		sizeof(struct luo_session_header_ser)) /		\
 		sizeof(struct luo_session_ser))
 
@@ -444,7 +444,7 @@ int __init luo_session_setup_outgoing(void *fdt_out)
 	u64 header_ser_pa;
 	int err;
 
-	header_ser = kho_alloc_preserve(LUO_SESSION_PGCNT << PAGE_SHIFT);
+	header_ser = kho_alloc_preserve(LUO_SESSION_PGCNT << PG_SHIFT);
 	if (IS_ERR(header_ser))
 		return PTR_ERR(header_ser);
 	header_ser_pa = virt_to_phys(header_ser);

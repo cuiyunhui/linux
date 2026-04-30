@@ -101,7 +101,7 @@ struct xrep_pptr {
  * Stash up to 8 pages of recovered parent pointers in pptr_recs and
  * pptr_names before we write them to the temp file.
  */
-#define XREP_PARENT_MAX_STASH_BYTES	(PAGE_SIZE * 8)
+#define XREP_PARENT_MAX_STASH_BYTES	(PG_SIZE * 8)
 
 struct xrep_parent {
 	struct xfs_scrub	*sc;
@@ -181,7 +181,7 @@ struct xrep_parent_xattr {
  * Stash up to 8 pages of attrs in xattr_records/xattr_blobs before we write
  * them to the temp file.
  */
-#define XREP_PARENT_XATTR_MAX_STASH_BYTES	(PAGE_SIZE * 8)
+#define XREP_PARENT_XATTR_MAX_STASH_BYTES	(PG_SIZE * 8)
 
 /* Tear down all the incore stuff we created. */
 static void

@@ -335,8 +335,8 @@ static ssize_t ima_write_policy(struct file *file, const char __user *buf,
 	char *data;
 	ssize_t result;
 
-	if (datalen >= PAGE_SIZE)
-		datalen = PAGE_SIZE - 1;
+	if (datalen >= PG_SIZE)
+		datalen = PG_SIZE - 1;
 
 	/* No partial writes. */
 	result = -EINVAL;

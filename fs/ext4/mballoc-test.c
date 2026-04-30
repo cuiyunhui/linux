@@ -788,7 +788,7 @@ static void test_mb_mark_used(struct kunit *test)
 	int i;
 
 	/* buddy cache assumes that each page contains at least one block */
-	if (sb->s_blocksize > PAGE_SIZE)
+	if (sb->s_blocksize > PG_SIZE)
 		kunit_skip(test, "blocksize exceeds pagesize");
 
 	bitmap = kunit_kzalloc(test, sb->s_blocksize, GFP_KERNEL);
@@ -855,7 +855,7 @@ static void test_mb_free_blocks(struct kunit *test)
 	struct test_range ranges[TEST_RANGE_COUNT];
 
 	/* buddy cache assumes that each page contains at least one block */
-	if (sb->s_blocksize > PAGE_SIZE)
+	if (sb->s_blocksize > PG_SIZE)
 		kunit_skip(test, "blocksize exceeds pagesize");
 
 	bitmap = kunit_kzalloc(test, sb->s_blocksize, GFP_KERNEL);
@@ -902,7 +902,7 @@ static void test_mb_mark_used_cost(struct kunit *test)
 	unsigned long start, end, all = 0;
 
 	/* buddy cache assumes that each page contains at least one block */
-	if (sb->s_blocksize > PAGE_SIZE)
+	if (sb->s_blocksize > PG_SIZE)
 		kunit_skip(test, "blocksize exceeds pagesize");
 
 	ret = ext4_mb_load_buddy_test(sb, TEST_GOAL_GROUP, &e4b);

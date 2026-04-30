@@ -8951,7 +8951,7 @@ set_max_delegations(void)
 	 * is for a different inode), a delegation could take about 1.5K,
 	 * giving a worst case usage of about 6% of memory.
 	 */
-	max_delegations = nr_free_buffer_pages() >> (20 - 2 - PAGE_SHIFT);
+	max_delegations = nr_free_buffer_pages() >> (20 - 2 - PG_SHIFT);
 }
 
 static int nfs4_state_create_net(struct net *net)

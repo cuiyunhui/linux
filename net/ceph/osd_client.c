@@ -3163,7 +3163,7 @@ static void send_linger(struct ceph_osd_linger_request *lreq)
 					       lreq->request_pl);
 			ceph_osd_data_pages_init(
 			    osd_req_op_data(req, 0, notify, response_data),
-			    lreq->notify_id_pages, PAGE_SIZE, 0, false, false);
+			    lreq->notify_id_pages, PG_SIZE, 0, false, false);
 		}
 		dout("lreq %p register\n", lreq);
 		req->r_callback = linger_commit_cb;
@@ -5078,7 +5078,7 @@ int ceph_osdc_list_watchers(struct ceph_osd_client *osdc,
 	osd_req_op_init(req, 0, CEPH_OSD_OP_LIST_WATCHERS, 0);
 	ceph_osd_data_pages_init(osd_req_op_data(req, 0, list_watchers,
 						 response_data),
-				 pages, PAGE_SIZE, 0, false, true);
+				 pages, PG_SIZE, 0, false, true);
 
 	ret = ceph_osdc_alloc_messages(req, GFP_NOIO);
 	if (ret)
@@ -5135,7 +5135,7 @@ int ceph_osdc_call(struct ceph_osd_client *osdc,
 	struct ceph_osd_request *req;
 	int ret;
 
-	if (req_len > PAGE_SIZE)
+	if (req_len > PG_SIZE)
 		return -E2BIG;
 
 	req = ceph_osdc_alloc_request(osdc, NULL, 1, false, GFP_NOIO);
@@ -5227,11 +5227,11 @@ int ceph_osdc_init(struct ceph_osd_client *osdc, struct ceph_client *client)
 		goto out_map;
 
 	err = ceph_msgpool_init(&osdc->msgpool_op, CEPH_MSG_OSD_OP,
-				PAGE_SIZE, CEPH_OSD_SLAB_OPS, 10, "osd_op");
+				PG_SIZE, CEPH_OSD_SLAB_OPS, 10, "osd_op");
 	if (err < 0)
 		goto out_mempool;
 	err = ceph_msgpool_init(&osdc->msgpool_op_reply, CEPH_MSG_OSD_OPREPLY,
-				PAGE_SIZE, CEPH_OSD_SLAB_OPS, 10,
+				PG_SIZE, CEPH_OSD_SLAB_OPS, 10,
 				"osd_op_reply");
 	if (err < 0)
 		goto out_msgpool;
@@ -5321,12 +5321,12 @@ int osd_req_op_copy_from_init(struct ceph_osd_request *req,
 	op->copy_from.src_fadvise_flags = src_fadvise_flags;
 
 	p = page_address(pages[0]);
-	end = p + PAGE_SIZE;
+	end = p + PG_SIZE;
 	ceph_encode_string(&p, end, src_oid->name, src_oid->name_len);
 	encode_oloc(&p, end, src_oloc);
 	ceph_encode_32(&p, truncate_seq);
 	ceph_encode_64(&p, truncate_size);
-	op->indata_len = PAGE_SIZE - (end - p);
+	op->indata_len = PG_SIZE - (end - p);
 
 	ceph_osd_data_pages_init(&op->copy_from.osd_data, pages,
 				 op->indata_len, 0, false, true);

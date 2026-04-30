@@ -26,7 +26,7 @@ static inline void __arena* bpf_alloc(unsigned int size)
 	int offset;
 
 	size = round_up(size, 8);
-	if (size >= PAGE_SIZE - 8)
+	if (size >= PG_SIZE - 8)
 		return NULL;
 	if (!page) {
 refill:
@@ -35,12 +35,12 @@ refill:
 			return NULL;
 		cast_kern(page);
 		page_frag_cur_page[cpu] = page;
-		*cur_offset = PAGE_SIZE - 8;
-		obj_cnt = page + PAGE_SIZE - 8;
+		*cur_offset = PG_SIZE - 8;
+		obj_cnt = page + PG_SIZE - 8;
 		*obj_cnt = 0;
 	} else {
 		cast_kern(page);
-		obj_cnt = page + PAGE_SIZE - 8;
+		obj_cnt = page + PG_SIZE - 8;
 	}
 
 	offset = *cur_offset - size;
@@ -56,8 +56,8 @@ static inline void bpf_free(void __arena *addr)
 {
 	__u64 __arena *obj_cnt;
 
-	addr = (void __arena *)(((long)addr) & ~(PAGE_SIZE - 1));
-	obj_cnt = addr + PAGE_SIZE - 8;
+	addr = (void __arena *)(((long)addr) & ~(PG_SIZE - 1));
+	obj_cnt = addr + PG_SIZE - 8;
 	if (--(*obj_cnt) == 0)
 		bpf_arena_free_pages(&arena, addr, 1);
 }

@@ -16,7 +16,7 @@
 #define MEM_REGION_GVA	0x0000123456789000
 #define MEM_REGION_GPA	0x0000000700000000
 #define MEM_REGION_SLOT	10
-#define MEM_REGION_SIZE PAGE_SIZE
+#define MEM_REGION_SIZE PG_SIZE
 
 static void guest_code(bool tdp_enabled)
 {
@@ -64,13 +64,13 @@ int main(int argc, char *argv[])
 
 	vm_userspace_mem_region_add(vm, VM_MEM_SRC_ANONYMOUS,
 				    MEM_REGION_GPA, MEM_REGION_SLOT,
-				    MEM_REGION_SIZE / PAGE_SIZE, 0);
-	gpa = vm_phy_pages_alloc(vm, MEM_REGION_SIZE / PAGE_SIZE,
+				    MEM_REGION_SIZE / PG_SIZE, 0);
+	gpa = vm_phy_pages_alloc(vm, MEM_REGION_SIZE / PG_SIZE,
 				 MEM_REGION_GPA, MEM_REGION_SLOT);
 	TEST_ASSERT(gpa == MEM_REGION_GPA, "Failed vm_phy_pages_alloc");
 	virt_map(vm, MEM_REGION_GVA, MEM_REGION_GPA, 1);
 	hva = addr_gpa2hva(vm, MEM_REGION_GPA);
-	memset(hva, 0, PAGE_SIZE);
+	memset(hva, 0, PG_SIZE);
 
 	*vm_get_pte(vm, MEM_REGION_GVA) |= BIT_ULL(MAXPHYADDR);
 

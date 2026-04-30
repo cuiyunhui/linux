@@ -10,7 +10,7 @@
 #include <trace/events/erofs.h>
 
 #define Z_EROFS_MAX_SYNC_DECOMPRESS_BYTES	12288
-#define Z_EROFS_PCLUSTER_MAX_PAGES	(Z_EROFS_PCLUSTER_MAX_SIZE / PAGE_SIZE)
+#define Z_EROFS_PCLUSTER_MAX_PAGES	(Z_EROFS_PCLUSTER_MAX_SIZE / PG_SIZE)
 #define Z_EROFS_INLINE_BVECS		2
 
 struct z_erofs_bvec {
@@ -105,7 +105,7 @@ struct z_erofs_decompressqueue {
 
 static inline unsigned int z_erofs_pclusterpages(struct z_erofs_pcluster *pcl)
 {
-	return PAGE_ALIGN(pcl->pageofs_in + pcl->pclustersize) >> PAGE_SHIFT;
+	return PG_ALIGN(pcl->pageofs_in + pcl->pclustersize) >> PG_SHIFT;
 }
 
 static bool erofs_folio_is_managed(struct erofs_sb_info *sbi, struct folio *fo)
@@ -156,7 +156,7 @@ static struct page *z_erofs_bvset_flip(struct z_erofs_bvec_iter *iter)
 	oldpage = z_erofs_bvec_iter_end(iter);
 	iter->bvpage = nextpage;
 	iter->bvset = kmap_local_page(nextpage);
-	iter->nr = (PAGE_SIZE - base) / sizeof(struct z_erofs_bvec);
+	iter->nr = (PG_SIZE - base) / sizeof(struct z_erofs_bvec);
 	iter->cur = 0;
 	return oldpage;
 }
@@ -251,7 +251,7 @@ static int z_erofs_create_pcluster_pool(void)
 
 static struct z_erofs_pcluster *z_erofs_alloc_pcluster(unsigned int size)
 {
-	unsigned int nrpages = PAGE_ALIGN(size) >> PAGE_SHIFT;
+	unsigned int nrpages = PG_ALIGN(size) >> PG_SHIFT;
 	struct z_erofs_pcluster_slab *pcs = pcluster_pool;
 
 	for (; pcs < pcluster_pool + ARRAY_SIZE(pcluster_pool); ++pcs) {
@@ -536,7 +536,7 @@ static void z_erofs_bind_cache(struct z_erofs_frontend *fe)
 	struct z_erofs_pcluster *pcl = fe->pcl;
 	unsigned int pclusterpages = z_erofs_pclusterpages(pcl);
 	bool shouldalloc = z_erofs_should_alloc_cache(fe);
-	pgoff_t poff = pcl->pos >> PAGE_SHIFT;
+	pgoff_t poff = pcl->pos >> PG_SHIFT;
 	bool may_bypass = true;
 	/* Optimistic allocation, as in-place I/O can be used as a fallback */
 	gfp_t gfp = (mapping_gfp_mask(mc) & ~__GFP_DIRECT_RECLAIM) |
@@ -544,7 +544,7 @@ static void z_erofs_bind_cache(struct z_erofs_frontend *fe)
 	struct folio *folio, *newfolio;
 	unsigned int i;
 
-	if (i_blocksize(fe->inode) != PAGE_SIZE ||
+	if (i_blocksize(fe->inode) != PG_SIZE ||
 	    fe->mode < Z_EROFS_PCLUSTER_FOLLOWED)
 		return;
 
@@ -759,7 +759,7 @@ static int z_erofs_register_pcluster(struct z_erofs_frontend *fe)
 	pcl->next = fe->head;
 	pcl->pos = map->m_pa;
 	pcl->pageofs_in = pageofs_in;
-	pcl->pageofs_out = map->m_la & ~PAGE_MASK;
+	pcl->pageofs_out = map->m_la & ~PG_MASK;
 	pcl->from_meta = map->m_flags & EROFS_MAP_META;
 	fe->mode = Z_EROFS_PCLUSTER_FOLLOWED;
 
@@ -867,7 +867,7 @@ static int z_erofs_pcluster_begin(struct z_erofs_frontend *fe)
 	} else {
 		folio_get(page_folio((struct page *)ptr));
 		WRITE_ONCE(fe->pcl->compressed_bvecs[0].page, ptr);
-		fe->pcl->pageofs_in = map->m_pa & ~PAGE_MASK;
+		fe->pcl->pageofs_in = map->m_pa & ~PG_MASK;
 		fe->mode = Z_EROFS_PCLUSTER_FOLLOWED_NOINPLACE;
 	}
 	/* file-backed inplace I/O pages are traversed in reverse order */
@@ -1016,7 +1016,7 @@ static int z_erofs_scan_folio(struct z_erofs_frontend *f,
 	bool tight, excl;
 	int err = 0;
 
-	tight = (bs == PAGE_SIZE);
+	tight = (bs == PG_SIZE);
 	erofs_onlinefolio_init(folio);
 	do {
 		if (offset + end - 1 < map->m_la ||
@@ -1030,7 +1030,7 @@ static int z_erofs_scan_folio(struct z_erofs_frontend *f,
 		}
 
 		cur = offset > map->m_la ? 0 : map->m_la - offset;
-		pgs = round_down(cur, PAGE_SIZE);
+		pgs = round_down(cur, PG_SIZE);
 		/* bump split parts first to avoid several separate cases */
 		++split;
 
@@ -1054,7 +1054,7 @@ static int z_erofs_scan_folio(struct z_erofs_frontend *f,
 				f->pcl->besteffort |= !ra;
 			}
 
-			pgs = round_down(end - 1, PAGE_SIZE);
+			pgs = round_down(end - 1, PG_SIZE);
 			/*
 			 * Ensure this partial page belongs to this submit chain
 			 * rather than other concurrent submit chains or
@@ -1070,7 +1070,7 @@ static int z_erofs_scan_folio(struct z_erofs_frontend *f,
 			}
 
 			err = z_erofs_attach_page(f, &((struct z_erofs_bvec) {
-				.page = folio_page(folio, pgs >> PAGE_SHIFT),
+				.page = folio_page(folio, pgs >> PG_SHIFT),
 				.offset = offset + pgs - map->m_la,
 				.end = end - pgs, }), excl);
 			if (err)
@@ -1079,7 +1079,7 @@ static int z_erofs_scan_folio(struct z_erofs_frontend *f,
 			erofs_onlinefolio_split(folio);
 			if (f->pcl->length < offset + end - map->m_la) {
 				f->pcl->length = offset + end - map->m_la;
-				f->pcl->pageofs_out = map->m_la & ~PAGE_MASK;
+				f->pcl->pageofs_out = map->m_la & ~PG_MASK;
 			}
 			if ((map->m_flags & EROFS_MAP_FULL_MAPPED) &&
 			    !(map->m_flags & EROFS_MAP_PARTIAL_REF) &&
@@ -1091,7 +1091,7 @@ static int z_erofs_scan_folio(struct z_erofs_frontend *f,
 		map->m_flags &= ~EROFS_MAP_FULL_MAPPED;
 		if (cur <= pgs) {
 			split = cur < pgs;
-			tight = (bs == PAGE_SIZE);
+			tight = (bs == PG_SIZE);
 		}
 	} while ((end = cur) > 0);
 	erofs_onlinefolio_end(folio, err, false);
@@ -1131,10 +1131,10 @@ static void z_erofs_do_decompressed_bvec(struct z_erofs_backend *be,
 	struct z_erofs_bvec_item *item;
 	struct page **page;
 
-	if (!(poff & ~PAGE_MASK) && (bvec->end == PAGE_SIZE ||
-			bvec->offset + bvec->end == be->pcl->length)) {
-		DBG_BUGON((poff >> PAGE_SHIFT) >= be->nr_pages);
-		page = be->decompressed_pages + (poff >> PAGE_SHIFT);
+	if (!(poff & ~PG_MASK) && (bvec->end == PG_SIZE ||
+				     bvec->offset + bvec->end == be->pcl->length)) {
+		DBG_BUGON((poff >> PG_SHIFT) >= be->nr_pages);
+		page = be->decompressed_pages + (poff >> PG_SHIFT);
 		if (!*page) {
 			*page = bvec->page;
 			return;
@@ -1167,12 +1167,12 @@ static void z_erofs_fill_other_copies(struct z_erofs_backend *be, int err)
 		while (cur < end) {
 			unsigned int pgnr, scur, len;
 
-			pgnr = (bvi->bvec.offset + cur + off0) >> PAGE_SHIFT;
+			pgnr = (bvi->bvec.offset + cur + off0) >> PG_SHIFT;
 			DBG_BUGON(pgnr >= be->nr_pages);
 
 			scur = bvi->bvec.offset + cur -
-					((pgnr << PAGE_SHIFT) - off0);
-			len = min_t(unsigned int, end - cur, PAGE_SIZE - scur);
+					((pgnr << PG_SHIFT) - off0);
+			len = min_t(unsigned int, end - cur, PG_SIZE - scur);
 			if (!be->decompressed_pages[pgnr]) {
 				err = -EFSCORRUPTED;
 				cur += len;
@@ -1264,7 +1264,7 @@ static int z_erofs_decompress_pcluster(struct z_erofs_backend *be, bool eio)
 	const char *reason;
 
 	mutex_lock(&pcl->lock);
-	be->nr_pages = PAGE_ALIGN(pcl->length + pcl->pageofs_out) >> PAGE_SHIFT;
+	be->nr_pages = PG_ALIGN(pcl->length + pcl->pageofs_out) >> PG_SHIFT;
 
 	/* allocate (de)compressed page arrays if cannot be kept on stack */
 	be->decompressed_pages = NULL;
@@ -1499,7 +1499,7 @@ static void z_erofs_fill_bio_vec(struct bio_vec *bvec,
 
 	/* Except for inplace folios, the entire folio can be used for I/Os */
 	bvec->bv_offset = 0;
-	bvec->bv_len = PAGE_SIZE;
+	bvec->bv_len = PG_SIZE;
 repeat:
 	spin_lock(&pcl->lockref.lock);
 	zbv = pcl->compressed_bvecs[nr];
@@ -1576,8 +1576,8 @@ out_allocfolio:
 		return;
 	folio = page_folio(page);
 out_tocache:
-	if (!tocache || bs != PAGE_SIZE ||
-	    filemap_add_folio(mc, folio, (pcl->pos >> PAGE_SHIFT) + nr, gfp)) {
+	if (!tocache || bs != PG_SIZE ||
+	    filemap_add_folio(mc, folio, (pcl->pos >> PG_SHIFT) + nr, gfp)) {
 		/* turn into a temporary shortlived folio (1 ref) */
 		folio->private = (void *)Z_EROFS_SHORTLIVED_PAGE;
 		return;
@@ -1838,7 +1838,7 @@ static void z_erofs_pcluster_readmore(struct z_erofs_frontend *f,
 		if (rac)
 			end = headoffset + readahead_length(rac) - 1;
 		else
-			end = headoffset + PAGE_SIZE - 1;
+			end = headoffset + PG_SIZE - 1;
 		map->m_la = end;
 		err = z_erofs_map_blocks_iter(inode, map,
 					      EROFS_GET_BLOCKS_READMORE);
@@ -1847,20 +1847,20 @@ static void z_erofs_pcluster_readmore(struct z_erofs_frontend *f,
 
 		/* expand ra for the trailing edge if readahead */
 		if (rac) {
-			cur = round_up(map->m_la + map->m_llen, PAGE_SIZE);
+			cur = round_up(map->m_la + map->m_llen, PG_SIZE);
 			readahead_expand(rac, headoffset, cur - headoffset);
 			return;
 		}
-		end = round_up(end, PAGE_SIZE);
+		end = round_up(end, PG_SIZE);
 	} else {
-		end = round_up(map->m_la, PAGE_SIZE);
+		end = round_up(map->m_la, PG_SIZE);
 		if (!(map->m_flags & EROFS_MAP_ENCODED) || !map->m_llen)
 			return;
 	}
 
 	cur = map->m_la + map->m_llen - 1;
 	while ((cur >= end) && (cur < i_size_read(inode))) {
-		pgoff_t index = cur >> PAGE_SHIFT;
+		pgoff_t index = cur >> PG_SHIFT;
 		struct folio *folio;
 
 		folio = erofs_grab_folio_nowait(f->sharedinode->i_mapping, index);
@@ -1872,9 +1872,9 @@ static void z_erofs_pcluster_readmore(struct z_erofs_frontend *f,
 			folio_put(folio);
 		}
 
-		if (cur < PAGE_SIZE)
+		if (cur < PG_SIZE)
 			break;
-		cur = (index << PAGE_SHIFT) - 1;
+		cur = (index << PG_SHIFT) - 1;
 	}
 }
 
@@ -1936,7 +1936,7 @@ static void z_erofs_readahead(struct readahead_control *rac)
 	z_erofs_pcluster_readmore(&f, rac, false);
 	z_erofs_pcluster_end(&f);
 
-	(void)z_erofs_runqueue(&f, nrpages << PAGE_SHIFT);
+	(void)z_erofs_runqueue(&f, nrpages << PG_SHIFT);
 	erofs_put_metabuf(&f.map.buf);
 	erofs_release_pages(&f.pagepool);
 

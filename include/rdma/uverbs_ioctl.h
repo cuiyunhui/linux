@@ -489,7 +489,7 @@ struct uapi_definition {
 		.id = (_attr_id) +                                             \
 		      BUILD_BUG_ON_ZERO((_min_len) == 0 ||                     \
 					(_max_len) >                           \
-						PAGE_SIZE / sizeof(void *) ||  \
+						PG_SIZE / sizeof(void *) ||  \
 					(_min_len) > (_max_len) ||             \
 					(_access) == UVERBS_ACCESS_NEW ||      \
 					(_access) == UVERBS_ACCESS_DESTROY),   \

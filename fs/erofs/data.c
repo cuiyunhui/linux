@@ -28,7 +28,7 @@ void erofs_put_metabuf(struct erofs_buf *buf)
 
 void *erofs_bread(struct erofs_buf *buf, erofs_off_t offset, bool need_kmap)
 {
-	pgoff_t index = (buf->off + offset) >> PAGE_SHIFT;
+	pgoff_t index = (buf->off + offset) >> PG_SHIFT;
 	struct folio *folio = NULL;
 
 	if (buf->page) {
@@ -47,7 +47,7 @@ void *erofs_bread(struct erofs_buf *buf, erofs_off_t offset, bool need_kmap)
 		return NULL;
 	if (!buf->base)
 		buf->base = kmap_local_page(buf->page);
-	return buf->base + (offset & ~PAGE_MASK);
+	return buf->base + (offset & ~PG_MASK);
 }
 
 int erofs_init_metabuf(struct erofs_buf *buf, struct super_block *sb,

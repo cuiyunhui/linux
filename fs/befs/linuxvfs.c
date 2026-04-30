@@ -478,7 +478,7 @@ static int befs_symlink_read_folio(struct file *unused, struct folio *folio)
 	char *link = folio_address(folio);
 	int err = -EIO;
 
-	if (len == 0 || len > PAGE_SIZE) {
+	if (len == 0 || len > PG_SIZE) {
 		befs_error(sb, "Long symlink with illegal length");
 		goto fail;
 	}

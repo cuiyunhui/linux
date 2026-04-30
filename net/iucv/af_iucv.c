@@ -982,9 +982,9 @@ static int iucv_sock_sendmsg(struct socket *sock, struct msghdr *msg,
 	if (iucv->transport == AF_IUCV_TRANS_HIPER) {
 		headroom = sizeof(struct af_iucv_trans_hdr) +
 			   LL_RESERVED_SPACE(iucv->hs_dev);
-		linear = min(len, PAGE_SIZE - headroom);
+		linear = min(len, PG_SIZE - headroom);
 	} else {
-		if (len < PAGE_SIZE) {
+		if (len < PG_SIZE) {
 			linear = len;
 		} else {
 			/* In nonlinear "classic" iucv skb,
@@ -992,7 +992,7 @@ static int iucv_sock_sendmsg(struct socket *sock, struct msghdr *msg,
 			 */
 			headroom = sizeof(struct iucv_array) *
 				   (MAX_SKB_FRAGS + 1);
-			linear = PAGE_SIZE - headroom;
+			linear = PG_SIZE - headroom;
 		}
 	}
 	skb = sock_alloc_send_pskb(sk, headroom + linear, len - linear,
@@ -1112,12 +1112,12 @@ static struct sk_buff *alloc_iucv_recv_skb(unsigned long len)
 	struct sk_buff *skb;
 	int err;
 
-	if (len < PAGE_SIZE) {
+	if (len < PG_SIZE) {
 		headroom = 0;
 		linear = len;
 	} else {
 		headroom = sizeof(struct iucv_array) * (MAX_SKB_FRAGS + 1);
-		linear = PAGE_SIZE - headroom;
+		linear = PG_SIZE - headroom;
 	}
 	skb = alloc_skb_with_frags(headroom + linear, len - linear,
 				   0, &err, GFP_ATOMIC | GFP_DMA);

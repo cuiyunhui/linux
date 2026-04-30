@@ -173,7 +173,7 @@ static void test_mlock_within_limit(char *p, int alloc_size)
 	locked_vm_size = get_proc_locked_vm_size();
 	page_size = get_proc_page_size((unsigned long)p);
 
-	if (locked_vm_size > PAGE_ALIGN(alloc_size, page_size) + page_size)
+	if (locked_vm_size > PG_ALIGN(alloc_size, page_size) + page_size)
 		ksft_exit_fail_msg("%s left VmLck:%d on %d chunk\n",
 				   __func__, locked_vm_size, alloc_size);
 

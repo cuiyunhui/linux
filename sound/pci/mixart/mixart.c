@@ -1342,7 +1342,7 @@ static int snd_mixart_probe(struct pci_dev *pci,
 	mgr->board_type = MIXART_DAUGHTER_TYPE_NONE;
 
 	/* create array of streaminfo */
-	size = PAGE_ALIGN( (MIXART_MAX_STREAM_PER_CARD * MIXART_MAX_CARDS *
+	size = PG_ALIGN( (MIXART_MAX_STREAM_PER_CARD * MIXART_MAX_CARDS *
 			    sizeof(struct mixart_flowinfo)) );
 	if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, &pci->dev,
 				size, &mgr->flowinfo) < 0) {
@@ -1353,7 +1353,7 @@ static int snd_mixart_probe(struct pci_dev *pci,
 	memset(mgr->flowinfo.area, 0, size);
 
 	/* create array of bufferinfo */
-	size = PAGE_ALIGN( (MIXART_MAX_STREAM_PER_CARD * MIXART_MAX_CARDS *
+	size = PG_ALIGN( (MIXART_MAX_STREAM_PER_CARD * MIXART_MAX_CARDS *
 			    sizeof(struct mixart_bufferinfo)) );
 	if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, &pci->dev,
 				size, &mgr->bufferinfo) < 0) {

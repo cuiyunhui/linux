@@ -85,7 +85,7 @@ static void __damon_pa_check_access(struct damon_region *r,
 		struct damon_attrs *attrs, unsigned long addr_unit)
 {
 	static phys_addr_t last_addr;
-	static unsigned long last_folio_sz = PAGE_SIZE;
+	static unsigned long last_folio_sz = PG_SIZE;
 	static bool last_accessed;
 	phys_addr_t sampling_addr = damon_pa_phys_addr(
 			r->sampling_addr, addr_unit);
@@ -177,7 +177,7 @@ static unsigned long damon_pa_pageout(struct damon_region *r,
 	while (addr < damon_pa_phys_addr(r->ar.end, addr_unit)) {
 		folio = damon_get_folio(PHYS_PFN(addr));
 		if (damon_pa_invalid_damos_folio(folio, s)) {
-			addr += PAGE_SIZE;
+			addr += PG_SIZE;
 			continue;
 		}
 
@@ -203,7 +203,7 @@ put_folio:
 	applied = reclaim_pages(&folio_list);
 	cond_resched();
 	s->last_applied = folio;
-	return damon_pa_core_addr(applied * PAGE_SIZE, addr_unit);
+	return damon_pa_core_addr(applied * PG_SIZE, addr_unit);
 }
 
 static inline unsigned long damon_pa_de_activate(
@@ -218,7 +218,7 @@ static inline unsigned long damon_pa_de_activate(
 	while (addr < damon_pa_phys_addr(r->ar.end, addr_unit)) {
 		folio = damon_get_folio(PHYS_PFN(addr));
 		if (damon_pa_invalid_damos_folio(folio, s)) {
-			addr += PAGE_SIZE;
+			addr += PG_SIZE;
 			continue;
 		}
 
@@ -237,7 +237,7 @@ put_folio:
 		folio_put(folio);
 	}
 	s->last_applied = folio;
-	return damon_pa_core_addr(applied * PAGE_SIZE, addr_unit);
+	return damon_pa_core_addr(applied * PG_SIZE, addr_unit);
 }
 
 static unsigned long damon_pa_activate_pages(struct damon_region *r,
@@ -266,7 +266,7 @@ static unsigned long damon_pa_migrate(struct damon_region *r,
 	while (addr < damon_pa_phys_addr(r->ar.end, addr_unit)) {
 		folio = damon_get_folio(PHYS_PFN(addr));
 		if (damon_pa_invalid_damos_folio(folio, s)) {
-			addr += PAGE_SIZE;
+			addr += PG_SIZE;
 			continue;
 		}
 
@@ -285,7 +285,7 @@ put_folio:
 	applied = damon_migrate_pages(&folio_list, s->target_nid);
 	cond_resched();
 	s->last_applied = folio;
-	return damon_pa_core_addr(applied * PAGE_SIZE, addr_unit);
+	return damon_pa_core_addr(applied * PG_SIZE, addr_unit);
 }
 
 static unsigned long damon_pa_stat(struct damon_region *r,
@@ -302,7 +302,7 @@ static unsigned long damon_pa_stat(struct damon_region *r,
 	while (addr < damon_pa_phys_addr(r->ar.end, addr_unit)) {
 		folio = damon_get_folio(PHYS_PFN(addr));
 		if (damon_pa_invalid_damos_folio(folio, s)) {
-			addr += PAGE_SIZE;
+			addr += PG_SIZE;
 			continue;
 		}
 

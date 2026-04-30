@@ -879,9 +879,9 @@ static struct snd_soc_dai_driver stm32_spdifrx_dai[] = {
 
 static const struct snd_pcm_hardware stm32_spdifrx_pcm_hw = {
 	.info = SNDRV_PCM_INFO_INTERLEAVED | SNDRV_PCM_INFO_MMAP,
-	.buffer_bytes_max = 8 * PAGE_SIZE,
+	.buffer_bytes_max = 8 * PG_SIZE,
 	.period_bytes_min = 1024,
-	.period_bytes_max = 4 * PAGE_SIZE,
+	.period_bytes_max = 4 * PG_SIZE,
 	.periods_min = 2,
 	.periods_max = 8,
 };

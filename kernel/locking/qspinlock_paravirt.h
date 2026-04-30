@@ -170,7 +170,7 @@ struct pv_hash_entry {
 };
 
 #define PV_HE_PER_LINE	(SMP_CACHE_BYTES / sizeof(struct pv_hash_entry))
-#define PV_HE_MIN	(PAGE_SIZE / sizeof(struct pv_hash_entry))
+#define PV_HE_MIN	(PG_SIZE / sizeof(struct pv_hash_entry))
 
 static struct pv_hash_entry *pv_lock_hash;
 static unsigned int pv_lock_hash_bits __read_mostly;

@@ -452,8 +452,8 @@ static int memblock_add_many_check(void)
 	 * split it into small block. First we split a large enough memory block
 	 * as the memory region which will be choosed by memblock_double_array().
 	 */
-	base = PAGE_ALIGN(dummy_physical_memory_base());
-	new_memory_regions_size = PAGE_ALIGN(INIT_MEMBLOCK_REGIONS * 2 *
+	base = PG_ALIGN(dummy_physical_memory_base());
+	new_memory_regions_size = PG_ALIGN(INIT_MEMBLOCK_REGIONS * 2 *
 					     sizeof(struct memblock_region));
 	memblock_add(base, new_memory_regions_size);
 
@@ -939,7 +939,7 @@ static int memblock_reserve_many_check(void)
 	 * and it has been reserved due to it has been used. The size is used to
 	 * calculate the total_size that the memblock.reserved have now.
 	 */
-	new_reserved_regions_size = PAGE_ALIGN((INIT_MEMBLOCK_REGIONS * 2) *
+	new_reserved_regions_size = PG_ALIGN((INIT_MEMBLOCK_REGIONS * 2) *
 					sizeof(struct memblock_region));
 	/*
 	 * The double_array() will find a free memory region as the new
@@ -1044,7 +1044,7 @@ static int memblock_reserve_all_locations_check(void)
 		 * and it has been reserved due to it has been used. The size is used to
 		 * calculate the total_size that the memblock.reserved have now.
 		 */
-		new_reserved_regions_size = PAGE_ALIGN((INIT_MEMBLOCK_REGIONS * 2) *
+		new_reserved_regions_size = PG_ALIGN((INIT_MEMBLOCK_REGIONS * 2) *
 						sizeof(struct memblock_region));
 		/*
 		 * The double_array() will find a free memory region as the new
@@ -1141,7 +1141,7 @@ static int memblock_reserve_many_may_conflict_check(void)
 	 */
 	dummy_physical_memory_init();
 	phys_addr_t memory_base = dummy_physical_memory_base();
-	phys_addr_t offset = PAGE_ALIGN(memory_base);
+	phys_addr_t offset = PG_ALIGN(memory_base);
 
 	PREFIX_PUSH();
 
@@ -1185,7 +1185,7 @@ static int memblock_reserve_many_may_conflict_check(void)
 		 * and it has been reserved due to it has been used. The size is used to
 		 * calculate the total_size that the memblock.reserved have now.
 		 */
-		new_reserved_regions_size = PAGE_ALIGN((INIT_MEMBLOCK_REGIONS * 2) *
+		new_reserved_regions_size = PG_ALIGN((INIT_MEMBLOCK_REGIONS * 2) *
 						sizeof(struct memblock_region));
 		/*
 		 * The double_array() will find a free memory region as the new

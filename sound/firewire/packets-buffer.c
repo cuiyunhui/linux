@@ -34,7 +34,7 @@ int iso_packets_buffer_init(struct iso_packets_buffer *b, struct fw_unit *unit,
 	}
 
 	packet_size = L1_CACHE_ALIGN(packet_size);
-	packets_per_page = PAGE_SIZE / packet_size;
+	packets_per_page = PG_SIZE / packet_size;
 	if (WARN_ON(!packets_per_page)) {
 		err = -EINVAL;
 		goto err_packets;
@@ -51,7 +51,7 @@ int iso_packets_buffer_init(struct iso_packets_buffer *b, struct fw_unit *unit,
 		p = page_address(b->iso_buffer.pages[page_index]);
 		offset_in_page = (i % packets_per_page) * packet_size;
 		b->packets[i].buffer = p + offset_in_page;
-		b->packets[i].offset = page_index * PAGE_SIZE + offset_in_page;
+		b->packets[i].offset = page_index * PG_SIZE + offset_in_page;
 	}
 
 	return 0;

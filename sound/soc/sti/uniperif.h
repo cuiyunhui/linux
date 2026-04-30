@@ -1366,8 +1366,8 @@ static __maybe_unused const struct snd_pcm_hardware uni_tdm_hw = {
 	.periods_max = 10,
 
 	.period_bytes_min = 128,
-	.period_bytes_max = 64 * PAGE_SIZE,
-	.buffer_bytes_max = 256 * PAGE_SIZE
+	.period_bytes_max = 64 * PG_SIZE,
+	.buffer_bytes_max = 256 * PG_SIZE
 };
 
 /* uniperiph player*/

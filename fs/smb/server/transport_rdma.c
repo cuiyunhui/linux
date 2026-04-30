@@ -144,8 +144,8 @@ unsigned int get_smbd_max_read_write_size(struct ksmbd_transport *kt)
 
 static inline int get_buf_page_count(void *buf, int size)
 {
-	return DIV_ROUND_UP((uintptr_t)buf + size, PAGE_SIZE) -
-		(uintptr_t)buf / PAGE_SIZE;
+	return DIV_ROUND_UP((uintptr_t)buf + size, PG_SIZE) -
+		(uintptr_t)buf / PG_SIZE;
 }
 
 static void smb_direct_destroy_pools(struct smbdirect_socket *sc);
@@ -1428,10 +1428,10 @@ static int get_sg_list(void *buf, int size, struct scatterlist *sg_list, int nen
 	if (size <= 0 || nentries < get_buf_page_count(buf, size))
 		return -EINVAL;
 
-	offset = offset_in_page(buf);
+	offset = offset_in_pg(buf);
 	buf -= offset;
 	while (size > 0) {
-		len = min_t(int, PAGE_SIZE - offset, size);
+		len = min_t(int, PG_SIZE - offset, size);
 		if (high)
 			page = vmalloc_to_page(buf);
 		else
@@ -1442,7 +1442,7 @@ static int get_sg_list(void *buf, int size, struct scatterlist *sg_list, int nen
 		sg_set_page(sg_list, page, len, offset);
 		sg_list = sg_next(sg_list);
 
-		buf += PAGE_SIZE;
+		buf += PG_SIZE;
 		size -= len;
 		offset = 0;
 		i++;
@@ -1697,9 +1697,11 @@ static int smb_direct_writev(struct ksmbd_transport *t,
 				 * we can keep for the extra pages.
 				 */
 				size_t epages = possible_vecs - 1;
-				size_t fpofs = offset_in_page(v->iov_base);
-				size_t fplen = min_t(size_t, PAGE_SIZE - fpofs, v->iov_len);
-				size_t elen = min_t(size_t, v->iov_len - fplen, epages*PAGE_SIZE);
+				size_t fpofs = offset_in_pg(v->iov_base);
+				size_t fplen = min_t(size_t, PG_SIZE - fpofs,
+						     v->iov_len);
+				size_t elen = min_t(size_t, v->iov_len - fplen,
+						    epages*PG_SIZE);
 
 				v->iov_len = fplen + elen;
 				page_count = get_buf_page_count(v->iov_base, v->iov_len);
@@ -2207,7 +2209,7 @@ static int smb_direct_init_params(struct smbdirect_socket *sc)
 	/* need 3 more sge. because a SMB_DIRECT header, SMB2 header,
 	 * SMB2 response could be mapped.
 	 */
-	max_send_sges = DIV_ROUND_UP(sp->max_send_size, PAGE_SIZE) + 3;
+	max_send_sges = DIV_ROUND_UP(sp->max_send_size, PG_SIZE) + 3;
 	if (max_send_sges > SMBDIRECT_SEND_IO_MAX_SGE) {
 		pr_err("max_send_size %d is too large\n", sp->max_send_size);
 		return -EINVAL;
@@ -2215,7 +2217,7 @@ static int smb_direct_init_params(struct smbdirect_socket *sc)
 
 	atomic_set(&sc->send_io.lcredits.count, sp->send_credit_target);
 
-	maxpages = DIV_ROUND_UP(sp->max_read_write_size, PAGE_SIZE);
+	maxpages = DIV_ROUND_UP(sp->max_read_write_size, PG_SIZE);
 	sc->rw_io.credits.max = rdma_rw_mr_factor(sc->ib.dev,
 						  sc->rdma.cm_id->port_num,
 						  maxpages);

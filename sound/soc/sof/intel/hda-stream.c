@@ -943,7 +943,7 @@ int hda_dsp_stream_init(struct snd_sof_dev *sdev)
 	 * HDAudio codecs
 	 */
 	ret = snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, &pci->dev,
-				  PAGE_SIZE, &bus->rb);
+				  PG_SIZE, &bus->rb);
 	if (ret < 0) {
 		dev_err(sdev->dev, "error: RB alloc failed\n");
 		return -ENOMEM;

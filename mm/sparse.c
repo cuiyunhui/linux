@@ -411,7 +411,7 @@ unsigned long __init section_map_size(void)
 #else
 unsigned long __init section_map_size(void)
 {
-	return PAGE_ALIGN(sizeof(struct page) * PAGES_PER_SECTION);
+	return PG_ALIGN(sizeof(struct page) * PAGES_PER_SECTION);
 }
 
 struct page __init *__populate_section_memmap(unsigned long pfn,
@@ -758,7 +758,7 @@ static void free_map_bootmem(struct page *memmap)
 	unsigned long type, nr_pages;
 	struct page *page = virt_to_page(memmap);
 
-	nr_pages = PAGE_ALIGN(PAGES_PER_SECTION * sizeof(struct page))
+	nr_pages = PG_ALIGN(PAGES_PER_SECTION * sizeof(struct page))
 		>> PG_SHIFT;
 
 	for (i = 0; i < nr_pages; i++, page++) {

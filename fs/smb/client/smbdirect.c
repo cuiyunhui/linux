@@ -700,8 +700,8 @@ static bool process_negotiation_response(
 
 	sp->max_read_write_size = min_t(u32,
 			le32_to_cpu(packet->max_readwrite_size),
-			sp->max_frmr_depth * PAGE_SIZE);
-	sp->max_frmr_depth = sp->max_read_write_size / PAGE_SIZE;
+			sp->max_frmr_depth * PG_SIZE);
+	sp->max_frmr_depth = sp->max_read_write_size / PG_SIZE;
 
 	atomic_set(&sc->send_io.bcredits.count, 1);
 	sc->recv_io.expected = SMBDIRECT_EXPECT_DATA_TRANSFER;
@@ -2947,7 +2947,7 @@ struct smbdirect_mr_io *smbd_register_mr(struct smbd_connection *info,
 		goto dma_map_error;
 	}
 
-	rc = ib_map_mr_sg(mr->mr, mr->sgt.sgl, mr->sgt.nents, NULL, PAGE_SIZE);
+	rc = ib_map_mr_sg(mr->mr, mr->sgt.sgl, mr->sgt.nents, NULL, PG_SIZE);
 	if (rc != mr->sgt.nents) {
 		log_rdma_mr(ERR,
 			    "ib_map_mr_sg failed rc = %d nents = %x\n",
@@ -3208,13 +3208,13 @@ static ssize_t smb_extract_kvec_to_rdma(struct iov_iter *iter,
 		}
 
 		kaddr = (unsigned long)kv[i].iov_base + start;
-		off = kaddr & ~PAGE_MASK;
+		off = kaddr & ~PG_MASK;
 		len = min_t(size_t, maxsize, len - start);
-		kaddr &= PAGE_MASK;
+		kaddr &= PG_MASK;
 
 		maxsize -= len;
 		do {
-			seg = min_t(size_t, len, PAGE_SIZE - off);
+			seg = min_t(size_t, len, PG_SIZE - off);
 
 			if (is_vmalloc_or_module_addr((void *)kaddr))
 				page = vmalloc_to_page((void *)kaddr);
@@ -3226,7 +3226,7 @@ static ssize_t smb_extract_kvec_to_rdma(struct iov_iter *iter,
 
 			ret += seg;
 			len -= seg;
-			kaddr += PAGE_SIZE;
+			kaddr += PG_SIZE;
 			off = 0;
 		} while (len > 0 && rdma->nr_sge < rdma->max_sge);
 

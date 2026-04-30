@@ -505,7 +505,7 @@ void test_task_local_storage(void)
 	if (test__start_subtest("uptr_update_failure"))
 		test_uptr_update_failure();
 	if (test__start_subtest("uptr_map_failure_e2big")) {
-		if (getpagesize() == PAGE_SIZE)
+		if (getpagesize() == PG_SIZE)
 			test_uptr_map_failure("large_uptr_map", E2BIG);
 		else
 			test__skip();

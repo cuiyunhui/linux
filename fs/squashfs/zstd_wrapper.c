@@ -78,7 +78,7 @@ static int zstd_uncompress(struct squashfs_sb_info *msblk, void *strm,
 		return -EIO;
 	}
 
-	out_buf.size = PAGE_SIZE;
+	out_buf.size = PG_SIZE;
 	out_buf.dst = squashfs_first_page(output);
 	if (IS_ERR(out_buf.dst)) {
 		error = PTR_ERR(out_buf.dst);
@@ -119,7 +119,7 @@ static int zstd_uncompress(struct squashfs_sb_info *msblk, void *strm,
 				break;
 			}
 			out_buf.pos = 0;
-			out_buf.size = PAGE_SIZE;
+			out_buf.size = PG_SIZE;
 		}
 
 		total_out -= out_buf.pos;

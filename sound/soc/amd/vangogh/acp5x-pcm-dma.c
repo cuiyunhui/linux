@@ -143,7 +143,7 @@ static void config_acp5x_dma(struct i2s_stream_instance *rtd, int direction)
 		acp_writel(high, rtd->acp5x_base + ACP_SCRATCH_REG_0 + val + 4);
 		/* Move to next physically contiguous page */
 		val += 8;
-		addr += PAGE_SIZE;
+		addr += PG_SIZE;
 	}
 
 	if (direction == SNDRV_PCM_STREAM_PLAYBACK) {
@@ -282,7 +282,7 @@ static int acp5x_dma_hw_params(struct snd_soc_component *component,
 	}
 	size = params_buffer_bytes(params);
 	rtd->dma_addr = substream->runtime->dma_addr;
-	rtd->num_pages = (PAGE_ALIGN(size) >> PAGE_SHIFT);
+	rtd->num_pages = (PG_ALIGN(size) >> PG_SHIFT);
 	config_acp5x_dma(rtd, substream->stream);
 	return 0;
 }

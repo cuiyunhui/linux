@@ -67,7 +67,7 @@ static const struct snd_pcm_hardware ls_pcm_hardware = {
 	.period_bytes_min = 128,
 	.period_bytes_max = 128 * 1024,
 	.periods_min = 1,
-	.periods_max = PAGE_SIZE / sizeof(struct loongson_dma_desc),
+	.periods_max = PG_SIZE / sizeof(struct loongson_dma_desc),
 	.buffer_bytes_max = 1024 * 1024,
 };
 
@@ -247,13 +247,13 @@ static int loongson_pcm_open(struct snd_soc_component *component,
 	if (!prtd)
 		return -ENOMEM;
 
-	prtd->dma_desc_arr = dma_alloc_coherent(card->dev, PAGE_SIZE,
+	prtd->dma_desc_arr = dma_alloc_coherent(card->dev, PG_SIZE,
 						&prtd->dma_desc_arr_phy,
 						GFP_KERNEL);
 	if (!prtd->dma_desc_arr)
 		goto desc_err;
 
-	prtd->dma_desc_arr_size = PAGE_SIZE / sizeof(*prtd->dma_desc_arr);
+	prtd->dma_desc_arr_size = PG_SIZE / sizeof(*prtd->dma_desc_arr);
 
 	prtd->dma_pos_desc = dma_alloc_coherent(card->dev,
 						sizeof(*prtd->dma_pos_desc),
@@ -269,7 +269,7 @@ static int loongson_pcm_open(struct snd_soc_component *component,
 
 	return 0;
 pos_err:
-	dma_free_coherent(card->dev, PAGE_SIZE, prtd->dma_desc_arr,
+	dma_free_coherent(card->dev, PG_SIZE, prtd->dma_desc_arr,
 			  prtd->dma_desc_arr_phy);
 desc_err:
 	kfree(prtd);
@@ -283,7 +283,7 @@ static int loongson_pcm_close(struct snd_soc_component *component,
 	struct snd_card *card = substream->pcm->card;
 	struct loongson_runtime_data *prtd = substream->runtime->private_data;
 
-	dma_free_coherent(card->dev, PAGE_SIZE, prtd->dma_desc_arr,
+	dma_free_coherent(card->dev, PG_SIZE, prtd->dma_desc_arr,
 			  prtd->dma_desc_arr_phy);
 
 	dma_free_coherent(card->dev, sizeof(*prtd->dma_pos_desc),
@@ -298,7 +298,7 @@ static int loongson_pcm_mmap(struct snd_soc_component *component,
 			     struct vm_area_struct *vma)
 {
 	return remap_pfn_range(vma, vma->vm_start,
-			substream->dma_buffer.addr >> PAGE_SHIFT,
+			substream->dma_buffer.addr >> PG_SHIFT,
 			vma->vm_end - vma->vm_start, vma->vm_page_prot);
 }
 

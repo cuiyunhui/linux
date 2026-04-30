@@ -89,8 +89,8 @@ static bool hfs_release_folio(struct folio *folio, gfp_t mask)
 	if (!tree)
 		return false;
 
-	if (tree->node_size >= PAGE_SIZE) {
-		nidx = folio->index >> (tree->node_size_shift - PAGE_SHIFT);
+	if (tree->node_size >= PG_SIZE) {
+		nidx = folio->index >> (tree->node_size_shift - PG_SHIFT);
 		spin_lock(&tree->hash_lock);
 		node = hfs_bnode_findhash(tree, nidx);
 		if (!node)
@@ -103,8 +103,8 @@ static bool hfs_release_folio(struct folio *folio, gfp_t mask)
 		}
 		spin_unlock(&tree->hash_lock);
 	} else {
-		nidx = folio->index << (PAGE_SHIFT - tree->node_size_shift);
-		i = 1 << (PAGE_SHIFT - tree->node_size_shift);
+		nidx = folio->index << (PG_SHIFT - tree->node_size_shift);
+		i = 1 << (PG_SHIFT - tree->node_size_shift);
 		spin_lock(&tree->hash_lock);
 		do {
 			node = hfs_bnode_findhash(tree, nidx++);

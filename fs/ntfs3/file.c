@@ -250,7 +250,7 @@ static void ntfs_filemap_close(struct vm_area_struct *vma)
 {
 	struct inode *inode = file_inode(vma->vm_file);
 	struct ntfs_inode *ni = ntfs_i(inode);
-	u64 from = (u64)vma->vm_pgoff << PAGE_SHIFT;
+	u64 from = (u64)vma->vm_pgoff << PG_SHIFT;
 	u64 to = min_t(u64, i_size_read(inode),
 		       from + vma->vm_end - vma->vm_start);
 
@@ -307,7 +307,7 @@ static int ntfs_file_mmap_prepare(struct vm_area_desc *desc)
 	}
 
 	if (rw) {
-		u64 from = (u64)desc->pgoff << PAGE_SHIFT;
+		u64 from = (u64)desc->pgoff << PG_SHIFT;
 		u64 to = min_t(u64, i_size_read(inode),
 			       from + vma_desc_size(desc));
 
@@ -455,7 +455,7 @@ static long ntfs_fallocate(struct file *file, int mode, loff_t vbo, loff_t len)
 	struct ntfs_inode *ni = ntfs_i(inode);
 	loff_t end = vbo + len;
 	loff_t vbo_down = round_down(vbo, max_t(unsigned long,
-						sbi->cluster_size, PAGE_SIZE));
+						sbi->cluster_size, PG_SIZE));
 	bool is_supported_holes = is_sparsed(ni) || is_compressed(ni);
 	loff_t i_size, new_size;
 	bool map_locked;
@@ -990,14 +990,14 @@ static ssize_t ntfs_compress_write(struct kiocb *iocb, struct iov_iter *from)
 	size_t written = 0;
 	u8 frame_bits = NTFS_LZNT_CUNIT + sbi->cluster_bits;
 	u32 frame_size = 1u << frame_bits;
-	u32 pages_per_frame = frame_size >> PAGE_SHIFT;
+	u32 pages_per_frame = frame_size >> PG_SHIFT;
 	u32 ip, off;
 	CLST frame;
 	u64 frame_vbo;
 	pgoff_t index;
 	bool frame_uptodate;
 
-	if (frame_size < PAGE_SIZE) {
+	if (frame_size < PG_SIZE) {
 		/*
 		 * frame_size == 8K if cluster 512
 		 * frame_size == 64K if cluster 4096
@@ -1038,7 +1038,7 @@ static ssize_t ntfs_compress_write(struct kiocb *iocb, struct iov_iter *from)
 		}
 
 		/* Load full frame. */
-		err = ntfs_get_frame_pages(mapping, frame_vbo >> PAGE_SHIFT,
+		err = ntfs_get_frame_pages(mapping, frame_vbo >> PG_SHIFT,
 					   pages, pages_per_frame,
 					   &frame_uptodate);
 		if (err)
@@ -1057,11 +1057,11 @@ static ssize_t ntfs_compress_write(struct kiocb *iocb, struct iov_iter *from)
 			}
 		}
 
-		ip = off >> PAGE_SHIFT;
-		off = offset_in_page(valid);
+		ip = off >> PG_SHIFT;
+		off = offset_in_pg(valid);
 		for (; ip < pages_per_frame; ip++, off = 0) {
 			folio = page_folio(pages[ip]);
-			folio_zero_segment(folio, off, PAGE_SIZE);
+			folio_zero_segment(folio, off, PG_SIZE);
 			flush_dcache_folio(folio);
 			folio_mark_uptodate(folio);
 		}
@@ -1093,7 +1093,7 @@ static ssize_t ntfs_compress_write(struct kiocb *iocb, struct iov_iter *from)
 			bytes = count;
 
 		frame_vbo = pos & ~(frame_size - 1);
-		index = frame_vbo >> PAGE_SHIFT;
+		index = frame_vbo >> PG_SHIFT;
 
 		if (unlikely(fault_in_iov_iter_readable(from, bytes))) {
 			err = -EFAULT;
@@ -1126,12 +1126,12 @@ static ssize_t ntfs_compress_write(struct kiocb *iocb, struct iov_iter *from)
 
 		WARN_ON(!bytes);
 		copied = 0;
-		ip = off >> PAGE_SHIFT;
-		off = offset_in_page(pos);
+		ip = off >> PG_SHIFT;
+		off = offset_in_pg(pos);
 
 		/* Copy user data to pages. */
 		for (;;) {
-			size_t cp, tail = PAGE_SIZE - off;
+			size_t cp, tail = PG_SIZE - off;
 
 			folio = page_folio(pages[ip]);
 			cp = copy_folio_from_iter_atomic(
@@ -1333,8 +1333,8 @@ static ssize_t ntfs_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 			goto out;
 		}
 
-		invalidate_mapping_pages(inode->i_mapping, offset >> PAGE_SHIFT,
-					 endbyte >> PAGE_SHIFT);
+		invalidate_mapping_pages(inode->i_mapping, offset >> PG_SHIFT,
+					 endbyte >> PG_SHIFT);
 	}
 
 out:

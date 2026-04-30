@@ -437,7 +437,7 @@ struct ftrace_profile_stat {
 };
 
 #define PROFILE_RECORDS_SIZE						\
-	(PAGE_SIZE - offsetof(struct ftrace_profile_page, records))
+	(PG_SIZE - offsetof(struct ftrace_profile_page, records))
 
 #define PROFILES_PER_PAGE					\
 	(PROFILE_RECORDS_SIZE / sizeof(struct ftrace_profile))
@@ -458,7 +458,7 @@ function_stat_next(void *v, int idx)
 	struct ftrace_profile *rec = v;
 	struct ftrace_profile_page *pg;
 
-	pg = (struct ftrace_profile_page *)((unsigned long)rec & PAGE_MASK);
+	pg = (struct ftrace_profile_page *)((unsigned long)rec & PG_MASK);
 
  again:
 	if (idx != 0)
@@ -1147,7 +1147,7 @@ struct ftrace_page {
 };
 
 #define ENTRY_SIZE sizeof(struct dyn_ftrace)
-#define ENTRIES_PER_PAGE_GROUP(order) ((PAGE_SIZE << (order)) / ENTRY_SIZE)
+#define ENTRIES_PER_PAGE_GROUP(order) ((PG_SIZE << (order)) / ENTRY_SIZE)
 
 static struct ftrace_page	*ftrace_pages_start;
 static struct ftrace_page	*ftrace_pages;
@@ -3856,7 +3856,7 @@ static int ftrace_allocate_records(struct ftrace_page *pg, int count,
 		return -EINVAL;
 
 	/* We want to fill as much as possible, with no empty pages */
-	pages = DIV_ROUND_UP(count * ENTRY_SIZE, PAGE_SIZE);
+	pages = DIV_ROUND_UP(count * ENTRY_SIZE, PG_SIZE);
 	order = fls(pages) - 1;
 
  again:
@@ -7629,7 +7629,7 @@ static int ftrace_process_locs(struct module *mod,
 		addr = ftrace_call_adjust(addr);
 
 		end_offset = (pg->index+1) * sizeof(pg->records[0]);
-		if (end_offset > PAGE_SIZE << pg->order) {
+		if (end_offset > PG_SIZE << pg->order) {
 			/* We should have allocated enough */
 			if (WARN_ON(!pg->next))
 				break;

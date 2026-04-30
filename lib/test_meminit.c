@@ -64,7 +64,7 @@ static int __init do_alloc_pages_order(int order, int *total_failures)
 {
 	struct page *page;
 	void *buf;
-	size_t size = PAGE_SIZE << order;
+	size_t size = PG_SIZE << order;
 
 	page = alloc_pages(GFP_KERNEL, order);
 	if (!page)

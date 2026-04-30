@@ -996,7 +996,7 @@ static int ext2_fill_super(struct super_block *sb, struct fs_context *fc)
 			ext2_msg(sb, KERN_ERR,
 				"DAX unsupported by block device. Turning off DAX.");
 			clear_opt(sbi->s_mount_opt, DAX);
-		} else if (blocksize != PAGE_SIZE) {
+		} else if (blocksize != PG_SIZE) {
 			ext2_msg(sb, KERN_ERR, "unsupported blocksize for DAX\n");
 			clear_opt(sbi->s_mount_opt, DAX);
 		}

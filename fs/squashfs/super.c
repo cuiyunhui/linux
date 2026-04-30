@@ -269,7 +269,7 @@ static int squashfs_fill_super(struct super_block *sb, struct fs_context *fc)
 	 * Check the system page size is not larger than the filesystem
 	 * block size (by default 128K).  This is currently not supported.
 	 */
-	if (PAGE_SIZE > msblk->block_size) {
+	if (PG_SIZE > msblk->block_size) {
 		errorf(fc, "Page size > filesystem block size (%d).  This is "
 		       "currently not supported!", msblk->block_size);
 		goto failed_mount;
@@ -335,7 +335,7 @@ static int squashfs_fill_super(struct super_block *sb, struct fs_context *fc)
 		goto failed_mount;
 	}
 
-	if (msblk->devblksize == PAGE_SIZE) {
+	if (msblk->devblksize == PG_SIZE) {
 		struct inode *cache = new_inode(sb);
 
 		if (cache == NULL) {

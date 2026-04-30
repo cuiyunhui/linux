@@ -238,7 +238,7 @@ char *tomoyo_realpath_from_path(const struct path *path)
 {
 	char *buf = NULL;
 	char *name = NULL;
-	unsigned int buf_len = PAGE_SIZE / 2;
+	unsigned int buf_len = PG_SIZE / 2;
 	struct dentry *dentry = path->dentry;
 	struct super_block *sb = dentry->d_sb;
 

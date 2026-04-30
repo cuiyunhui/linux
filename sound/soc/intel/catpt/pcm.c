@@ -159,7 +159,7 @@ static void catpt_arrange_page_table(struct snd_pcm_substream *substream,
 		u32 pfn, offset;
 		u32 *page_table;
 
-		pfn = PFN_DOWN(snd_sgbuf_get_addr(databuf, i * PAGE_SIZE));
+		pfn = PFN_DOWN(snd_sgbuf_get_addr(databuf, i * PG_SIZE));
 		/* incrementing by 2 on even and 3 on odd */
 		offset = ((i << 2) + i) >> 1;
 		page_table = (u32 *)(pgtbl->area + offset);
@@ -267,7 +267,7 @@ static int catpt_dai_startup(struct snd_pcm_substream *substream,
 	if (!stream)
 		return -ENOMEM;
 
-	ret = snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, cdev->dev, PAGE_SIZE,
+	ret = snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, cdev->dev, PG_SIZE,
 				  &stream->pgtbl);
 	if (ret)
 		goto err_pgtbl;
@@ -394,7 +394,7 @@ static int catpt_dai_hw_params(struct snd_pcm_substream *substream,
 
 	memset(&rinfo, 0, sizeof(rinfo));
 	rinfo.page_table_addr = stream->pgtbl.addr;
-	rinfo.num_pages = DIV_ROUND_UP(rtm->dma_bytes, PAGE_SIZE);
+	rinfo.num_pages = DIV_ROUND_UP(rtm->dma_bytes, PG_SIZE);
 	rinfo.size = rtm->dma_bytes;
 	rinfo.offset = 0;
 	rinfo.ring_first_page_pfn = PFN_DOWN(snd_sgbuf_get_addr(dmab, 0));
@@ -567,7 +567,7 @@ static const struct snd_pcm_hardware catpt_pcm_hardware = {
 				  SNDRV_PCM_FMTBIT_S32_LE,
 	.subformats		= SNDRV_PCM_SUBFMTBIT_MSBITS_24 |
 				  SNDRV_PCM_SUBFMTBIT_MSBITS_MAX,
-	.period_bytes_min	= PAGE_SIZE,
+	.period_bytes_min	= PG_SIZE,
 	.period_bytes_max	= CATPT_BUFFER_MAX_SIZE / CATPT_PCM_PERIODS_MIN,
 	.periods_min		= CATPT_PCM_PERIODS_MIN,
 	.periods_max		= CATPT_PCM_PERIODS_MAX,

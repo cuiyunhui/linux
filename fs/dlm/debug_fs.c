@@ -706,10 +706,10 @@ static ssize_t dlm_rawmsg_write(struct file *fp, const char __user *user_buf,
 	void *buf;
 	int ret;
 
-	if (count > PAGE_SIZE || count < sizeof(struct dlm_header))
+	if (count > PG_SIZE || count < sizeof(struct dlm_header))
 		return -EINVAL;
 
-	buf = kmalloc(PAGE_SIZE, GFP_NOFS);
+	buf = kmalloc(PG_SIZE, GFP_NOFS);
 	if (!buf)
 		return -ENOMEM;
 

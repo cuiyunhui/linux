@@ -509,7 +509,7 @@ static int kcov_mmap(struct file *filep, struct vm_area_struct *vma)
 	area = kcov->area;
 	spin_unlock_irqrestore(&kcov->lock, flags);
 	vm_flags_set(vma, VM_DONTEXPAND);
-	for (off = 0; off < size; off += PAGE_SIZE) {
+	for (off = 0; off < size; off += PG_SIZE) {
 		page = vmalloc_to_page(area + off);
 		res = vm_insert_page(vma, vma->vm_start + off, page);
 		if (res) {
@@ -566,7 +566,7 @@ static int kcov_get_mode(unsigned long arg)
 static void kcov_fault_in_area(struct kcov *kcov)
 	__must_hold(&kcov->lock)
 {
-	unsigned long stride = PAGE_SIZE / sizeof(unsigned long);
+	unsigned long stride = PG_SIZE / sizeof(unsigned long);
 	unsigned long *area = kcov->area;
 	unsigned long offset;
 

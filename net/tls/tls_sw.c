@@ -1447,7 +1447,7 @@ static int tls_setup_from_iter(struct iov_iter *from,
 		length -= copied;
 		size += copied;
 		while (copied) {
-			use = min_t(int, copied, PAGE_SIZE - offset);
+			use = min_t(int, copied, PG_SIZE - offset);
 
 			sg_set_page(&to[num_elem],
 				    pages[i], use, offset);

@@ -300,7 +300,7 @@ static ssize_t ocfs2_filecheck_attr_show(struct kobject *kobj,
 				    char *buf)
 {
 
-	ssize_t ret = 0, total = 0, remain = PAGE_SIZE;
+	ssize_t ret = 0, total = 0, remain = PG_SIZE;
 	unsigned int type;
 	struct ocfs2_filecheck_entry *p;
 	struct ocfs2_filecheck_sysfs_entry *ent = container_of(kobj,

@@ -899,7 +899,7 @@ static int snd_ps3_driver_probe(struct ps3_system_bus_device *dev)
 		goto clean_open;
 	}
 	ps3_mmio_region_init(dev, dev->m_region, lpar_addr, lpar_size,
-		PAGE_SHIFT);
+		PG_SHIFT);
 
 	ret = snd_ps3_map_mmio();
 	if (ret)
@@ -907,10 +907,10 @@ static int snd_ps3_driver_probe(struct ps3_system_bus_device *dev)
 
 	/* setup DMA area */
 	ps3_dma_region_init(dev, dev->d_region,
-			    PAGE_SHIFT, /* use system page size */
+			    PG_SHIFT, /* use system page size */
 			    0, /* dma type; not used */
 			    NULL,
-			    ALIGN(SND_PS3_DMA_REGION_SIZE, PAGE_SIZE));
+			    ALIGN(SND_PS3_DMA_REGION_SIZE, PG_SIZE));
 	dev->d_region->ioid = PS3_AUDIO_IOID;
 
 	ret = ps3_dma_region_create(dev->d_region);
@@ -985,7 +985,7 @@ static int snd_ps3_driver_probe(struct ps3_system_bus_device *dev)
 	 */
 	the_card.null_buffer_start_vaddr =
 		dma_alloc_coherent(&the_card.ps3_dev->core,
-				   PAGE_SIZE,
+				   PG_SIZE,
 				   &the_card.null_buffer_start_dma_addr,
 				   GFP_KERNEL);
 	if (!the_card.null_buffer_start_vaddr) {
@@ -1010,7 +1010,7 @@ static int snd_ps3_driver_probe(struct ps3_system_bus_device *dev)
 
 clean_dma_map:
 	dma_free_coherent(&the_card.ps3_dev->core,
-			  PAGE_SIZE,
+			  PG_SIZE,
 			  the_card.null_buffer_start_vaddr,
 			  the_card.null_buffer_start_dma_addr);
 clean_card:
@@ -1044,7 +1044,7 @@ static void snd_ps3_driver_remove(struct ps3_system_bus_device *dev)
 	snd_card_free(the_card.card);
 
 	dma_free_coherent(&dev->core,
-			  PAGE_SIZE,
+			  PG_SIZE,
 			  the_card.null_buffer_start_vaddr,
 			  the_card.null_buffer_start_dma_addr);
 

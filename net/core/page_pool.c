@@ -533,7 +533,7 @@ static bool page_pool_dma_map(struct page_pool *pool, netmem_ref netmem, gfp_t g
 	 * This mapping is kept for lifetime of page, until leaving pool.
 	 */
 	dma = dma_map_page_attrs(pool->p.dev, netmem_to_page(netmem), 0,
-				 (PAGE_SIZE << pool->p.order), pool->p.dma_dir,
+				 (PG_SIZE << pool->p.order), pool->p.dma_dir,
 				 DMA_ATTR_SKIP_CPU_SYNC |
 					 DMA_ATTR_WEAK_ORDERING);
 	if (dma_mapping_error(pool->p.dev, dma))
@@ -556,7 +556,7 @@ unset_failed:
 	page_pool_set_dma_addr_netmem(netmem, 0);
 unmap_failed:
 	dma_unmap_page_attrs(pool->p.dev, dma,
-			     PAGE_SIZE << pool->p.order, pool->p.dma_dir,
+			     PG_SIZE << pool->p.order, pool->p.dma_dir,
 			     DMA_ATTR_SKIP_CPU_SYNC | DMA_ATTR_WEAK_ORDERING);
 	return false;
 }
@@ -740,7 +740,7 @@ static __always_inline void __page_pool_release_netmem_dma(struct page_pool *poo
 
 	/* When page is unmapped, it cannot be returned to our pool */
 	dma_unmap_page_attrs(pool->p.dev, dma,
-			     PAGE_SIZE << pool->p.order, pool->p.dma_dir,
+			     PG_SIZE << pool->p.order, pool->p.dma_dir,
 			     DMA_ATTR_SKIP_CPU_SYNC | DMA_ATTR_WEAK_ORDERING);
 	page_pool_set_dma_addr_netmem(netmem, 0);
 }
@@ -1054,7 +1054,7 @@ netmem_ref page_pool_alloc_frag_netmem(struct page_pool *pool,
 				       unsigned int *offset, unsigned int size,
 				       gfp_t gfp)
 {
-	unsigned int max_size = PAGE_SIZE << pool->p.order;
+	unsigned int max_size = PG_SIZE << pool->p.order;
 	netmem_ref netmem = pool->frag_page;
 
 	if (WARN_ON(size > max_size))

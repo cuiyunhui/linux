@@ -1108,9 +1108,9 @@ static const struct snd_soc_dai_ops stm32_i2s_pcm_dai_ops = {
 
 static const struct snd_pcm_hardware stm32_i2s_pcm_hw = {
 	.info = SNDRV_PCM_INFO_INTERLEAVED | SNDRV_PCM_INFO_MMAP,
-	.buffer_bytes_max = 8 * PAGE_SIZE,
+	.buffer_bytes_max = 8 * PG_SIZE,
 	.period_bytes_min = 1024,
-	.period_bytes_max = 4 * PAGE_SIZE,
+	.period_bytes_max = 4 * PG_SIZE,
 	.periods_min = 2,
 	.periods_max = 8,
 };
@@ -1118,7 +1118,7 @@ static const struct snd_pcm_hardware stm32_i2s_pcm_hw = {
 static const struct snd_dmaengine_pcm_config stm32_i2s_pcm_config = {
 	.pcm_hardware	= &stm32_i2s_pcm_hw,
 	.prepare_slave_config = snd_dmaengine_pcm_prepare_slave_config,
-	.prealloc_buffer_size = PAGE_SIZE * 8,
+	.prealloc_buffer_size = PG_SIZE * 8,
 };
 
 static const struct snd_soc_component_driver stm32_i2s_component = {

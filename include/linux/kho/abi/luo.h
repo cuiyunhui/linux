@@ -112,7 +112,7 @@
  * In the root it also carries "liveupdate-number" 64-bit property that
  * corresponds to the number of live-updates performed on this machine.
  */
-#define LUO_FDT_SIZE		PAGE_SIZE
+#define LUO_FDT_SIZE		PG_SIZE
 #define LUO_FDT_KHO_ENTRY_NAME	"LUO"
 #define LUO_FDT_COMPATIBLE	"luo-v1"
 #define LUO_FDT_LIVEUPDATE_NUM	"liveupdate-number"

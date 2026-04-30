@@ -704,7 +704,7 @@ xchk_btree(
 	 * totally absurd size.
 	 */
 	cur_sz = xchk_btree_sizeof(cur->bc_nlevels);
-	if (cur_sz > PAGE_SIZE) {
+	if (cur_sz > PG_SIZE) {
 		xchk_btree_set_corrupt(sc, cur, 0);
 		return 0;
 	}

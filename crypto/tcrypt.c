@@ -106,14 +106,14 @@ static void sg_init_aead(struct scatterlist *sg, char *xbuf[XBUFSIZE],
 			 unsigned int buflen, const void *assoc,
 			 unsigned int aad_size)
 {
-	int np = (buflen + PAGE_SIZE - 1)/PAGE_SIZE;
+	int np = (buflen + PG_SIZE - 1)/PG_SIZE;
 	int k, rem;
 
 	if (np > XBUFSIZE) {
-		rem = PAGE_SIZE;
+		rem = PG_SIZE;
 		np = XBUFSIZE;
 	} else {
-		rem = buflen % PAGE_SIZE;
+		rem = buflen % PG_SIZE;
 	}
 
 	sg_init_table(sg, np + 1);
@@ -123,7 +123,7 @@ static void sg_init_aead(struct scatterlist *sg, char *xbuf[XBUFSIZE],
 	if (rem)
 		np--;
 	for (k = 0; k < np; k++)
-		sg_set_buf(&sg[k + 1], xbuf[k], PAGE_SIZE);
+		sg_set_buf(&sg[k + 1], xbuf[k], PG_SIZE);
 
 	if (rem)
 		sg_set_buf(&sg[k + 1], xbuf[k], rem);
@@ -256,7 +256,7 @@ static void test_mb_aead_speed(const char *algo, int enc, int secs,
 	int ret;
 
 
-	if (aad_size >= PAGE_SIZE) {
+	if (aad_size >= PG_SIZE) {
 		pr_err("associate data length (%u) too big\n", aad_size);
 		return;
 	}
@@ -336,10 +336,10 @@ static void test_mb_aead_speed(const char *algo, int enc, int secs,
 		do {
 			int bs = round_up(*b_size, crypto_aead_blocksize(tfm));
 
-			if (bs + authsize > XBUFSIZE * PAGE_SIZE) {
+			if (bs + authsize > XBUFSIZE * PG_SIZE) {
 				pr_err("template (%u) too big for buffer (%lu)\n",
 				       authsize + bs,
-				       XBUFSIZE * PAGE_SIZE);
+				       XBUFSIZE * PG_SIZE);
 				goto out;
 			}
 
@@ -348,7 +348,7 @@ static void test_mb_aead_speed(const char *algo, int enc, int secs,
 
 			/* Set up tfm global state, i.e. the key */
 
-			memset(tvmem[0], 0xff, PAGE_SIZE);
+			memset(tvmem[0], 0xff, PG_SIZE);
 			key = tvmem[0];
 			for (j = 0; j < tcount; j++) {
 				if (template[j].klen == *keysize) {
@@ -541,7 +541,7 @@ static void test_aead_speed(const char *algo, int enc, unsigned int secs,
 	if (!iv)
 		return;
 
-	if (aad_size >= PAGE_SIZE) {
+	if (aad_size >= PG_SIZE) {
 		pr_err("associate data length (%u) too big\n", aad_size);
 		goto out_noxbuf;
 	}
@@ -600,10 +600,10 @@ static void test_aead_speed(const char *algo, int enc, unsigned int secs,
 			assoc = axbuf[0];
 			memset(assoc, 0xff, aad_size);
 
-			if ((*keysize + bs) > TVMEMSIZE * PAGE_SIZE) {
+			if ((*keysize + bs) > TVMEMSIZE * PG_SIZE) {
 				pr_err("template (%u) too big for tvmem (%lu)\n",
 				       *keysize + bs,
-					TVMEMSIZE * PAGE_SIZE);
+					TVMEMSIZE * PG_SIZE);
 				goto out;
 			}
 
@@ -630,7 +630,7 @@ static void test_aead_speed(const char *algo, int enc, unsigned int secs,
 			pr_info("test %u (%d bit key, %d byte blocks): ",
 				i, *keysize * 8, bs);
 
-			memset(tvmem[0], 0xff, PAGE_SIZE);
+			memset(tvmem[0], 0xff, PG_SIZE);
 
 			sg_init_aead(sg, xbuf, bs + (enc ? 0 : authsize),
 				     assoc, aad_size);
@@ -704,8 +704,8 @@ static void test_hash_sg_init(struct scatterlist *sg)
 
 	sg_init_table(sg, TVMEMSIZE);
 	for (i = 0; i < TVMEMSIZE; i++) {
-		sg_set_buf(sg + i, tvmem[i], PAGE_SIZE);
-		memset(tvmem[i], 0xff, PAGE_SIZE);
+		sg_set_buf(sg + i, tvmem[i], PG_SIZE);
+		memset(tvmem[i], 0xff, PG_SIZE);
 	}
 }
 
@@ -905,9 +905,9 @@ static void test_ahash_speed_common(const char *algo, unsigned int secs,
 		goto out_nomem;
 
 	for (i = 0; speed[i].blen != 0; i++) {
-		if (speed[i].blen > TVMEMSIZE * PAGE_SIZE) {
+		if (speed[i].blen > TVMEMSIZE * PG_SIZE) {
 			pr_err("template (%u) too big for tvmem (%lu)\n",
-			       speed[i].blen, TVMEMSIZE * PAGE_SIZE);
+			       speed[i].blen, TVMEMSIZE * PG_SIZE);
 			break;
 		}
 
@@ -1120,9 +1120,9 @@ static void test_mb_skcipher_speed(const char *algo, int enc, int secs,
 		do {
 			u32 bs = round_up(*b_size, crypto_skcipher_blocksize(tfm));
 
-			if (bs > XBUFSIZE * PAGE_SIZE) {
+			if (bs > XBUFSIZE * PG_SIZE) {
 				pr_err("template (%u) too big for buffer (%lu)\n",
-				       bs, XBUFSIZE * PAGE_SIZE);
+				       bs, XBUFSIZE * PG_SIZE);
 				goto out;
 			}
 
@@ -1131,7 +1131,7 @@ static void test_mb_skcipher_speed(const char *algo, int enc, int secs,
 
 			/* Set up tfm global state, i.e. the key */
 
-			memset(tvmem[0], 0xff, PAGE_SIZE);
+			memset(tvmem[0], 0xff, PG_SIZE);
 			key = tvmem[0];
 			for (j = 0; j < tcount; j++) {
 				if (template[j].klen == *keysize) {
@@ -1158,17 +1158,17 @@ static void test_mb_skcipher_speed(const char *algo, int enc, int secs,
 			for (j = 0; j < num_mb; ++j) {
 				struct test_mb_skcipher_data *cur = &data[j];
 				unsigned int k = bs;
-				unsigned int pages = DIV_ROUND_UP(k, PAGE_SIZE);
+				unsigned int pages = DIV_ROUND_UP(k, PG_SIZE);
 				unsigned int p = 0;
 
 				sg_init_table(cur->sg, pages);
 
-				while (k > PAGE_SIZE) {
+				while (k > PG_SIZE) {
 					sg_set_buf(cur->sg + p, cur->xbuf[p],
-						   PAGE_SIZE);
-					memset(cur->xbuf[p], 0xff, PAGE_SIZE);
+						   PG_SIZE);
+					memset(cur->xbuf[p], 0xff, PG_SIZE);
 					p++;
-					k -= PAGE_SIZE;
+					k -= PG_SIZE;
 				}
 
 				sg_set_buf(cur->sg + p, cur->xbuf[p], k);
@@ -1338,17 +1338,17 @@ static void test_skcipher_speed(const char *algo, int enc, unsigned int secs,
 			u32 bs = round_up(*b_size, crypto_skcipher_blocksize(tfm));
 			struct scatterlist sg[TVMEMSIZE];
 
-			if ((*keysize + bs) > TVMEMSIZE * PAGE_SIZE) {
+			if ((*keysize + bs) > TVMEMSIZE * PG_SIZE) {
 				pr_err("template (%u) too big for "
 				       "tvmem (%lu)\n", *keysize + bs,
-				       TVMEMSIZE * PAGE_SIZE);
+				       TVMEMSIZE * PG_SIZE);
 				goto out_free_req;
 			}
 
 			pr_info("test %u (%d bit key, %d byte blocks): ", i,
 				*keysize * 8, bs);
 
-			memset(tvmem[0], 0xff, PAGE_SIZE);
+			memset(tvmem[0], 0xff, PG_SIZE);
 
 			/* set key, plain text and IV */
 			key = tvmem[0];
@@ -1369,18 +1369,18 @@ static void test_skcipher_speed(const char *algo, int enc, unsigned int secs,
 			}
 
 			k = *keysize + bs;
-			sg_init_table(sg, DIV_ROUND_UP(k, PAGE_SIZE));
+			sg_init_table(sg, DIV_ROUND_UP(k, PG_SIZE));
 
-			if (k > PAGE_SIZE) {
+			if (k > PG_SIZE) {
 				sg_set_buf(sg, tvmem[0] + *keysize,
-				   PAGE_SIZE - *keysize);
-				k -= PAGE_SIZE;
+				   PG_SIZE - *keysize);
+				k -= PG_SIZE;
 				j = 1;
-				while (k > PAGE_SIZE) {
-					sg_set_buf(sg + j, tvmem[j], PAGE_SIZE);
-					memset(tvmem[j], 0xff, PAGE_SIZE);
+				while (k > PG_SIZE) {
+					sg_set_buf(sg + j, tvmem[j], PG_SIZE);
+					memset(tvmem[j], 0xff, PG_SIZE);
 					j++;
-					k -= PAGE_SIZE;
+					k -= PG_SIZE;
 				}
 				sg_set_buf(sg + j, tvmem[j], k);
 				memset(tvmem[j], 0xff, k);

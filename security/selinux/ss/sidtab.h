@@ -34,8 +34,8 @@ union sidtab_entry_inner {
 };
 
 /* align node size to page boundary */
-#define SIDTAB_NODE_ALLOC_SHIFT PAGE_SHIFT
-#define SIDTAB_NODE_ALLOC_SIZE	PAGE_SIZE
+#define SIDTAB_NODE_ALLOC_SHIFT PG_SHIFT
+#define SIDTAB_NODE_ALLOC_SIZE	PG_SIZE
 
 #define size_to_shift(size) ((size) == 1 ? 1 : (const_ilog2((size)-1) + 1))
 

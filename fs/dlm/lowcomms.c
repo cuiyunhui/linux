@@ -119,7 +119,7 @@ struct listen_connection {
 	struct work_struct rwork;
 };
 
-#define DLM_WQ_REMAIN_BYTES(e) (PAGE_SIZE - e->end)
+#define DLM_WQ_REMAIN_BYTES(e) (PG_SIZE - e->end)
 #define DLM_WQ_LENGTH_BYTES(e) (e->end - e->offset)
 
 /* An entry waiting to be sent */
@@ -1266,7 +1266,7 @@ struct dlm_msg *dlm_lowcomms_new_msg(int nodeid, int len, char **ppc,
 
 	if (len > DLM_MAX_SOCKET_BUFSIZE ||
 	    len < sizeof(struct dlm_header)) {
-		BUILD_BUG_ON(PAGE_SIZE < DLM_MAX_SOCKET_BUFSIZE);
+		BUILD_BUG_ON(PG_SIZE < DLM_MAX_SOCKET_BUFSIZE);
 		log_print("failed to allocate a buffer of size %d", len);
 		WARN_ON_ONCE(1);
 		return NULL;

@@ -23,10 +23,10 @@
 static inline size_t cifs_io_align(struct fs_context *fc,
 				   const char *name, size_t size)
 {
-	if (!size || !IS_ALIGNED(size, PAGE_SIZE)) {
+	if (!size || !IS_ALIGNED(size, PG_SIZE)) {
 		cifs_errorf(fc, "unaligned %s, making it a multiple of %lu bytes\n",
-			    name, PAGE_SIZE);
-		size = umax(round_down(size, PAGE_SIZE), PAGE_SIZE);
+			    name, PG_SIZE);
+		size = umax(round_down(size, PG_SIZE), PG_SIZE);
 	}
 	return size;
 }
@@ -402,10 +402,10 @@ static inline void cifs_negotiate_rsize(struct TCP_Server_Info *server,
 {
 	unsigned int size;
 
-	size = umax(server->ops->negotiate_rsize(tcon, ctx), PAGE_SIZE);
+	size = umax(server->ops->negotiate_rsize(tcon, ctx), PG_SIZE);
 	if (ctx->rsize)
-		size = umax(umin(ctx->rsize, size), PAGE_SIZE);
-	ctx->rsize = round_down(size, PAGE_SIZE);
+		size = umax(umin(ctx->rsize, size), PG_SIZE);
+	ctx->rsize = round_down(size, PG_SIZE);
 }
 
 static inline void cifs_negotiate_wsize(struct TCP_Server_Info *server,
@@ -414,10 +414,10 @@ static inline void cifs_negotiate_wsize(struct TCP_Server_Info *server,
 {
 	unsigned int size;
 
-	size = umax(server->ops->negotiate_wsize(tcon, ctx), PAGE_SIZE);
+	size = umax(server->ops->negotiate_wsize(tcon, ctx), PG_SIZE);
 	if (ctx->wsize)
-		size = umax(umin(ctx->wsize, size), PAGE_SIZE);
-	ctx->wsize = round_down(size, PAGE_SIZE);
+		size = umax(umin(ctx->wsize, size), PG_SIZE);
+	ctx->wsize = round_down(size, PG_SIZE);
 }
 
 static inline void cifs_negotiate_iosize(struct TCP_Server_Info *server,

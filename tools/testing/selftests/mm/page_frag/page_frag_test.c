@@ -130,7 +130,7 @@ static int __init page_frag_test_init(void)
 	atomic_set(&nthreads, 2);
 	init_completion(&wait);
 
-	if (test_alloc_len > PAGE_SIZE || test_alloc_len <= 0 ||
+	if (test_alloc_len > PG_SIZE || test_alloc_len <= 0 ||
 	    !cpu_active(test_push_cpu) || !cpu_active(test_pop_cpu))
 		return -EINVAL;
 

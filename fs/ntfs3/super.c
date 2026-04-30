@@ -977,10 +977,10 @@ static int ntfs_init_from_boot(struct super_block *sb, u32 sector_size,
 	/* Save original dev_size. Used with alternative boot. */
 	dev_size0 = dev_size;
 
-	sbi->volume.blocks = dev_size >> PAGE_SHIFT;
+	sbi->volume.blocks = dev_size >> PG_SHIFT;
 
 	/* Set dummy blocksize to read boot_block. */
-	if (!sb_min_blocksize(sb, PAGE_SIZE)) {
+	if (!sb_min_blocksize(sb, PG_SIZE)) {
 		return -EINVAL;
 	}
 
@@ -1181,7 +1181,7 @@ read_boot:
 	rec->total = cpu_to_le32(sbi->record_size);
 	((struct ATTRIB *)Add2Ptr(rec, ao))->type = ATTR_END;
 
-	sb_set_blocksize(sb, min_t(u32, sbi->cluster_size, PAGE_SIZE));
+	sb_set_blocksize(sb, min_t(u32, sbi->cluster_size, PG_SIZE));
 
 	sbi->block_mask = sb->s_blocksize - 1;
 	sbi->blocks_per_cluster = sbi->cluster_size >> sb->s_blocksize_bits;
@@ -1222,8 +1222,8 @@ read_boot:
 out:
 	brelse(bh);
 
-	if (err == -EINVAL && !boot_block && dev_size0 > PAGE_SHIFT) {
-		u32 block_size = min_t(u32, sector_size, PAGE_SIZE);
+	if (err == -EINVAL && !boot_block && dev_size0 > PG_SHIFT) {
+		u32 block_size = min_t(u32, sector_size, PG_SIZE);
 		u64 lbo = dev_size0 - sizeof(*boot);
 
 		boot_block = lbo >> blksize_bits(block_size);
@@ -1725,7 +1725,7 @@ void ntfs_unmap_meta(struct super_block *sb, CLST lcn, CLST len)
 	unsigned long blocks = (u64)len * sbi->blocks_per_cluster;
 	unsigned long cnt = 0;
 	unsigned long limit = global_zone_page_state(NR_FREE_PAGES)
-			      << (PAGE_SHIFT - sb->s_blocksize_bits);
+			      << (PG_SHIFT - sb->s_blocksize_bits);
 
 	if (limit >= 0x2000)
 		limit -= 0x1000;

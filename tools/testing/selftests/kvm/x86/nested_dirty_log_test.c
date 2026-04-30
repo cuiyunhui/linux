@@ -31,7 +31,7 @@
 #define TEST_MEM_BASE			0xc0000000
 #define TEST_MEM_ALIAS_BASE		0xc0002000
 
-#define TEST_GUEST_ADDR(base, idx)	((base) + (idx) * PAGE_SIZE)
+#define TEST_GUEST_ADDR(base, idx)	((base) + (idx) * PG_SIZE)
 
 #define TEST_GVA(idx)			TEST_GUEST_ADDR(TEST_MEM_BASE, idx)
 #define TEST_GPA(idx)			TEST_GUEST_ADDR(TEST_MEM_BASE, idx)
@@ -143,7 +143,7 @@ static void l1_guest_code(void *data)
 static void test_handle_ucall_sync(struct kvm_vm *vm, u64 arg,
 				   unsigned long *bmap)
 {
-	vm_vaddr_t gva = arg & ~(PAGE_SIZE - 1);
+	vm_vaddr_t gva = arg & ~(PG_SIZE - 1);
 	int page_nr, i;
 
 	/*
@@ -159,9 +159,9 @@ static void test_handle_ucall_sync(struct kvm_vm *vm, u64 arg,
 	if (!gva)
 		page_nr = 0;
 	else if (gva >= TEST_MEM_ALIAS_BASE)
-		page_nr = (gva - TEST_MEM_ALIAS_BASE) >> PAGE_SHIFT;
+		page_nr = (gva - TEST_MEM_ALIAS_BASE) >> PG_SHIFT;
 	else
-		page_nr = (gva - TEST_MEM_BASE) >> PAGE_SHIFT;
+		page_nr = (gva - TEST_MEM_BASE) >> PG_SHIFT;
 	TEST_ASSERT(page_nr == 0 || page_nr == 1,
 		    "Test bug, unexpected frame number '%u' for arg = %lx", page_nr, arg);
 	TEST_ASSERT(gva || (arg & TEST_SYNC_NO_FAULT),
@@ -246,8 +246,8 @@ static void test_dirty_log(bool nested_tdp)
 	 */
 	if (nested_tdp) {
 		tdp_identity_map_default_memslots(vm);
-		tdp_map(vm, TEST_ALIAS_GPA(0), TEST_GPA(0), PAGE_SIZE);
-		tdp_map(vm, TEST_ALIAS_GPA(1), TEST_GPA(1), PAGE_SIZE);
+		tdp_map(vm, TEST_ALIAS_GPA(0), TEST_GPA(0), PG_SIZE);
+		tdp_map(vm, TEST_ALIAS_GPA(1), TEST_GPA(1), PG_SIZE);
 
 		*tdp_get_pte(vm, TEST_ALIAS_GPA(0)) |= PTE_DIRTY_MASK(&vm->stage2_mmu);
 		*tdp_get_pte(vm, TEST_ALIAS_GPA(1)) |= PTE_DIRTY_MASK(&vm->stage2_mmu);
@@ -259,7 +259,7 @@ static void test_dirty_log(bool nested_tdp)
 	bmap = bitmap_zalloc(TEST_MEM_PAGES);
 
 	while (!done) {
-		memset(TEST_HVA(vm, 0), 0xaa, TEST_MEM_PAGES * PAGE_SIZE);
+		memset(TEST_HVA(vm, 0), 0xaa, TEST_MEM_PAGES * PG_SIZE);
 
 		vcpu_run(vcpu);
 		TEST_ASSERT_KVM_EXIT_REASON(vcpu, KVM_EXIT_IO);

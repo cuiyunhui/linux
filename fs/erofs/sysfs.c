@@ -144,7 +144,7 @@ static ssize_t erofs_attr_show(struct kobject *kobj,
 			return 0;
 		return sysfs_emit(buf, "%d\n", *(bool *)ptr);
 	case attr_accel:
-		return z_erofs_crypto_show_engines(buf, PAGE_SIZE, '\n');
+		return z_erofs_crypto_show_engines(buf, PG_SIZE, '\n');
 	}
 	return 0;
 }

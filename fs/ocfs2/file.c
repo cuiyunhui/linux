@@ -484,7 +484,7 @@ int ocfs2_truncate_file(struct inode *inode,
 
 	if (OCFS2_I(inode)->ip_dyn_features & OCFS2_INLINE_DATA_FL) {
 		unmap_mapping_range(inode->i_mapping,
-				    new_i_size + PAGE_SIZE - 1, 0, 1);
+				    new_i_size + PG_SIZE - 1, 0, 1);
 		truncate_inode_pages(inode->i_mapping, new_i_size);
 		status = ocfs2_truncate_inline(inode, di_bh, new_i_size,
 					       i_size_read(inode), 1);
@@ -504,7 +504,7 @@ int ocfs2_truncate_file(struct inode *inode,
 		goto bail_unlock_sem;
 	}
 
-	unmap_mapping_range(inode->i_mapping, new_i_size + PAGE_SIZE - 1, 0, 1);
+	unmap_mapping_range(inode->i_mapping, new_i_size + PG_SIZE - 1, 0, 1);
 	truncate_inode_pages(inode->i_mapping, new_i_size);
 
 	status = ocfs2_commit_truncate(osb, inode, di_bh);
@@ -757,14 +757,14 @@ static int ocfs2_write_zero_page(struct inode *inode, u64 abs_from,
 {
 	struct address_space *mapping = inode->i_mapping;
 	struct folio *folio;
-	unsigned long index = abs_from >> PAGE_SHIFT;
+	unsigned long index = abs_from >> PG_SHIFT;
 	handle_t *handle;
 	int ret = 0;
 	unsigned zero_from, zero_to, block_start, block_end;
 	struct ocfs2_dinode *di = (struct ocfs2_dinode *)di_bh->b_data;
 
 	BUG_ON(abs_from >= abs_to);
-	BUG_ON(abs_to > (((u64)index + 1) << PAGE_SHIFT));
+	BUG_ON(abs_to > (((u64)index + 1) << PG_SHIFT));
 	BUG_ON(abs_from & (inode->i_blkbits - 1));
 
 	handle = ocfs2_zero_start_ordered_transaction(inode, di_bh,
@@ -944,7 +944,7 @@ static int ocfs2_zero_extend_range(struct inode *inode, u64 range_start,
 	BUG_ON(range_start >= range_end);
 
 	while (zero_pos < range_end) {
-		next_pos = (zero_pos & PAGE_MASK) + PAGE_SIZE;
+		next_pos = (zero_pos & PG_MASK) + PG_SIZE;
 		if (next_pos > range_end)
 			next_pos = range_end;
 		rc = ocfs2_write_zero_page(inode, zero_pos, next_pos, di_bh);
@@ -2741,8 +2741,8 @@ static loff_t ocfs2_remap_file_range(struct file *file_in, loff_t pos_in,
 
 	/* Zap any page cache for the destination file's range. */
 	truncate_inode_pages_range(&inode_out->i_data,
-				   round_down(pos_out, PAGE_SIZE),
-				   round_up(pos_out + len, PAGE_SIZE) - 1);
+				   round_down(pos_out, PG_SIZE),
+				   round_up(pos_out + len, PG_SIZE) - 1);
 
 	remapped = ocfs2_reflink_remap_blocks(inode_in, in_bh, pos_in,
 			inode_out, out_bh, pos_out, len);

@@ -327,7 +327,7 @@ static int snd_atiixp_update_bits(struct atiixp *chip, unsigned int reg,
  */
 
 #define ATI_DESC_LIST_SIZE \
-	PAGE_ALIGN(ATI_MAX_DESCRIPTORS * sizeof(struct atiixp_dma_desc))
+	PG_ALIGN(ATI_MAX_DESCRIPTORS * sizeof(struct atiixp_dma_desc))
 
 /*
  * build packets ring for the given buffer size.

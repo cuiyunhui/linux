@@ -77,7 +77,7 @@ static inline bool is_via_compact_memory(int order) { return false; }
 #elif defined CONFIG_HUGETLBFS
 #define COMPACTION_HPAGE_ORDER	HUGETLB_PAGE_ORDER
 #else
-#define COMPACTION_HPAGE_ORDER	(PMD_SHIFT - PAGE_SHIFT)
+#define COMPACTION_HPAGE_ORDER	(PMD_SHIFT - PG_SHIFT)
 #endif
 
 static struct page *mark_allocated_noprof(struct page *page, unsigned int order, gfp_t gfp_flags)

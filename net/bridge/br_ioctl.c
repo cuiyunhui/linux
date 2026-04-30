@@ -61,8 +61,8 @@ static int get_fdb_entries(struct net_bridge *br, void __user *userbuf,
 	size_t size;
 
 	/* Clamp size to PAGE_SIZE, test maxnum to avoid overflow */
-	if (maxnum > PAGE_SIZE/sizeof(struct __fdb_entry))
-		maxnum = PAGE_SIZE/sizeof(struct __fdb_entry);
+	if (maxnum > PG_SIZE/sizeof(struct __fdb_entry))
+		maxnum = PG_SIZE/sizeof(struct __fdb_entry);
 
 	size = maxnum * sizeof(struct __fdb_entry);
 

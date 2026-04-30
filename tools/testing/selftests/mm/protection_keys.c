@@ -668,7 +668,7 @@ static void *malloc_pkey_with_mprotect(long size, int prot, u16 pkey)
 	pkey_assert(pkey < NR_PKEYS);
 	ptr = mmap(NULL, size, prot, MAP_ANONYMOUS|MAP_PRIVATE, -1, 0);
 	pkey_assert(ptr != (void *)-1);
-	ret = mprotect_pkey((void *)ptr, PAGE_SIZE, prot, pkey);
+	ret = mprotect_pkey((void *)ptr, PG_SIZE, prot, pkey);
 	pkey_assert(!ret);
 	record_pkey_malloc(ptr, size, prot);
 	read_pkey_reg();
@@ -1056,7 +1056,7 @@ static void test_kernel_gup_of_access_disabled_region(int *ptr, u16 pkey)
 		 "having kernel vmsplice from buffer\n", pkey);
 	pkey_access_deny(pkey);
 	iov.iov_base = ptr;
-	iov.iov_len = PAGE_SIZE;
+	iov.iov_len = PG_SIZE;
 	vmsplice_ret = vmsplice(pipe_fds[1], &iov, 1, SPLICE_F_GIFT);
 	dprintf1("vmsplice() ret: %d\n", vmsplice_ret);
 	pkey_assert(vmsplice_ret == -1);
@@ -1100,7 +1100,7 @@ static void test_pkey_syscalls_on_non_allocated_pkey(int *ptr, u16 pkey)
 		err = sys_pkey_free(i);
 		pkey_assert(err);
 
-		err = sys_mprotect_pkey(ptr, PAGE_SIZE, PROT_READ, i);
+		err = sys_mprotect_pkey(ptr, PG_SIZE, PROT_READ, i);
 		pkey_assert(err);
 	}
 }
@@ -1112,7 +1112,7 @@ static void test_pkey_syscalls_bad_args(int *ptr, u16 pkey)
 	int bad_pkey = NR_PKEYS+99;
 
 	/* pass a known-invalid pkey in: */
-	err = sys_mprotect_pkey(ptr, PAGE_SIZE, PROT_READ, bad_pkey);
+	err = sys_mprotect_pkey(ptr, PG_SIZE, PROT_READ, bad_pkey);
 	pkey_assert(err);
 }
 
@@ -1312,7 +1312,7 @@ static void test_ptrace_of_child(int *ptr, u16 pkey)
 	 * we can always access it when ptracing.
 	 */
 	int *plain_ptr_unaligned = malloc(HPAGE_SIZE);
-	int *plain_ptr = ALIGN_PTR_UP(plain_ptr_unaligned, PAGE_SIZE);
+	int *plain_ptr = ALIGN_PTR_UP(plain_ptr_unaligned, PG_SIZE);
 
 	/*
 	 * Fork a child which is an exact copy of this process, of course.
@@ -1380,19 +1380,19 @@ static void *get_pointer_to_instructions(void)
 {
 	void *p1;
 
-	p1 = ALIGN_PTR_UP(&lots_o_noops_around_write, PAGE_SIZE);
+	p1 = ALIGN_PTR_UP(&lots_o_noops_around_write, PG_SIZE);
 	dprintf3("&lots_o_noops: %p\n", &lots_o_noops_around_write);
 	/* lots_o_noops_around_write should be page-aligned already */
 	assert(p1 == &lots_o_noops_around_write);
 
 	/* Point 'p1' at the *second* page of the function: */
-	p1 += PAGE_SIZE;
+	p1 += PG_SIZE;
 
 	/*
 	 * Try to ensure we fault this in on next touch to ensure
 	 * we get an instruction fault as opposed to a data one
 	 */
-	madvise(p1, PAGE_SIZE, MADV_DONTNEED);
+	madvise(p1, PG_SIZE, MADV_DONTNEED);
 
 	return p1;
 }
@@ -1409,7 +1409,7 @@ static void test_executing_on_unreadable_memory(int *ptr, u16 pkey)
 	ptr_contents = read_ptr(p1);
 	dprintf2("ptr (%p) contents@%d: %x\n", p1, __LINE__, ptr_contents);
 
-	ret = mprotect_pkey(p1, PAGE_SIZE, PROT_EXEC, (u64)pkey);
+	ret = mprotect_pkey(p1, PG_SIZE, PROT_EXEC, (u64)pkey);
 	pkey_assert(!ret);
 	pkey_access_deny(pkey);
 
@@ -1418,14 +1418,14 @@ static void test_executing_on_unreadable_memory(int *ptr, u16 pkey)
 	/*
 	 * Make sure this is an *instruction* fault
 	 */
-	madvise(p1, PAGE_SIZE, MADV_DONTNEED);
+	madvise(p1, PG_SIZE, MADV_DONTNEED);
 	lots_o_noops_around_write(&scratch);
 	do_not_expect_pkey_fault("executing on PROT_EXEC memory");
 	expect_fault_on_read_execonly_key(p1, pkey);
 
 	// Reset back to PROT_EXEC | PROT_READ for architectures that support
 	// non-PKEY execute-only permissions.
-	ret = mprotect_pkey(p1, PAGE_SIZE, PROT_EXEC | PROT_READ, (u64)pkey);
+	ret = mprotect_pkey(p1, PG_SIZE, PROT_EXEC | PROT_READ, (u64)pkey);
 	pkey_assert(!ret);
 }
 
@@ -1444,7 +1444,7 @@ static void test_implicit_mprotect_exec_only_memory(int *ptr, u16 pkey)
 	dprintf2("ptr (%p) contents@%d: %x\n", p1, __LINE__, ptr_contents);
 
 	/* Use a *normal* mprotect(), not mprotect_pkey(): */
-	ret = mprotect(p1, PAGE_SIZE, PROT_EXEC);
+	ret = mprotect(p1, PG_SIZE, PROT_EXEC);
 	pkey_assert(!ret);
 
 	/*
@@ -1457,7 +1457,7 @@ static void test_implicit_mprotect_exec_only_memory(int *ptr, u16 pkey)
 	dprintf2("pkey_reg: %016llx\n", read_pkey_reg());
 
 	/* Make sure this is an *instruction* fault */
-	madvise(p1, PAGE_SIZE, MADV_DONTNEED);
+	madvise(p1, PG_SIZE, MADV_DONTNEED);
 	lots_o_noops_around_write(&scratch);
 	do_not_expect_pkey_fault("executing on PROT_EXEC memory");
 	expect_fault_on_read_execonly_key(p1, UNKNOWN_PKEY);
@@ -1468,10 +1468,10 @@ static void test_implicit_mprotect_exec_only_memory(int *ptr, u16 pkey)
 	 * again.  Go to PROT_NONE first to check for a kernel bug
 	 * that did not clear the pkey when doing PROT_NONE.
 	 */
-	ret = mprotect(p1, PAGE_SIZE, PROT_NONE);
+	ret = mprotect(p1, PG_SIZE, PROT_NONE);
 	pkey_assert(!ret);
 
-	ret = mprotect(p1, PAGE_SIZE, PROT_READ|PROT_EXEC);
+	ret = mprotect(p1, PG_SIZE, PROT_READ|PROT_EXEC);
 	pkey_assert(!ret);
 	ptr_contents = read_ptr(p1);
 	do_not_expect_pkey_fault("plain read on recently PROT_EXEC area");
@@ -1680,7 +1680,7 @@ static void test_ptrace_modifies_pkru(int *ptr, u16 pkey)
 
 static void test_mprotect_pkey_on_unsupported_cpu(int *ptr, u16 pkey)
 {
-	int size = PAGE_SIZE;
+	int size = PG_SIZE;
 	int sret;
 
 	if (cpu_has_pkeys()) {
@@ -1733,7 +1733,7 @@ static void run_tests_once(void)
 		tracing_on();
 		pkey = alloc_random_pkey();
 		dprintf1("test %d starting with pkey: %d\n", test_nr, pkey);
-		ptr = malloc_pkey(PAGE_SIZE, prot, pkey);
+		ptr = malloc_pkey(PG_SIZE, prot, pkey);
 		dprintf1("test %d starting...\n", test_nr);
 		pkey_tests[test_nr](ptr, pkey);
 		dprintf1("freeing test memory: %p\n", ptr);
@@ -1769,7 +1769,7 @@ int main(void)
 	printf("has pkeys: %d\n", pkeys_supported);
 
 	if (!pkeys_supported) {
-		int size = PAGE_SIZE;
+		int size = PG_SIZE;
 		int *ptr;
 
 		printf("running PKEY tests for unsupported CPU/OS\n");

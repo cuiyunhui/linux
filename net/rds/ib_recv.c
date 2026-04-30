@@ -811,7 +811,7 @@ static void rds_ib_cong_recv(struct rds_connection *conn,
 		__le64 *src, *dst;
 		unsigned int k;
 
-		to_copy = min(RDS_FRAG_SIZE - frag_off, PAGE_SIZE - map_off);
+		to_copy = min(RDS_FRAG_SIZE - frag_off, PG_SIZE - map_off);
 		BUG_ON(to_copy & 7); /* Must be 64bit aligned. */
 
 		addr = kmap_atomic(sg_page(&frag->f_sg));
@@ -829,7 +829,7 @@ static void rds_ib_cong_recv(struct rds_connection *conn,
 		copied += to_copy;
 
 		map_off += to_copy;
-		if (map_off == PAGE_SIZE) {
+		if (map_off == PG_SIZE) {
 			map_off = 0;
 			map_page++;
 		}
@@ -1061,7 +1061,7 @@ int rds_ib_recv_init(void)
 
 	/* Default to 30% of all available RAM for recv memory */
 	si_meminfo(&si);
-	rds_ib_sysctl_max_recv_allocation = si.totalram / 3 * PAGE_SIZE / RDS_FRAG_SIZE;
+	rds_ib_sysctl_max_recv_allocation = si.totalram / 3 * PG_SIZE / RDS_FRAG_SIZE;
 
 	rds_ib_incoming_slab =
 		kmem_cache_create_usercopy("rds_ib_incoming",

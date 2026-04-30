@@ -16,11 +16,11 @@
  */
 
 #define xen_pfn_to_page(xen_pfn)	\
-	(pfn_to_page((unsigned long)(xen_pfn) >> (PAGE_SHIFT - XEN_PAGE_SHIFT)))
+	(pfn_to_page((unsigned long)(xen_pfn) >> (PG_SHIFT - XEN_PAGE_SHIFT)))
 #define page_to_xen_pfn(page)		\
-	((page_to_pfn(page)) << (PAGE_SHIFT - XEN_PAGE_SHIFT))
+	((page_to_pfn(page)) << (PG_SHIFT - XEN_PAGE_SHIFT))
 
-#define XEN_PFN_PER_PAGE	(PAGE_SIZE / XEN_PAGE_SIZE)
+#define XEN_PFN_PER_PAGE	(PG_SIZE / XEN_PAGE_SIZE)
 
 #define XEN_PFN_DOWN(x)	((x) >> XEN_PAGE_SHIFT)
 #define XEN_PFN_UP(x)	(((x) + XEN_PAGE_SIZE-1) >> XEN_PAGE_SHIFT)

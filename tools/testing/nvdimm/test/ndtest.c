@@ -674,7 +674,7 @@ static ssize_t flags_show(struct device *dev,
 
 	flags = dimm->flags;
 
-	seq_buf_init(&s, buf, PAGE_SIZE);
+	seq_buf_init(&s, buf, PG_SIZE);
 	if (flags & PAPR_PMEM_UNARMED_MASK)
 		seq_buf_printf(&s, "not_armed ");
 

@@ -138,7 +138,7 @@ bool __kasan_unpoison_pages(struct page *page, unsigned int order, bool init)
 
 	tag = kasan_random_tag();
 	kasan_unpoison(set_tag(page_address(page), tag),
-		       PAGE_SIZE << order, init);
+		       PG_SIZE << order, init);
 	for (i = 0; i < (1 << order); i++)
 		page_kasan_tag_set(page + i, tag);
 
@@ -148,7 +148,7 @@ bool __kasan_unpoison_pages(struct page *page, unsigned int order, bool init)
 void __kasan_poison_pages(struct page *page, unsigned int order, bool init)
 {
 	if (likely(!PageHighMem(page)))
-		kasan_poison(page_address(page), PAGE_SIZE << order,
+		kasan_poison(page_address(page), PG_SIZE << order,
 			     KASAN_PAGE_FREE, init);
 }
 
@@ -505,7 +505,7 @@ bool __kasan_mempool_poison_pages(struct page *page, unsigned int order,
 	if (check_page_allocation(ptr, ip))
 		return false;
 
-	kasan_poison(ptr, PAGE_SIZE << order, KASAN_PAGE_FREE, false);
+	kasan_poison(ptr, PG_SIZE << order, KASAN_PAGE_FREE, false);
 
 	return true;
 }

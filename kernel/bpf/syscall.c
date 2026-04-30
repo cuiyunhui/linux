@@ -94,7 +94,7 @@ int bpf_check_uarg_tail_zero(bpfptr_t uaddr,
 {
 	int res;
 
-	if (unlikely(actual_size > PAGE_SIZE))	/* silly large */
+	if (unlikely(actual_size > PG_SIZE))	/* silly large */
 		return -E2BIG;
 
 	if (actual_size <= expected_size)
@@ -222,7 +222,7 @@ static int bpf_obj_pin_uptrs(struct btf_record *rec, void *obj)
 		}
 
 		/* The uptr's struct cannot span across two pages */
-		if ((start & PAGE_MASK) != (end & PAGE_MASK)) {
+		if ((start & PG_MASK) != (end & PG_MASK)) {
 			err = -EOPNOTSUPP;
 			goto unpin_all;
 		}
@@ -237,7 +237,7 @@ static int bpf_obj_pin_uptrs(struct btf_record *rec, void *obj)
 			goto unpin_all;
 		}
 
-		*uptr_addr = page_address(page) + offset_in_page(start);
+		*uptr_addr = page_address(page) + offset_in_pg(start);
 	}
 
 	return 0;
@@ -391,10 +391,10 @@ static void *__bpf_map_area_alloc(u64 size, int numa_node, bool mmapable)
 
 	/* kmalloc()'ed memory can't be mmap()'ed */
 	if (mmapable) {
-		BUG_ON(!PAGE_ALIGNED(size));
+		BUG_ON(!PG_ALIGNED(size));
 		align = SHMLBA;
 		flags = VM_USERMAP;
-	} else if (size <= (PAGE_SIZE << PAGE_ALLOC_COSTLY_ORDER)) {
+	} else if (size <= (PG_SIZE << PAGE_ALLOC_COSTLY_ORDER)) {
 		area = kmalloc_node(size, gfp | GFP_USER | __GFP_NORETRY,
 				    numa_node);
 		if (area != NULL)
@@ -2505,7 +2505,7 @@ static void bpf_prog_show_fdinfo(struct seq_file *m, struct file *filp)
 		   prog->type,
 		   prog->jited,
 		   prog_tag,
-		   prog->pages * 1ULL << PAGE_SHIFT,
+		   prog->pages * 1ULL << PG_SHIFT,
 		   prog->aux->id,
 		   stats.nsecs,
 		   stats.cnt,

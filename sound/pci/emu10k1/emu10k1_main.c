@@ -1563,7 +1563,7 @@ int snd_emu10k1_create(struct snd_card *card,
 		return err;
 	emu->port = pci_resource_start(pci, 0);
 
-	emu->max_cache_pages = max_cache_bytes >> PAGE_SHIFT;
+	emu->max_cache_pages = max_cache_bytes >> PG_SHIFT;
 
 	page_table_size = sizeof(u32) * (emu->address_mode ? MAXPAGES1 :
 					 MAXPAGES0);
@@ -1589,7 +1589,7 @@ int snd_emu10k1_create(struct snd_card *card,
 		(unsigned long)(emu->silent_page.addr +
 				emu->silent_page.bytes));
 
-	emu->memhdr = snd_util_memhdr_new(emu->max_cache_pages * PAGE_SIZE);
+	emu->memhdr = snd_util_memhdr_new(emu->max_cache_pages * PG_SIZE);
 	if (!emu->memhdr)
 		return -ENOMEM;
 	emu->memhdr->block_extra_size = sizeof(struct snd_emu10k1_memblk) -

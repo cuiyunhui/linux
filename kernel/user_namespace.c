@@ -944,7 +944,7 @@ static ssize_t map_write(struct file *file, const char __user *buf,
 	ssize_t ret;
 
 	/* Only allow < page size writes at the beginning of the file */
-	if ((*ppos != 0) || (count >= PAGE_SIZE))
+	if ((*ppos != 0) || (count >= PG_SIZE))
 		return -EINVAL;
 
 	/* Slurp in the user data */

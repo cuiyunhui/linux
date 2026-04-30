@@ -855,7 +855,7 @@ static noinline int prepare_one_folio(struct inode *inode, struct folio **folio_
 				      loff_t pos, size_t write_bytes,
 				      bool nowait)
 {
-	const pgoff_t index = pos >> PAGE_SHIFT;
+	const pgoff_t index = pos >> PG_SHIFT;
 	gfp_t mask = get_prepare_gfp_flags(inode, nowait);
 	fgf_t fgp_flags = (nowait ? FGP_WRITEBEGIN | FGP_NOWAIT : FGP_WRITEBEGIN) |
 			  fgf_set_order(write_bytes);
@@ -1947,7 +1947,7 @@ again:
 		goto again;
 	}
 
-	if (folio_contains(folio, (size - 1) >> PAGE_SHIFT)) {
+	if (folio_contains(folio, (size - 1) >> PG_SHIFT)) {
 		reserved_space = round_up(size - page_start, fs_info->sectorsize);
 		if (reserved_space < fsize) {
 			const u64 to_free = fsize - reserved_space;
@@ -2239,10 +2239,10 @@ static bool check_range_has_page(struct inode *inode, u64 start, u64 end)
 	 *
 	 * And do not decrease page_lockend right now, as it can be 0.
 	 */
-	const u64 page_lockstart = round_up(start, PAGE_SIZE);
-	const u64 page_lockend = round_down(end + 1, PAGE_SIZE);
-	const pgoff_t start_index = page_lockstart >> PAGE_SHIFT;
-	const pgoff_t end_index = (page_lockend - 1) >> PAGE_SHIFT;
+	const u64 page_lockstart = round_up(start, PG_SIZE);
+	const u64 page_lockend = round_down(end + 1, PG_SIZE);
+	const pgoff_t start_index = page_lockstart >> PG_SHIFT;
+	const pgoff_t end_index = (page_lockend - 1) >> PG_SHIFT;
 	pgoff_t tmp = start_index;
 	int found_folios;
 

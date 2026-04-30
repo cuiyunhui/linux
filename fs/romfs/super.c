@@ -115,7 +115,7 @@ static int romfs_read_folio(struct file *file, struct folio *folio)
 	ret = 0;
 	if (offset < size) {
 		size -= offset;
-		fillsize = size > PAGE_SIZE ? PAGE_SIZE : size;
+		fillsize = size > PG_SIZE ? PG_SIZE : size;
 
 		pos = ROMFS_I(inode)->i_dataoffset + offset;
 

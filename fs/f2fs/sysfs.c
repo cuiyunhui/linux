@@ -1941,9 +1941,9 @@ static int __maybe_unused donation_list_seq_show(struct seq_file *seq,
 				path ? path : "<unlinked>",
 				is_inode_flag_set(inode, FI_DONATE_FINISHED) ?
 				"Evicted" : "Donated",
-				(loff_t)fi->donate_start << (PAGE_SHIFT - 10),
-				(loff_t)(fi->donate_end + 1) << (PAGE_SHIFT - 10),
-				(loff_t)inode->i_mapping->nrpages << (PAGE_SHIFT - 10));
+				(loff_t)fi->donate_start << (PG_SHIFT - 10),
+				(loff_t)(fi->donate_end + 1) << (PG_SHIFT - 10),
+				(loff_t)inode->i_mapping->nrpages << (PG_SHIFT - 10));
 next:
 		dput(dentry);
 		inode_unlock_shared(inode);

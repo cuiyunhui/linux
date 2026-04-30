@@ -87,7 +87,7 @@ int ramfs_nommu_expand_for_mapping(struct inode *inode, size_t newsize)
 
 	/* split the high-order page into an array of single pages */
 	xpages = 1UL << order;
-	npages = (newsize + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	npages = (newsize + PG_SIZE - 1) >> PG_SHIFT;
 
 	split_page(pages, order);
 
@@ -96,7 +96,7 @@ int ramfs_nommu_expand_for_mapping(struct inode *inode, size_t newsize)
 		__free_page(pages + loop);
 
 	/* clear the memory we allocated */
-	newsize = PAGE_SIZE * npages;
+	newsize = PG_SIZE * npages;
 	data = page_address(pages);
 	memset(data, 0, newsize);
 
@@ -209,11 +209,11 @@ static unsigned long ramfs_nommu_get_unmapped_area(struct file *file,
 	loff_t isize;
 
 	/* the mapping mustn't extend beyond the EOF */
-	lpages = (len + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	lpages = (len + PG_SIZE - 1) >> PG_SHIFT;
 	isize = i_size_read(inode);
 
 	ret = -ENOSYS;
-	maxpages = (isize + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	maxpages = (isize + PG_SIZE - 1) >> PG_SHIFT;
 	if (pgoff >= maxpages)
 		goto out;
 

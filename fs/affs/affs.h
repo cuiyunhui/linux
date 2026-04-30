@@ -23,7 +23,7 @@
 #define AFFS_DATA_HEAD(bh)	((struct affs_data_head *)(bh)->b_data)
 #define AFFS_DATA(bh)		(((struct affs_data_head *)(bh)->b_data)->data)
 
-#define AFFS_CACHE_SIZE		PAGE_SIZE
+#define AFFS_CACHE_SIZE		PG_SIZE
 
 #define AFFS_LC_SIZE		(AFFS_CACHE_SIZE/sizeof(u32)/2)
 #define AFFS_AC_SIZE		(AFFS_CACHE_SIZE/sizeof(struct affs_ext_key)/2)

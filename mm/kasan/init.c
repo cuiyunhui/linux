@@ -26,7 +26,7 @@
  *   - Latter it reused it as zero shadow to cover large ranges of memory
  *     that allowed to access, but not handled by kasan (vmalloc/vmemmap ...).
  */
-unsigned char kasan_early_shadow_page[PAGE_SIZE] __page_aligned_bss;
+unsigned char kasan_early_shadow_page[PG_SIZE] __page_aligned_bss;
 
 #if CONFIG_PGTABLE_LEVELS > 4
 p4d_t kasan_early_shadow_p4d[MAX_PTRS_PER_P4D] __page_aligned_bss;
@@ -99,9 +99,9 @@ static void __ref zero_pte_populate(pmd_t *pmd, unsigned long addr,
 				PAGE_KERNEL);
 	zero_pte = pte_wrprotect(zero_pte);
 
-	while (addr + PAGE_SIZE <= end) {
+	while (addr + PG_SIZE <= end) {
 		set_pte_at(&init_mm, addr, pte, zero_pte);
-		addr += PAGE_SIZE;
+		addr += PG_SIZE;
 		pte = pte_offset_kernel(pmd, addr);
 	}
 }
@@ -127,7 +127,7 @@ static int __ref zero_pmd_populate(pud_t *pud, unsigned long addr,
 			if (slab_is_available())
 				p = pte_alloc_one_kernel(&init_mm);
 			else {
-				p = early_alloc(PAGE_SIZE, NUMA_NO_NODE);
+				p = early_alloc(PG_SIZE, NUMA_NO_NODE);
 				kernel_pte_init(p);
 			}
 			if (!p)
@@ -168,7 +168,7 @@ static int __ref zero_pud_populate(p4d_t *p4d, unsigned long addr,
 				if (!p)
 					return -ENOMEM;
 			} else {
-				p = early_alloc(PAGE_SIZE, NUMA_NO_NODE);
+				p = early_alloc(PG_SIZE, NUMA_NO_NODE);
 				pmd_init(p);
 				pud_populate(&init_mm, pud, p);
 			}
@@ -210,7 +210,7 @@ static int __ref zero_p4d_populate(pgd_t *pgd, unsigned long addr,
 				if (!p)
 					return -ENOMEM;
 			} else {
-				p = early_alloc(PAGE_SIZE, NUMA_NO_NODE);
+				p = early_alloc(PG_SIZE, NUMA_NO_NODE);
 				pud_init(p);
 				p4d_populate_kernel(addr, p4d, p);
 			}
@@ -272,7 +272,7 @@ int __ref kasan_populate_early_shadow(const void *shadow_start,
 					return -ENOMEM;
 			} else {
 				pgd_populate_kernel(addr, pgd,
-					early_alloc(PAGE_SIZE, NUMA_NO_NODE));
+					early_alloc(PG_SIZE, NUMA_NO_NODE));
 			}
 		}
 		zero_p4d_populate(pgd, addr, next);
@@ -348,7 +348,7 @@ static void kasan_remove_pte_table(pte_t *pte, unsigned long addr,
 	pte_t ptent;
 
 	for (; addr < end; addr = next, pte++) {
-		next = (addr + PAGE_SIZE) & PAGE_MASK;
+		next = (addr + PG_SIZE) & PG_MASK;
 		if (next > end)
 			next = end;
 

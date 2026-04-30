@@ -113,7 +113,7 @@ struct xdp_test_data {
  * must be updated accordingly this gets changed, otherwise BPF selftests
  * will fail.
  */
-#define TEST_XDP_FRAME_SIZE (PAGE_SIZE - sizeof(struct xdp_page_head))
+#define TEST_XDP_FRAME_SIZE (PG_SIZE - sizeof(struct xdp_page_head))
 #define TEST_XDP_MAX_BATCH 256
 
 static void xdp_test_run_init_page(netmem_ref netmem, void *arg)
@@ -654,7 +654,7 @@ static void *bpf_test_init(const union bpf_attr *kattr, u32 user_size,
 	void __user *data_in = u64_to_user_ptr(kattr->test.data_in);
 	void *data;
 
-	if (user_size > PAGE_SIZE - headroom - tailroom)
+	if (user_size > PG_SIZE - headroom - tailroom)
 		return ERR_PTR(-EINVAL);
 
 	size = SKB_DATA_ALIGN(size);
@@ -1044,7 +1044,7 @@ int bpf_prog_test_run_skb(struct bpf_prog *prog, const union bpf_attr *kattr,
 		}
 	}
 
-	linear_sz = min_t(u32, linear_sz, PAGE_SIZE - headroom - tailroom);
+	linear_sz = min_t(u32, linear_sz, PG_SIZE - headroom - tailroom);
 
 	data = bpf_test_init(kattr, linear_sz, linear_sz, headroom, tailroom);
 	if (IS_ERR(data)) {
@@ -1093,7 +1093,7 @@ int bpf_prog_test_run_skb(struct bpf_prog *prog, const union bpf_attr *kattr,
 			}
 
 			data_len = min_t(u32, kattr->test.data_size_in - copied,
-					 PAGE_SIZE);
+					 PG_SIZE);
 			skb_fill_page_desc(skb, sinfo->nr_frags, page, 0, data_len);
 
 			if (copy_from_user(page_address(page), data_in + copied,
@@ -1102,7 +1102,7 @@ int bpf_prog_test_run_skb(struct bpf_prog *prog, const union bpf_attr *kattr,
 				goto out;
 			}
 			skb->data_len += data_len;
-			skb->truesize += PAGE_SIZE;
+			skb->truesize += PG_SIZE;
 			skb->len += data_len;
 			copied += data_len;
 		}
@@ -1327,7 +1327,7 @@ int bpf_prog_test_run_xdp(struct bpf_prog *prog, const union bpf_attr *kattr,
         if (do_live)
 		headroom += sizeof(struct xdp_page_head);
 
-	max_linear_sz = PAGE_SIZE - headroom - tailroom;
+	max_linear_sz = PG_SIZE - headroom - tailroom;
 	linear_sz = min_t(u32, linear_sz, max_linear_sz);
 
 	/* disallow live data mode for jumbo frames */
@@ -1344,7 +1344,7 @@ int bpf_prog_test_run_xdp(struct bpf_prog *prog, const union bpf_attr *kattr,
 	}
 
 	rxqueue = __netif_get_rx_queue(current->nsproxy->net_ns->loopback_dev, 0);
-	rxqueue->xdp_rxq.frag_size = PAGE_SIZE;
+	rxqueue->xdp_rxq.frag_size = PG_SIZE;
 	xdp_init_buff(&xdp, rxqueue->xdp_rxq.frag_size, &rxqueue->xdp_rxq);
 	xdp_prepare_buff(&xdp, data, headroom, linear_sz, true);
 	sinfo = xdp_get_shared_info_from_buff(&xdp);
@@ -1376,7 +1376,7 @@ int bpf_prog_test_run_xdp(struct bpf_prog *prog, const union bpf_attr *kattr,
 			frag = &sinfo->frags[sinfo->nr_frags++];
 
 			data_len = min_t(u32, kattr->test.data_size_in - size,
-					 PAGE_SIZE);
+					 PG_SIZE);
 			skb_frag_fill_page_desc(frag, page, 0, data_len);
 
 			if (copy_from_user(page_address(page), data_in + size,

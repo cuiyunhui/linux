@@ -22,7 +22,7 @@ static void set_pages(struct page **pages, const unsigned *array, unsigned num)
 	assert(num < MAX_PAGES);
 	for (i = 0; i < num; i++)
 		pages[i] = (struct page *)(unsigned long)
-			   ((1 + array[i]) * PAGE_SIZE);
+			   ((1 + array[i]) * PG_SIZE);
 }
 
 #define pfn(...) (unsigned []){ __VA_ARGS__ }
@@ -53,32 +53,32 @@ int main(void)
 {
 	const unsigned int sgmax = UINT_MAX;
 	struct test *test, tests[] = {
-		{ -EINVAL, 1, pfn(0), NULL, PAGE_SIZE, 0, 1 },
-		{ 0, 1, pfn(0), NULL, PAGE_SIZE, PAGE_SIZE + 1, 1 },
-		{ 0, 1, pfn(0), NULL, PAGE_SIZE, sgmax, 1 },
+		{ -EINVAL, 1, pfn(0), NULL, PG_SIZE, 0, 1 },
+		{ 0, 1, pfn(0), NULL, PG_SIZE, PG_SIZE + 1, 1 },
+		{ 0, 1, pfn(0), NULL, PG_SIZE, sgmax, 1 },
 		{ 0, 1, pfn(0), NULL, 1, sgmax, 1 },
-		{ 0, 2, pfn(0, 1), NULL, 2 * PAGE_SIZE, sgmax, 1 },
-		{ 0, 2, pfn(1, 0), NULL, 2 * PAGE_SIZE, sgmax, 2 },
-		{ 0, 3, pfn(0, 1, 2), NULL, 3 * PAGE_SIZE, sgmax, 1 },
-		{ 0, 3, pfn(0, 1, 2), NULL, 3 * PAGE_SIZE, sgmax, 1 },
-		{ 0, 3, pfn(0, 1, 2), pfn(3, 4, 5), 3 * PAGE_SIZE, sgmax, 1 },
-		{ 0, 3, pfn(0, 1, 2), pfn(4, 5, 6), 3 * PAGE_SIZE, sgmax, 2 },
-		{ 0, 3, pfn(0, 2, 1), NULL, 3 * PAGE_SIZE, sgmax, 3 },
-		{ 0, 3, pfn(0, 1, 3), NULL, 3 * PAGE_SIZE, sgmax, 2 },
-		{ 0, 3, pfn(1, 2, 4), NULL, 3 * PAGE_SIZE, sgmax, 2 },
-		{ 0, 3, pfn(1, 3, 4), NULL, 3 * PAGE_SIZE, sgmax, 2 },
-		{ 0, 4, pfn(0, 1, 3, 4), NULL, 4 * PAGE_SIZE, sgmax, 2 },
-		{ 0, 5, pfn(0, 1, 3, 4, 5), NULL, 5 * PAGE_SIZE, sgmax, 2 },
-		{ 0, 5, pfn(0, 1, 3, 4, 6), NULL, 5 * PAGE_SIZE, sgmax, 3 },
-		{ 0, 5, pfn(0, 1, 2, 3, 4), NULL, 5 * PAGE_SIZE, sgmax, 1 },
-		{ 0, 5, pfn(0, 1, 2, 3, 4), NULL, 5 * PAGE_SIZE, 2 * PAGE_SIZE,
+		{ 0, 2, pfn(0, 1), NULL, 2 * PG_SIZE, sgmax, 1 },
+		{ 0, 2, pfn(1, 0), NULL, 2 * PG_SIZE, sgmax, 2 },
+		{ 0, 3, pfn(0, 1, 2), NULL, 3 * PG_SIZE, sgmax, 1 },
+		{ 0, 3, pfn(0, 1, 2), NULL, 3 * PG_SIZE, sgmax, 1 },
+		{ 0, 3, pfn(0, 1, 2), pfn(3, 4, 5), 3 * PG_SIZE, sgmax, 1 },
+		{ 0, 3, pfn(0, 1, 2), pfn(4, 5, 6), 3 * PG_SIZE, sgmax, 2 },
+		{ 0, 3, pfn(0, 2, 1), NULL, 3 * PG_SIZE, sgmax, 3 },
+		{ 0, 3, pfn(0, 1, 3), NULL, 3 * PG_SIZE, sgmax, 2 },
+		{ 0, 3, pfn(1, 2, 4), NULL, 3 * PG_SIZE, sgmax, 2 },
+		{ 0, 3, pfn(1, 3, 4), NULL, 3 * PG_SIZE, sgmax, 2 },
+		{ 0, 4, pfn(0, 1, 3, 4), NULL, 4 * PG_SIZE, sgmax, 2 },
+		{ 0, 5, pfn(0, 1, 3, 4, 5), NULL, 5 * PG_SIZE, sgmax, 2 },
+		{ 0, 5, pfn(0, 1, 3, 4, 6), NULL, 5 * PG_SIZE, sgmax, 3 },
+		{ 0, 5, pfn(0, 1, 2, 3, 4), NULL, 5 * PG_SIZE, sgmax, 1 },
+		{ 0, 5, pfn(0, 1, 2, 3, 4), NULL, 5 * PG_SIZE, 2 * PG_SIZE,
 		  3 },
-		{ 0, 6, pfn(0, 1, 2, 3, 4, 5), NULL, 6 * PAGE_SIZE,
-		  2 * PAGE_SIZE, 3 },
-		{ 0, 6, pfn(0, 2, 3, 4, 5, 6), NULL, 6 * PAGE_SIZE,
-		  2 * PAGE_SIZE, 4 },
+		{ 0, 6, pfn(0, 1, 2, 3, 4, 5), NULL, 6 * PG_SIZE,
+		  2 * PG_SIZE, 3 },
+		{ 0, 6, pfn(0, 2, 3, 4, 5, 6), NULL, 6 * PG_SIZE,
+		  2 * PG_SIZE, 4 },
 		{ 0, 6, pfn(0, 1, 3, 4, 5, 6), pfn(7, 8, 9, 10, 11, 12),
-		  6 * PAGE_SIZE, 12 * PAGE_SIZE, 2 },
+		  6 * PG_SIZE, 12 * PG_SIZE, 2 },
 		{ 0, 0, NULL, NULL, 0, 0, 0 },
 	};
 	unsigned int i;

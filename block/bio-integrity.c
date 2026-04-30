@@ -36,7 +36,7 @@ void bio_integrity_alloc_buf(struct bio *bio, bool zero_buffer)
 		bip->bip_flags |= BIP_MEMPOOL;
 	} else {
 		bvec_set_page(&bip->bip_vec[0], virt_to_page(buf), len,
-				offset_in_page(buf));
+				offset_in_pg(buf));
 	}
 
 	bip->bip_vcnt = 1;
@@ -237,7 +237,7 @@ static int bio_integrity_copy_user(struct bio *bio, struct bio_vec *bvec,
 		memcpy(&bip->bip_vec[1], bvec, nr_vecs * sizeof(*bvec));
 
 	ret = bio_integrity_add_page(bio, virt_to_page(buf), len,
-				     offset_in_page(buf));
+				     offset_in_pg(buf));
 	if (ret != len) {
 		ret = -ENOMEM;
 		goto free_bip;
@@ -276,12 +276,12 @@ static unsigned int bvec_from_pages(struct bio_vec *bvec, struct page **pages,
 	int i, j;
 
 	for (i = 0; i < nr_vecs; i = j) {
-		size_t size = min_t(size_t, bytes, PAGE_SIZE - offset);
+		size_t size = min_t(size_t, bytes, PG_SIZE - offset);
 		struct folio *folio = page_folio(pages[i]);
 
 		bytes -= size;
 		for (j = i + 1; j < nr_vecs; j++) {
-			size_t next = min_t(size_t, PAGE_SIZE, bytes);
+			size_t next = min_t(size_t, PG_SIZE, bytes);
 
 			if (page_folio(pages[j]) != folio ||
 			    pages[j] != pages[j - 1] + 1)

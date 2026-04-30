@@ -208,9 +208,9 @@ static int setup_sgtable(struct sg_table *sgt, struct scatterlist *prealloc_sg,
 {
 	struct scatterlist *sg;
 	const bool is_vmalloc = is_vmalloc_addr(buf);
-	unsigned int off = offset_in_page(buf);
+	unsigned int off = offset_in_pg(buf);
 	unsigned int chunk_cnt = 1;
-	unsigned int chunk_len = PAGE_ALIGN(off + buf_len);
+	unsigned int chunk_len = PG_ALIGN(off + buf_len);
 	int i;
 	int ret;
 
@@ -220,8 +220,8 @@ static int setup_sgtable(struct sg_table *sgt, struct scatterlist *prealloc_sg,
 	}
 
 	if (is_vmalloc) {
-		chunk_cnt = chunk_len >> PAGE_SHIFT;
-		chunk_len = PAGE_SIZE;
+		chunk_cnt = chunk_len >> PG_SHIFT;
+		chunk_len = PG_SIZE;
 	}
 
 	if (chunk_cnt > 1) {

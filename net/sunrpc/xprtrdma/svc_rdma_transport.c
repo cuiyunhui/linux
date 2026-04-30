@@ -450,7 +450,7 @@ static struct svc_xprt *svc_rdma_accept(struct svc_xprt *xprt)
 	/* Transport header, head iovec, tail iovec */
 	newxprt->sc_max_send_sges = 3;
 	/* Add one SGE per page list entry */
-	newxprt->sc_max_send_sges += (svcrdma_max_req_size / PAGE_SIZE) + 1;
+	newxprt->sc_max_send_sges += (svcrdma_max_req_size / PG_SIZE) + 1;
 	if (newxprt->sc_max_send_sges > dev->attrs.max_send_sge)
 		newxprt->sc_max_send_sges = dev->attrs.max_send_sge;
 	rq_depth = newxprt->sc_max_requests + newxprt->sc_max_bc_requests +
@@ -471,7 +471,7 @@ static struct svc_xprt *svc_rdma_accept(struct svc_xprt *xprt)
 			 RPCSVC_MAXPAYLOAD_RDMA);
 	ctxts = newxprt->sc_max_requests * 3 *
 		rdma_rw_mr_factor(dev, newxprt->sc_port_num,
-				  maxpayload >> PAGE_SHIFT);
+				  maxpayload >> PG_SHIFT);
 
 	newxprt->sc_sq_depth = rq_depth +
 		rdma_rw_max_send_wr(dev, newxprt->sc_port_num, ctxts, 0);

@@ -51,14 +51,14 @@ static int check_error_paths(pid_t child)
 	 * Allocate two contiguous pages. The first one is for read-write,
 	 * another is for read-only.
 	 */
-	addr_rw = mmap(NULL, 2 * PAGE_SIZE, PROT_READ | PROT_WRITE,
+	addr_rw = mmap(NULL, 2 * PG_SIZE, PROT_READ | PROT_WRITE,
 				MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	if (addr_rw == MAP_FAILED) {
 		err("mmap() failed: %m\n");
 		return 1;
 	}
 
-	addr_ro = mmap(addr_rw + PAGE_SIZE, PAGE_SIZE, PROT_READ,
+	addr_ro = mmap(addr_rw + PG_SIZE, PG_SIZE, PROT_READ,
 			MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
 	if (addr_ro == MAP_FAILED) {
 		err("mmap() failed: %m\n");
@@ -98,7 +98,7 @@ static int check_error_paths(pid_t child)
 
 	exit_code = 0;
 out:
-	munmap(addr_rw, 2 * PAGE_SIZE);
+	munmap(addr_rw, 2 * PG_SIZE);
 	return exit_code;
 }
 

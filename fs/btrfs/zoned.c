@@ -132,7 +132,7 @@ static int sb_write_pointer(struct block_device *bdev, struct blk_zone *zones,
 						BTRFS_SUPER_INFO_SIZE;
 
 			page[i] = read_cache_page_gfp(mapping,
-					bytenr >> PAGE_SHIFT, GFP_NOFS);
+					bytenr >> PG_SHIFT, GFP_NOFS);
 			if (IS_ERR(page[i])) {
 				if (i == 1)
 					btrfs_release_disk_super(super[0]);
@@ -763,7 +763,7 @@ int btrfs_check_zoned_mode(struct btrfs_fs_info *fs_info)
 	fs_info->max_zone_append_size = ALIGN_DOWN(
 		min3((u64)lim->max_zone_append_sectors << SECTOR_SHIFT,
 		     (u64)lim->max_sectors << SECTOR_SHIFT,
-		     (u64)lim->max_segments << PAGE_SHIFT),
+		     (u64)lim->max_segments << PG_SHIFT),
 		fs_info->sectorsize);
 	fs_info->fs_devices->chunk_alloc_policy = BTRFS_CHUNK_ALLOC_ZONED;
 
@@ -2294,14 +2294,14 @@ static int read_zone_info(struct btrfs_fs_info *fs_info, u64 logical,
 			  struct blk_zone *zone)
 {
 	struct btrfs_io_context *bioc = NULL;
-	u64 mapped_length = PAGE_SIZE;
+	u64 mapped_length = PG_SIZE;
 	unsigned int nofs_flag;
 	int nmirrors;
 	int i, ret;
 
 	ret = btrfs_map_block(fs_info, BTRFS_MAP_GET_READ_MIRRORS, logical,
 			      &mapped_length, &bioc, NULL, NULL);
-	if (unlikely(ret || !bioc || mapped_length < PAGE_SIZE)) {
+	if (unlikely(ret || !bioc || mapped_length < PG_SIZE)) {
 		ret = -EIO;
 		goto out_put_bioc;
 	}

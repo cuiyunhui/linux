@@ -997,7 +997,7 @@ static const struct vm_operations_struct pseudo_mmap_ops = {
 
 static int pseudo_lock_dev_mmap_prepare(struct vm_area_desc *desc)
 {
-	unsigned long off = desc->pgoff << PAGE_SHIFT;
+	unsigned long off = desc->pgoff << PG_SHIFT;
 	unsigned long vsize = vma_desc_size(desc);
 	struct file *filp = desc->file;
 	struct pseudo_lock_region *plr;
@@ -1032,7 +1032,7 @@ static int pseudo_lock_dev_mmap_prepare(struct vm_area_desc *desc)
 		return -EINVAL;
 	}
 
-	physical = __pa(plr->kmem) >> PAGE_SHIFT;
+	physical = __pa(plr->kmem) >> PG_SHIFT;
 	psize = plr->size - off;
 
 	if (off > plr->size) {

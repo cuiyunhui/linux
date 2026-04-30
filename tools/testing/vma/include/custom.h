@@ -24,7 +24,7 @@ extern unsigned long dac_mmap_min_addr;
 /* We hardcode this for now. */
 #define sysctl_max_map_count 0x1000000UL
 
-#define TASK_SIZE ((1ul << 47)-PAGE_SIZE)
+#define TASK_SIZE ((1ul << 47)-PG_SIZE)
 
 /*
  * The shared stubs do not implement this, it amounts to an fprintf(STDERR,...)

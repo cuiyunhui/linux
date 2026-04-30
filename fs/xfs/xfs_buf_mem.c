@@ -143,12 +143,12 @@ xmbuf_map_backing_mem(
 		return -ENOMEM;
 	if (BBTOB(bp->b_length) != XMBUF_BLOCKSIZE)
 		return -ENOMEM;
-	if (offset_in_page(pos) != 0) {
-		ASSERT(offset_in_page(pos));
+	if (offset_in_pg(pos) != 0) {
+		ASSERT(offset_in_pg(pos));
 		return -ENOMEM;
 	}
 
-	error = shmem_get_folio(inode, pos >> PAGE_SHIFT, 0, &folio, SGP_CACHE);
+	error = shmem_get_folio(inode, pos >> PG_SHIFT, 0, &folio, SGP_CACHE);
 	if (error)
 		return error;
 

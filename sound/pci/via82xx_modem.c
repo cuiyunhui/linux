@@ -273,7 +273,7 @@ static int build_via_table(struct viadev *dev, struct snd_pcm_substream *substre
 		 * but the kernel pages are much bigger, so we don't care
 		 */
 		if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, &chip->pci->dev,
-					PAGE_ALIGN(VIA_TABLE_SIZE * 2 * 8),
+					PG_ALIGN(VIA_TABLE_SIZE * 2 * 8),
 					&dev->table) < 0)
 			return -ENOMEM;
 	}
@@ -304,7 +304,7 @@ static int build_via_table(struct viadev *dev, struct snd_pcm_substream *substre
 			}
 			addr = snd_pcm_sgbuf_get_addr(substream, ofs);
 			pgtbl[idx << 1] = cpu_to_le32(addr);
-			r = PAGE_SIZE - (ofs % PAGE_SIZE);
+			r = PG_SIZE - (ofs % PG_SIZE);
 			if (rest < r)
 				r = rest;
 			rest -= r;

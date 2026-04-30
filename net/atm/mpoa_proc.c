@@ -212,8 +212,8 @@ static ssize_t proc_mpc_write(struct file *file, const char __user *buff,
 	if (nbytes == 0)
 		return 0;
 
-	if (nbytes >= PAGE_SIZE)
-		nbytes = PAGE_SIZE-1;
+	if (nbytes >= PG_SIZE)
+		nbytes = PG_SIZE-1;
 
 	page = (char *)__get_free_page(GFP_KERNEL);
 	if (!page)

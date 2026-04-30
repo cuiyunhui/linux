@@ -58,8 +58,8 @@ static unsigned int rds_pages_in_vec(struct rds_iovec *vec)
 	    (vec->bytes > (u64)UINT_MAX))
 		return 0;
 
-	return ((vec->addr + vec->bytes + PAGE_SIZE - 1) >> PAGE_SHIFT) -
-		(vec->addr >> PAGE_SHIFT);
+	return ((vec->addr + vec->bytes + PG_SIZE - 1) >> PG_SHIFT) -
+		(vec->addr >> PG_SHIFT);
 }
 
 static struct rds_mr *rds_mr_tree_walk(struct rb_root *root, u64 key,
@@ -199,8 +199,8 @@ static int __rds_rdma_map(struct rds_sock *rs, struct rds_get_mr_args *args,
 	 * region causes an integer overflow, return error.
 	 */
 	if (((args->vec.addr + args->vec.bytes) < args->vec.addr) ||
-	    PAGE_ALIGN(args->vec.addr + args->vec.bytes) <
-		    (args->vec.addr + args->vec.bytes)) {
+	    PG_ALIGN(args->vec.addr + args->vec.bytes) <
+	    (args->vec.addr + args->vec.bytes)) {
 		ret = -EINVAL;
 		goto out;
 	}
@@ -219,7 +219,7 @@ static int __rds_rdma_map(struct rds_sock *rs, struct rds_get_mr_args *args,
 	/* Restrict the size of mr irrespective of underlying transport
 	 * To account for unaligned mr regions, subtract one from nr_pages
 	 */
-	if ((nr_pages - 1) > (RDS_MAX_MSG_SIZE >> PAGE_SHIFT)) {
+	if ((nr_pages - 1) > (RDS_MAX_MSG_SIZE >> PG_SHIFT)) {
 		ret = -EMSGSIZE;
 		goto out;
 	}
@@ -279,7 +279,7 @@ static int __rds_rdma_map(struct rds_sock *rs, struct rds_get_mr_args *args,
 
 		/* Stick all pages into the scatterlist */
 		for (i = 0 ; i < nents; i++)
-			sg_set_page(&sg[i], pages[i], PAGE_SIZE, 0);
+			sg_set_page(&sg[i], pages[i], PG_SIZE, 0);
 
 		rdsdebug("RDS: trans_private nents is %u\n", nents);
 	}
@@ -320,7 +320,7 @@ static int __rds_rdma_map(struct rds_sock *rs, struct rds_get_mr_args *args,
 		cookie = rds_rdma_make_cookie(mr->r_key, 0);
 	else
 		cookie = rds_rdma_make_cookie(mr->r_key,
-					      args->vec.addr & ~PAGE_MASK);
+					      args->vec.addr & ~PG_MASK);
 	if (cookie_ret)
 		*cookie_ret = cookie;
 
@@ -761,12 +761,12 @@ int rds_cmsg_rdma_args(struct rds_sock *rs, struct rds_message *rm,
 		nr_bytes += iov->bytes;
 
 		for (j = 0; j < nr; j++) {
-			unsigned int offset = iov->addr & ~PAGE_MASK;
+			unsigned int offset = iov->addr & ~PG_MASK;
 			struct scatterlist *sg;
 
 			sg = &op->op_sg[op->op_nents + j];
 			sg_set_page(sg, pages[j],
-					min_t(unsigned int, iov->bytes, PAGE_SIZE - offset),
+					min_t(unsigned int, iov->bytes, PG_SIZE - offset),
 					offset);
 
 			sg_dma_len(sg) = sg->length;
@@ -926,7 +926,7 @@ int rds_cmsg_atomic(struct rds_sock *rs, struct rds_message *rm,
 		goto err;
 	ret = 0;
 
-	sg_set_page(rm->atomic.op_sg, page, 8, offset_in_page(args->local_addr));
+	sg_set_page(rm->atomic.op_sg, page, 8, offset_in_pg(args->local_addr));
 
 	if (rm->atomic.op_notify || rm->atomic.op_recverr) {
 		/* We allocate an uninitialized notifier here, because

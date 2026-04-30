@@ -25,8 +25,8 @@ int squashfs_readpage_block(struct folio *folio, u64 block, int bsize,
 	struct page *target_page = &folio->page;
 	struct inode *inode = folio->mapping->host;
 	struct squashfs_sb_info *msblk = inode->i_sb->s_fs_info;
-	loff_t file_end = (i_size_read(inode) - 1) >> PAGE_SHIFT;
-	int mask = (1 << (msblk->block_log - PAGE_SHIFT)) - 1;
+	loff_t file_end = (i_size_read(inode) - 1) >> PG_SHIFT;
+	int mask = (1 << (msblk->block_log - PG_SHIFT)) - 1;
 	loff_t start_index = folio->index & ~mask;
 	loff_t end_index = start_index | mask;
 	loff_t index;
@@ -68,7 +68,7 @@ int squashfs_readpage_block(struct folio *folio, u64 block, int bsize,
 	 * page cache pages appropriately within the decompressor
 	 */
 	actor = squashfs_page_actor_init_special(msblk, page, pages, expected,
-						start_index << PAGE_SHIFT);
+						start_index << PG_SHIFT);
 	if (actor == NULL)
 		goto out;
 
@@ -86,10 +86,10 @@ int squashfs_readpage_block(struct folio *folio, u64 block, int bsize,
 	}
 
 	/* Last page (if present) may have trailing bytes not filled */
-	bytes = res % PAGE_SIZE;
+	bytes = res % PG_SIZE;
 	if (end_index == file_end && last_page && bytes) {
 		pageaddr = kmap_local_page(last_page);
-		memset(pageaddr + bytes, 0, PAGE_SIZE - bytes);
+		memset(pageaddr + bytes, 0, PG_SIZE - bytes);
 		kunmap_local(pageaddr);
 	}
 

@@ -4,7 +4,7 @@
 
 struct z_erofs_zstd {
 	struct z_erofs_zstd *next;
-	u8 bounce[PAGE_SIZE];
+	u8 bounce[PG_SIZE];
 	void *wksp;
 	unsigned int wkspsz;
 };
@@ -167,7 +167,7 @@ static const char *z_erofs_zstd_decompress(struct z_erofs_decompress_req *rq,
 	}
 
 	rq->fillgaps = true;	/* ZSTD doesn't support NULL output buffer */
-	in_buf.size = min_t(u32, rq->inputsize, PAGE_SIZE - rq->pageofs_in);
+	in_buf.size = min_t(u32, rq->inputsize, PG_SIZE - rq->pageofs_in);
 	rq->inputsize -= in_buf.size;
 	in_buf.src = dctx.kin + rq->pageofs_in;
 	dctx.bounce = strm->bounce;

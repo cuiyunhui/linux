@@ -333,7 +333,7 @@ static void update_mem_info(struct f2fs_sb_info *sbi)
 
 	/* build curseg */
 	si->base_mem += sizeof(struct curseg_info) * NR_CURSEG_TYPE;
-	si->base_mem += PAGE_SIZE * NR_CURSEG_TYPE;
+	si->base_mem += PG_SIZE * NR_CURSEG_TYPE;
 
 	/* build dirty segmap */
 	si->base_mem += sizeof(struct dirty_seglist_info);
@@ -390,18 +390,18 @@ get_cache:
 	if (sbi->node_inode) {
 		unsigned long npages = NODE_MAPPING(sbi)->nrpages;
 
-		si->page_mem += (unsigned long long)npages << PAGE_SHIFT;
+		si->page_mem += (unsigned long long)npages << PG_SHIFT;
 	}
 	if (sbi->meta_inode) {
 		unsigned long npages = META_MAPPING(sbi)->nrpages;
 
-		si->page_mem += (unsigned long long)npages << PAGE_SHIFT;
+		si->page_mem += (unsigned long long)npages << PG_SHIFT;
 	}
 #ifdef CONFIG_F2FS_FS_COMPRESSION
 	if (sbi->compress_inode) {
 		unsigned long npages = COMPRESS_MAPPING(sbi)->nrpages;
 
-		si->page_mem += (unsigned long long)npages << PAGE_SHIFT;
+		si->page_mem += (unsigned long long)npages << PG_SHIFT;
 	}
 #endif
 }

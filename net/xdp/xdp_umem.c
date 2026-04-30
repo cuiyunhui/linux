@@ -133,7 +133,7 @@ static int xdp_umem_account_pages(struct xdp_umem *umem)
 	if (capable(CAP_IPC_LOCK))
 		return 0;
 
-	lock_limit = rlimit(RLIMIT_MEMLOCK) >> PAGE_SHIFT;
+	lock_limit = rlimit(RLIMIT_MEMLOCK) >> PG_SHIFT;
 	umem->user = get_uid(current_user());
 
 	do {
@@ -164,7 +164,7 @@ static int xdp_umem_reg(struct xdp_umem *umem, struct xdp_umem_reg *mr)
 	u64 chunks, npgs;
 	int err;
 
-	if (chunk_size < XDP_UMEM_MIN_CHUNK_SIZE || chunk_size > PAGE_SIZE) {
+	if (chunk_size < XDP_UMEM_MIN_CHUNK_SIZE || chunk_size > PG_SIZE) {
 		/* Strictly speaking we could support this, if:
 		 * - huge pages, or*
 		 * - using an IOMMU, or
@@ -180,7 +180,7 @@ static int xdp_umem_reg(struct xdp_umem *umem, struct xdp_umem_reg *mr)
 	if (!unaligned_chunks && !is_power_of_2(chunk_size))
 		return -EINVAL;
 
-	if (!PAGE_ALIGNED(addr)) {
+	if (!PG_ALIGNED(addr)) {
 		/* Memory area has to be page size aligned. For
 		 * simplicity, this might change.
 		 */
@@ -190,7 +190,7 @@ static int xdp_umem_reg(struct xdp_umem *umem, struct xdp_umem_reg *mr)
 	if ((addr + size) < addr)
 		return -EINVAL;
 
-	npgs = div_u64_rem(size, PAGE_SIZE, &npgs_rem);
+	npgs = div_u64_rem(size, PG_SIZE, &npgs_rem);
 	if (npgs_rem)
 		npgs++;
 	if (npgs > U32_MAX)

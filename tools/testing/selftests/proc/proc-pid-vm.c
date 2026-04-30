@@ -348,7 +348,7 @@ int main(void)
 	memset(buf0, ' ', sizeof(buf0));
 	int len = snprintf(buf0, sizeof(buf0),
 			"%08lx-%08lx r-xp 00000000 %02lx:%02lx %llu",
-			VADDR, VADDR + PAGE_SIZE,
+			VADDR, VADDR + PG_SIZE,
 			MAJOR(st.st_dev), MINOR(st.st_dev),
 			(unsigned long long)st.st_ino);
 	buf0[len] = ' ';
@@ -428,7 +428,7 @@ int main(void)
 		memset(bufr, ' ', sizeof(bufr));
 		len = snprintf(bufr, sizeof(bufr),
 				"%08lx-%08lx ---p 00000000 00:00 0",
-				VADDR, VADDR + PAGE_SIZE);
+				VADDR, VADDR + PG_SIZE);
 		bufr[len] = ' ';
 		snprintf(bufr + MAPS_OFFSET, sizeof(bufr) - MAPS_OFFSET,
 			 "[rollup]\n");
@@ -524,8 +524,8 @@ int main(void)
 
 		assert(q.vma_flags == (PROCMAP_QUERY_VMA_READABLE | PROCMAP_QUERY_VMA_EXECUTABLE));
 		assert(q.vma_start == VADDR);
-		assert(q.vma_end == VADDR + PAGE_SIZE);
-		assert(q.vma_page_size == PAGE_SIZE);
+		assert(q.vma_end == VADDR + PG_SIZE);
+		assert(q.vma_page_size == PG_SIZE);
 
 		assert(q.vma_offset == 0);
 		assert(q.inode == st.st_ino);
@@ -559,12 +559,12 @@ int main(void)
 		assert(q.query_addr == VADDR - 1);
 		assert(q.query_flags == PROCMAP_QUERY_COVERING_OR_NEXT_VMA);
 		assert(q.vma_start == VADDR);
-		assert(q.vma_end == VADDR + PAGE_SIZE);
+		assert(q.vma_end == VADDR + PG_SIZE);
 
 		/* CASE 4: NO MATCH at VADDR + PAGE_SIZE */
 		memset(&q, 0, sizeof(q));
 		q.size = sizeof(q);
-		q.query_addr = VADDR + PAGE_SIZE; /* point right after the VMA */
+		q.query_addr = VADDR + PG_SIZE; /* point right after the VMA */
 		q.query_flags = PROCMAP_QUERY_COVERING_OR_NEXT_VMA;
 
 		err = ioctl(fd, PROCMAP_QUERY, &q);

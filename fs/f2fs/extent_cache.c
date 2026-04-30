@@ -901,7 +901,7 @@ static int __get_new_block_age(struct inode *inode, struct extent_info *ei,
 	 * file block even in seq write. So don't record age for newly last file
 	 * block here.
 	 */
-	if ((f_size >> PAGE_SHIFT) == ei->fofs && f_size & (PAGE_SIZE - 1) &&
+	if ((f_size >> PG_SHIFT) == ei->fofs && f_size & (PG_SIZE - 1) &&
 			blkaddr == NEW_ADDR)
 		return -EINVAL;
 

@@ -1340,7 +1340,7 @@ static int selinux_genfs_get_sid(struct dentry *dentry,
 	if (!buffer)
 		return -ENOMEM;
 
-	path = dentry_path_raw(dentry, buffer, PAGE_SIZE);
+	path = dentry_path_raw(dentry, buffer, PG_SIZE);
 	if (IS_ERR(path))
 		rc = PTR_ERR(path);
 	else {

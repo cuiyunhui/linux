@@ -21,7 +21,7 @@ static int param_set_do_prints(const char *instr, const struct kernel_param *kp)
 static int param_get_do_prints(char *buffer, const struct kernel_param *kp)
 {
 	do_prints();
-	return scnprintf(buffer, PAGE_SIZE, "did do_prints\n");
+	return scnprintf(buffer, PG_SIZE, "did do_prints\n");
 }
 static const struct kernel_param_ops param_ops_do_prints = {
 	.set = param_set_do_prints,

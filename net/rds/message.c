@@ -375,7 +375,7 @@ struct rds_message *rds_message_map_pages(unsigned long *page_addrs, unsigned in
 {
 	struct rds_message *rm;
 	unsigned int i;
-	int num_sgs = DIV_ROUND_UP(total_len, PAGE_SIZE);
+	int num_sgs = DIV_ROUND_UP(total_len, PG_SIZE);
 	int extra_bytes = num_sgs * sizeof(struct scatterlist);
 
 	rm = rds_message_alloc(extra_bytes, GFP_NOWAIT);
@@ -384,7 +384,7 @@ struct rds_message *rds_message_map_pages(unsigned long *page_addrs, unsigned in
 
 	set_bit(RDS_MSG_PAGEVEC, &rm->m_flags);
 	rm->m_inc.i_hdr.h_len = cpu_to_be32(total_len);
-	rm->data.op_nents = DIV_ROUND_UP(total_len, PAGE_SIZE);
+	rm->data.op_nents = DIV_ROUND_UP(total_len, PG_SIZE);
 	rm->data.op_sg = rds_message_alloc_sgs(rm, num_sgs);
 	if (IS_ERR(rm->data.op_sg)) {
 		void *err = ERR_CAST(rm->data.op_sg);
@@ -395,7 +395,7 @@ struct rds_message *rds_message_map_pages(unsigned long *page_addrs, unsigned in
 	for (i = 0; i < rm->data.op_nents; ++i) {
 		sg_set_page(&rm->data.op_sg[i],
 				virt_to_page((void *)page_addrs[i]),
-				PAGE_SIZE, 0);
+				PG_SIZE, 0);
 	}
 
 	return rm;
@@ -430,8 +430,8 @@ static int rds_message_zcopy_from_user(struct rds_message *rm, struct iov_iter *
 		size_t start;
 		ssize_t copied;
 
-		copied = iov_iter_get_pages2(from, &pages, PAGE_SIZE,
-					    1, &start);
+		copied = iov_iter_get_pages2(from, &pages, PG_SIZE,
+					     1, &start);
 		if (copied < 0) {
 			struct mmpin *mmp;
 			int i;

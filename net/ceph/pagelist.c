@@ -64,7 +64,7 @@ static int ceph_pagelist_addpage(struct ceph_pagelist *pl)
 	}
 	if (!page)
 		return -ENOMEM;
-	pl->room += PAGE_SIZE;
+	pl->room += PG_SIZE;
 	ceph_pagelist_unmap_tail(pl);
 	list_add_tail(&page->lru, &pl->head);
 	pl->mapped_tail = kmap(page);
@@ -77,7 +77,7 @@ int ceph_pagelist_append(struct ceph_pagelist *pl, const void *buf, size_t len)
 		size_t bit = pl->room;
 		int ret;
 
-		memcpy(pl->mapped_tail + (pl->length & ~PAGE_MASK),
+		memcpy(pl->mapped_tail + (pl->length & ~PG_MASK),
 		       buf, bit);
 		pl->length += bit;
 		pl->room -= bit;
@@ -88,7 +88,7 @@ int ceph_pagelist_append(struct ceph_pagelist *pl, const void *buf, size_t len)
 			return ret;
 	}
 
-	memcpy(pl->mapped_tail + (pl->length & ~PAGE_MASK), buf, len);
+	memcpy(pl->mapped_tail + (pl->length & ~PG_MASK), buf, len);
 	pl->length += len;
 	pl->room -= len;
 	return 0;
@@ -104,7 +104,7 @@ int ceph_pagelist_reserve(struct ceph_pagelist *pl, size_t space)
 	if (space <= pl->room)
 		return 0;
 	space -= pl->room;
-	space = (space + PAGE_SIZE - 1) >> PAGE_SHIFT;   /* conv to num pages */
+	space = (space + PG_SIZE - 1) >> PG_SHIFT;   /* conv to num pages */
 
 	while (space > pl->num_pages_free) {
 		struct page *page = __page_cache_alloc(GFP_NOFS);

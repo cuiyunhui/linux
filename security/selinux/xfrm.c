@@ -85,7 +85,7 @@ static int selinux_xfrm_alloc_user(struct xfrm_sec_ctx **ctxp,
 		return -EINVAL;
 
 	str_len = uctx->ctx_len;
-	if (str_len >= PAGE_SIZE)
+	if (str_len >= PG_SIZE)
 		return -ENOMEM;
 
 	ctx = kmalloc_flex(*ctx, ctx_str, str_len + 1, gfp);

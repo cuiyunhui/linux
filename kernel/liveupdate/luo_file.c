@@ -117,7 +117,7 @@ static LIST_HEAD(luo_file_handler_list);
 /* 2 4K pages, give space for 128 files per file_set */
 #define LUO_FILE_PGCNT		2ul
 #define LUO_FILE_MAX							\
-	((LUO_FILE_PGCNT << PAGE_SHIFT) / sizeof(struct luo_file_ser))
+	((LUO_FILE_PGCNT << PG_SHIFT) / sizeof(struct luo_file_ser))
 
 /**
  * struct luo_file - Represents a single preserved file instance.
@@ -180,7 +180,7 @@ static int luo_alloc_files_mem(struct luo_file_set *file_set)
 
 	WARN_ON_ONCE(file_set->count);
 
-	size = LUO_FILE_PGCNT << PAGE_SHIFT;
+	size = LUO_FILE_PGCNT << PG_SHIFT;
 	mem = kho_alloc_preserve(size);
 	if (IS_ERR(mem))
 		return PTR_ERR(mem);
@@ -427,7 +427,7 @@ static void __luo_file_unfreeze(struct luo_file_set *file_set,
 		luo_file_unfreeze_one(file_set, luo_file);
 	}
 
-	memset(file_set->files, 0, LUO_FILE_PGCNT << PAGE_SHIFT);
+	memset(file_set->files, 0, LUO_FILE_PGCNT << PG_SHIFT);
 }
 
 /**

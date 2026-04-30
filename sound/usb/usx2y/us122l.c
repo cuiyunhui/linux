@@ -102,12 +102,12 @@ static vm_fault_t usb_stream_hwdep_vm_fault(struct vm_fault *vmf)
 	if (!s)
 		return VM_FAULT_SIGBUS;
 
-	offset = vmf->pgoff << PAGE_SHIFT;
-	if (offset < PAGE_ALIGN(s->read_size)) {
+	offset = vmf->pgoff << PG_SHIFT;
+	if (offset < PG_ALIGN(s->read_size)) {
 		vaddr = (char *)s + offset;
 	} else {
-		offset -= PAGE_ALIGN(s->read_size);
-		if (offset >= PAGE_ALIGN(s->write_size))
+		offset -= PG_ALIGN(s->read_size);
+		if (offset >= PG_ALIGN(s->write_size))
 			return VM_FAULT_SIGBUS;
 
 		vaddr = us122l->sk.write_page + offset;
@@ -176,14 +176,14 @@ static int usb_stream_hwdep_mmap(struct snd_hwdep *hw,
 	struct usb_stream *s;
 	bool read;
 
-	offset = area->vm_pgoff << PAGE_SHIFT;
+	offset = area->vm_pgoff << PG_SHIFT;
 	guard(mutex)(&us122l->mutex);
 	s = us122l->sk.s;
 	read = offset < s->read_size;
 	if (read && area->vm_flags & VM_WRITE)
 		return -EPERM;
 	/* if userspace tries to mmap beyond end of our buffer, fail */
-	if (size > PAGE_ALIGN(read ? s->read_size : s->write_size)) {
+	if (size > PG_ALIGN(read ? s->read_size : s->write_size)) {
 		dev_warn(hw->card->dev, "%s: size %lu > %u\n", __func__,
 			 size, read ? s->read_size : s->write_size);
 		return -EINVAL;

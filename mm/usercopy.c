@@ -168,8 +168,8 @@ static inline void check_heap_object(const void *ptr, unsigned long n,
 	struct slab *slab;
 
 	if (is_kmap_addr(ptr)) {
-		offset = offset_in_page(ptr);
-		if (n > PAGE_SIZE - offset)
+		offset = offset_in_pg(ptr);
+		if (n > PG_SIZE - offset)
 			usercopy_abort("kmap", NULL, to_user, offset, n);
 		return;
 	}

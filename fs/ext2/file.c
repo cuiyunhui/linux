@@ -267,8 +267,8 @@ static ssize_t ext2_dio_write_iter(struct kiocb *iocb, struct iov_iter *from)
 						    endbyte);
 		if (!ret2)
 			invalidate_mapping_pages(inode->i_mapping,
-						 pos >> PAGE_SHIFT,
-						 endbyte >> PAGE_SHIFT);
+						 pos >> PG_SHIFT,
+						 endbyte >> PG_SHIFT);
 		if (ret > 0)
 			generic_write_sync(iocb, ret);
 	}

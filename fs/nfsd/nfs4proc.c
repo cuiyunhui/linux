@@ -3216,7 +3216,7 @@ static u32 nfsd4_max_payload(const struct svc_rqst *rqstp)
 {
 	u32 buflen;
 
-	buflen = (rqstp->rq_page_end - rqstp->rq_next_page) * PAGE_SIZE;
+	buflen = (rqstp->rq_page_end - rqstp->rq_next_page) * PG_SIZE;
 	buflen -= rqstp->rq_auth_slack;
 	buflen -= rqstp->rq_res.head[0].iov_len;
 	return min_t(u32, buflen, svc_max_payload(rqstp));
@@ -3360,7 +3360,7 @@ static u32 nfsd4_readdir_rsize(const struct svc_rqst *rqstp,
 static u32 nfsd4_readlink_rsize(const struct svc_rqst *rqstp,
 				const struct nfsd4_op *op)
 {
-	return (op_encode_hdr_size + 1) * sizeof(__be32) + PAGE_SIZE;
+	return (op_encode_hdr_size + 1) * sizeof(__be32) + PG_SIZE;
 }
 
 static u32 nfsd4_remove_rsize(const struct svc_rqst *rqstp,

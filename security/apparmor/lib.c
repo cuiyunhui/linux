@@ -114,7 +114,7 @@ int aa_print_debug_params(char *buffer)
 {
 	if (!aa_g_debug)
 		return sprintf(buffer, "N");
-	return val_mask_to_str(buffer, PAGE_SIZE, debug_values_table,
+	return val_mask_to_str(buffer, PG_SIZE, debug_values_table,
 			       aa_g_debug);
 }
 

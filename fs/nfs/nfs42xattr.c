@@ -183,7 +183,7 @@ nfs4_xattr_alloc_entry(const char *name, const void *value,
 	uint32_t flags;
 
 	BUILD_BUG_ON(sizeof(struct nfs4_xattr_entry) +
-	    XATTR_NAME_MAX + 1 > PAGE_SIZE);
+	    XATTR_NAME_MAX + 1 > PG_SIZE);
 
 	alloclen = sizeof(struct nfs4_xattr_entry);
 	if (name != NULL) {
@@ -192,7 +192,7 @@ nfs4_xattr_alloc_entry(const char *name, const void *value,
 	} else
 		slen = 0;
 
-	if (alloclen + len <= PAGE_SIZE) {
+	if (alloclen + len <= PG_SIZE) {
 		alloclen += len;
 		flags = 0;
 	} else {

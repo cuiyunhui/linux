@@ -7,18 +7,18 @@
 #include <linux/sizes.h>
 
 #define PAGE_SHIFT		12
-#define PAGE_SIZE		(_AC(1, UL) << PAGE_SHIFT)
-#define PAGE_MASK		(~(PAGE_SIZE - 1))
+#define PAGE_SIZE		(_AC(1, UL) << PG_SHIFT)
+#define PAGE_MASK		(~(PG_SIZE - 1))
 
 #define PHYS_ADDR_MAX	(~(phys_addr_t)0)
 
-#define PAGE_ALIGN(addr) ALIGN(addr, PAGE_SIZE)
-#define PAGE_ALIGN_DOWN(addr) ALIGN_DOWN(addr, PAGE_SIZE)
+#define PAGE_ALIGN(addr) ALIGN(addr, PG_SIZE)
+#define PAGE_ALIGN_DOWN(addr) ALIGN_DOWN(addr, PG_SIZE)
 
 #define __va(x) ((void *)((unsigned long)(x)))
 #define __pa(x) ((unsigned long)(x))
 
-#define pfn_to_page(pfn) ((void *)((pfn) * PAGE_SIZE))
+#define pfn_to_page(pfn) ((void *)((pfn) * PG_SIZE))
 
 #define phys_to_virt phys_to_virt
 static inline void *phys_to_virt(unsigned long address)

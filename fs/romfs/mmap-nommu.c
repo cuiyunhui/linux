@@ -30,18 +30,18 @@ static unsigned long romfs_get_unmapped_area(struct file *file,
 		return (unsigned long) -ENOSYS;
 
 	/* the mapping mustn't extend beyond the EOF */
-	lpages = (len + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	lpages = (len + PG_SIZE - 1) >> PG_SHIFT;
 	isize = i_size_read(inode);
-	offset = pgoff << PAGE_SHIFT;
+	offset = pgoff << PG_SHIFT;
 
-	maxpages = (isize + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	maxpages = (isize + PG_SIZE - 1) >> PG_SHIFT;
 	if ((pgoff >= maxpages) || (maxpages - pgoff < lpages))
 		return (unsigned long) -EINVAL;
 
 	if (addr != 0)
 		return (unsigned long) -EINVAL;
 
-	if (len > mtd->size || pgoff >= (mtd->size >> PAGE_SHIFT))
+	if (len > mtd->size || pgoff >= (mtd->size >> PG_SHIFT))
 		return (unsigned long) -EINVAL;
 
 	offset += ROMFS_I(inode)->i_dataoffset;

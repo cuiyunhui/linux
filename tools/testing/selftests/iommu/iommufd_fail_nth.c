@@ -41,7 +41,7 @@ static int writeat(int dfd, const char *fn, const char *val)
 
 static __attribute__((constructor)) void setup_buffer(void)
 {
-	PAGE_SIZE = sysconf(_SC_PAGE_SIZE);
+	PG_SIZE = sysconf(_SC_PAGE_SIZE);
 
 	BUFFER_SIZE = 2*1024*1024;
 

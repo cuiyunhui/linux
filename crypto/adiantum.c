@@ -399,7 +399,7 @@ static int adiantum_crypt(struct skcipher_request *req, bool enc)
 	 */
 	adiantum_hash_header(req, &header_hash);
 	if (src->length >= req->cryptlen &&
-	    src->offset + req->cryptlen <= PAGE_SIZE) {
+	    src->offset + req->cryptlen <= PG_SIZE) {
 		/* Fast path for single-page source */
 		void *virt = kmap_local_page(sg_page(src)) + src->offset;
 
@@ -463,7 +463,7 @@ static int adiantum_crypt(struct skcipher_request *req, bool enc)
 	 */
 	le128_sub(&rbuf.bignum, &rbuf.bignum, &header_hash);
 	if (dst->length >= req->cryptlen &&
-	    dst->offset + req->cryptlen <= PAGE_SIZE) {
+	    dst->offset + req->cryptlen <= PG_SIZE) {
 		/* Fast path for single-page destination */
 		struct page *page = sg_page(dst);
 		void *virt = kmap_local_page(page) + dst->offset;

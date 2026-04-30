@@ -133,7 +133,7 @@ int hfs_mdb_get(struct super_block *sb)
 		return -EIO;
 	}
 
-	size = min(HFS_SB(sb)->alloc_blksz, (u32)PAGE_SIZE);
+	size = min(HFS_SB(sb)->alloc_blksz, (u32) PG_SIZE);
 	/* size must be a multiple of 512 */
 	while (size & (size - 1))
 		size -= HFS_SECTOR_SIZE;

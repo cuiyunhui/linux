@@ -425,7 +425,7 @@ static bool gfs2_jhead_folio_search(struct gfs2_jdesc *jd,
 
 	VM_BUG_ON_FOLIO(folio_test_large(folio), folio);
 	kaddr = kmap_local_folio(folio, 0);
-	for (offset = 0; offset < PAGE_SIZE; offset += sdp->sd_sb.sb_bsize) {
+	for (offset = 0; offset < PG_SIZE; offset += sdp->sd_sb.sb_bsize) {
 		if (!__get_log_header(sdp, kaddr + offset, 0, &lh)) {
 			if (lh.lh_sequence >= head->lh_sequence)
 				*head = lh;
@@ -508,7 +508,7 @@ int gfs2_find_jhead(struct gfs2_jdesc *jd, struct gfs2_log_header_host *head)
 	unsigned int block = 0, blocks_submitted = 0, blocks_read = 0;
 	unsigned int bsize = sdp->sd_sb.sb_bsize, off;
 	unsigned int bsize_shift = sdp->sd_sb.sb_bsize_shift;
-	unsigned int shift = PAGE_SHIFT - bsize_shift;
+	unsigned int shift = PG_SHIFT - bsize_shift;
 	unsigned int max_blocks = 2 * 1024 * 1024 >> bsize_shift;
 	struct gfs2_journal_extent *je;
 	int ret = 0;
@@ -546,7 +546,7 @@ int gfs2_find_jhead(struct gfs2_jdesc *jd, struct gfs2_log_header_host *head)
 				}
 				if (off) {
 					unsigned int blocks =
-						(PAGE_SIZE - off) >> bsize_shift;
+						(PG_SIZE - off) >> bsize_shift;
 
 					bio = gfs2_chain_bio(bio, blocks, sector,
 							     REQ_OP_READ);
@@ -573,7 +573,7 @@ block_added:
 			}
 
 			gfs2_jhead_process_page(jd, blocks_read >> shift, head, &done);
-			blocks_read += PAGE_SIZE >> bsize_shift;
+			blocks_read += PG_SIZE >> bsize_shift;
 			if (done)
 				goto out;  /* found */
 		}
@@ -584,7 +584,7 @@ out:
 		submit_bio(bio);
 	while (blocks_read < block) {
 		gfs2_jhead_process_page(jd, blocks_read >> shift, head, &done);
-		blocks_read += PAGE_SIZE >> bsize_shift;
+		blocks_read += PG_SIZE >> bsize_shift;
 	}
 
 	if (!ret)

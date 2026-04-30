@@ -831,7 +831,7 @@ static void svc_rdma_read_complete_multiple(struct svc_rqst *rqstp,
 	buf->buflen += ctxt->rc_readbytes;
 
 	buf->head[0].iov_base = page_address(rqstp->rq_pages[0]);
-	buf->head[0].iov_len = min_t(size_t, PAGE_SIZE, ctxt->rc_readbytes);
+	buf->head[0].iov_len = min_t(size_t, PG_SIZE, ctxt->rc_readbytes);
 	buf->pages = &rqstp->rq_pages[1];
 	buf->page_len = ctxt->rc_readbytes - buf->head[0].iov_len;
 }
@@ -850,7 +850,7 @@ static void svc_rdma_read_complete_pzrc(struct svc_rqst *rqstp,
 	buf->buflen += ctxt->rc_readbytes;
 
 	buf->head[0].iov_base = page_address(rqstp->rq_pages[0]);
-	buf->head[0].iov_len = min_t(size_t, PAGE_SIZE, ctxt->rc_readbytes);
+	buf->head[0].iov_len = min_t(size_t, PG_SIZE, ctxt->rc_readbytes);
 	buf->pages = &rqstp->rq_pages[1];
 	buf->page_len = ctxt->rc_readbytes - buf->head[0].iov_len;
 }

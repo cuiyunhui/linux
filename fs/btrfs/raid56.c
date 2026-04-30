@@ -230,7 +230,7 @@ int btrfs_alloc_stripe_hash_table(struct btrfs_fs_info *info)
 
 static void memcpy_from_bio_to_stripe(struct btrfs_raid_bio *rbio, unsigned int sector_nr)
 {
-	const u32 step = min(rbio->bioc->fs_info->sectorsize, PAGE_SIZE);
+	const u32 step = min(rbio->bioc->fs_info->sectorsize, PG_SIZE);
 
 	ASSERT(sector_nr < rbio->nr_sectors);
 	for (int i = 0; i < rbio->sector_nsteps; i++) {
@@ -241,8 +241,8 @@ static void memcpy_from_bio_to_stripe(struct btrfs_raid_bio *rbio, unsigned int 
 		ASSERT(dst != INVALID_PADDR);
 		ASSERT(src != INVALID_PADDR);
 
-		memcpy_page(phys_to_page(dst), offset_in_page(dst),
-			    phys_to_page(src), offset_in_page(src), step);
+		memcpy_page(phys_to_page(dst), offset_in_pg(dst),
+			    phys_to_page(src), offset_in_pg(src), step);
 	}
 }
 
@@ -308,7 +308,7 @@ static u32 page_nr_to_sector_nr(struct btrfs_raid_bio *rbio, unsigned int page_n
 
 	ASSERT(page_nr < rbio->nr_pages);
 
-	sector_nr = (page_nr << PAGE_SHIFT) >> rbio->bioc->fs_info->sectorsize_bits;
+	sector_nr = (page_nr << PG_SHIFT) >> rbio->bioc->fs_info->sectorsize_bits;
 	ASSERT(sector_nr < rbio->nr_sectors);
 	return sector_nr;
 }
@@ -326,7 +326,7 @@ static u32 page_nr_to_num_sectors(struct btrfs_raid_bio *rbio, unsigned int page
 
 	ASSERT(page_nr < rbio->nr_pages);
 
-	nr_sectors = round_up(PAGE_SIZE, fs_info->sectorsize) >> fs_info->sectorsize_bits;
+	nr_sectors = round_up(PG_SIZE, fs_info->sectorsize) >> fs_info->sectorsize_bits;
 	ASSERT(nr_sectors > 0);
 	return nr_sectors;
 }
@@ -355,20 +355,20 @@ static __maybe_unused bool full_page_sectors_uptodate(struct btrfs_raid_bio *rbi
  */
 static void index_stripe_sectors(struct btrfs_raid_bio *rbio)
 {
-	const u32 step = min(rbio->bioc->fs_info->sectorsize, PAGE_SIZE);
+	const u32 step = min(rbio->bioc->fs_info->sectorsize, PG_SIZE);
 	u32 offset;
 	int i;
 
 	for (i = 0, offset = 0; i < rbio->nr_sectors * rbio->sector_nsteps;
 	     i++, offset += step) {
-		int page_index = offset >> PAGE_SHIFT;
+		int page_index = offset >> PG_SHIFT;
 
 		ASSERT(page_index < rbio->nr_pages);
 		if (!rbio->stripe_pages[page_index])
 			continue;
 
 		rbio->stripe_paddrs[i] = page_to_phys(rbio->stripe_pages[page_index]) +
-					 offset_in_page(offset);
+					 offset_in_pg(offset);
 	}
 }
 
@@ -1062,12 +1062,12 @@ static struct btrfs_raid_bio *alloc_rbio(struct btrfs_fs_info *fs_info,
 					 struct btrfs_io_context *bioc)
 {
 	const unsigned int real_stripes = bioc->num_stripes - bioc->replace_nr_stripes;
-	const unsigned int stripe_npages = BTRFS_STRIPE_LEN >> PAGE_SHIFT;
+	const unsigned int stripe_npages = BTRFS_STRIPE_LEN >> PG_SHIFT;
 	const unsigned int num_pages = stripe_npages * real_stripes;
 	const unsigned int stripe_nsectors =
 		BTRFS_STRIPE_LEN >> fs_info->sectorsize_bits;
 	const unsigned int num_sectors = stripe_nsectors * real_stripes;
-	const unsigned int step = min(fs_info->sectorsize, PAGE_SIZE);
+	const unsigned int step = min(fs_info->sectorsize, PG_SIZE);
 	const unsigned int sector_nsteps = fs_info->sectorsize / step;
 	struct btrfs_raid_bio *rbio;
 
@@ -1075,8 +1075,8 @@ static struct btrfs_raid_bio *alloc_rbio(struct btrfs_fs_info *fs_info,
 	 * For bs <= ps cases, ps must be aligned to bs.
 	 * For bs > ps cases, bs must be aligned to ps.
 	 */
-	ASSERT(IS_ALIGNED(PAGE_SIZE, fs_info->sectorsize) ||
-	       IS_ALIGNED(fs_info->sectorsize, PAGE_SIZE));
+	ASSERT(IS_ALIGNED(PG_SIZE, fs_info->sectorsize) ||
+	       IS_ALIGNED(fs_info->sectorsize, PG_SIZE));
 	/*
 	 * Our current stripe len should be fixed to 64k thus stripe_nsectors
 	 * (at most 16) should be no larger than BITS_PER_LONG.
@@ -1213,7 +1213,7 @@ static int bio_add_paddrs(struct bio *bio, phys_addr_t *paddrs, unsigned int nr_
 
 	for (int i = 0; i < nr_steps; i++) {
 		ret = bio_add_page(bio, phys_to_page(paddrs[i]), step,
-				   offset_in_page(paddrs[i]));
+				   offset_in_pg(paddrs[i]));
 		if (ret != step)
 			goto revert;
 		added += ret;
@@ -1239,7 +1239,7 @@ static int rbio_add_io_paddrs(struct btrfs_raid_bio *rbio, struct bio_list *bio_
 			      unsigned int sector_nr, enum req_op op)
 {
 	const u32 sectorsize = rbio->bioc->fs_info->sectorsize;
-	const u32 step = min(sectorsize, PAGE_SIZE);
+	const u32 step = min(sectorsize, PG_SIZE);
 	struct bio *last = bio_list->tail;
 	int ret;
 	struct bio *bio;
@@ -1294,7 +1294,7 @@ static int rbio_add_io_paddrs(struct btrfs_raid_bio *rbio, struct bio_list *bio_
 
 	/* put a new bio on the list */
 	bio = bio_alloc(stripe->dev->bdev,
-			max(BTRFS_STRIPE_LEN >> PAGE_SHIFT, 1),
+			max(BTRFS_STRIPE_LEN >> PG_SHIFT, 1),
 			op, GFP_NOFS);
 	bio->bi_iter.bi_sector = disk_start >> SECTOR_SHIFT;
 	bio->bi_private = rbio;
@@ -1308,8 +1308,8 @@ static int rbio_add_io_paddrs(struct btrfs_raid_bio *rbio, struct bio_list *bio_
 static void index_one_bio(struct btrfs_raid_bio *rbio, struct bio *bio)
 {
 	struct btrfs_fs_info *fs_info = rbio->bioc->fs_info;
-	const u32 step = min(fs_info->sectorsize, PAGE_SIZE);
-	const u32 step_bits = min(fs_info->sectorsize_bits, PAGE_SHIFT);
+	const u32 step = min(fs_info->sectorsize, PG_SIZE);
+	const u32 step_bits = min(fs_info->sectorsize_bits, PG_SHIFT);
 	struct bvec_iter iter = bio->bi_iter;
 	phys_addr_t paddr;
 	u32 offset = (bio->bi_iter.bi_sector << SECTOR_SHIFT) -
@@ -1402,14 +1402,14 @@ static inline void *kmap_local_paddr(phys_addr_t paddr)
 	/* The sector pointer must have a page mapped to it. */
 	ASSERT(paddr != INVALID_PADDR);
 
-	return kmap_local_page(phys_to_page(paddr)) + offset_in_page(paddr);
+	return kmap_local_page(phys_to_page(paddr)) + offset_in_pg(paddr);
 }
 
 static void generate_pq_vertical_step(struct btrfs_raid_bio *rbio, unsigned int sector_nr,
 				      unsigned int step_nr)
 {
 	void **pointers = rbio->finish_pointers;
-	const u32 step = min(rbio->bioc->fs_info->sectorsize, PAGE_SIZE);
+	const u32 step = min(rbio->bioc->fs_info->sectorsize, PG_SIZE);
 	int stripe;
 	const bool has_qstripe = rbio->bioc->map_type & BTRFS_BLOCK_GROUP_RAID6;
 
@@ -1616,7 +1616,7 @@ static int find_stripe_sector_nr(struct btrfs_raid_bio *rbio, phys_addr_t paddr)
 static void set_bio_pages_uptodate(struct btrfs_raid_bio *rbio, struct bio *bio)
 {
 	const u32 sectorsize = rbio->bioc->fs_info->sectorsize;
-	const u32 step = min(sectorsize, PAGE_SIZE);
+	const u32 step = min(sectorsize, PG_SIZE);
 	u32 offset = 0;
 	phys_addr_t paddr;
 
@@ -1676,11 +1676,11 @@ static void verify_bio_data_sectors(struct btrfs_raid_bio *rbio,
 				    struct bio *bio)
 {
 	struct btrfs_fs_info *fs_info = rbio->bioc->fs_info;
-	const u32 step = min(fs_info->sectorsize, PAGE_SIZE);
+	const u32 step = min(fs_info->sectorsize, PG_SIZE);
 	const u32 nr_steps = rbio->sector_nsteps;
 	int total_sector_nr = get_bio_sector_nr(rbio, bio);
 	u32 offset = 0;
-	phys_addr_t paddrs[BTRFS_MAX_BLOCKSIZE / PAGE_SIZE];
+	phys_addr_t paddrs[BTRFS_MAX_BLOCKSIZE / PG_SIZE];
 	phys_addr_t paddr;
 
 	/* No data csum for the whole stripe, no need to verify. */
@@ -1941,7 +1941,7 @@ static void recover_vertical_step(struct btrfs_raid_bio *rbio,
 				  void **pointers, void **unmap_array)
 {
 	struct btrfs_fs_info *fs_info = rbio->bioc->fs_info;
-	const u32 step = min(fs_info->sectorsize, PAGE_SIZE);
+	const u32 step = min(fs_info->sectorsize, PG_SIZE);
 	int stripe_nr;
 
 	ASSERT(step_nr < rbio->sector_nsteps);
@@ -2606,11 +2606,11 @@ struct btrfs_raid_bio *raid56_parity_alloc_scrub_rbio(struct bio *bio,
 static int alloc_rbio_sector_pages(struct btrfs_raid_bio *rbio,
 				  int sector_nr)
 {
-	const u32 step = min(PAGE_SIZE, rbio->bioc->fs_info->sectorsize);
+	const u32 step = min(PG_SIZE, rbio->bioc->fs_info->sectorsize);
 	const u32 base = sector_nr * rbio->sector_nsteps;
 
 	for (int i = base; i < base + rbio->sector_nsteps; i++) {
-		const unsigned int page_index = (i * step) >> PAGE_SHIFT;
+		const unsigned int page_index = (i * step) >> PG_SHIFT;
 		struct page *page;
 
 		if (rbio->stripe_pages[page_index])
@@ -2653,7 +2653,7 @@ static bool verify_one_parity_step(struct btrfs_raid_bio *rbio,
 {
 	const unsigned int nr_data = rbio->nr_data;
 	const bool has_qstripe = (rbio->real_stripes - rbio->nr_data == 2);
-	const u32 step = min(rbio->bioc->fs_info->sectorsize, PAGE_SIZE);
+	const u32 step = min(rbio->bioc->fs_info->sectorsize, PG_SIZE);
 	void *parity;
 	bool ret = false;
 
@@ -3047,15 +3047,16 @@ void raid56_parity_cache_data_folios(struct btrfs_raid_bio *rbio,
 
 	for (unsigned int cur_off = offset_in_full_stripe;
 	     cur_off < offset_in_full_stripe + BTRFS_STRIPE_LEN;
-	     cur_off += PAGE_SIZE) {
-		const unsigned int pindex = cur_off >> PAGE_SHIFT;
+	     cur_off += PG_SIZE) {
+		const unsigned int pindex = cur_off >> PG_SHIFT;
 		void *kaddr;
 
 		kaddr = kmap_local_page(rbio->stripe_pages[pindex]);
-		memcpy_from_folio(kaddr, data_folios[findex], foffset, PAGE_SIZE);
+		memcpy_from_folio(kaddr, data_folios[findex], foffset,
+				  PG_SIZE);
 		kunmap_local(kaddr);
 
-		foffset += PAGE_SIZE;
+		foffset += PG_SIZE;
 		ASSERT(foffset <= folio_size(data_folios[findex]));
 		if (foffset == folio_size(data_folios[findex])) {
 			findex++;

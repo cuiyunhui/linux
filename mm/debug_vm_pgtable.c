@@ -963,10 +963,10 @@ static unsigned long __init get_random_vaddr(void)
 {
 	unsigned long random_vaddr, random_pages, total_user_pages;
 
-	total_user_pages = (TASK_SIZE - FIRST_USER_ADDRESS) / PAGE_SIZE;
+	total_user_pages = (TASK_SIZE - FIRST_USER_ADDRESS) / PG_SIZE;
 
 	random_pages = get_random_long() % total_user_pages;
-	random_vaddr = FIRST_USER_ADDRESS + random_pages * PAGE_SIZE;
+	random_vaddr = FIRST_USER_ADDRESS + random_pages * PG_SIZE;
 
 	return random_vaddr;
 }
@@ -1078,7 +1078,7 @@ static void  __init phys_align_check(phys_addr_t pstart,
 	phys_addr_t aligned_start, aligned_end;
 
 	if (pstart == 0)
-		pstart = PAGE_SIZE;
+		pstart = PG_SIZE;
 
 	aligned_start = ALIGN(pstart, psize);
 	aligned_end = aligned_start + psize;
@@ -1111,7 +1111,7 @@ static void __init init_fixed_pfns(struct pgtable_debug_args *args)
 	 */
 
 	phys = __pa_symbol(&start_kernel);
-	args->fixed_alignment = PAGE_SIZE;
+	args->fixed_alignment = PG_SIZE;
 
 	for_each_mem_range(idx, &pstart, &pend) {
 		/* First check for a PUD-aligned area */
@@ -1135,7 +1135,7 @@ static void __init init_fixed_pfns(struct pgtable_debug_args *args)
 	args->fixed_p4d_pfn = __phys_to_pfn(phys & P4D_MASK);
 	args->fixed_pud_pfn = __phys_to_pfn(phys & PUD_MASK);
 	args->fixed_pmd_pfn = __phys_to_pfn(phys & PMD_MASK);
-	args->fixed_pte_pfn = __phys_to_pfn(phys & PAGE_MASK);
+	args->fixed_pte_pfn = __phys_to_pfn(phys & PG_MASK);
 	WARN_ON(!pfn_valid(args->fixed_pte_pfn));
 }
 

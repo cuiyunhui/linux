@@ -1828,9 +1828,9 @@ cifs_push_mandatory_locks(struct cifsFileInfo *cfile)
 	}
 
 	BUILD_BUG_ON(sizeof(struct smb_hdr) + sizeof(LOCKING_ANDX_RANGE) >
-		     PAGE_SIZE);
+		     PG_SIZE);
 	max_buf = min_t(unsigned int, max_buf - sizeof(struct smb_hdr),
-			PAGE_SIZE);
+			PG_SIZE);
 	max_num = (max_buf - sizeof(struct smb_hdr)) /
 						sizeof(LOCKING_ANDX_RANGE);
 	buf = kzalloc_objs(LOCKING_ANDX_RANGE, max_num);
@@ -2204,9 +2204,9 @@ cifs_unlock_range(struct cifsFileInfo *cfile, struct file_lock *flock,
 		return -EINVAL;
 
 	BUILD_BUG_ON(sizeof(struct smb_hdr) + sizeof(LOCKING_ANDX_RANGE) >
-		     PAGE_SIZE);
+		     PG_SIZE);
 	max_buf = min_t(unsigned int, max_buf - sizeof(struct smb_hdr),
-			PAGE_SIZE);
+			PG_SIZE);
 	max_num = (max_buf - sizeof(struct smb_hdr)) /
 						sizeof(LOCKING_ANDX_RANGE);
 	buf = kzalloc_objs(LOCKING_ANDX_RANGE, max_num);

@@ -675,7 +675,7 @@ static inline void mptcp_borrow_fwdmem(struct sock *sk, struct sk_buff *skb)
 static inline void
 __mptcp_subflow_lend_fwdmem(struct mptcp_subflow_context *subflow, int size)
 {
-	int frag = (subflow->lent_mem_frag + size) & (PAGE_SIZE - 1);
+	int frag = (subflow->lent_mem_frag + size) & (PG_SIZE - 1);
 
 	subflow->lent_mem_frag = frag;
 }

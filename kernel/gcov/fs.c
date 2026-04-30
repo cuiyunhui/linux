@@ -86,7 +86,7 @@ static int __init gcov_persist_setup(char *str)
 }
 __setup("gcov_persist=", gcov_persist_setup);
 
-#define ITER_STRIDE	PAGE_SIZE
+#define ITER_STRIDE	PG_SIZE
 
 /**
  * struct gcov_iterator - specifies current file position in logical records

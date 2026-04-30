@@ -95,7 +95,7 @@ static void *get_comp_opts(struct super_block *sb, unsigned short flags)
 	 * Read decompressor specific options from file system if present
 	 */
 	if (SQUASHFS_COMP_OPTS(flags)) {
-		buffer = kmalloc(PAGE_SIZE, GFP_KERNEL);
+		buffer = kmalloc(PG_SIZE, GFP_KERNEL);
 		if (buffer == NULL) {
 			comp_opts = ERR_PTR(-ENOMEM);
 			goto out;

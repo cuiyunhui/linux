@@ -346,7 +346,7 @@ static int jffs2_block_check_erase(struct jffs2_sb_info *c, struct jffs2_erasebl
 		return 0;
 	}
  do_flash_read:
-	ebuf = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	ebuf = kmalloc(PG_SIZE, GFP_KERNEL);
 	if (!ebuf) {
 		pr_warn("Failed to allocate page buffer for verifying erase at 0x%08x. Refiling\n",
 			jeb->offset);
@@ -356,7 +356,8 @@ static int jffs2_block_check_erase(struct jffs2_sb_info *c, struct jffs2_erasebl
 	jffs2_dbg(1, "Verifying erase at 0x%08x\n", jeb->offset);
 
 	for (ofs = jeb->offset; ofs < jeb->offset + c->sector_size; ) {
-		uint32_t readlen = min((uint32_t)PAGE_SIZE, jeb->offset + c->sector_size - ofs);
+		uint32_t readlen = min((uint32_t) PG_SIZE,
+				       jeb->offset + c->sector_size - ofs);
 		int i;
 
 		*bad_offset = ofs;

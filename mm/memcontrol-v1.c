@@ -1595,18 +1595,18 @@ static u64 mem_cgroup_read_u64(struct cgroup_subsys_state *css,
 	switch (MEMFILE_ATTR(cft->private)) {
 	case RES_USAGE:
 		if (counter == &memcg->memory)
-			return (u64)mem_cgroup_usage(memcg, false) * PAGE_SIZE;
+			return (u64)mem_cgroup_usage(memcg, false) * PG_SIZE;
 		if (counter == &memcg->memsw)
-			return (u64)mem_cgroup_usage(memcg, true) * PAGE_SIZE;
-		return (u64)page_counter_read(counter) * PAGE_SIZE;
+			return (u64)mem_cgroup_usage(memcg, true) * PG_SIZE;
+		return (u64)page_counter_read(counter) * PG_SIZE;
 	case RES_LIMIT:
-		return (u64)counter->max * PAGE_SIZE;
+		return (u64)counter->max * PG_SIZE;
 	case RES_MAX_USAGE:
-		return (u64)counter->watermark * PAGE_SIZE;
+		return (u64)counter->watermark * PG_SIZE;
 	case RES_FAILCNT:
 		return counter->failcnt;
 	case RES_SOFT_LIMIT:
-		return (u64)READ_ONCE(memcg->soft_limit) * PAGE_SIZE;
+		return (u64)READ_ONCE(memcg->soft_limit) * PG_SIZE;
 	default:
 		BUG();
 	}
@@ -1911,7 +1911,7 @@ void memcg1_stat_format(struct mem_cgroup *memcg, struct seq_buf *s)
 	for (i = 0; i < NR_LRU_LISTS; i++)
 		seq_buf_printf(s, "%s %lu\n", lru_list_name(i),
 			       memcg_page_state_local(memcg, NR_LRU_BASE + i) *
-			       PAGE_SIZE);
+			       PG_SIZE);
 
 	/* Hierarchical information */
 	memory = memsw = PAGE_COUNTER_MAX;
@@ -1920,9 +1920,9 @@ void memcg1_stat_format(struct mem_cgroup *memcg, struct seq_buf *s)
 		memsw = min(memsw, READ_ONCE(mi->memsw.max));
 	}
 	seq_buf_printf(s, "hierarchical_memory_limit %llu\n",
-		       (u64)memory * PAGE_SIZE);
+		       (u64)memory * PG_SIZE);
 	seq_buf_printf(s, "hierarchical_memsw_limit %llu\n",
-		       (u64)memsw * PAGE_SIZE);
+		       (u64)memsw * PG_SIZE);
 
 	for (i = 0; i < ARRAY_SIZE(memcg1_stats); i++) {
 		unsigned long nr;
@@ -1940,7 +1940,7 @@ void memcg1_stat_format(struct mem_cgroup *memcg, struct seq_buf *s)
 	for (i = 0; i < NR_LRU_LISTS; i++)
 		seq_buf_printf(s, "total_%s %llu\n", lru_list_name(i),
 			       (u64)memcg_page_state(memcg, NR_LRU_BASE + i) *
-			       PAGE_SIZE);
+			       PG_SIZE);
 
 #ifdef CONFIG_DEBUG_VM
 	{

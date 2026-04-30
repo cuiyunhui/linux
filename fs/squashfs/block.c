@@ -48,7 +48,7 @@ static int copy_bio_to_actor(struct bio *bio,
 
 	while (copied_bytes < req_length) {
 		int bytes_to_copy = min_t(int, bvec->bv_len - offset,
-					  PAGE_SIZE - actor_offset);
+					  PG_SIZE - actor_offset);
 
 		bytes_to_copy = min_t(int, bytes_to_copy,
 				      req_length - copied_bytes);
@@ -60,7 +60,7 @@ static int copy_bio_to_actor(struct bio *bio,
 		copied_bytes += bytes_to_copy;
 		offset += bytes_to_copy;
 
-		if (actor_offset >= PAGE_SIZE) {
+		if (actor_offset >= PG_SIZE) {
 			actor_addr = squashfs_next_page(actor);
 			if (!actor_addr)
 				break;
@@ -150,7 +150,7 @@ static int squashfs_bio_read_cached(struct bio *fullbio,
 
 	if (head_to_cache) {
 		int ret = filemap_add_folio(cache_mapping, head_to_cache,
-						read_start >> PAGE_SHIFT,
+						read_start >> PG_SHIFT,
 						GFP_NOIO);
 
 		if (!ret) {
@@ -162,7 +162,7 @@ static int squashfs_bio_read_cached(struct bio *fullbio,
 
 	if (tail_to_cache) {
 		int ret = filemap_add_folio(cache_mapping, tail_to_cache,
-						(read_end >> PAGE_SHIFT) - 1,
+						(read_end >> PG_SHIFT) - 1,
 						GFP_NOIO);
 
 		if (!ret) {
@@ -179,7 +179,7 @@ static int squashfs_bio_read_cached(struct bio *fullbio,
 		if (!cache_folios[idx])
 			continue;
 		int ret = filemap_add_folio(cache_mapping, cache_folios[idx],
-						(read_start >> PAGE_SHIFT) + idx,
+						(read_start >> PG_SHIFT) + idx,
 						GFP_NOIO);
 
 		if (!ret) {
@@ -222,9 +222,9 @@ static int squashfs_bio_read(struct super_block *sb, u64 index, int length,
 	const sector_t block = read_start >> msblk->devblksize_log2;
 	const u64 read_end = round_up(index + length, msblk->devblksize);
 	const sector_t block_end = read_end >> msblk->devblksize_log2;
-	int offset = read_start - round_down(index, PAGE_SIZE);
+	int offset = read_start - round_down(index, PG_SIZE);
 	int total_len = (block_end - block) << msblk->devblksize_log2;
-	const int page_count = DIV_ROUND_UP(total_len + offset, PAGE_SIZE);
+	const int page_count = DIV_ROUND_UP(total_len + offset, PG_SIZE);
 	int error, i;
 	struct bio *bio;
 
@@ -236,8 +236,8 @@ static int squashfs_bio_read(struct super_block *sb, u64 index, int length,
 
 	for (i = 0; i < page_count; ++i) {
 		unsigned int len =
-			min_t(unsigned int, PAGE_SIZE - offset, total_len);
-		pgoff_t index = (read_start >> PAGE_SHIFT) + i;
+			min_t(unsigned int, PG_SIZE - offset, total_len);
+		pgoff_t index = (read_start >> PG_SHIFT) + i;
 		struct page *page;
 
 		page = squashfs_get_cache_page(cache_mapping, index);

@@ -1503,14 +1503,14 @@ static __init int sctp_init(void)
 	sysctl_sctp_mem[2] = sysctl_sctp_mem[0] * 2;
 
 	/* Set per-socket limits to no more than 1/128 the pressure threshold*/
-	limit = (sysctl_sctp_mem[1]) << (PAGE_SHIFT - 7);
+	limit = (sysctl_sctp_mem[1]) << (PG_SHIFT - 7);
 	max_share = min(4UL*1024*1024, limit);
 
-	sysctl_sctp_rmem[0] = PAGE_SIZE; /* give each asoc 1 page min */
+	sysctl_sctp_rmem[0] = PG_SIZE; /* give each asoc 1 page min */
 	sysctl_sctp_rmem[1] = 1500 * SKB_TRUESIZE(1);
 	sysctl_sctp_rmem[2] = max(sysctl_sctp_rmem[1], max_share);
 
-	sysctl_sctp_wmem[0] = PAGE_SIZE;
+	sysctl_sctp_wmem[0] = PG_SIZE;
 	sysctl_sctp_wmem[1] = 16*1024;
 	sysctl_sctp_wmem[2] = max(64*1024, max_share);
 
@@ -1519,9 +1519,9 @@ static __init int sctp_init(void)
 	 * Though not identical.  Start by getting a goal size
 	 */
 	if (nr_pages >= (128 * 1024))
-		goal = nr_pages >> (22 - PAGE_SHIFT);
+		goal = nr_pages >> (22 - PG_SHIFT);
 	else
-		goal = nr_pages >> (24 - PAGE_SHIFT);
+		goal = nr_pages >> (24 - PG_SHIFT);
 
 	/* Then compute the page order for said goal */
 	order = get_order(goal);
@@ -1568,7 +1568,7 @@ static __init int sctp_init(void)
 	/* Now compute the number of entries that will fit in the
 	 * port hash space we allocated
 	 */
-	num_entries = (1UL << order) * PAGE_SIZE /
+	num_entries = (1UL << order) * PG_SIZE /
 		      sizeof(struct sctp_bind_hashbucket);
 
 	/* And finish by rounding it down to the nearest power of two.

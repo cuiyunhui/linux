@@ -111,7 +111,7 @@ static int memfd_luo_preserve_folios(struct file *file,
 	 * Guess the number of folios based on inode size. Real number might end
 	 * up being smaller if there are higher order folios.
 	 */
-	max_folios = PAGE_ALIGN(size) / PAGE_SIZE;
+	max_folios = PG_ALIGN(size) / PG_SIZE;
 	folios = kvmalloc_objs(*folios, max_folios);
 	if (!folios)
 		return -ENOMEM;

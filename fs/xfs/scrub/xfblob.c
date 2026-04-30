@@ -48,7 +48,7 @@ xfblob_create(
 	}
 
 	blob->xfile = xfile;
-	blob->last_offset = PAGE_SIZE;
+	blob->last_offset = PG_SIZE;
 
 	*blobp = blob;
 	return 0;
@@ -163,6 +163,6 @@ void
 xfblob_truncate(
 	struct xfblob	*blob)
 {
-	xfile_discard(blob->xfile, PAGE_SIZE, MAX_LFS_FILESIZE - PAGE_SIZE);
-	blob->last_offset = PAGE_SIZE;
+	xfile_discard(blob->xfile, PG_SIZE, MAX_LFS_FILESIZE - PG_SIZE);
+	blob->last_offset = PG_SIZE;
 }

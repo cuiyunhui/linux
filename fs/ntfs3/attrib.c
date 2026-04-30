@@ -1559,7 +1559,7 @@ int attr_wof_frame_info(struct ntfs_inode *ni, struct ATTRIB *attr,
 	addr = folio_address(folio);
 
 	if (vbo[1]) {
-		voff = vbo[1] & (PAGE_SIZE - 1);
+		voff = vbo[1] & (PG_SIZE - 1);
 		vbo[0] = vbo[1] - bytes_per_off;
 		i = 0;
 	} else {
@@ -1570,11 +1570,11 @@ int attr_wof_frame_info(struct ntfs_inode *ni, struct ATTRIB *attr,
 	}
 
 	do {
-		pgoff_t index = vbo[i] >> PAGE_SHIFT;
+		pgoff_t index = vbo[i] >> PG_SHIFT;
 
 		if (index != folio->index) {
-			u64 from = vbo[i] & ~(u64)(PAGE_SIZE - 1);
-			u64 to = min(from + PAGE_SIZE, wof_size);
+			u64 from = vbo[i] & ~(u64)(PG_SIZE - 1);
+			u64 to = min(from + PG_SIZE, wof_size);
 
 			err = attr_load_runs_range(ni, ATTR_DATA, WOF_NAME,
 						   ARRAY_SIZE(WOF_NAME), run,
@@ -1600,10 +1600,10 @@ int attr_wof_frame_info(struct ntfs_inode *ni, struct ATTRIB *attr,
 			}
 		} else if (!voff) {
 			if (bytes_per_off == sizeof(__le32)) {
-				off32 = Add2Ptr(addr, PAGE_SIZE - sizeof(u32));
+				off32 = Add2Ptr(addr, PG_SIZE - sizeof(u32));
 				off[0] = le32_to_cpu(*off32);
 			} else {
-				off64 = Add2Ptr(addr, PAGE_SIZE - sizeof(u64));
+				off64 = Add2Ptr(addr, PG_SIZE - sizeof(u64));
 				off[0] = le64_to_cpu(*off64);
 			}
 		} else {

@@ -187,7 +187,7 @@ struct usb_stream *usb_stream_new(struct usb_stream_kernel *sk,
 	max_packsize = usb_maxpacket(dev, out_pipe);
 	write_size = max_packsize * packets * USB_STREAM_URBDEPTH;
 
-	if (read_size >= 256*PAGE_SIZE || write_size >= 256*PAGE_SIZE) {
+	if (read_size >= 256*PG_SIZE || write_size >= 256*PG_SIZE) {
 		dev_warn(&dev->dev, "%s: a size exceeds 128*PAGE_SIZE\n", __func__);
 		goto out;
 	}

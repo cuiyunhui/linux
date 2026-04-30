@@ -475,8 +475,8 @@ static int f2fs_move_inline_dirents(struct inode *dir, struct folio *ifolio,
 		F2FS_I(dir)->i_inline_xattr_size = 0;
 
 	f2fs_i_depth_write(dir, 1);
-	if (i_size_read(dir) < PAGE_SIZE)
-		f2fs_i_size_write(dir, PAGE_SIZE);
+	if (i_size_read(dir) < PG_SIZE)
+		f2fs_i_size_write(dir, PG_SIZE);
 out:
 	f2fs_folio_put(folio, true);
 	return err;

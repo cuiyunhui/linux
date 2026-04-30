@@ -188,9 +188,9 @@ int virt_to_scatterlist(const void *addr, int size, struct scatterlist *sg,
 
 	while (size > 0 && i < sg_size) {
 		pg = virt_to_page(addr);
-		offset = offset_in_page(addr);
+		offset = offset_in_pg(addr);
 		sg_set_page(&sg[i], pg, 0, offset);
-		remainder_of_page = PAGE_SIZE - offset;
+		remainder_of_page = PG_SIZE - offset;
 		if (size >= remainder_of_page) {
 			sg[i].length = remainder_of_page;
 			addr += remainder_of_page;
@@ -278,7 +278,7 @@ static loff_t lower_offset_for_page(struct ecryptfs_crypt_stat *crypt_stat,
 				    struct folio *folio)
 {
 	return ecryptfs_lower_header_size(crypt_stat) +
-	       (loff_t)folio->index * PAGE_SIZE;
+	       (loff_t)folio->index * PG_SIZE;
 }
 
 /**
@@ -307,7 +307,7 @@ static int crypt_extent(struct ecryptfs_crypt_stat *crypt_stat,
 	size_t extent_size = crypt_stat->extent_size;
 	int rc;
 
-	extent_base = (((loff_t)page_index) * (PAGE_SIZE / extent_size));
+	extent_base = (((loff_t)page_index) * (PG_SIZE / extent_size));
 	ecryptfs_derive_iv(extent_iv, crypt_stat, extent_base + extent_offset);
 
 	sg_init_table(&src_sg, 1);
@@ -370,7 +370,7 @@ int ecryptfs_encrypt_page(struct folio *folio)
 	}
 
 	for (extent_offset = 0;
-	     extent_offset < (PAGE_SIZE / crypt_stat->extent_size);
+	     extent_offset < (PG_SIZE / crypt_stat->extent_size);
 	     extent_offset++) {
 		rc = crypt_extent(crypt_stat, enc_extent_page,
 				folio_page(folio, 0), folio->index,
@@ -385,7 +385,7 @@ int ecryptfs_encrypt_page(struct folio *folio)
 	lower_offset = lower_offset_for_page(crypt_stat, folio);
 	enc_extent_virt = kmap_local_page(enc_extent_page);
 	rc = ecryptfs_write_lower(ecryptfs_inode, enc_extent_virt, lower_offset,
-				  PAGE_SIZE);
+				  PG_SIZE);
 	kunmap_local(enc_extent_virt);
 	if (rc < 0) {
 		ecryptfs_printk(KERN_ERR,
@@ -433,7 +433,7 @@ int ecryptfs_decrypt_page(struct folio *folio)
 
 	lower_offset = lower_offset_for_page(crypt_stat, folio);
 	page_virt = kmap_local_folio(folio, 0);
-	rc = ecryptfs_read_lower(page_virt, lower_offset, PAGE_SIZE,
+	rc = ecryptfs_read_lower(page_virt, lower_offset, PG_SIZE,
 				 ecryptfs_inode);
 	kunmap_local(page_virt);
 	if (rc < 0) {
@@ -444,7 +444,7 @@ int ecryptfs_decrypt_page(struct folio *folio)
 	}
 
 	for (extent_offset = 0;
-	     extent_offset < (PAGE_SIZE / crypt_stat->extent_size);
+	     extent_offset < (PG_SIZE / crypt_stat->extent_size);
 	     extent_offset++) {
 		struct page *page = folio_page(folio, 0);
 		rc = crypt_extent(crypt_stat, page, page, folio->index,
@@ -534,11 +534,11 @@ void ecryptfs_set_default_sizes(struct ecryptfs_crypt_stat *crypt_stat)
 	if (crypt_stat->flags & ECRYPTFS_METADATA_IN_XATTR)
 		crypt_stat->metadata_size = ECRYPTFS_MINIMUM_HEADER_EXTENT_SIZE;
 	else {
-		if (PAGE_SIZE <= ECRYPTFS_MINIMUM_HEADER_EXTENT_SIZE)
+		if (PG_SIZE <= ECRYPTFS_MINIMUM_HEADER_EXTENT_SIZE)
 			crypt_stat->metadata_size =
 				ECRYPTFS_MINIMUM_HEADER_EXTENT_SIZE;
 		else
-			crypt_stat->metadata_size = PAGE_SIZE;
+			crypt_stat->metadata_size = PG_SIZE;
 	}
 }
 
@@ -1309,7 +1309,7 @@ int ecryptfs_read_metadata(struct dentry *ecryptfs_dentry)
 						ECRYPTFS_VALIDATE_HEADER_SIZE);
 	if (rc) {
 		/* metadata is not in the file header, so try xattrs */
-		memset(page_virt, 0, PAGE_SIZE);
+		memset(page_virt, 0, PG_SIZE);
 		rc = ecryptfs_read_xattr_region(page_virt, ecryptfs_inode);
 		if (rc) {
 			printk(KERN_DEBUG "Valid eCryptfs headers not found in "
@@ -1342,7 +1342,7 @@ int ecryptfs_read_metadata(struct dentry *ecryptfs_dentry)
 	}
 out:
 	if (page_virt) {
-		memset(page_virt, 0, PAGE_SIZE);
+		memset(page_virt, 0, PG_SIZE);
 		kmem_cache_free(ecryptfs_header_cache, page_virt);
 	}
 	return rc;

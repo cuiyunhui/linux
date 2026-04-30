@@ -387,7 +387,7 @@ static void __xp_dma_unmap(struct xsk_dma_map *dma_map, unsigned long attrs)
 		dma = &dma_map->dma_pages[i];
 		if (*dma) {
 			*dma &= ~XSK_NEXT_PG_CONTIG_MASK;
-			dma_unmap_page_attrs(dma_map->dev, *dma, PAGE_SIZE,
+			dma_unmap_page_attrs(dma_map->dev, *dma, PG_SIZE,
 					     DMA_BIDIRECTIONAL, attrs);
 			*dma = 0;
 		}
@@ -424,7 +424,7 @@ static void xp_check_dma_contiguity(struct xsk_dma_map *dma_map)
 	u32 i;
 
 	for (i = 0; i < dma_map->dma_pages_cnt - 1; i++) {
-		if (dma_map->dma_pages[i] + PAGE_SIZE == dma_map->dma_pages[i + 1])
+		if (dma_map->dma_pages[i] + PG_SIZE == dma_map->dma_pages[i + 1])
 			dma_map->dma_pages[i] |= XSK_NEXT_PG_CONTIG_MASK;
 		else
 			dma_map->dma_pages[i] &= ~XSK_NEXT_PG_CONTIG_MASK;
@@ -481,7 +481,7 @@ int xp_dma_map(struct xsk_buff_pool *pool, struct device *dev,
 		return -ENOMEM;
 
 	for (i = 0; i < dma_map->dma_pages_cnt; i++) {
-		dma = dma_map_page_attrs(dev, pages[i], 0, PAGE_SIZE,
+		dma = dma_map_page_attrs(dev, pages[i], 0, PG_SIZE,
 					 DMA_BIDIRECTIONAL, attrs);
 		if (dma_mapping_error(dev, dma)) {
 			__xp_dma_unmap(dma_map, attrs);
@@ -740,9 +740,9 @@ EXPORT_SYMBOL(xp_raw_get_data);
 
 static dma_addr_t __xp_raw_get_dma(const struct xsk_buff_pool *pool, u64 addr)
 {
-	return (pool->dma_pages[addr >> PAGE_SHIFT] &
+	return (pool->dma_pages[addr >> PG_SHIFT] &
 		~XSK_NEXT_PG_CONTIG_MASK) +
-		(addr & ~PAGE_MASK);
+		(addr & ~PG_MASK);
 }
 
 dma_addr_t xp_raw_get_dma(struct xsk_buff_pool *pool, u64 addr)

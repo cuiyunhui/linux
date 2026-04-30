@@ -1889,7 +1889,7 @@ static bool pgdat_free_space_enough(struct pglist_data *pgdat)
 	int z;
 	unsigned long enough_wmark;
 
-	enough_wmark = max(1UL * 1024 * 1024 * 1024 >> PAGE_SHIFT,
+	enough_wmark = max(1UL * 1024 * 1024 * 1024 >> PG_SHIFT,
 			   pgdat->node_present_pages >> 4);
 	for (z = pgdat->nr_zones - 1; z >= 0; z--) {
 		struct zone *zone = pgdat->node_zones + z;
@@ -3425,7 +3425,7 @@ static void task_numa_work(struct callback_head *work)
 	p->node_stamp += 2 * TICK_NSEC;
 
 	pages = sysctl_numa_balancing_scan_size;
-	pages <<= 20 - PAGE_SHIFT; /* MB in pages */
+	pages <<= 20 - PG_SHIFT; /* MB in pages */
 	virtpages = pages * 8;	   /* Scan up to this much virtual space */
 	if (!pages)
 		return;
@@ -3548,7 +3548,7 @@ retry_pids:
 
 		do {
 			start = max(start, vma->vm_start);
-			end = ALIGN(start + (pages << PAGE_SHIFT), HPAGE_SIZE);
+			end = ALIGN(start + (pages << PG_SHIFT), HPAGE_SIZE);
 			end = min(end, vma->vm_end);
 			nr_pte_updates = change_prot_numa(vma, start, end);
 
@@ -3561,8 +3561,8 @@ retry_pids:
 			 * areas faster.
 			 */
 			if (nr_pte_updates)
-				pages -= (end - start) >> PAGE_SHIFT;
-			virtpages -= (end - start) >> PAGE_SHIFT;
+				pages -= (end - start) >> PG_SHIFT;
+			virtpages -= (end - start) >> PG_SHIFT;
 
 			start = end;
 			if (pages <= 0 || virtpages <= 0)

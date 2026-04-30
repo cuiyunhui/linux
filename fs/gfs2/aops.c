@@ -304,8 +304,8 @@ static int gfs2_write_cache_jdata(struct address_space *mapping,
 			cycled = 0;
 		end = -1;
 	} else {
-		index = wbc->range_start >> PAGE_SHIFT;
-		end = wbc->range_end >> PAGE_SHIFT;
+		index = wbc->range_start >> PG_SHIFT;
+		end = wbc->range_end >> PG_SHIFT;
 		if (wbc->range_start == 0 && wbc->range_end == LLONG_MAX)
 			range_whole = 1;
 		cycled = 1; /* ignore range_cyclic tests */
@@ -423,7 +423,7 @@ static int gfs2_read_folio(struct file *file, struct folio *folio)
 	int error = 0;
 
 	if (!gfs2_is_jdata(ip) ||
-	    (i_blocksize(inode) == PAGE_SIZE && !folio_buffers(folio))) {
+	    (i_blocksize(inode) == PG_SIZE && !folio_buffers(folio))) {
 		iomap_bio_read_folio(folio, &gfs2_iomap_ops);
 	} else if (gfs2_is_stuffed(ip)) {
 		error = stuffed_read_folio(ip, folio);
@@ -450,7 +450,7 @@ ssize_t gfs2_internal_read(struct gfs2_inode *ip, char *buf, loff_t *pos,
 			   size_t size)
 {
 	struct address_space *mapping = ip->i_inode.i_mapping;
-	unsigned long index = *pos >> PAGE_SHIFT;
+	unsigned long index = *pos >> PG_SHIFT;
 	size_t copied = 0;
 
 	do {

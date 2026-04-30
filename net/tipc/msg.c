@@ -51,7 +51,7 @@
 #define BUF_OVERHEAD BUF_HEADROOM
 #endif
 
-const int one_page_mtu = PAGE_SIZE - SKB_DATA_ALIGN(BUF_OVERHEAD) -
+const int one_page_mtu = PG_SIZE - SKB_DATA_ALIGN(BUF_OVERHEAD) -
 			 SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
 
 /**

@@ -669,7 +669,7 @@ static int affs_write_begin_ofs(const struct kiocb *iocb,
 			return err;
 	}
 
-	index = pos >> PAGE_SHIFT;
+	index = pos >> PG_SHIFT;
 	folio = __filemap_get_folio(mapping, index, FGP_WRITEBEGIN,
 			mapping_gfp_mask(mapping));
 	if (IS_ERR(folio))
@@ -702,7 +702,7 @@ static int affs_write_end_ofs(const struct kiocb *iocb,
 	u32 tmp;
 	int written;
 
-	from = pos & (PAGE_SIZE - 1);
+	from = pos & (PG_SIZE - 1);
 	to = from + len;
 	/*
 	 * XXX: not sure if this can handle short copies (len < copied), but
@@ -717,7 +717,7 @@ static int affs_write_end_ofs(const struct kiocb *iocb,
 
 	bh = NULL;
 	written = 0;
-	tmp = (folio->index << PAGE_SHIFT) + from;
+	tmp = (folio->index << PG_SHIFT) + from;
 	bidx = tmp / bsize;
 	boff = tmp % bsize;
 	if (boff) {
@@ -814,7 +814,7 @@ static int affs_write_end_ofs(const struct kiocb *iocb,
 
 done:
 	affs_brelse(bh);
-	tmp = (folio->index << PAGE_SHIFT) + from;
+	tmp = (folio->index << PG_SHIFT) + from;
 	if (tmp > inode->i_size)
 		inode->i_size = AFFS_I(inode)->mmu_private = tmp;
 

@@ -283,48 +283,48 @@ static ssize_t config_show(struct device *dev,
 
 	mutex_lock(&test_fw_mutex);
 
-	len += scnprintf(buf, PAGE_SIZE - len,
-			"Custom trigger configuration for: %s\n",
-			dev_name(dev));
+	len += scnprintf(buf, PG_SIZE - len,
+			 "Custom trigger configuration for: %s\n",
+			 dev_name(dev));
 
 	if (test_fw_config->name)
-		len += scnprintf(buf + len, PAGE_SIZE - len,
-				"name:\t%s\n",
-				test_fw_config->name);
+		len += scnprintf(buf + len, PG_SIZE - len,
+				 "name:\t%s\n",
+				 test_fw_config->name);
 	else
-		len += scnprintf(buf + len, PAGE_SIZE - len,
-				"name:\tEMPTY\n");
+		len += scnprintf(buf + len, PG_SIZE - len,
+				 "name:\tEMPTY\n");
 
-	len += scnprintf(buf + len, PAGE_SIZE - len,
-			"num_requests:\t%u\n", test_fw_config->num_requests);
+	len += scnprintf(buf + len, PG_SIZE - len,
+			 "num_requests:\t%u\n", test_fw_config->num_requests);
 
-	len += scnprintf(buf + len, PAGE_SIZE - len,
-			"send_uevent:\t\t%s\n",
-			test_fw_config->send_uevent ?
-			"FW_ACTION_UEVENT" :
-			"FW_ACTION_NOUEVENT");
-	len += scnprintf(buf + len, PAGE_SIZE - len,
-			"into_buf:\t\t%s\n",
-			str_true_false(test_fw_config->into_buf));
-	len += scnprintf(buf + len, PAGE_SIZE - len,
-			"buf_size:\t%zu\n", test_fw_config->buf_size);
-	len += scnprintf(buf + len, PAGE_SIZE - len,
-			"file_offset:\t%zu\n", test_fw_config->file_offset);
-	len += scnprintf(buf + len, PAGE_SIZE - len,
-			"partial:\t\t%s\n",
-			str_true_false(test_fw_config->partial));
-	len += scnprintf(buf + len, PAGE_SIZE - len,
-			"sync_direct:\t\t%s\n",
-			str_true_false(test_fw_config->sync_direct));
-	len += scnprintf(buf + len, PAGE_SIZE - len,
-			"read_fw_idx:\t%u\n", test_fw_config->read_fw_idx);
+	len += scnprintf(buf + len, PG_SIZE - len,
+			 "send_uevent:\t\t%s\n",
+			 test_fw_config->send_uevent ?
+			 "FW_ACTION_UEVENT" :
+			 "FW_ACTION_NOUEVENT");
+	len += scnprintf(buf + len, PG_SIZE - len,
+			 "into_buf:\t\t%s\n",
+			 str_true_false(test_fw_config->into_buf));
+	len += scnprintf(buf + len, PG_SIZE - len,
+			 "buf_size:\t%zu\n", test_fw_config->buf_size);
+	len += scnprintf(buf + len, PG_SIZE - len,
+			 "file_offset:\t%zu\n", test_fw_config->file_offset);
+	len += scnprintf(buf + len, PG_SIZE - len,
+			 "partial:\t\t%s\n",
+			 str_true_false(test_fw_config->partial));
+	len += scnprintf(buf + len, PG_SIZE - len,
+			 "sync_direct:\t\t%s\n",
+			 str_true_false(test_fw_config->sync_direct));
+	len += scnprintf(buf + len, PG_SIZE - len,
+			 "read_fw_idx:\t%u\n", test_fw_config->read_fw_idx);
 	if (test_fw_config->upload_name)
-		len += scnprintf(buf + len, PAGE_SIZE - len,
-				"upload_name:\t%s\n",
-				test_fw_config->upload_name);
+		len += scnprintf(buf + len, PG_SIZE - len,
+				 "upload_name:\t%s\n",
+				 test_fw_config->upload_name);
 	else
-		len += scnprintf(buf + len, PAGE_SIZE - len,
-				"upload_name:\tEMPTY\n");
+		len += scnprintf(buf + len, PG_SIZE - len,
+				 "upload_name:\tEMPTY\n");
 
 	mutex_unlock(&test_fw_mutex);
 
@@ -355,7 +355,7 @@ static ssize_t config_test_show_str(char *dst,
 	int len;
 
 	mutex_lock(&test_fw_mutex);
-	len = snprintf(dst, PAGE_SIZE, "%s\n", src);
+	len = snprintf(dst, PG_SIZE, "%s\n", src);
 	mutex_unlock(&test_fw_mutex);
 
 	return len;
@@ -388,7 +388,7 @@ static int test_dev_config_update_bool(const char *buf, size_t size,
 
 static ssize_t test_dev_config_show_bool(char *buf, bool val)
 {
-	return snprintf(buf, PAGE_SIZE, "%d\n", val);
+	return snprintf(buf, PG_SIZE, "%d\n", val);
 }
 
 static int __test_dev_config_update_size_t(
@@ -411,12 +411,12 @@ static int __test_dev_config_update_size_t(
 
 static ssize_t test_dev_config_show_size_t(char *buf, size_t val)
 {
-	return snprintf(buf, PAGE_SIZE, "%zu\n", val);
+	return snprintf(buf, PG_SIZE, "%zu\n", val);
 }
 
 static ssize_t test_dev_config_show_int(char *buf, int val)
 {
-	return snprintf(buf, PAGE_SIZE, "%d\n", val);
+	return snprintf(buf, PG_SIZE, "%d\n", val);
 }
 
 static int __test_dev_config_update_u8(const char *buf, size_t size, u8 *cfg)
@@ -447,7 +447,7 @@ static int test_dev_config_update_u8(const char *buf, size_t size, u8 *cfg)
 
 static ssize_t test_dev_config_show_u8(char *buf, u8 val)
 {
-	return snprintf(buf, PAGE_SIZE, "%u\n", val);
+	return snprintf(buf, PG_SIZE, "%u\n", val);
 }
 
 static ssize_t config_name_show(struct device *dev,
@@ -1421,7 +1421,7 @@ static ssize_t read_firmware_show(struct device *dev,
 
 	pr_info("#%u: loaded %zu\n", idx, req->fw->size);
 
-	if (req->fw->size > PAGE_SIZE) {
+	if (req->fw->size > PG_SIZE) {
 		pr_err("Testing interface must use PAGE_SIZE firmware for now\n");
 		rc = -EINVAL;
 		goto out;
@@ -1462,7 +1462,7 @@ static ssize_t upload_read_show(struct device *dev,
 		goto out;
 	}
 
-	if (tst->size > PAGE_SIZE) {
+	if (tst->size > PG_SIZE) {
 		pr_err("Testing interface must use PAGE_SIZE firmware for now\n");
 		goto out;
 	}

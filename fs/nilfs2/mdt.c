@@ -353,7 +353,7 @@ int nilfs_mdt_delete_block(struct inode *inode, unsigned long block)
  */
 int nilfs_mdt_forget_block(struct inode *inode, unsigned long block)
 {
-	pgoff_t index = block >> (PAGE_SHIFT - inode->i_blkbits);
+	pgoff_t index = block >> (PG_SHIFT - inode->i_blkbits);
 	struct folio *folio;
 	struct buffer_head *bh;
 	int ret = 0;
@@ -368,7 +368,7 @@ int nilfs_mdt_forget_block(struct inode *inode, unsigned long block)
 	bh = folio_buffers(folio);
 	if (bh) {
 		unsigned long first_block = index <<
-				(PAGE_SHIFT - inode->i_blkbits);
+				(PG_SHIFT - inode->i_blkbits);
 		bh = get_nth_bh(bh, block - first_block);
 		nilfs_forget_buffer(bh);
 	}

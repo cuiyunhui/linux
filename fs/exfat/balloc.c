@@ -102,7 +102,7 @@ static int exfat_allocate_bitmap(struct super_block *sb,
 
 	sector = exfat_cluster_to_sector(sbi, sbi->map_clu);
 	max_ra_count = min(sb->s_bdi->ra_pages, sb->s_bdi->io_pages) <<
-		(PAGE_SHIFT - sb->s_blocksize_bits);
+		(PG_SHIFT - sb->s_blocksize_bits);
 	for (i = 0; i < sbi->map_sectors; i++) {
 		/* Trigger the next readahead in advance. */
 		if (max_ra_count && 0 == (i % max_ra_count)) {

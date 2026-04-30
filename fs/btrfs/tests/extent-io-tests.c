@@ -23,8 +23,8 @@ static noinline int process_page_range(struct inode *inode, u64 start, u64 end,
 {
 	int ret;
 	struct folio_batch fbatch;
-	pgoff_t index = start >> PAGE_SHIFT;
-	pgoff_t end_index = end >> PAGE_SHIFT;
+	pgoff_t index = start >> PG_SHIFT;
+	pgoff_t end_index = end >> PG_SHIFT;
 	int i;
 	int count = 0;
 	int loops = 0;
@@ -156,7 +156,7 @@ static int test_find_delalloc(u32 sectorsize, u32 nodesize)
 	 * everything to make sure our pages don't get evicted and screw up our
 	 * test.
 	 */
-	for (pgoff_t index = 0; index < (total_dirty >> PAGE_SHIFT); index++) {
+	for (pgoff_t index = 0; index < (total_dirty >> PG_SHIFT); index++) {
 		page = find_or_create_page(inode->i_mapping, index, GFP_KERNEL);
 		if (!page) {
 			test_err("failed to allocate test page");
@@ -178,7 +178,7 @@ static int test_find_delalloc(u32 sectorsize, u32 nodesize)
 	 */
 	btrfs_set_extent_bit(tmp, 0, sectorsize - 1, EXTENT_DELALLOC, NULL);
 	start = 0;
-	end = start + PAGE_SIZE - 1;
+	end = start + PG_SIZE - 1;
 	found = find_lock_delalloc_range(inode, page_folio(locked_page), &start,
 					 &end);
 	if (!found) {
@@ -202,14 +202,14 @@ static int test_find_delalloc(u32 sectorsize, u32 nodesize)
 	 */
 	test_start = SZ_64M;
 	locked_page = find_lock_page(inode->i_mapping,
-				     test_start >> PAGE_SHIFT);
+				     test_start >> PG_SHIFT);
 	if (!locked_page) {
 		test_err("couldn't find the locked page");
 		goto out_bits;
 	}
 	btrfs_set_extent_bit(tmp, sectorsize, max_bytes - 1, EXTENT_DELALLOC, NULL);
 	start = test_start;
-	end = start + PAGE_SIZE - 1;
+	end = start + PG_SIZE - 1;
 	found = find_lock_delalloc_range(inode, page_folio(locked_page), &start,
 					 &end);
 	if (!found) {
@@ -237,20 +237,20 @@ static int test_find_delalloc(u32 sectorsize, u32 nodesize)
 	 */
 	test_start = max_bytes + sectorsize;
 	locked_page = find_lock_page(inode->i_mapping, test_start >>
-				     PAGE_SHIFT);
+				     PG_SHIFT);
 	if (!locked_page) {
 		test_err("couldn't find the locked page");
 		goto out_bits;
 	}
 	start = test_start;
-	end = start + PAGE_SIZE - 1;
+	end = start + PG_SIZE - 1;
 	found = find_lock_delalloc_range(inode, page_folio(locked_page), &start,
 					 &end);
 	if (found) {
 		test_err("found range when we shouldn't have");
 		goto out_bits;
 	}
-	if (end != test_start + PAGE_SIZE - 1) {
+	if (end != test_start + PG_SIZE - 1) {
 		test_err("did not return the proper end offset");
 		goto out_bits;
 	}
@@ -264,7 +264,7 @@ static int test_find_delalloc(u32 sectorsize, u32 nodesize)
 	 */
 	btrfs_set_extent_bit(tmp, max_bytes, total_dirty - 1, EXTENT_DELALLOC, NULL);
 	start = test_start;
-	end = start + PAGE_SIZE - 1;
+	end = start + PG_SIZE - 1;
 	found = find_lock_delalloc_range(inode, page_folio(locked_page), &start,
 					 &end);
 	if (!found) {
@@ -288,7 +288,7 @@ static int test_find_delalloc(u32 sectorsize, u32 nodesize)
 	 * range we want to find.
 	 */
 	page = find_get_page(inode->i_mapping,
-			     (max_bytes + SZ_1M) >> PAGE_SHIFT);
+			     (max_bytes + SZ_1M) >> PG_SHIFT);
 	if (!page) {
 		test_err("couldn't find our page");
 		goto out_bits;
@@ -299,7 +299,7 @@ static int test_find_delalloc(u32 sectorsize, u32 nodesize)
 	/* We unlocked it in the previous test */
 	lock_page(locked_page);
 	start = test_start;
-	end = start + PAGE_SIZE - 1;
+	end = start + PG_SIZE - 1;
 	/*
 	 * Currently if we fail to find dirty pages in the delalloc range we
 	 * will adjust max_bytes down to PAGE_SIZE and then re-search.  If
@@ -312,9 +312,9 @@ static int test_find_delalloc(u32 sectorsize, u32 nodesize)
 		test_err("didn't find our range");
 		goto out_bits;
 	}
-	if (start != test_start && end != test_start + PAGE_SIZE - 1) {
+	if (start != test_start && end != test_start + PG_SIZE - 1) {
 		test_err("expected start %llu end %llu, got start %llu end %llu",
-			 test_start, test_start + PAGE_SIZE - 1, start, end);
+			 test_start, test_start + PG_SIZE - 1, start, end);
 		goto out_bits;
 	}
 	if (process_page_range(inode, start, end, PROCESS_TEST_LOCKED |
@@ -454,9 +454,9 @@ static int __test_eb_bitmaps(unsigned long *bitmap, struct extent_buffer *eb)
 		return ret;
 
 	/* Straddling pages test */
-	if (byte_len > PAGE_SIZE) {
+	if (byte_len > PG_SIZE) {
 		ret = test_bitmap_set("cross page set", bitmap, eb,
-				      PAGE_SIZE - sizeof(long) / 2, 0,
+				      PG_SIZE - sizeof(long) / 2, 0,
 				      sizeof(long) * BITS_PER_BYTE);
 		if (ret < 0)
 			return ret;
@@ -467,7 +467,7 @@ static int __test_eb_bitmaps(unsigned long *bitmap, struct extent_buffer *eb)
 			return ret;
 
 		ret = test_bitmap_clear("cross page clear", bitmap, eb,
-					PAGE_SIZE - sizeof(long) / 2, 0,
+					PG_SIZE - sizeof(long) / 2, 0,
 					sizeof(long) * BITS_PER_BYTE);
 		if (ret < 0)
 			return ret;
@@ -670,8 +670,8 @@ static void dump_eb_and_memory_contents(struct extent_buffer *eb, void *memory,
 					const char *test_name)
 {
 	for (int i = 0; i < eb->len; i++) {
-		struct page *page = folio_page(eb->folios[i >> PAGE_SHIFT], 0);
-		void *addr = page_address(page) + offset_in_page(i);
+		struct page *page = folio_page(eb->folios[i >> PG_SHIFT], 0);
+		void *addr = page_address(page) + offset_in_pg(i);
 
 		if (memcmp(addr, memory + i, 1) != 0) {
 			test_err("%s failed", test_name);
@@ -685,10 +685,10 @@ static void dump_eb_and_memory_contents(struct extent_buffer *eb, void *memory,
 static int verify_eb_and_memory(struct extent_buffer *eb, void *memory,
 				const char *test_name)
 {
-	for (int i = 0; i < (eb->len >> PAGE_SHIFT); i++) {
+	for (int i = 0; i < (eb->len >> PG_SHIFT); i++) {
 		void *eb_addr = folio_address(eb->folios[i]);
 
-		if (memcmp(memory + (i << PAGE_SHIFT), eb_addr, PAGE_SIZE) != 0) {
+		if (memcmp(memory + (i << PG_SHIFT), eb_addr, PG_SIZE) != 0) {
 			dump_eb_and_memory_contents(eb, memory, test_name);
 			return -EUCLEAN;
 		}
@@ -774,7 +774,7 @@ static int test_eb_mem_ops(u32 sectorsize, u32 nodesize)
 	if (ret < 0)
 		goto out;
 
-	if (nodesize > PAGE_SIZE) {
+	if (nodesize > PG_SIZE) {
 		memcpy(memory, memory + 4096 - 128, 256);
 		memcpy_extent_buffer(eb, 0, 4096 - 128, 256);
 		ret = verify_eb_and_memory(eb, memory, "cross page non-overlapping memcpy 1");

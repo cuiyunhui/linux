@@ -55,12 +55,12 @@ int main(void)
 	if (fd == -1)
 		return 1;
 
-	p = mmap(NULL, PAGE_SIZE, PROT_NONE, MAP_PRIVATE|MAP_FILE, fd, 0);
+	p = mmap(NULL, PG_SIZE, PROT_NONE, MAP_PRIVATE|MAP_FILE, fd, 0);
 	if (p == MAP_FAILED)
 		return 1;
 
 	a = (unsigned long)p;
-	b = (unsigned long)p + PAGE_SIZE;
+	b = (unsigned long)p + PG_SIZE;
 
 	pass("/proc/self/map_files/%lx-%lx", a, b);
 	fail("/proc/self/map_files/ %lx-%lx", a, b);

@@ -27,9 +27,9 @@ static int fsverity_read_merkle_tree(struct inode *inode,
 	end_offset = min(offset + length, vi->tree_params.tree_size);
 	if (offset >= end_offset)
 		return 0;
-	offs_in_page = offset_in_page(offset);
-	index = offset >> PAGE_SHIFT;
-	last_index = (end_offset - 1) >> PAGE_SHIFT;
+	offs_in_page = offset_in_pg(offset);
+	index = offset >> PG_SHIFT;
+	last_index = (end_offset - 1) >> PG_SHIFT;
 
 	/*
 	 * Kick off readahead for the range we are going to read to ensure a
@@ -50,7 +50,7 @@ static int fsverity_read_merkle_tree(struct inode *inode,
 	 */
 	for (; index <= last_index; index++) {
 		unsigned int bytes_to_copy = min_t(u64, end_offset - offset,
-						   PAGE_SIZE - offs_in_page);
+						   PG_SIZE - offs_in_page);
 		struct page *page;
 		const void *virt;
 

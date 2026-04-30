@@ -219,9 +219,9 @@ bool read_coredump_req(int fd, struct coredump_req *req)
 			kernel_size, COREDUMP_ACK_SIZE_VER0);
 		return false;
 	}
-	if (kernel_size >= PAGE_SIZE) {
+	if (kernel_size >= PG_SIZE) {
 		fprintf(stderr, "read_coredump_req: kernel_size %zu >= PAGE_SIZE %d\n",
-			kernel_size, PAGE_SIZE);
+			kernel_size, PG_SIZE);
 		return false;
 	}
 
@@ -240,7 +240,7 @@ bool read_coredump_req(int fd, struct coredump_req *req)
 	else
 		remaining_size = kernel_size - user_size;
 
-	if (PAGE_SIZE <= remaining_size)
+	if (PG_SIZE <= remaining_size)
 		return false;
 
 	/*
@@ -248,7 +248,7 @@ bool read_coredump_req(int fd, struct coredump_req *req)
 	 * what we knew about or cared about.
 	 */
 	if (remaining_size) {
-		char buffer[PAGE_SIZE];
+		char buffer[PG_SIZE];
 
 		ret = recv(fd, buffer, sizeof(buffer), MSG_WAITALL);
 		if (ret != remaining_size)
@@ -269,7 +269,7 @@ bool send_coredump_ack(int fd, const struct coredump_req *req,
 	 */
 	struct large_ack_for_size_testing {
 		struct coredump_ack ack;
-		char buffer[PAGE_SIZE];
+		char buffer[PG_SIZE];
 	} large_ack = {};
 
 	if (!size_ack)

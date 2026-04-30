@@ -97,7 +97,7 @@ struct report_time {
  * races is not excessive, and b) occurrence of unique races within the
  * same time window is limited.
  */
-#define REPORT_TIMES_MAX (PAGE_SIZE / sizeof(struct report_time))
+#define REPORT_TIMES_MAX (PG_SIZE / sizeof(struct report_time))
 #define REPORT_TIMES_SIZE                                                      \
 	(CONFIG_KCSAN_REPORT_ONCE_IN_MS > REPORT_TIMES_MAX ?                   \
 		 REPORT_TIMES_MAX :                                            \

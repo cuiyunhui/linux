@@ -173,7 +173,7 @@ static int collect_sample(const struct iov_iter *source, ssize_t max, u8 *sample
 		s += n;
 		max -= n;
 
-		if (iov_iter_count(&iter) < PAGE_SIZE - SZ_2K)
+		if (iov_iter_count(&iter) < PG_SIZE - SZ_2K)
 			break;
 
 		iov_iter_advance(&iter, SZ_2K);

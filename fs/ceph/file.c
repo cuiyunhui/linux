@@ -105,7 +105,7 @@ static ssize_t __iter_get_bvecs(struct iov_iter *iter, size_t maxsize,
 		size += bytes;
 
 		for ( ; bytes; idx++, bvec_idx++) {
-			int len = min_t(int, bytes, PAGE_SIZE - start);
+			int len = min_t(int, bytes, PG_SIZE - start);
 
 			bvec_set_page(&bvecs[bvec_idx], pages[idx], len, start);
 			bytes -= len;
@@ -1121,7 +1121,7 @@ ssize_t __ceph_sync_read(struct inode *inode, loff_t *ki_pos,
 		}
 
 		num_pages = calc_pages_for(read_off, read_len);
-		page_off = offset_in_page(off);
+		page_off = offset_in_pg(off);
 		pages = ceph_alloc_page_vector(num_pages, GFP_KERNEL);
 		if (IS_ERR(pages)) {
 			ceph_osdc_put_request(req);
@@ -1130,7 +1130,7 @@ ssize_t __ceph_sync_read(struct inode *inode, loff_t *ki_pos,
 		}
 
 		osd_req_op_extent_osd_data_pages(req, 0, pages, read_len,
-						 offset_in_page(read_off),
+						 offset_in_pg(read_off),
 						 false, true);
 
 		ceph_osdc_start_request(osdc, req);
@@ -1206,7 +1206,7 @@ ssize_t __ceph_sync_read(struct inode *inode, loff_t *ki_pos,
 		while (left > 0) {
 			size_t plen, copied;
 
-			plen = min_t(size_t, left, PAGE_SIZE - page_off);
+			plen = min_t(size_t, left, PG_SIZE - page_off);
 			SetPageUptodate(pages[idx]);
 			copied = copy_page_to_iter(pages[idx++],
 						   page_off, plen, to);
@@ -1508,8 +1508,8 @@ ceph_direct_read_write(struct kiocb *iocb, struct iov_iter *iter,
 		ceph_fscache_invalidate(inode, true);
 
 		ret2 = invalidate_inode_pages2_range(inode->i_mapping,
-					pos >> PAGE_SHIFT,
-					(pos + count - 1) >> PAGE_SHIFT);
+					pos >> PG_SHIFT,
+					(pos + count - 1) >> PG_SHIFT);
 		if (ret2 < 0)
 			doutc(cl, "invalidate_inode_pages2_range returned %d\n",
 			      ret2);
@@ -1592,7 +1592,7 @@ ceph_direct_read_write(struct kiocb *iocb, struct iov_iter *iter,
 			 * may block.
 			 */
 			truncate_inode_pages_range(inode->i_mapping, pos,
-						   PAGE_ALIGN(pos + len) - 1);
+						   PG_ALIGN(pos + len) - 1);
 
 			req->r_mtime = mtime;
 		}
@@ -1827,7 +1827,7 @@ ceph_sync_write(struct kiocb *iocb, struct iov_iter *from, loff_t pos,
 			if (first) {
 				osd_req_op_extent_osd_data_pages(req, 0, pages,
 							 CEPH_FSCRYPT_BLOCK_SIZE,
-							 offset_in_page(first_pos),
+							 offset_in_pg(first_pos),
 							 false, false);
 				/* We only expect a single extent here */
 				ret = __ceph_alloc_sparse_ext_map(op, 1);
@@ -1860,7 +1860,7 @@ ceph_sync_write(struct kiocb *iocb, struct iov_iter *from, loff_t pos,
 				osd_req_op_extent_osd_data_pages(req, first ? 1 : 0,
 							&pages[num_pages - 1],
 							CEPH_FSCRYPT_BLOCK_SIZE,
-							offset_in_page(last_pos),
+							offset_in_pg(last_pos),
 							false, false);
 			}
 
@@ -1889,11 +1889,11 @@ ceph_sync_write(struct kiocb *iocb, struct iov_iter *from, loff_t pos,
 				 */
 				if (first)
 					zero_user_segment(pages[0], 0,
-							  offset_in_page(first_pos));
+							  offset_in_pg(first_pos));
 				if (last)
 					zero_user_segment(pages[num_pages - 1],
-							  offset_in_page(last_pos),
-							  PAGE_SIZE);
+							  offset_in_pg(last_pos),
+							  PG_SIZE);
 			} else {
 				if (ret < 0) {
 					ceph_osdc_put_request(req);
@@ -1905,11 +1905,11 @@ ceph_sync_write(struct kiocb *iocb, struct iov_iter *from, loff_t pos,
 				if (op->extent.sparse_ext_cnt == 0) {
 					if (first)
 						zero_user_segment(pages[0], 0,
-								  offset_in_page(first_pos));
+								  offset_in_pg(first_pos));
 					else
 						zero_user_segment(pages[num_pages - 1],
-								  offset_in_page(last_pos),
-								  PAGE_SIZE);
+								  offset_in_pg(last_pos),
+								  PG_SIZE);
 				} else if (op->extent.sparse_ext_cnt != 1 ||
 					   ceph_sparse_ext_map_end(op) !=
 						CEPH_FSCRYPT_BLOCK_SIZE) {
@@ -1923,8 +1923,8 @@ ceph_sync_write(struct kiocb *iocb, struct iov_iter *from, loff_t pos,
 					op = &req->r_ops[1];
 					if (op->extent.sparse_ext_cnt == 0) {
 						zero_user_segment(pages[num_pages - 1],
-								  offset_in_page(last_pos),
-								  PAGE_SIZE);
+								  offset_in_pg(last_pos),
+								  PG_SIZE);
 					} else if (op->extent.sparse_ext_cnt != 1 ||
 						   ceph_sparse_ext_map_end(op) !=
 							CEPH_FSCRYPT_BLOCK_SIZE) {
@@ -1943,7 +1943,7 @@ ceph_sync_write(struct kiocb *iocb, struct iov_iter *from, loff_t pos,
 				if (first) {
 					ret = ceph_fscrypt_decrypt_block_inplace(inode,
 							pages[0], CEPH_FSCRYPT_BLOCK_SIZE,
-							offset_in_page(first_pos),
+							offset_in_pg(first_pos),
 							first_pos >> CEPH_FSCRYPT_BLOCK_SHIFT);
 					if (ret < 0) {
 						ceph_release_page_vector(pages, num_pages);
@@ -1954,7 +1954,7 @@ ceph_sync_write(struct kiocb *iocb, struct iov_iter *from, loff_t pos,
 					ret = ceph_fscrypt_decrypt_block_inplace(inode,
 							pages[num_pages - 1],
 							CEPH_FSCRYPT_BLOCK_SIZE,
-							offset_in_page(last_pos),
+							offset_in_pg(last_pos),
 							last_pos >> CEPH_FSCRYPT_BLOCK_SHIFT);
 					if (ret < 0) {
 						ceph_release_page_vector(pages, num_pages);
@@ -1965,9 +1965,9 @@ ceph_sync_write(struct kiocb *iocb, struct iov_iter *from, loff_t pos,
 		}
 
 		left = len;
-		off = offset_in_page(pos);
+		off = offset_in_pg(pos);
 		for (n = 0; n < num_pages; n++) {
-			size_t plen = min_t(size_t, left, PAGE_SIZE - off);
+			size_t plen = min_t(size_t, left, PG_SIZE - off);
 
 			/* copy the data */
 			ret = copy_page_from_iter(pages[n], off, plen, from);
@@ -2009,7 +2009,8 @@ ceph_sync_write(struct kiocb *iocb, struct iov_iter *from, loff_t pos,
 
 		doutc(cl, "write op %lld~%llu\n", write_pos, write_len);
 		osd_req_op_extent_osd_data_pages(req, rmw ? 1 : 0, pages, write_len,
-						 offset_in_page(write_pos), false,
+						 offset_in_pg(write_pos),
+						 false,
 						 true);
 		req->r_inode = inode;
 		req->r_mtime = mtime;
@@ -2065,8 +2066,8 @@ ceph_sync_write(struct kiocb *iocb, struct iov_iter *from, loff_t pos,
 		 */
 		ret = invalidate_inode_pages2_range(
 				inode->i_mapping,
-				pos >> PAGE_SHIFT,
-				(pos + len - 1) >> PAGE_SHIFT);
+				pos >> PG_SHIFT,
+				(pos + len - 1) >> PG_SHIFT);
 		if (ret < 0) {
 			doutc(cl, "invalidate_inode_pages2_range returned %d\n",
 			      ret);
@@ -2207,14 +2208,14 @@ again:
 		if (retry_op == READ_INLINE) {
 			BUG_ON(ret > 0 || read > 0);
 			if (iocb->ki_pos < i_size &&
-			    iocb->ki_pos < PAGE_SIZE) {
+			    iocb->ki_pos < PG_SIZE) {
 				loff_t end = min_t(loff_t, i_size,
 						   iocb->ki_pos + len);
-				end = min_t(loff_t, end, PAGE_SIZE);
+				end = min_t(loff_t, end, PG_SIZE);
 				if (statret < end)
 					zero_user_segment(page, statret, end);
 				ret = copy_page_to_iter(page,
-						iocb->ki_pos & ~PAGE_MASK,
+						iocb->ki_pos & ~PG_MASK,
 						end - iocb->ki_pos, to);
 				iocb->ki_pos += ret;
 				read += ret;
@@ -2530,7 +2531,7 @@ static inline void ceph_zero_partial_page(struct inode *inode,
 {
 	struct folio *folio;
 
-	folio = filemap_lock_folio(inode->i_mapping, offset >> PAGE_SHIFT);
+	folio = filemap_lock_folio(inode->i_mapping, offset >> PG_SHIFT);
 	if (IS_ERR(folio))
 		return;
 
@@ -2543,7 +2544,7 @@ static inline void ceph_zero_partial_page(struct inode *inode,
 static void ceph_zero_pagecache_range(struct inode *inode, loff_t offset,
 				      loff_t length)
 {
-	loff_t nearly = round_up(offset, PAGE_SIZE);
+	loff_t nearly = round_up(offset, PG_SIZE);
 	if (offset < nearly) {
 		loff_t size = nearly - offset;
 		if (length < size)
@@ -2552,8 +2553,8 @@ static void ceph_zero_pagecache_range(struct inode *inode, loff_t offset,
 		offset += size;
 		length -= size;
 	}
-	if (length >= PAGE_SIZE) {
-		loff_t size = round_down(length, PAGE_SIZE);
+	if (length >= PG_SIZE) {
+		loff_t size = round_down(length, PG_SIZE);
 		truncate_pagecache_range(inode, offset, offset + size - 1);
 		offset += size;
 		length -= size;
@@ -3059,8 +3060,8 @@ static ssize_t __ceph_copy_file_range(struct file *src_file, loff_t src_off,
 	/* Drop dst file cached pages */
 	ceph_fscache_invalidate(dst_inode, false);
 	ret = invalidate_inode_pages2_range(dst_inode->i_mapping,
-					    dst_off >> PAGE_SHIFT,
-					    (dst_off + len) >> PAGE_SHIFT);
+					    dst_off >> PG_SHIFT,
+					    (dst_off + len) >> PG_SHIFT);
 	if (ret < 0) {
 		doutc(cl, "Failed to invalidate inode pages (%zd)\n",
 			    ret);

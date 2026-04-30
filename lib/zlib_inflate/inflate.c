@@ -82,7 +82,7 @@ int zlib_inflateInit2(z_streamp strm, int windowBits)
      * DFLTCC requires the window to be page aligned.
      * Thus, we overallocate and take the aligned portion of the buffer.
      */
-    state->window = PTR_ALIGN(&WS(strm)->working_window[0], PAGE_SIZE);
+    state->window = PTR_ALIGN(&WS(strm)->working_window[0], PG_SIZE);
 #else
     state->window = &WS(strm)->working_window[0];
 #endif

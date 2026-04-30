@@ -326,7 +326,7 @@ again2:
 		break;
 	case S_IFDIR:
 		if (flags) {
-			inode->i_size = PAGE_SIZE;
+			inode->i_size = PG_SIZE;
 			inode_set_bytes(inode, inode->i_size);
 		}
 		set_nlink(inode, 1);

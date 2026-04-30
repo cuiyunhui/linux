@@ -223,7 +223,7 @@ orangefs_bufmap_alloc(struct ORANGEFS_dev_map_desc *user_desc)
 	if (!bufmap->desc_array)
 		goto out_free_index_array;
 
-	bufmap->page_count = bufmap->total_size / PAGE_SIZE;
+	bufmap->page_count = bufmap->total_size / PG_SIZE;
 
 	/* allocate storage to track our page mappings */
 	bufmap->page_array =
@@ -247,7 +247,7 @@ static int
 orangefs_bufmap_map(struct orangefs_bufmap *bufmap,
 		struct ORANGEFS_dev_map_desc *user_desc)
 {
-	int pages_per_desc = bufmap->desc_size / PAGE_SIZE;
+	int pages_per_desc = bufmap->desc_size / PG_SIZE;
 	int offset = 0, ret, i;
 
 	/* map the pages */
@@ -280,7 +280,7 @@ orangefs_bufmap_map(struct orangefs_bufmap *bufmap,
 		bufmap->desc_array[i].page_array = &bufmap->page_array[offset];
 		bufmap->desc_array[i].array_count = pages_per_desc;
 		bufmap->desc_array[i].uaddr =
-		    (user_desc->ptr + (i * pages_per_desc * PAGE_SIZE));
+		    (user_desc->ptr + (i * pages_per_desc * PG_SIZE));
 		offset += pages_per_desc;
 	}
 
@@ -315,14 +315,14 @@ int orangefs_bufmap_initialize(struct ORANGEFS_dev_map_desc *user_desc)
 	 * sanity check alignment and size of buffer that caller wants to
 	 * work with
 	 */
-	if (PAGE_ALIGN((unsigned long)user_desc->ptr) !=
+	if (PG_ALIGN((unsigned long)user_desc->ptr) !=
 	    (unsigned long)user_desc->ptr) {
 		gossip_err("orangefs error: memory alignment (front). %p\n",
 			   user_desc->ptr);
 		goto out;
 	}
 
-	if (PAGE_ALIGN(((unsigned long)user_desc->ptr + user_desc->total_size))
+	if (PG_ALIGN(((unsigned long)user_desc->ptr + user_desc->total_size))
 	    != (unsigned long)(user_desc->ptr + user_desc->total_size)) {
 		gossip_err("orangefs error: memory alignment (back).(%p + %d)\n",
 			   user_desc->ptr,
@@ -338,7 +338,7 @@ int orangefs_bufmap_initialize(struct ORANGEFS_dev_map_desc *user_desc)
 		goto out;
 	}
 
-	if ((user_desc->size % PAGE_SIZE) != 0) {
+	if ((user_desc->size % PG_SIZE) != 0) {
 		gossip_err("orangefs error: bufmap size not page size divisible (%d).\n",
 			   user_desc->size);
 		goto out;
@@ -481,8 +481,8 @@ int orangefs_bufmap_copy_from_iovec(struct iov_iter *iter,
 	for (i = 0; size; i++) {
 		struct page *page = to->page_array[i];
 		size_t n = size;
-		if (n > PAGE_SIZE)
-			n = PAGE_SIZE;
+		if (n > PG_SIZE)
+			n = PG_SIZE;
 		if (copy_page_from_iter(page, 0, n, iter) != n)
 			return -EFAULT;
 		size -= n;
@@ -510,8 +510,8 @@ int orangefs_bufmap_copy_to_iovec(struct iov_iter *iter,
 	for (i = 0; size; i++) {
 		struct page *page = from->page_array[i];
 		size_t n = size;
-		if (n > PAGE_SIZE)
-			n = PAGE_SIZE;
+		if (n > PG_SIZE)
+			n = PG_SIZE;
 		n = copy_page_to_iter(page, 0, n, iter);
 		if (!n)
 			return -EFAULT;

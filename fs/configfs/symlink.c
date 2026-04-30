@@ -85,7 +85,7 @@ static int create_link(struct config_item *parent_item,
 	if (!configfs_dirent_is_ready(target_sd))
 		return -ENOENT;
 
-	body = kzalloc(PAGE_SIZE, GFP_KERNEL);
+	body = kzalloc(PG_SIZE, GFP_KERNEL);
 	if (!body)
 		return -ENOMEM;
 

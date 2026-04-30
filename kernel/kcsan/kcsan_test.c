@@ -300,7 +300,7 @@ static bool report_matches_any_reordered(struct expect_report *r)
 static long test_sink;
 static long test_var;
 /* @test_array should be large enough to fall into multiple watchpoint slots. */
-static long test_array[3 * PAGE_SIZE / sizeof(long)];
+static long test_array[3 * PG_SIZE / sizeof(long)];
 static struct {
 	long val[8];
 } test_struct;

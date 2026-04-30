@@ -2093,7 +2093,8 @@ static u8 smc_compress_bufsize(int size, bool is_smcd, bool is_rmb)
 #ifdef CONFIG_ARCH_NO_SG_CHAIN
 	if (!is_smcd && is_rmb)
 		/* RMBs are backed by & limited to max size of scatterlists */
-		compressed = min_t(u8, compressed, ilog2((SG_MAX_SINGLE_ALLOC * PAGE_SIZE) >> 14));
+		compressed = min_t(u8, compressed,
+				   ilog2((SG_MAX_SINGLE_ALLOC * PG_SIZE) >> 14));
 #endif
 
 	return compressed;
@@ -2150,8 +2151,8 @@ static int smcr_buf_map_link(struct smc_buf_desc *buf_desc, bool is_rmb,
 	if (buf_desc->is_vm) {
 		buf = buf_desc->cpu_addr;
 		buf_size = buf_desc->len;
-		offset = offset_in_page(buf_desc->cpu_addr);
-		nents = PAGE_ALIGN(buf_size + offset) / PAGE_SIZE;
+		offset = offset_in_pg(buf_desc->cpu_addr);
+		nents = PG_ALIGN(buf_size + offset) / PG_SIZE;
 	} else {
 		nents = 1;
 	}
@@ -2163,7 +2164,7 @@ static int smcr_buf_map_link(struct smc_buf_desc *buf_desc, bool is_rmb,
 	if (buf_desc->is_vm) {
 		/* virtually contiguous buffer */
 		for_each_sg(buf_desc->sgt[lnk->link_idx].sgl, sg, nents, i) {
-			size = min_t(int, PAGE_SIZE - offset, buf_size);
+			size = min_t(int, PG_SIZE - offset, buf_size);
 			sg_set_page(sg, vmalloc_to_page(buf), size, offset);
 			buf += size;
 			buf_size -= size;
@@ -2344,7 +2345,7 @@ static struct smc_buf_desc *smcr_new_buf_create(struct smc_link_group *lgr,
 		fallthrough;	// try virtually contiguous buf
 	case SMCR_VIRT_CONT_BUFS:
 		buf_desc->order = get_order(bufsize);
-		buf_desc->cpu_addr = vzalloc(PAGE_SIZE << buf_desc->order);
+		buf_desc->cpu_addr = vzalloc(PG_SIZE << buf_desc->order);
 		if (!buf_desc->cpu_addr)
 			goto out;
 		buf_desc->pages = NULL;

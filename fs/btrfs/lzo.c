@@ -384,7 +384,7 @@ static struct folio *get_current_folio(struct compressed_bio *cb, struct folio_i
 				       u32 *cur_folio_index, u32 cur_in)
 {
 	struct btrfs_fs_info *fs_info = cb_to_fs_info(cb);
-	const u32 min_folio_shift = PAGE_SHIFT + fs_info->block_min_order;
+	const u32 min_folio_shift = PG_SHIFT + fs_info->block_min_order;
 
 	ASSERT(cur_folio_index);
 

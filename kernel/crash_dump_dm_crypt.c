@@ -91,7 +91,7 @@ static void get_keys_from_kdump_reserved_memory(void)
 	arch_kexec_unprotect_crashkres();
 
 	keys_header_loaded = kmap_local_page(pfn_to_page(
-		kexec_crash_image->dm_crypt_keys_addr >> PAGE_SHIFT));
+		kexec_crash_image->dm_crypt_keys_addr >> PG_SHIFT));
 
 	memcpy(keys_header, keys_header_loaded, get_keys_header_size(key_count));
 	kunmap_local(keys_header_loaded);

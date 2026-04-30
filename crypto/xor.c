@@ -132,7 +132,7 @@ calibrate_xor_blocks(void)
 		printk(KERN_WARNING "xor: Yikes!  No memory available.\n");
 		return -ENOMEM;
 	}
-	b2 = b1 + 2*PAGE_SIZE + BENCH_SIZE;
+	b2 = b1 + 2*PG_SIZE + BENCH_SIZE;
 
 	/*
 	 * If this arch/cpu has a short-circuited selection, don't loop through

@@ -309,7 +309,7 @@ static void init_vmalloc_pages(const void *start, unsigned long size)
 {
 	const void *addr;
 
-	for (addr = start; addr < start + size; addr += PAGE_SIZE) {
+	for (addr = start; addr < start + size; addr += PG_SIZE) {
 		struct page *page = vmalloc_to_page(addr);
 
 		clear_highpage_kasan_tagged(page);
@@ -374,7 +374,7 @@ void *__kasan_unpoison_vmalloc(const void *start, unsigned long size,
 	 */
 	redzone_start = round_up((unsigned long)start + size,
 				 KASAN_GRANULE_SIZE);
-	redzone_size = round_up(redzone_start, PAGE_SIZE) - redzone_start;
+	redzone_size = round_up(redzone_start, PG_SIZE) - redzone_start;
 	kasan_poison((void *)redzone_start, redzone_size, KASAN_TAG_INVALID,
 		     flags & KASAN_VMALLOC_INIT);
 

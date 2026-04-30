@@ -1213,7 +1213,7 @@ int ceph_fill_inode(struct inode *inode, struct page *locked_page,
 	case S_IFBLK:
 	case S_IFCHR:
 	case S_IFSOCK:
-		inode->i_blkbits = PAGE_SHIFT;
+		inode->i_blkbits = PG_SHIFT;
 		init_special_inode(inode, inode->i_mode, rdev);
 		inode->i_op = &ceph_file_iops;
 		break;
@@ -1915,7 +1915,7 @@ static int fill_readdir_cache(struct inode *dir, struct dentry *dn,
 {
 	struct ceph_client *cl = ceph_inode_to_client(dir);
 	struct ceph_inode_info *ci = ceph_inode(dir);
-	unsigned nsize = PAGE_SIZE / sizeof(struct dentry*);
+	unsigned nsize = PG_SIZE / sizeof(struct dentry*);
 	unsigned idx = ctl->index % nsize;
 	pgoff_t pgoff = ctl->index / nsize;
 
@@ -1940,7 +1940,7 @@ static int fill_readdir_cache(struct inode *dir, struct dentry *dn,
 		folio_unlock(ctl->folio);
 		ctl->dentries = kmap_local_folio(ctl->folio, 0);
 		if (idx == 0)
-			memset(ctl->dentries, 0, PAGE_SIZE);
+			memset(ctl->dentries, 0, PG_SIZE);
 	}
 
 	if (req->r_dir_release_cnt == atomic64_read(&ci->i_release_count) &&
@@ -2489,7 +2489,7 @@ static int fill_fscrypt_truncate(struct inode *inode,
 		      CEPH_FSCRYPT_BLOCK_SIZE);
 
 		/* truncate and zero out the extra contents for the last block */
-		memset(iov.iov_base + boff, 0, PAGE_SIZE - boff);
+		memset(iov.iov_base + boff, 0, PG_SIZE - boff);
 
 		/* encrypt the last block */
 		ret = ceph_fscrypt_encrypt_block_inplace(inode, page,

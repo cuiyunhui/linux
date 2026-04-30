@@ -164,7 +164,7 @@ static int gfs2_check_sb(struct gfs2_sbd *sdp, int silent)
 		return -EINVAL;
 	}
 
-	if (sb->sb_bsize < SECTOR_SIZE || sb->sb_bsize > PAGE_SIZE ||
+	if (sb->sb_bsize < SECTOR_SIZE || sb->sb_bsize > PG_SIZE ||
 	    (sb->sb_bsize & (sb->sb_bsize - 1))) {
 		pr_warn("Invalid block size\n");
 		return -EINVAL;
@@ -221,12 +221,12 @@ static int gfs2_read_super(struct gfs2_sbd *sdp, sector_t sector, int silent)
 	struct gfs2_sb *sb;
 	int err;
 
-	sb = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	sb = kmalloc(PG_SIZE, GFP_KERNEL);
 	if (unlikely(!sb))
 		return -ENOMEM;
 	err = bdev_rw_virt(sdp->sd_vfs->s_bdev,
 			   sector << (sdp->sd_vfs->s_blocksize_bits - SECTOR_SHIFT),
-			   sb, PAGE_SIZE, REQ_OP_READ | REQ_META);
+			   sb, PG_SIZE, REQ_OP_READ | REQ_META);
 	if (err) {
 		pr_warn("error %d reading superblock\n", err);
 		kfree(sb);
@@ -479,11 +479,11 @@ static int init_sb(struct gfs2_sbd *sdp, int silent)
 		       sdp->sd_sb.sb_bsize, bdev_logical_block_size(sb->s_bdev));
 		goto out;
 	}
-	if (sdp->sd_sb.sb_bsize > PAGE_SIZE) {
+	if (sdp->sd_sb.sb_bsize > PG_SIZE) {
 		ret = -EINVAL;
 		fs_err(sdp, "FS block size (%u) is too big for machine "
 		       "page size (%u)\n",
-		       sdp->sd_sb.sb_bsize, (unsigned int)PAGE_SIZE);
+		       sdp->sd_sb.sb_bsize, (unsigned int) PG_SIZE);
 		goto out;
 	}
 	ret = -EINVAL;

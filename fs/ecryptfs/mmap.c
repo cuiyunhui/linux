@@ -92,7 +92,7 @@ ecryptfs_copy_up_encrypted_with_header(struct folio *folio,
 				       struct ecryptfs_crypt_stat *crypt_stat)
 {
 	loff_t extent_num_in_page = 0;
-	loff_t num_extents_per_page = (PAGE_SIZE
+	loff_t num_extents_per_page = (PG_SIZE
 				       / crypt_stat->extent_size);
 	int rc = 0;
 
@@ -108,7 +108,7 @@ ecryptfs_copy_up_encrypted_with_header(struct folio *folio,
 			char *page_virt;
 
 			page_virt = kmap_local_folio(folio, 0);
-			memset(page_virt, 0, PAGE_SIZE);
+			memset(page_virt, 0, PG_SIZE);
 			/* TODO: Support more than one header extent */
 			if (view_extent_num == 0) {
 				size_t written;
@@ -134,8 +134,8 @@ ecryptfs_copy_up_encrypted_with_header(struct folio *folio,
 				 - crypt_stat->metadata_size);
 
 			rc = ecryptfs_read_lower_page_segment(
-				folio, (lower_offset >> PAGE_SHIFT),
-				(lower_offset & ~PAGE_MASK),
+				folio, (lower_offset >> PG_SHIFT),
+				(lower_offset & ~PG_MASK),
 				crypt_stat->extent_size, folio->mapping->host);
 			if (rc) {
 				printk(KERN_ERR "%s: Error attempting to read "
@@ -216,12 +216,12 @@ static int fill_zeros_to_end_of_page(struct folio *folio, unsigned int to)
 	struct inode *inode = folio->mapping->host;
 	int end_byte_in_page;
 
-	if ((i_size_read(inode) / PAGE_SIZE) != folio->index)
+	if ((i_size_read(inode) / PG_SIZE) != folio->index)
 		goto out;
-	end_byte_in_page = i_size_read(inode) % PAGE_SIZE;
+	end_byte_in_page = i_size_read(inode) % PG_SIZE;
 	if (to > end_byte_in_page)
 		end_byte_in_page = to;
-	folio_zero_segment(folio, end_byte_in_page, PAGE_SIZE);
+	folio_zero_segment(folio, end_byte_in_page, PG_SIZE);
 out:
 	return 0;
 }
@@ -244,7 +244,7 @@ static int ecryptfs_write_begin(const struct kiocb *iocb,
 			loff_t pos, unsigned len,
 			struct folio **foliop, void **fsdata)
 {
-	pgoff_t index = pos >> PAGE_SHIFT;
+	pgoff_t index = pos >> PG_SHIFT;
 	struct folio *folio;
 	loff_t prev_page_end_size;
 	int rc = 0;
@@ -255,14 +255,14 @@ static int ecryptfs_write_begin(const struct kiocb *iocb,
 		return PTR_ERR(folio);
 	*foliop = folio;
 
-	prev_page_end_size = ((loff_t)index << PAGE_SHIFT);
+	prev_page_end_size = ((loff_t)index << PG_SHIFT);
 	if (!folio_test_uptodate(folio)) {
 		struct ecryptfs_crypt_stat *crypt_stat =
 			&ecryptfs_inode_to_private(mapping->host)->crypt_stat;
 
 		if (!(crypt_stat->flags & ECRYPTFS_ENCRYPTED)) {
 			rc = ecryptfs_read_lower_page_segment(
-				folio, index, 0, PAGE_SIZE, mapping->host);
+				folio, index, 0, PG_SIZE, mapping->host);
 			if (rc) {
 				printk(KERN_ERR "%s: Error attempting to read "
 				       "lower page segment; rc = [%d]\n",
@@ -288,7 +288,7 @@ static int ecryptfs_write_begin(const struct kiocb *iocb,
 				folio_mark_uptodate(folio);
 			} else {
 				rc = ecryptfs_read_lower_page_segment(
-					folio, index, 0, PAGE_SIZE,
+					folio, index, 0, PG_SIZE,
 					mapping->host);
 				if (rc) {
 					printk(KERN_ERR "%s: Error reading "
@@ -302,9 +302,9 @@ static int ecryptfs_write_begin(const struct kiocb *iocb,
 		} else {
 			if (prev_page_end_size
 			    >= i_size_read(mapping->host)) {
-				folio_zero_range(folio, 0, PAGE_SIZE);
+				folio_zero_range(folio, 0, PG_SIZE);
 				folio_mark_uptodate(folio);
-			} else if (len < PAGE_SIZE) {
+			} else if (len < PG_SIZE) {
 				rc = ecryptfs_decrypt_page(folio);
 				if (rc) {
 					printk(KERN_ERR "%s: Error decrypting "
@@ -337,7 +337,7 @@ static int ecryptfs_write_begin(const struct kiocb *iocb,
 	 * of page?  Zero it out. */
 	if ((i_size_read(mapping->host) == prev_page_end_size)
 	    && (pos != 0))
-		folio_zero_range(folio, 0, PAGE_SIZE);
+		folio_zero_range(folio, 0, PG_SIZE);
 out:
 	if (unlikely(rc)) {
 		folio_unlock(folio);
@@ -400,7 +400,7 @@ static int ecryptfs_write_inode_size_to_xattr(struct inode *ecryptfs_inode)
 	}
 	inode_lock(lower_inode);
 	size = __vfs_getxattr(lower_dentry, lower_inode, ECRYPTFS_XATTR_NAME,
-			      xattr_virt, PAGE_SIZE);
+			      xattr_virt, PG_SIZE);
 	if (size < 0)
 		size = 8;
 	put_unaligned_be64(i_size_read(ecryptfs_inode), xattr_virt);
@@ -442,8 +442,8 @@ static int ecryptfs_write_end(const struct kiocb *iocb,
 			loff_t pos, unsigned len, unsigned copied,
 			struct folio *folio, void *fsdata)
 {
-	pgoff_t index = pos >> PAGE_SHIFT;
-	unsigned from = pos & (PAGE_SIZE - 1);
+	pgoff_t index = pos >> PG_SHIFT;
+	unsigned from = pos & (PG_SIZE - 1);
 	unsigned to = from + copied;
 	struct inode *ecryptfs_inode = mapping->host;
 	struct ecryptfs_crypt_stat *crypt_stat =
@@ -463,7 +463,7 @@ static int ecryptfs_write_end(const struct kiocb *iocb,
 		goto out;
 	}
 	if (!folio_test_uptodate(folio)) {
-		if (copied < PAGE_SIZE) {
+		if (copied < PG_SIZE) {
 			rc = 0;
 			goto out;
 		}

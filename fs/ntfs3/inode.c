@@ -625,7 +625,7 @@ static int ntfs_iomap_bio_read_folio_range(const struct iomap_iter *iter,
 	    !bio_add_folio(bio, folio, plen, poff)) {
 		gfp_t gfp = mapping_gfp_constraint(folio->mapping, GFP_KERNEL);
 		gfp_t orig_gfp = gfp;
-		unsigned int nr_vecs = DIV_ROUND_UP(length, PAGE_SIZE);
+		unsigned int nr_vecs = DIV_ROUND_UP(length, PG_SIZE);
 
 		if (bio)
 			submit_bio(bio);
@@ -905,11 +905,11 @@ static int ntfs_iomap_begin(struct inode *inode, loff_t offset, loff_t length,
 	    (iomap->type == IOMAP_MAPPED || iomap->type == IOMAP_DELALLOC)) {
 		/* Avoid too large requests. */
 		u32 tail;
-		u32 off_a = offset & (PAGE_SIZE - 1);
+		u32 off_a = offset & (PG_SIZE - 1);
 		if (off_a)
-			tail = PAGE_SIZE - off_a;
+			tail = PG_SIZE - off_a;
 		else
-			tail = PAGE_SIZE;
+			tail = PG_SIZE;
 
 		if (iomap->length > tail)
 			iomap->length = tail;
@@ -1112,7 +1112,7 @@ int inode_read_data(struct inode *inode, void *data, size_t bytes)
 	struct address_space *mapping = inode->i_mapping;
 
 	for (idx = 0; bytes; idx++) {
-		size_t op = bytes > PAGE_SIZE ? PAGE_SIZE : bytes;
+		size_t op = bytes > PG_SIZE ? PG_SIZE : bytes;
 		struct page *page = read_mapping_page(mapping, idx, NULL);
 		void *kaddr;
 
@@ -1126,7 +1126,7 @@ int inode_read_data(struct inode *inode, void *data, size_t bytes)
 		put_page(page);
 
 		bytes -= op;
-		data = Add2Ptr(data, PAGE_SIZE);
+		data = Add2Ptr(data, PG_SIZE);
 	}
 	return 0;
 }
@@ -2124,11 +2124,11 @@ static const char *ntfs_get_link(struct dentry *de, struct inode *inode,
 	if (!de)
 		return ERR_PTR(-ECHILD);
 
-	ret = kmalloc(PAGE_SIZE, GFP_NOFS);
+	ret = kmalloc(PG_SIZE, GFP_NOFS);
 	if (!ret)
 		return ERR_PTR(-ENOMEM);
 
-	err = ntfs_readlink_hlp(de, inode, ret, PAGE_SIZE);
+	err = ntfs_readlink_hlp(de, inode, ret, PG_SIZE);
 	if (err < 0) {
 		kfree(ret);
 		return ERR_PTR(err);

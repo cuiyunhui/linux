@@ -61,7 +61,7 @@ struct snd_harmony {
 
 #define HARMONY_SIZE       64
 
-#define BUF_SIZE     PAGE_SIZE
+#define BUF_SIZE     PG_SIZE
 #define MAX_BUFS     16
 #define MAX_BUF_SIZE (MAX_BUFS * BUF_SIZE)
 

@@ -35,8 +35,8 @@ static int vxfs_immed_read_folio(struct file *fp, struct folio *folio)
 	unsigned long i;
 
 	for (i = 0; i < folio_nr_pages(folio); i++) {
-		memcpy_to_page(folio_page(folio, i), 0, src, PAGE_SIZE);
-		src += PAGE_SIZE;
+		memcpy_to_page(folio_page(folio, i), 0, src, PG_SIZE);
+		src += PG_SIZE;
 	}
 
 	folio_mark_uptodate(folio);

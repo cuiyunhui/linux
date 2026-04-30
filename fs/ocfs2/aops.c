@@ -489,12 +489,12 @@ static void ocfs2_figure_cluster_boundaries(struct ocfs2_super *osb,
 					    unsigned int *start,
 					    unsigned int *end)
 {
-	unsigned int cluster_start = 0, cluster_end = PAGE_SIZE;
+	unsigned int cluster_start = 0, cluster_end = PG_SIZE;
 
-	if (unlikely(PAGE_SHIFT > osb->s_clustersize_bits)) {
+	if (unlikely(PG_SHIFT > osb->s_clustersize_bits)) {
 		unsigned int cpp;
 
-		cpp = 1 << (PAGE_SHIFT - osb->s_clustersize_bits);
+		cpp = 1 << (PG_SHIFT - osb->s_clustersize_bits);
 
 		cluster_start = cpos % cpp;
 		cluster_start = cluster_start << osb->s_clustersize_bits;
@@ -502,8 +502,8 @@ static void ocfs2_figure_cluster_boundaries(struct ocfs2_super *osb,
 		cluster_end = cluster_start + osb->s_clustersize;
 	}
 
-	BUG_ON(cluster_start > PAGE_SIZE);
-	BUG_ON(cluster_end > PAGE_SIZE);
+	BUG_ON(cluster_start > PG_SIZE);
+	BUG_ON(cluster_end > PG_SIZE);
 
 	if (start)
 		*start = cluster_start;
@@ -664,10 +664,10 @@ next_bh:
 #if (PAGE_SIZE >= OCFS2_MAX_CLUSTERSIZE)
 #define OCFS2_MAX_CTXT_PAGES	1
 #else
-#define OCFS2_MAX_CTXT_PAGES	(OCFS2_MAX_CLUSTERSIZE / PAGE_SIZE)
+#define OCFS2_MAX_CTXT_PAGES	(OCFS2_MAX_CLUSTERSIZE / PG_SIZE)
 #endif
 
-#define OCFS2_MAX_CLUSTERS_PER_PAGE	(PAGE_SIZE / OCFS2_MIN_CLUSTERSIZE)
+#define OCFS2_MAX_CLUSTERS_PER_PAGE	(PG_SIZE / OCFS2_MIN_CLUSTERSIZE)
 
 struct ocfs2_unwritten_extent {
 	struct list_head	ue_node;
@@ -835,7 +835,7 @@ static int ocfs2_alloc_write_ctxt(struct ocfs2_write_ctxt **wcp,
 	wc->w_di_bh = di_bh;
 	wc->w_type = type;
 
-	if (unlikely(PAGE_SHIFT > osb->s_clustersize_bits))
+	if (unlikely(PG_SHIFT > osb->s_clustersize_bits))
 		wc->w_large_pages = 1;
 	else
 		wc->w_large_pages = 0;
@@ -899,7 +899,7 @@ static void ocfs2_write_failure(struct inode *inode,
 				loff_t user_pos, unsigned user_len)
 {
 	int i;
-	unsigned from = user_pos & (PAGE_SIZE - 1),
+	unsigned from = user_pos & (PG_SIZE - 1),
 		to = user_pos + user_len;
 
 	if (wc->w_target_folio)
@@ -937,7 +937,7 @@ static int ocfs2_prepare_folio_for_write(struct inode *inode, u64 *p_blkno,
 			(folio_pos(folio) <= user_pos));
 
 	if (folio == wc->w_target_folio) {
-		map_from = user_pos & (PAGE_SIZE - 1);
+		map_from = user_pos & (PG_SIZE - 1);
 		map_to = map_from + user_len;
 
 		if (new)
@@ -1008,7 +1008,7 @@ static int ocfs2_grab_folios_for_write(struct address_space *mapping,
 	struct inode *inode = mapping->host;
 	loff_t last_byte;
 
-	target_index = user_pos >> PAGE_SHIFT;
+	target_index = user_pos >> PG_SHIFT;
 
 	/*
 	 * Figure out how many pages we'll be manipulating here. For
@@ -1027,14 +1027,14 @@ static int ocfs2_grab_folios_for_write(struct address_space *mapping,
 		 */
 		last_byte = max(user_pos + user_len, i_size_read(inode));
 		BUG_ON(last_byte < 1);
-		end_index = ((last_byte - 1) >> PAGE_SHIFT) + 1;
+		end_index = ((last_byte - 1) >> PG_SHIFT) + 1;
 		if ((start + wc->w_num_folios) > end_index)
 			wc->w_num_folios = end_index - start;
 	} else {
 		wc->w_num_folios = 1;
 		start = target_index;
 	}
-	end_index = (user_pos + user_len - 1) >> PAGE_SHIFT;
+	end_index = (user_pos + user_len - 1) >> PG_SHIFT;
 
 	for(i = 0; i < wc->w_num_folios; i++) {
 		index = start + i;
@@ -1167,7 +1167,7 @@ static int ocfs2_write_cluster(struct address_space *mapping,
 
 		/* This is the direct io target page. */
 		if (wc->w_folios[i] == NULL) {
-			p_blkno += (1 << (PAGE_SHIFT - inode->i_sb->s_blocksize_bits));
+			p_blkno += (1 << (PG_SHIFT - inode->i_sb->s_blocksize_bits));
 			continue;
 		}
 
@@ -1247,7 +1247,7 @@ static void ocfs2_set_target_boundaries(struct ocfs2_super *osb,
 {
 	struct ocfs2_write_cluster_desc *desc;
 
-	wc->w_target_from = pos & (PAGE_SIZE - 1);
+	wc->w_target_from = pos & (PG_SIZE - 1);
 	wc->w_target_to = wc->w_target_from + len;
 
 	if (alloc == 0)
@@ -1284,7 +1284,7 @@ static void ocfs2_set_target_boundaries(struct ocfs2_super *osb,
 							&wc->w_target_to);
 	} else {
 		wc->w_target_from = 0;
-		wc->w_target_to = PAGE_SIZE;
+		wc->w_target_to = PG_SIZE;
 	}
 }
 
@@ -1926,7 +1926,7 @@ int ocfs2_write_end_nolock(struct address_space *mapping, loff_t pos,
 		unsigned len, unsigned copied, void *fsdata)
 {
 	int i, ret;
-	size_t from, to, start = pos & (PAGE_SIZE - 1);
+	size_t from, to, start = pos & (PG_SIZE - 1);
 	struct inode *inode = mapping->host;
 	struct ocfs2_super *osb = OCFS2_SB(inode->i_sb);
 	struct ocfs2_write_ctxt *wc = fsdata;

@@ -53,8 +53,8 @@ static int erofs_readdir(struct file *f, struct dir_context *ctx)
 	unsigned long bsz = sb->s_blocksize;
 	unsigned int ofs = erofs_blkoff(sb, ctx->pos);
 	pgoff_t ra_pages = DIV_ROUND_UP_POW2(
-			EROFS_I_SB(dir)->dir_ra_bytes, PAGE_SIZE);
-	pgoff_t nr_pages = DIV_ROUND_UP_POW2(dir->i_size, PAGE_SIZE);
+			EROFS_I_SB(dir)->dir_ra_bytes, PG_SIZE);
+	pgoff_t nr_pages = DIV_ROUND_UP_POW2(dir->i_size, PG_SIZE);
 	int err = 0;
 	bool initial = true;
 
@@ -71,7 +71,7 @@ static int erofs_readdir(struct file *f, struct dir_context *ctx)
 
 		/* readahead blocks to enhance performance for large directories */
 		if (ra_pages) {
-			pgoff_t idx = DIV_ROUND_UP_POW2(ctx->pos, PAGE_SIZE);
+			pgoff_t idx = DIV_ROUND_UP_POW2(ctx->pos, PG_SIZE);
 			pgoff_t pages = min(nr_pages - idx, ra_pages);
 
 			if (pages > 1 && !ra_has_index(ra, idx))

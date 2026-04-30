@@ -113,7 +113,7 @@ struct xrep_dirent {
  * Stash up to 8 pages of recovered dirent data in dir_entries and dir_names
  * before we write them to the temp dir.
  */
-#define XREP_DIR_MAX_STASH_BYTES	(PAGE_SIZE * 8)
+#define XREP_DIR_MAX_STASH_BYTES	(PG_SIZE * 8)
 
 struct xrep_dir {
 	struct xfs_scrub	*sc;

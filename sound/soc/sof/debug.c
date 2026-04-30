@@ -278,10 +278,10 @@ static int memory_info_open(struct inode *inode, struct file *file)
 
 	/* allocate buffer memory only in first open run, to save memory when unused */
 	if (!dfse->buf) {
-		dfse->buf = devm_kmalloc(sdev->dev, PAGE_SIZE, GFP_KERNEL);
+		dfse->buf = devm_kmalloc(sdev->dev, PG_SIZE, GFP_KERNEL);
 		if (!dfse->buf)
 			return -ENOMEM;
-		dfse->size = PAGE_SIZE;
+		dfse->size = PG_SIZE;
 	}
 
 	return 0;

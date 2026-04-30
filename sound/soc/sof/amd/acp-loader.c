@@ -61,7 +61,7 @@ int acp_dsp_block_write(struct snd_sof_dev *sdev, enum snd_sof_fw_blk_type blk_t
 	case SOF_FW_BLK_TYPE_IRAM:
 		if (!adata->bin_buf) {
 			size_fw = sdev->basefw.fw->size;
-			page_count = PAGE_ALIGN(size_fw) >> PAGE_SHIFT;
+			page_count = PG_ALIGN(size_fw) >> PG_SHIFT;
 			dma_size = page_count * ACP_PAGE_SIZE;
 			adata->bin_buf = dma_alloc_coherent(&pci->dev, dma_size,
 							    &adata->sha_dma_addr,
@@ -154,7 +154,7 @@ static void configure_pte_for_fw_loading(int type, int num_pages, struct acp_dev
 		high |= BIT(31);
 		snd_sof_dsp_write(sdev, ACP_DSP_BAR, ACP_SCRATCH_REG_0 + offset + 4, high);
 		offset += 8;
-		addr += PAGE_SIZE;
+		addr += PG_SIZE;
 	}
 
 	/* Flush ATU Cache after PTE Update */
@@ -178,7 +178,7 @@ int acp_dsp_pre_fw_run(struct snd_sof_dev *sdev)
 	else
 		size_fw = adata->fw_bin_size;
 
-	page_count = PAGE_ALIGN(size_fw) >> PAGE_SHIFT;
+	page_count = PG_ALIGN(size_fw) >> PG_SHIFT;
 	adata->fw_bin_page_count = page_count;
 
 	configure_pte_for_fw_loading(FW_BIN, page_count, adata);
@@ -229,7 +229,7 @@ int acp_dsp_pre_fw_run(struct snd_sof_dev *sdev)
 	}
 
 	/* Free memory once DMA is complete */
-	dma_size =  (PAGE_ALIGN(sdev->basefw.fw->size) >> PAGE_SHIFT) * ACP_PAGE_SIZE;
+	dma_size =  (PG_ALIGN(sdev->basefw.fw->size) >> PG_SHIFT) * ACP_PAGE_SIZE;
 	dma_free_coherent(&pci->dev, dma_size, adata->bin_buf, adata->sha_dma_addr);
 	adata->bin_buf = NULL;
 	if (adata->is_dram_in_use) {

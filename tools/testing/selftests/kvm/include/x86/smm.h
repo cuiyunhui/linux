@@ -6,7 +6,7 @@
 
 #define SMRAM_SIZE	65536
 #define SMRAM_MEMSLOT	((1 << 16) | 1)
-#define SMRAM_PAGES	(SMRAM_SIZE / PAGE_SIZE)
+#define SMRAM_PAGES	(SMRAM_SIZE / PG_SIZE)
 
 void setup_smram(struct kvm_vm *vm, struct kvm_vcpu *vcpu,
 		 uint64_t smram_gpa,

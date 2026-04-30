@@ -24,7 +24,7 @@
 #include "subpage.h"
 
 /* workspace buffer size for s390 zlib hardware support */
-#define ZLIB_DFLTCC_BUF_SIZE    (4 * PAGE_SIZE)
+#define ZLIB_DFLTCC_BUF_SIZE    (4 * PG_SIZE)
 
 struct workspace {
 	z_stream strm;

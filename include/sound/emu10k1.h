@@ -1554,7 +1554,7 @@ struct snd_emu10k1_memblk {
 	struct list_head mapped_order_link;
 };
 
-#define snd_emu10k1_memblk_offset(blk)	(((blk)->mapped_page << PAGE_SHIFT) | ((blk)->mem.offset & (PAGE_SIZE - 1)))
+#define snd_emu10k1_memblk_offset(blk)	(((blk)->mapped_page << PG_SHIFT) | ((blk)->mem.offset & (PG_SIZE - 1)))
 
 #define EMU10K1_MAX_TRAM_BLOCKS_PER_CODE	16
 

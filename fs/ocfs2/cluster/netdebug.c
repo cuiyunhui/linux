@@ -441,8 +441,8 @@ static int o2net_fill_bitmap(char *buf, int len)
 	o2net_fill_node_map(map, O2NM_MAX_NODES);
 
 	while ((i = find_next_bit(map, O2NM_MAX_NODES, i + 1)) < O2NM_MAX_NODES)
-		out += scnprintf(buf + out, PAGE_SIZE - out, "%d ", i);
-	out += scnprintf(buf + out, PAGE_SIZE - out, "\n");
+		out += scnprintf(buf + out, PG_SIZE - out, "%d ", i);
+	out += scnprintf(buf + out, PG_SIZE - out, "\n");
 
 	return out;
 }
@@ -451,11 +451,11 @@ static int nodes_fop_open(struct inode *inode, struct file *file)
 {
 	char *buf;
 
-	buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	buf = kmalloc(PG_SIZE, GFP_KERNEL);
 	if (!buf)
 		return -ENOMEM;
 
-	i_size_write(inode, o2net_fill_bitmap(buf, PAGE_SIZE));
+	i_size_write(inode, o2net_fill_bitmap(buf, PG_SIZE));
 
 	file->private_data = buf;
 

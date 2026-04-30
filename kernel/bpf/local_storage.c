@@ -490,11 +490,11 @@ static size_t bpf_cgroup_storage_calculate_size(struct bpf_map *map, u32 *pages)
 	if (cgroup_storage_type(map) == BPF_CGROUP_STORAGE_SHARED) {
 		size = sizeof(struct bpf_storage_buffer) + map->value_size;
 		*pages = round_up(sizeof(struct bpf_cgroup_storage) + size,
-				  PAGE_SIZE) >> PAGE_SHIFT;
+				  PG_SIZE) >> PG_SHIFT;
 	} else {
 		size = map->value_size;
 		*pages = round_up(round_up(size, 8) * num_possible_cpus(),
-				  PAGE_SIZE) >> PAGE_SHIFT;
+				  PG_SIZE) >> PG_SHIFT;
 	}
 
 	return size;

@@ -45,15 +45,15 @@ static int pagecache_read(struct inode *inode, void *buf, size_t count,
 {
 	while (count) {
 		size_t n = min_t(size_t, count,
-				 PAGE_SIZE - offset_in_page(pos));
+				 PG_SIZE - offset_in_pg(pos));
 		struct page *page;
 
-		page = read_mapping_page(inode->i_mapping, pos >> PAGE_SHIFT,
+		page = read_mapping_page(inode->i_mapping, pos >> PG_SHIFT,
 					 NULL);
 		if (IS_ERR(page))
 			return PTR_ERR(page);
 
-		memcpy_from_page(buf, page, offset_in_page(pos), n);
+		memcpy_from_page(buf, page, offset_in_pg(pos), n);
 
 		put_page(page);
 
@@ -79,7 +79,7 @@ static int pagecache_write(struct inode *inode, const void *buf, size_t count,
 
 	while (count) {
 		size_t n = min_t(size_t, count,
-				 PAGE_SIZE - offset_in_page(pos));
+				 PG_SIZE - offset_in_pg(pos));
 		struct folio *folio;
 		void *fsdata = NULL;
 		int res;
@@ -258,14 +258,14 @@ static int f2fs_get_verity_descriptor(struct inode *inode, void *buf,
 static struct page *f2fs_read_merkle_tree_page(struct inode *inode,
 					       pgoff_t index)
 {
-	index += f2fs_verity_metadata_pos(inode) >> PAGE_SHIFT;
+	index += f2fs_verity_metadata_pos(inode) >> PG_SHIFT;
 	return generic_read_merkle_tree_page(inode, index);
 }
 
 static void f2fs_readahead_merkle_tree(struct inode *inode, pgoff_t index,
 				       unsigned long nr_pages)
 {
-	index += f2fs_verity_metadata_pos(inode) >> PAGE_SHIFT;
+	index += f2fs_verity_metadata_pos(inode) >> PG_SHIFT;
 	generic_readahead_merkle_tree(inode, index, nr_pages);
 }
 

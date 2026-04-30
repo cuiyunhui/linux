@@ -31,7 +31,7 @@ struct io_mock_file {
 static int io_copy_regbuf(struct iov_iter *reg_iter, void __user *ubuf)
 {
 	size_t ret, copied = 0;
-	size_t buflen = PAGE_SIZE;
+	size_t buflen = PG_SIZE;
 	void *tmp_buf;
 
 	tmp_buf = kzalloc(buflen, GFP_KERNEL);

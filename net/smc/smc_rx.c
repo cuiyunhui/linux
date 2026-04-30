@@ -157,7 +157,7 @@ static int smc_rx_splice(struct pipe_inode_info *pipe, char *src, size_t len,
 			 struct smc_sock *smc)
 {
 	struct smc_link_group *lgr = smc->conn.lgr;
-	int offset = offset_in_page(src);
+	int offset = offset_in_pg(src);
 	struct partial_page *partial;
 	struct splice_pipe_desc spd;
 	struct smc_spd_priv **priv;
@@ -166,7 +166,7 @@ static int smc_rx_splice(struct pipe_inode_info *pipe, char *src, size_t len,
 	int i;
 
 	nr_pages = !lgr->is_smcd && smc->conn.rmb_desc->is_vm ?
-		   PAGE_ALIGN(len + offset) / PAGE_SIZE : 1;
+		   PG_ALIGN(len + offset) / PG_SIZE : 1;
 
 	pages = kzalloc_objs(*pages, nr_pages);
 	if (!pages)
@@ -197,7 +197,7 @@ static int smc_rx_splice(struct pipe_inode_info *pipe, char *src, size_t len,
 		void *buf = src;
 		/* smcr that uses virtually contiguous RMBs*/
 		for (i = 0; i < nr_pages; i++) {
-			size = min_t(int, PAGE_SIZE - offset, left);
+			size = min_t(int, PG_SIZE - offset, left);
 			priv[i]->len = size;
 			priv[i]->smc = smc;
 			pages[i] = vmalloc_to_page(buf);
@@ -220,7 +220,7 @@ static int smc_rx_splice(struct pipe_inode_info *pipe, char *src, size_t len,
 	if (bytes > 0) {
 		sock_hold(&smc->sk);
 		if (!lgr->is_smcd && smc->conn.rmb_desc->is_vm) {
-			for (i = 0; i < PAGE_ALIGN(bytes + offset) / PAGE_SIZE; i++)
+			for (i = 0; i < PG_ALIGN(bytes + offset) / PG_SIZE; i++)
 				get_page(pages[i]);
 		} else {
 			get_page(smc->conn.rmb_desc->pages);

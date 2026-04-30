@@ -77,12 +77,12 @@ int rds_page_remainder_alloc(struct scatterlist *scat, unsigned long bytes,
 	gfp |= __GFP_HIGHMEM;
 
 	/* jump straight to allocation if we're trying for a huge page */
-	if (bytes >= PAGE_SIZE) {
+	if (bytes >= PG_SIZE) {
 		page = alloc_page(gfp);
 		if (!page) {
 			ret = -ENOMEM;
 		} else {
-			sg_set_page(scat, page, PAGE_SIZE, 0);
+			sg_set_page(scat, page, PG_SIZE, 0);
 			ret = 0;
 		}
 		goto out;
@@ -94,14 +94,14 @@ int rds_page_remainder_alloc(struct scatterlist *scat, unsigned long bytes,
 
 	while (1) {
 		/* avoid a tiny region getting stuck by tossing it */
-		if (rem->r_page && bytes > (PAGE_SIZE - rem->r_offset)) {
+		if (rem->r_page && bytes > (PG_SIZE - rem->r_offset)) {
 			rds_stats_inc(s_page_remainder_miss);
 			__free_page(rem->r_page);
 			rem->r_page = NULL;
 		}
 
 		/* hand out a fragment from the cached page */
-		if (rem->r_page && bytes <= (PAGE_SIZE - rem->r_offset)) {
+		if (rem->r_page && bytes <= (PG_SIZE - rem->r_offset)) {
 			sg_set_page(scat, rem->r_page, bytes, rem->r_offset);
 			get_page(sg_page(scat));
 
@@ -109,7 +109,7 @@ int rds_page_remainder_alloc(struct scatterlist *scat, unsigned long bytes,
 				rds_stats_inc(s_page_remainder_hit);
 
 			rem->r_offset += ALIGN(bytes, 8);
-			if (rem->r_offset >= PAGE_SIZE) {
+			if (rem->r_offset >= PG_SIZE) {
 				__free_page(rem->r_page);
 				rem->r_page = NULL;
 			}

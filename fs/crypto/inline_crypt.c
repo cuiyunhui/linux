@@ -122,7 +122,7 @@ int fscrypt_select_encryption_impl(struct fscrypt_inode_info *ci,
 	 */
 	if ((fscrypt_policy_flags(&ci->ci_policy) &
 	     FSCRYPT_POLICY_FLAG_IV_INO_LBLK_32) &&
-	    sb->s_blocksize != PAGE_SIZE)
+	    sb->s_blocksize != PG_SIZE)
 		return 0;
 
 	/*

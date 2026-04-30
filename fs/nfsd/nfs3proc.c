@@ -555,7 +555,7 @@ static void nfsd3_init_dirlist_pages(struct svc_rqst *rqstp,
 	buf->buflen = clamp(count, (u32)(XDR_UNIT * 2), sendbuf);
 	buf->buflen -= XDR_UNIT * 2;
 	buf->pages = rqstp->rq_next_page;
-	rqstp->rq_next_page += (buf->buflen + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	rqstp->rq_next_page += (buf->buflen + PG_SIZE - 1) >> PG_SHIFT;
 
 	xdr_init_encode_pages(xdr, buf);
 }
@@ -664,10 +664,10 @@ nfsd3_proc_fsinfo(struct svc_rqst *rqstp)
 
 	resp->f_rtmax  = max_blocksize;
 	resp->f_rtpref = max_blocksize;
-	resp->f_rtmult = PAGE_SIZE;
+	resp->f_rtmult = PG_SIZE;
 	resp->f_wtmax  = max_blocksize;
 	resp->f_wtpref = max_blocksize;
-	resp->f_wtmult = PAGE_SIZE;
+	resp->f_wtmult = PG_SIZE;
 	resp->f_dtpref = max_blocksize;
 	resp->f_maxfilesize = ~(u32) 0;
 	resp->f_properties = NFS3_FSF_DEFAULT;

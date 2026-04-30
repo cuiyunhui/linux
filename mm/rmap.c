@@ -2832,7 +2832,7 @@ struct page *make_device_exclusive(struct mm_struct *mm, unsigned long addr,
 	int ret;
 
 	mmap_assert_locked(mm);
-	addr = PAGE_ALIGN_DOWN(addr);
+	addr = PG_ALIGN_DOWN(addr);
 
 	/*
 	 * Fault in the page writable and try to lock it; note that if the

@@ -1349,9 +1349,9 @@ static int gfs2_journaled_truncate(struct inode *inode, u64 oldsize, u64 newsize
 		if (chunk > max_chunk)
 			chunk = max_chunk;
 
-		offs = oldsize & ~PAGE_MASK;
-		if (offs && chunk > PAGE_SIZE)
-			chunk = offs + ((chunk - offs) & PAGE_MASK);
+		offs = oldsize & ~PG_MASK;
+		if (offs && chunk > PG_SIZE)
+			chunk = offs + ((chunk - offs) & PG_MASK);
 
 		truncate_pagecache(inode, oldsize - chunk);
 		oldsize -= chunk;
@@ -2390,9 +2390,9 @@ static int gfs2_journaled_truncate_range(struct inode *inode, loff_t offset,
 		if (chunk > max_chunk)
 			chunk = max_chunk;
 
-		offs = offset & ~PAGE_MASK;
-		if (offs && chunk > PAGE_SIZE)
-			chunk = offs + ((chunk - offs) & PAGE_MASK);
+		offs = offset & ~PG_MASK;
+		if (offs && chunk > PG_SIZE)
+			chunk = offs + ((chunk - offs) & PG_MASK);
 
 		truncate_pagecache_range(inode, offset, chunk);
 		offset += chunk;

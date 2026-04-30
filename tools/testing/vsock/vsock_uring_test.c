@@ -39,18 +39,18 @@ static struct vsock_io_uring_test test_data_array[] = {
 	{
 		.vecs_cnt = 3,
 		{
-			{ NULL, PAGE_SIZE },
-			{ NULL, 2 * PAGE_SIZE },
-			{ NULL, 3 * PAGE_SIZE },
+			{ NULL, PG_SIZE },
+			{ NULL, 2 * PG_SIZE },
+			{ NULL, 3 * PG_SIZE },
 		}
 	},
 	/* Middle element has both non-page aligned base and size. */
 	{
 		.vecs_cnt = 3,
 		{
-			{ NULL, PAGE_SIZE },
+			{ NULL, PG_SIZE },
 			{ (void *)1, 200  },
-			{ NULL, 3 * PAGE_SIZE },
+			{ NULL, 3 * PG_SIZE },
 		}
 	}
 };

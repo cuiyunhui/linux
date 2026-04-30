@@ -735,7 +735,7 @@ static int gfs2_write_buf_to_page(struct gfs2_sbd *sdp, unsigned long index,
 	unsigned bsize = sdp->sd_sb.sb_bsize, bnum = 0, boff = 0;
 	unsigned to_write = bytes, pg_off = off;
 
-	blk = index << (PAGE_SHIFT - sdp->sd_sb.sb_bsize_shift);
+	blk = index << (PG_SHIFT - sdp->sd_sb.sb_bsize_shift);
 	boff = off % bsize;
 
 	folio = filemap_grab_folio(mapping, index);
@@ -802,12 +802,12 @@ static int gfs2_write_disk_quota(struct gfs2_sbd *sdp, struct gfs2_quota *qp,
 
 	nbytes = sizeof(struct gfs2_quota);
 
-	pg_beg = loc >> PAGE_SHIFT;
-	pg_off = offset_in_page(loc);
+	pg_beg = loc >> PG_SHIFT;
+	pg_off = offset_in_pg(loc);
 
 	/* If the quota straddles a page boundary, split the write in two */
-	if ((pg_off + nbytes) > PAGE_SIZE)
-		overflow = (pg_off + nbytes) - PAGE_SIZE;
+	if ((pg_off + nbytes) > PG_SIZE)
+		overflow = (pg_off + nbytes) - PG_SIZE;
 
 	ptr = qp;
 	error = gfs2_write_buf_to_page(sdp, pg_beg, pg_off, ptr,
@@ -1311,7 +1311,7 @@ int gfs2_quota_sync(struct super_block *sb, int type)
 {
 	struct gfs2_sbd *sdp = sb->s_fs_info;
 	struct gfs2_quota_data **qda;
-	unsigned int max_qd = PAGE_SIZE / sizeof(struct gfs2_holder);
+	unsigned int max_qd = PG_SIZE / sizeof(struct gfs2_holder);
 	u64 sync_gen;
 	int error = 0;
 

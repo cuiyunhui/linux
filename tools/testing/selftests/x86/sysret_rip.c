@@ -145,11 +145,11 @@ int main(void)
 	sethandler(SIGSEGV, sigsegv_for_fallthrough, 0);
 
 	/* One extra test to check that we didn't screw up the mremap logic. */
-	test_syscall_fallthrough_to((1UL << 47) - 2*PAGE_SIZE);
+	test_syscall_fallthrough_to((1UL << 47) - 2*PG_SIZE);
 
 	/* These are the interesting cases. */
 	for (int i = 47; i < 64; i++) {
-		test_syscall_fallthrough_to((1UL<<i) - PAGE_SIZE);
+		test_syscall_fallthrough_to((1UL<<i) - PG_SIZE);
 		test_syscall_fallthrough_to(1UL<<i);
 	}
 

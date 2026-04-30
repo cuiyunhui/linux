@@ -507,7 +507,7 @@ static int omfs_fill_super(struct super_block *sb, struct fs_context *fc)
 		goto out_brelse_bh;
 	}
 
-	if (sbi->s_sys_blocksize > PAGE_SIZE) {
+	if (sbi->s_sys_blocksize > PG_SIZE) {
 		printk(KERN_ERR "omfs: sysblock size (%d) is out of range\n",
 			sbi->s_sys_blocksize);
 		goto out_brelse_bh;

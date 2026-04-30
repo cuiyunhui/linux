@@ -5,7 +5,7 @@
 struct z_erofs_lzma {
 	struct z_erofs_lzma *next;
 	struct xz_dec_microlzma *state;
-	u8 bounce[PAGE_SIZE];
+	u8 bounce[PG_SIZE];
 };
 
 /* considering the LZMA performance, no need to use a lockless list for now */
@@ -180,7 +180,7 @@ again:
 	/* 3. multi-call decompress */
 	xz_dec_microlzma_reset(strm->state, rq->inputsize, rq->outputsize,
 			       !rq->partial_decoding);
-	buf.in_size = min(rq->inputsize, PAGE_SIZE - rq->pageofs_in);
+	buf.in_size = min(rq->inputsize, PG_SIZE - rq->pageofs_in);
 	rq->inputsize -= buf.in_size;
 	buf.in = dctx.kin + rq->pageofs_in;
 	dctx.bounce = strm->bounce;

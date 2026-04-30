@@ -16,7 +16,7 @@
 
 #define PAGE_SIZE		(sysconf(_SC_PAGE_SIZE))
 #define PIPE_DEF_BUFS		16
-#define PIPE_MIN_SIZE		(PAGE_SIZE*PIPE_DEF_BUFS)
+#define PIPE_MIN_SIZE		(PG_SIZE*PIPE_DEF_BUFS)
 #define PIPE_MAX_SIZE		(1024*1024)
 #define TRACEFS 		"/sys/kernel/tracing"
 #define DEBUGFS 		"/sys/kernel/debug/tracing"
@@ -94,7 +94,7 @@ static unsigned long parse_size(const char *arg)
 	}
 
 	/* Align buffer size with page unit */
-	round = value & (PAGE_SIZE - 1);
+	round = value & (PG_SIZE - 1);
 	value = value - round;
 
 	return value;

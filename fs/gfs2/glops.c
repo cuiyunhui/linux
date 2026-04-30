@@ -167,8 +167,8 @@ static int gfs2_rgrp_metasync(struct gfs2_glock *gl)
 	struct address_space *metamapping = gfs2_aspace(sdp);
 	struct gfs2_rgrpd *rgd = gfs2_glock2rgrp(gl);
 	const unsigned bsize = sdp->sd_sb.sb_bsize;
-	loff_t start = (rgd->rd_addr * bsize) & PAGE_MASK;
-	loff_t end = PAGE_ALIGN((rgd->rd_addr + rgd->rd_length) * bsize) - 1;
+	loff_t start = (rgd->rd_addr * bsize) & PG_MASK;
+	loff_t end = PG_ALIGN((rgd->rd_addr + rgd->rd_length) * bsize) - 1;
 	int error;
 
 	filemap_fdatawrite_range(metamapping, start, end);
@@ -228,8 +228,8 @@ static void rgrp_go_inval(struct gfs2_glock *gl, int flags)
 
 	if (!rgd)
 		return;
-	start = (rgd->rd_addr * bsize) & PAGE_MASK;
-	end = PAGE_ALIGN((rgd->rd_addr + rgd->rd_length) * bsize) - 1;
+	start = (rgd->rd_addr * bsize) & PG_MASK;
+	end = PG_ALIGN((rgd->rd_addr + rgd->rd_length) * bsize) - 1;
 	gfs2_rgrp_brelse(rgd);
 	WARN_ON_ONCE(!(flags & DIO_METADATA));
 	gfs2_assert_withdraw(sdp, !atomic_read(&gl->gl_ail_count));

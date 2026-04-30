@@ -178,7 +178,7 @@ static inline const struct raid6_calls *raid6_choose_gen(
 				cpu_relax();
 			while (time_before(jiffies,
 					    j1 + (1<<RAID6_TIME_JIFFIES_LG2))) {
-				(*algo)->gen_syndrome(disks, PAGE_SIZE, *dptrs);
+				(*algo)->gen_syndrome(disks, PG_SIZE, *dptrs);
 				perf++;
 			}
 			preempt_enable();
@@ -189,7 +189,7 @@ static inline const struct raid6_calls *raid6_choose_gen(
 			}
 			pr_info("raid6: %-8s gen() %5ld MB/s\n", (*algo)->name,
 				(perf * HZ * (disks-2)) >>
-				(20 - PAGE_SHIFT + RAID6_TIME_JIFFIES_LG2));
+				(20 - PG_SHIFT + RAID6_TIME_JIFFIES_LG2));
 		}
 	}
 
@@ -209,7 +209,7 @@ static inline const struct raid6_calls *raid6_choose_gen(
 	pr_info("raid6: using algorithm %s gen() %ld MB/s\n",
 		best->name,
 		(bestgenperf * HZ * (disks - 2)) >>
-		(20 - PAGE_SHIFT + RAID6_TIME_JIFFIES_LG2));
+		(20 - PG_SHIFT + RAID6_TIME_JIFFIES_LG2));
 
 	if (best->xor_syndrome) {
 		perf = 0;
@@ -221,14 +221,14 @@ static inline const struct raid6_calls *raid6_choose_gen(
 		while (time_before(jiffies,
 				   j1 + (1 << RAID6_TIME_JIFFIES_LG2))) {
 			best->xor_syndrome(disks, start, stop,
-					   PAGE_SIZE, *dptrs);
+					   PG_SIZE, *dptrs);
 			perf++;
 		}
 		preempt_enable();
 
 		pr_info("raid6: .... xor() %ld MB/s, rmw enabled\n",
 			(perf * HZ * (disks - 2)) >>
-			(20 - PAGE_SHIFT + RAID6_TIME_JIFFIES_LG2 + 1));
+			(20 - PG_SHIFT + RAID6_TIME_JIFFIES_LG2 + 1));
 	}
 
 out:
@@ -258,16 +258,16 @@ int __init raid6_select_algo(void)
 
 	p = disk_ptr;
 	for (i = 0; i < disks; i++)
-		dptrs[i] = p + PAGE_SIZE * i;
+		dptrs[i] = p + PG_SIZE * i;
 
-	cycle = ((disks - 2) * PAGE_SIZE) / 65536;
+	cycle = ((disks - 2) * PG_SIZE) / 65536;
 	for (i = 0; i < cycle; i++) {
 		memcpy(p, raid6_gfmul, 65536);
 		p += 65536;
 	}
 
-	if ((disks - 2) * PAGE_SIZE % 65536)
-		memcpy(p, raid6_gfmul, (disks - 2) * PAGE_SIZE % 65536);
+	if ((disks - 2) * PG_SIZE % 65536)
+		memcpy(p, raid6_gfmul, (disks - 2) * PG_SIZE % 65536);
 
 	/* select raid gen_syndrome function */
 	gen_best = raid6_choose_gen(&dptrs, disks);

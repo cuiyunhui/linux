@@ -138,10 +138,10 @@ static int cachefiles_adjust_size(struct cachefiles_object *object)
 	/* if there's an extension to a partial page at the end of the backing
 	 * file, we need to discard the partial page so that we pick up new
 	 * data after it */
-	if (oi_size & ~PAGE_MASK && ni_size > oi_size) {
+	if (oi_size & ~PG_MASK && ni_size > oi_size) {
 		_debug("discard tail %llx", oi_size);
 		newattrs.ia_valid = ATTR_SIZE;
-		newattrs.ia_size = oi_size & PAGE_MASK;
+		newattrs.ia_size = oi_size & PG_MASK;
 		ret = cachefiles_inject_remove_error();
 		if (ret == 0)
 			ret = notify_change(&nop_mnt_idmap, file->f_path.dentry,

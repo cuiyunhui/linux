@@ -80,7 +80,7 @@ struct xrep_xattr_key {
  * Stash up to 8 pages of attrs in xattr_records/xattr_blobs before we write
  * them to the temp file.
  */
-#define XREP_XATTR_MAX_STASH_BYTES	(PAGE_SIZE * 8)
+#define XREP_XATTR_MAX_STASH_BYTES	(PG_SIZE * 8)
 
 struct xrep_xattr {
 	struct xfs_scrub	*sc;

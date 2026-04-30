@@ -214,26 +214,26 @@ idtoname_parse(struct cache_detail *cd, char *buf, int buflen)
 		return (-EINVAL);
 	buf[buflen - 1]= '\0';
 
-	buf1 = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	buf1 = kmalloc(PG_SIZE, GFP_KERNEL);
 	if (buf1 == NULL)
 		return (-ENOMEM);
 
 	memset(&ent, 0, sizeof(ent));
 
 	/* Authentication name */
-	len = qword_get(&buf, buf1, PAGE_SIZE);
+	len = qword_get(&buf, buf1, PG_SIZE);
 	if (len <= 0 || len >= IDMAP_NAMESZ)
 		goto out;
 	memcpy(ent.authname, buf1, sizeof(ent.authname));
 
 	/* Type */
-	if (qword_get(&buf, buf1, PAGE_SIZE) <= 0)
+	if (qword_get(&buf, buf1, PG_SIZE) <= 0)
 		goto out;
 	ent.type = strcmp(buf1, "user") == 0 ?
 		IDMAP_TYPE_USER : IDMAP_TYPE_GROUP;
 
 	/* ID */
-	if (qword_get(&buf, buf1, PAGE_SIZE) <= 0)
+	if (qword_get(&buf, buf1, PG_SIZE) <= 0)
 		goto out;
 	ent.id = simple_strtoul(buf1, &bp, 10);
 	if (bp == buf1)
@@ -251,7 +251,7 @@ idtoname_parse(struct cache_detail *cd, char *buf, int buflen)
 
 	/* Name */
 	error = -EINVAL;
-	len = qword_get(&buf, buf1, PAGE_SIZE);
+	len = qword_get(&buf, buf1, PG_SIZE);
 	if (len < 0 || len >= IDMAP_NAMESZ)
 		goto out;
 	if (len == 0)
@@ -383,26 +383,26 @@ nametoid_parse(struct cache_detail *cd, char *buf, int buflen)
 		return (-EINVAL);
 	buf[buflen - 1]= '\0';
 
-	buf1 = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	buf1 = kmalloc(PG_SIZE, GFP_KERNEL);
 	if (buf1 == NULL)
 		return (-ENOMEM);
 
 	memset(&ent, 0, sizeof(ent));
 
 	/* Authentication name */
-	len = qword_get(&buf, buf1, PAGE_SIZE);
+	len = qword_get(&buf, buf1, PG_SIZE);
 	if (len <= 0 || len >= IDMAP_NAMESZ)
 		goto out;
 	memcpy(ent.authname, buf1, sizeof(ent.authname));
 
 	/* Type */
-	if (qword_get(&buf, buf1, PAGE_SIZE) <= 0)
+	if (qword_get(&buf, buf1, PG_SIZE) <= 0)
 		goto out;
 	ent.type = strcmp(buf1, "user") == 0 ?
 		IDMAP_TYPE_USER : IDMAP_TYPE_GROUP;
 
 	/* Name */
-	len = qword_get(&buf, buf1, PAGE_SIZE);
+	len = qword_get(&buf, buf1, PG_SIZE);
 	if (len <= 0 || len >= IDMAP_NAMESZ)
 		goto out;
 	memcpy(ent.name, buf1, sizeof(ent.name));

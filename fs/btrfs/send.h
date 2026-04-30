@@ -28,7 +28,7 @@ struct btrfs_ioctl_send_args;
  * compressed extent size.
  */
 #define BTRFS_SEND_BUF_SIZE_V1				SZ_64K
-#define BTRFS_SEND_BUF_SIZE_V2	ALIGN(SZ_16K + BTRFS_MAX_COMPRESSED, PAGE_SIZE)
+#define BTRFS_SEND_BUF_SIZE_V2	ALIGN(SZ_16K + BTRFS_MAX_COMPRESSED, PG_SIZE)
 
 enum btrfs_tlv_type {
 	BTRFS_TLV_U8,

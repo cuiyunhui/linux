@@ -341,7 +341,7 @@ out_free_enc_bio:
 	 * bio.
 	 */
 	for (; enc_idx < nr_enc_pages; enc_idx++)
-		__bio_add_page(enc_bio, enc_pages[enc_idx], PAGE_SIZE, 0);
+		__bio_add_page(enc_bio, enc_pages[enc_idx], PG_SIZE, 0);
 	bio_endio(enc_bio);
 }
 

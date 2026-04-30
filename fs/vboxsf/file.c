@@ -229,7 +229,7 @@ static int vboxsf_read_folio(struct file *file, struct folio *folio)
 {
 	struct vboxsf_handle *sf_handle = file->private_data;
 	loff_t off = folio_pos(folio);
-	u32 nread = PAGE_SIZE;
+	u32 nread = PG_SIZE;
 	u8 *buf;
 	int err;
 

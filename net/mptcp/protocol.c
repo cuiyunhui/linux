@@ -2533,7 +2533,7 @@ static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 	 * the data allocated using such fragment will be freed.
 	 */
 	if (subflow->lent_mem_frag) {
-		fwd_remaining = PAGE_SIZE - subflow->lent_mem_frag;
+		fwd_remaining = PG_SIZE - subflow->lent_mem_frag;
 		sk_forward_alloc_add(sk, fwd_remaining);
 		sk_forward_alloc_add(ssk, -fwd_remaining);
 		subflow->lent_mem_frag = 0;

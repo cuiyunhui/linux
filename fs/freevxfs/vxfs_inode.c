@@ -186,8 +186,8 @@ __vxfs_iget(struct inode *ilistp, struct vxfs_inode_info *vip, ino_t ino)
 	struct page			*pp;
 	u_long				offset;
 
-	offset = (ino % (PAGE_SIZE / VXFS_ISIZE)) * VXFS_ISIZE;
-	pp = vxfs_get_page(ilistp->i_mapping, ino * VXFS_ISIZE / PAGE_SIZE);
+	offset = (ino % (PG_SIZE / VXFS_ISIZE)) * VXFS_ISIZE;
+	pp = vxfs_get_page(ilistp->i_mapping, ino * VXFS_ISIZE / PG_SIZE);
 
 	if (!IS_ERR(pp)) {
 		struct vxfs_dinode	*dip;

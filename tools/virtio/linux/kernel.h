@@ -25,8 +25,8 @@
 #define CONFIG_SMP
 
 #define PAGE_SIZE getpagesize()
-#define PAGE_MASK (~(PAGE_SIZE-1))
-#define PAGE_ALIGN(x) ((x + PAGE_SIZE - 1) & PAGE_MASK)
+#define PAGE_MASK (~(PG_SIZE-1))
+#define PAGE_ALIGN(x) ((x + PG_SIZE - 1) & PG_MASK)
 
 /* generic data direction definitions */
 #define READ                    0
@@ -45,9 +45,9 @@ struct page {
 #define phys_to_virt(a) ((void *)(unsigned long)(a))
 /* Page address: Virtual / 4K */
 #define page_to_phys(p) ((dma_addr_t)(unsigned long)(p))
-#define virt_to_page(p) ((struct page *)((unsigned long)p & PAGE_MASK))
+#define virt_to_page(p) ((struct page *)((unsigned long)p & PG_MASK))
 
-#define offset_in_page(p) (((unsigned long)p) % PAGE_SIZE)
+#define offset_in_page(p) (((unsigned long)p) % PG_SIZE)
 
 #define __printf(a,b) __attribute__((format(printf,a,b)))
 
@@ -100,7 +100,7 @@ static inline unsigned long __get_free_page(gfp_t gfp)
 {
 	void *p;
 
-	posix_memalign(&p, PAGE_SIZE, PAGE_SIZE);
+	posix_memalign(&p, PG_SIZE, PG_SIZE);
 	return (unsigned long)p;
 }
 

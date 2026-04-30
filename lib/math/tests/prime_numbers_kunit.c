@@ -8,7 +8,7 @@
 
 static void dump_primes(void *ctx, const struct primes *p)
 {
-	static char buf[PAGE_SIZE];
+	static char buf[PG_SIZE];
 	struct kunit_suite *suite = ctx;
 
 	bitmap_print_to_pagebuf(true, buf, p->primes, p->sz);

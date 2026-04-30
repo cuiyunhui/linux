@@ -1224,7 +1224,7 @@ bpf_jit_binary_hdr(const struct bpf_prog *fp)
 	unsigned long real_start = (unsigned long)fp->bpf_func;
 	unsigned long addr;
 
-	addr = real_start & PAGE_MASK;
+	addr = real_start & PG_MASK;
 	return (void *)addr;
 }
 

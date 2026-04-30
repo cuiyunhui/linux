@@ -794,7 +794,7 @@ int hci_get_dev_list(void __user *arg)
 	if (get_user(dev_num, (__u16 __user *) arg))
 		return -EFAULT;
 
-	if (!dev_num || dev_num > (PAGE_SIZE * 2) / sizeof(*dr))
+	if (!dev_num || dev_num > (PG_SIZE * 2) / sizeof(*dr))
 		return -EINVAL;
 
 	dl = kzalloc_flex(*dl, dev_req, dev_num);

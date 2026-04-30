@@ -43,8 +43,8 @@ static void erofs_fscache_req_complete(struct erofs_fscache_rq *req)
 {
 	struct folio *folio;
 	bool failed = req->error;
-	pgoff_t start_page = req->start / PAGE_SIZE;
-	pgoff_t last_page = ((req->start + req->len) / PAGE_SIZE) - 1;
+	pgoff_t start_page = req->start / PG_SIZE;
+	pgoff_t last_page = ((req->start + req->len) / PG_SIZE) - 1;
 
 	XA_STATE(xas, &req->mapping->i_pages, start_page);
 
@@ -266,14 +266,15 @@ static int erofs_fscache_data_read_slice(struct erofs_fscache_rq *req)
 		if (IS_ERR(src))
 			return PTR_ERR(src);
 
-		iov_iter_xarray(&iter, ITER_DEST, &mapping->i_pages, pos, PAGE_SIZE);
+		iov_iter_xarray(&iter, ITER_DEST, &mapping->i_pages, pos,
+				PG_SIZE);
 		if (copy_to_iter(src, size, &iter) != size) {
 			erofs_put_metabuf(&buf);
 			return -EFAULT;
 		}
-		iov_iter_zero(PAGE_SIZE - size, &iter);
+		iov_iter_zero(PG_SIZE - size, &iter);
 		erofs_put_metabuf(&buf);
-		req->submitted += PAGE_SIZE;
+		req->submitted += PG_SIZE;
 		return 0;
 	}
 
@@ -288,7 +289,7 @@ static int erofs_fscache_data_read_slice(struct erofs_fscache_rq *req)
 	}
 
 	count = min_t(size_t, map.m_llen - (pos - map.m_la), count);
-	DBG_BUGON(!count || count % PAGE_SIZE);
+	DBG_BUGON(!count || count % PG_SIZE);
 
 	mdev = (struct erofs_map_dev) {
 		.m_deviceid = map.m_deviceid,

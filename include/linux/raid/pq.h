@@ -44,7 +44,7 @@ typedef uint64_t u64;
 #ifndef PAGE_SHIFT
 # define PAGE_SHIFT 12
 #endif
-extern const char raid6_empty_zero_page[PAGE_SIZE];
+extern const char raid6_empty_zero_page[PG_SIZE];
 
 #define __init
 #define __exit
@@ -176,11 +176,11 @@ void raid6_dual_recov(int disks, size_t bytes, int faila, int failb,
 # define pr_err(format, ...) fprintf(stderr, format, ## __VA_ARGS__)
 # define pr_info(format, ...) fprintf(stdout, format, ## __VA_ARGS__)
 # define GFP_KERNEL	0
-# define __get_free_pages(x, y)	((unsigned long)mmap(NULL, PAGE_SIZE << (y), \
+# define __get_free_pages(x, y)	((unsigned long)mmap(NULL, PG_SIZE << (y), \
 						     PROT_READ|PROT_WRITE,   \
 						     MAP_PRIVATE|MAP_ANONYMOUS,\
 						     0, 0))
-# define free_pages(x, y)	munmap((void *)(x), PAGE_SIZE << (y))
+# define free_pages(x, y)	munmap((void *)(x), PG_SIZE << (y))
 
 static inline void cpu_relax(void)
 {

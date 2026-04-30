@@ -51,7 +51,7 @@ static inline struct page *io_zcrx_iov_page(const struct net_iov *niov)
 
 	lockdep_assert(!area->mem.is_dmabuf);
 
-	niov_pages_shift = area->ifq->niov_shift - PAGE_SHIFT;
+	niov_pages_shift = area->ifq->niov_shift - PG_SHIFT;
 	return area->mem.pages[net_iov_idx(niov) << niov_pages_shift];
 }
 
@@ -205,7 +205,8 @@ static int io_import_umem(struct io_zcrx_ifq *ifq,
 		return PTR_ERR(pages);
 
 	ret = sg_alloc_table_from_pages(&mem->page_sg_table, pages, nr_pages,
-					0, (unsigned long)nr_pages << PAGE_SHIFT,
+					0,
+					(unsigned long)nr_pages << PG_SHIFT,
 					GFP_KERNEL_ACCOUNT);
 	if (ret) {
 		unpin_user_pages(pages, nr_pages);
@@ -255,7 +256,7 @@ static int io_import_area(struct io_zcrx_ifq *ifq,
 	ret = io_validate_user_buf_range(area_reg->addr, area_reg->len);
 	if (ret)
 		return ret;
-	if (area_reg->addr & ~PAGE_MASK || area_reg->len & ~PAGE_MASK)
+	if (area_reg->addr & ~PG_MASK || area_reg->len & ~PG_MASK)
 		return -EINVAL;
 
 	if (area_reg->flags & IORING_ZCRX_AREA_DMABUF)
@@ -439,14 +440,14 @@ static int io_zcrx_create_area(struct io_zcrx_ifq *ifq,
 			       struct io_uring_zcrx_area_reg *area_reg,
 			       struct io_uring_zcrx_ifq_reg *reg)
 {
-	int buf_size_shift = PAGE_SHIFT;
+	int buf_size_shift = PG_SHIFT;
 	struct io_zcrx_area *area;
 	unsigned nr_iovs;
 	int i, ret;
 
 	if (reg->rx_buf_len) {
 		if (!is_power_of_2(reg->rx_buf_len) ||
-		     reg->rx_buf_len < PAGE_SIZE)
+		     reg->rx_buf_len < PG_SIZE)
 			return -EINVAL;
 		buf_size_shift = ilog2(reg->rx_buf_len);
 	}
@@ -1044,7 +1045,7 @@ static int io_pp_zc_init(struct page_pool *pp)
 		return -EINVAL;
 	if (WARN_ON_ONCE(!pp->dma_map))
 		return -EOPNOTSUPP;
-	if (pp->p.order + PAGE_SHIFT != ifq->niov_shift)
+	if (pp->p.order + PG_SHIFT != ifq->niov_shift)
 		return -EINVAL;
 	if (pp->p.dma_dir != DMA_FROM_DEVICE)
 		return -EOPNOTSUPP;
@@ -1255,11 +1256,11 @@ static ssize_t io_copy_page(struct io_copy_cache *cc, struct page *src_page,
 
 		if (folio_test_partial_kmap(page_folio(dst_page)) ||
 		    folio_test_partial_kmap(page_folio(src_page))) {
-			dst_page += dst_offset / PAGE_SIZE;
-			dst_offset = offset_in_page(dst_offset);
-			src_page += src_offset / PAGE_SIZE;
-			src_offset = offset_in_page(src_offset);
-			n = min(PAGE_SIZE - src_offset, PAGE_SIZE - dst_offset);
+			dst_page += dst_offset / PG_SIZE;
+			dst_offset = offset_in_pg(dst_offset);
+			src_page += src_offset / PG_SIZE;
+			src_offset = offset_in_pg(src_offset);
+			n = min(PG_SIZE - src_offset, PG_SIZE - dst_offset);
 			n = min(n, len);
 		}
 
@@ -1300,7 +1301,7 @@ static ssize_t io_zcrx_copy_chunk(struct io_kiocb *req, struct io_zcrx_ifq *ifq,
 
 		cc.page = io_zcrx_iov_page(niov);
 		cc.offset = 0;
-		cc.size = PAGE_SIZE;
+		cc.size = PG_SIZE;
 
 		n = io_copy_page(&cc, src_page, src_offset, len);
 
@@ -1384,7 +1385,7 @@ io_zcrx_recv_skb(read_descriptor_t *desc, struct sk_buff *skb,
 
 		to_copy = min_t(size_t, skb_headlen(skb) - offset, len);
 		copied = io_zcrx_copy_chunk(req, ifq, virt_to_page(skb->data),
-					    offset_in_page(skb->data) + offset,
+					    offset_in_pg(skb->data) + offset,
 					    to_copy);
 		if (copied < 0) {
 			ret = copied;

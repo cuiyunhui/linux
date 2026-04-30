@@ -52,7 +52,7 @@ static void usercopy_test_check_nonzero_user(struct kunit *test)
 	char *kmem = priv->kmem;
 	size_t size = priv->size;
 
-	KUNIT_ASSERT_GE_MSG(test, size, 2 * PAGE_SIZE, "buffer too small");
+	KUNIT_ASSERT_GE_MSG(test, size, 2 * PG_SIZE, "buffer too small");
 
 	/*
 	 * We want to cross a page boundary to exercise the code more
@@ -61,7 +61,7 @@ static void usercopy_test_check_nonzero_user(struct kunit *test)
 	 * scan a 1024 byte region across the page boundary.
 	 */
 	size = 1024;
-	start = PAGE_SIZE - (size / 2);
+	start = PG_SIZE - (size / 2);
 
 	kmem += start;
 	umem += start;
@@ -180,14 +180,14 @@ static void usercopy_test_valid(struct kunit *test)
 	char __user *usermem = priv->umem;
 	char *kmem = priv->kmem;
 
-	memset(kmem, 0x3a, PAGE_SIZE * 2);
-	KUNIT_EXPECT_EQ_MSG(test, 0, copy_to_user(usermem, kmem, PAGE_SIZE),
-	     "legitimate copy_to_user failed");
-	memset(kmem, 0x0, PAGE_SIZE);
-	KUNIT_EXPECT_EQ_MSG(test, 0, copy_from_user(kmem, usermem, PAGE_SIZE),
-	     "legitimate copy_from_user failed");
-	KUNIT_EXPECT_MEMEQ_MSG(test, kmem, kmem + PAGE_SIZE, PAGE_SIZE,
-	     "legitimate usercopy failed to copy data");
+	memset(kmem, 0x3a, PG_SIZE * 2);
+	KUNIT_EXPECT_EQ_MSG(test, 0, copy_to_user(usermem, kmem, PG_SIZE),
+			    "legitimate copy_to_user failed");
+	memset(kmem, 0x0, PG_SIZE);
+	KUNIT_EXPECT_EQ_MSG(test, 0, copy_from_user(kmem, usermem, PG_SIZE),
+			    "legitimate copy_from_user failed");
+	KUNIT_EXPECT_MEMEQ_MSG(test, kmem, kmem + PG_SIZE, PG_SIZE,
+			       "legitimate usercopy failed to copy data");
 
 #define test_legit(size, check)						\
 	do {								\
@@ -230,17 +230,17 @@ static void usercopy_test_invalid(struct kunit *test)
 	}
 
 	/* Prepare kernel memory with check values. */
-	memset(kmem, 0x5a, PAGE_SIZE);
-	memset(kmem + PAGE_SIZE, 0, PAGE_SIZE);
+	memset(kmem, 0x5a, PG_SIZE);
+	memset(kmem + PG_SIZE, 0, PG_SIZE);
 
 	/* Reject kernel-to-kernel copies through copy_from_user(). */
-	KUNIT_EXPECT_NE_MSG(test, copy_from_user(kmem, (char __user *)(kmem + PAGE_SIZE),
-						 PAGE_SIZE), 0,
-		    "illegal all-kernel copy_from_user passed");
+	KUNIT_EXPECT_NE_MSG(test, copy_from_user(kmem, (char __user *)(kmem + PG_SIZE),
+						 PG_SIZE), 0,
+			    "illegal all-kernel copy_from_user passed");
 
 	/* Destination half of buffer should have been zeroed. */
-	KUNIT_EXPECT_MEMEQ_MSG(test, kmem + PAGE_SIZE, kmem, PAGE_SIZE,
-		    "zeroing failure for illegal all-kernel copy_from_user");
+	KUNIT_EXPECT_MEMEQ_MSG(test, kmem + PG_SIZE, kmem, PG_SIZE,
+			       "zeroing failure for illegal all-kernel copy_from_user");
 
 #if 0
 	/*
@@ -253,13 +253,13 @@ static void usercopy_test_invalid(struct kunit *test)
 						 PAGE_SIZE), 0,
 		    "illegal reversed copy_from_user passed");
 #endif
-	KUNIT_EXPECT_NE_MSG(test, copy_to_user((char __user *)kmem, kmem + PAGE_SIZE,
-					       PAGE_SIZE), 0,
-		    "illegal all-kernel copy_to_user passed");
+	KUNIT_EXPECT_NE_MSG(test, copy_to_user((char __user *)kmem, kmem + PG_SIZE,
+					       PG_SIZE), 0,
+			    "illegal all-kernel copy_to_user passed");
 
 	KUNIT_EXPECT_NE_MSG(test, copy_to_user((char __user *)kmem, bad_usermem,
-					       PAGE_SIZE), 0,
-		    "illegal reversed copy_to_user passed");
+					       PG_SIZE), 0,
+			    "illegal reversed copy_to_user passed");
 
 #define test_illegal(size, check)							\
 	do {										\
@@ -299,7 +299,7 @@ static int usercopy_test_init(struct kunit *test)
 	priv = kunit_kzalloc(test, sizeof(*priv), GFP_KERNEL);
 	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, priv);
 	test->priv = priv;
-	priv->size = PAGE_SIZE * 2;
+	priv->size = PG_SIZE * 2;
 
 	priv->kmem = kunit_kmalloc(test, priv->size, GFP_KERNEL);
 	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, priv->kmem);

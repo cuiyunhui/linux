@@ -348,12 +348,12 @@ static int kdb_getphys(void *res, unsigned long addr, size_t size)
 	void *vaddr;
 	struct page *page;
 
-	pfn = (addr >> PAGE_SHIFT);
+	pfn = (addr >> PG_SHIFT);
 	if (!pfn_valid(pfn))
 		return 1;
 	page = pfn_to_page(pfn);
 	vaddr = kmap_local_page(page);
-	memcpy(res, vaddr + (addr & (PAGE_SIZE - 1)), size);
+	memcpy(res, vaddr + (addr & (PG_SIZE - 1)), size);
 	kunmap_local(vaddr);
 
 	return 0;

@@ -164,7 +164,7 @@ pte_t *pkmap_page_table;
 
 struct page *__kmap_to_page(void *vaddr)
 {
-	unsigned long base = (unsigned long) vaddr & PAGE_MASK;
+	unsigned long base = (unsigned long) vaddr & PG_MASK;
 	struct kmap_ctrl *kctrl = &current->kmap_ctrl;
 	unsigned long addr = (unsigned long)vaddr;
 	int i;
@@ -416,11 +416,11 @@ void zero_user_segments(struct page *page, unsigned start1, unsigned end1,
 	for (i = 0; i < compound_nr(page); i++) {
 		void *kaddr = NULL;
 
-		if (start1 >= PAGE_SIZE) {
-			start1 -= PAGE_SIZE;
-			end1 -= PAGE_SIZE;
+		if (start1 >= PG_SIZE) {
+			start1 -= PG_SIZE;
+			end1 -= PG_SIZE;
 		} else {
-			unsigned this_end = min_t(unsigned, end1, PAGE_SIZE);
+			unsigned this_end = min_t(unsigned, end1, PG_SIZE);
 
 			if (end1 > start1) {
 				kaddr = kmap_local_page(page + i);
@@ -430,11 +430,11 @@ void zero_user_segments(struct page *page, unsigned start1, unsigned end1,
 			start1 = 0;
 		}
 
-		if (start2 >= PAGE_SIZE) {
-			start2 -= PAGE_SIZE;
-			end2 -= PAGE_SIZE;
+		if (start2 >= PG_SIZE) {
+			start2 -= PG_SIZE;
+			end2 -= PG_SIZE;
 		} else {
-			unsigned this_end = min_t(unsigned, end2, PAGE_SIZE);
+			unsigned this_end = min_t(unsigned, end2, PG_SIZE);
 
 			if (end2 > start2) {
 				if (!kaddr)
@@ -596,7 +596,7 @@ EXPORT_SYMBOL(__kmap_local_page_prot);
 
 void kunmap_local_indexed(const void *vaddr)
 {
-	unsigned long addr = (unsigned long) vaddr & PAGE_MASK;
+	unsigned long addr = (unsigned long) vaddr & PG_MASK;
 	pte_t *kmap_pte;
 	int idx;
 

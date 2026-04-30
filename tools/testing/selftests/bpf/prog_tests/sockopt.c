@@ -322,7 +322,7 @@ static struct sockopt_test {
 		.get_level = 1234,
 		.get_optname = 5678,
 		.get_optval = {}, /* the changes are ignored */
-		.get_optlen = PAGE_SIZE + 1,
+		.get_optlen = PG_SIZE + 1,
 		.error = EOPNOTSUPP_GETSOCKOPT,
 		.io_uring_support = true,
 	},
@@ -723,7 +723,7 @@ static struct sockopt_test {
 		.set_level = SOL_IP,
 		.set_optname = IP_TOS,
 		.set_optval = {},
-		.set_optlen = PAGE_SIZE + 1,
+		.set_optlen = PG_SIZE + 1,
 
 		.get_level = SOL_IP,
 		.get_optname = IP_TOS,
@@ -1111,9 +1111,9 @@ static int run_test(int cgroup_fd, struct sockopt_test *test, bool use_io_uring,
 	}
 
 	if (test->set_optlen) {
-		if (test->set_optlen >= PAGE_SIZE) {
-			int num_pages = test->set_optlen / PAGE_SIZE;
-			int remainder = test->set_optlen % PAGE_SIZE;
+		if (test->set_optlen >= PG_SIZE) {
+			int num_pages = test->set_optlen / PG_SIZE;
+			int remainder = test->set_optlen % PG_SIZE;
 
 			test->set_optlen = num_pages * sysconf(_SC_PAGESIZE) + remainder;
 		}
@@ -1134,9 +1134,9 @@ static int run_test(int cgroup_fd, struct sockopt_test *test, bool use_io_uring,
 	}
 
 	if (test->get_optlen) {
-		if (test->get_optlen >= PAGE_SIZE) {
-			int num_pages = test->get_optlen / PAGE_SIZE;
-			int remainder = test->get_optlen % PAGE_SIZE;
+		if (test->get_optlen >= PG_SIZE) {
+			int num_pages = test->get_optlen / PG_SIZE;
+			int remainder = test->get_optlen % PG_SIZE;
 
 			test->get_optlen = num_pages * sysconf(_SC_PAGESIZE) + remainder;
 		}

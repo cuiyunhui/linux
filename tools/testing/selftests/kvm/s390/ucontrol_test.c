@@ -184,7 +184,7 @@ FIXTURE_SETUP(uc_kvm)
 
 FIXTURE_TEARDOWN(uc_kvm)
 {
-	kvm_munmap(self->sie_block, PAGE_SIZE);
+	kvm_munmap(self->sie_block, PG_SIZE);
 	kvm_munmap(self->run, self->kvm_run_size);
 	close(self->vcpu_fd);
 	close(self->vm_fd);
@@ -628,7 +628,7 @@ TEST_F(uc_kvm, uc_skey)
 	uc_assert_diag44(self);
 }
 
-static char uc_flic_b[PAGE_SIZE];
+static char uc_flic_b[PG_SIZE];
 static struct kvm_s390_io_adapter uc_flic_ioa = { .id = 0 };
 static struct kvm_s390_io_adapter_req uc_flic_ioam = { .id = 0 };
 static struct kvm_s390_ais_req uc_flic_asim = { .isc = 0 };
@@ -646,7 +646,7 @@ static struct uc_flic_attr_test {
 		.a = {
 			.group = KVM_DEV_FLIC_GET_ALL_IRQS,
 			.addr = (u64)&uc_flic_b,
-			.attr = PAGE_SIZE,
+			.attr = PG_SIZE,
 		},
 	},
 	{

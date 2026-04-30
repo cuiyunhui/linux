@@ -165,7 +165,7 @@ int avc_get_hash_stats(char *page)
 
 	rcu_read_unlock();
 
-	return scnprintf(page, PAGE_SIZE, "entries: %d\nbuckets used: %d/%d\n"
+	return scnprintf(page, PG_SIZE, "entries: %d\nbuckets used: %d/%d\n"
 			 "longest chain: %d\n",
 			 atomic_read(&selinux_avc.avc_cache.active_nodes),
 			 slots_used, AVC_CACHE_SLOTS, max_chain_len);

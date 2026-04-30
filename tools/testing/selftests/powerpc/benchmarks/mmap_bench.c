@@ -15,7 +15,7 @@
 
 #define MEMSIZE (1UL << 27)
 #define PAGE_SIZE (1UL << 16)
-#define CHUNK_COUNT (MEMSIZE/PAGE_SIZE)
+#define CHUNK_COUNT (MEMSIZE/PG_SIZE)
 
 static int pg_fault;
 static int iterations = ITERATIONS;

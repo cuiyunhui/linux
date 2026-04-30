@@ -179,8 +179,8 @@ extern void ceph_put_snap_context(struct ceph_snap_context *sc);
  */
 static inline int calc_pages_for(u64 off, u64 len)
 {
-	return ((off+len+PAGE_SIZE-1) >> PAGE_SHIFT) -
-		(off >> PAGE_SHIFT);
+	return ((off+len+PG_SIZE-1) >> PG_SHIFT) -
+		(off >> PG_SHIFT);
 }
 
 #define RB_BYVAL(a)      (a)

@@ -83,8 +83,8 @@ static inline void *kmap_local_page_try_from_panic(const struct page *page)
 
 static inline void *kmap_local_folio(const struct folio *folio, size_t offset)
 {
-	const struct page *page = folio_page(folio, offset / PAGE_SIZE);
-	return __kmap_local_page_prot(page, kmap_prot) + offset % PAGE_SIZE;
+	const struct page *page = folio_page(folio, offset / PG_SIZE);
+	return __kmap_local_page_prot(page, kmap_prot) + offset % PG_SIZE;
 }
 
 static inline void *kmap_local_page_prot(const struct page *page, pgprot_t prot)
@@ -211,7 +211,7 @@ static inline void *kmap_local_pfn(unsigned long pfn)
 static inline void __kunmap_local(const void *addr)
 {
 #ifdef ARCH_HAS_FLUSH_ON_KUNMAP
-	kunmap_flush_on_unmap(PTR_ALIGN_DOWN(addr, PAGE_SIZE));
+	kunmap_flush_on_unmap(PTR_ALIGN_DOWN(addr, PG_SIZE));
 #endif
 }
 
@@ -238,7 +238,7 @@ static inline void *kmap_atomic_pfn(unsigned long pfn)
 static inline void __kunmap_atomic(const void *addr)
 {
 #ifdef ARCH_HAS_FLUSH_ON_KUNMAP
-	kunmap_flush_on_unmap(PTR_ALIGN_DOWN(addr, PAGE_SIZE));
+	kunmap_flush_on_unmap(PTR_ALIGN_DOWN(addr, PG_SIZE));
 #endif
 	pagefault_enable();
 	if (IS_ENABLED(CONFIG_PREEMPT_RT))

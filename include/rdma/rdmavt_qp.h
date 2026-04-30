@@ -468,8 +468,8 @@ static inline struct rvt_qp *ibqp_to_rvtqp(struct ib_qp *ibqp)
 }
 
 #define RVT_QPN_MAX                 BIT(24)
-#define RVT_QPNMAP_ENTRIES          (RVT_QPN_MAX / PAGE_SIZE / BITS_PER_BYTE)
-#define RVT_BITS_PER_PAGE           (PAGE_SIZE * BITS_PER_BYTE)
+#define RVT_QPNMAP_ENTRIES          (RVT_QPN_MAX / PG_SIZE / BITS_PER_BYTE)
+#define RVT_BITS_PER_PAGE           (PG_SIZE * BITS_PER_BYTE)
 #define RVT_BITS_PER_PAGE_MASK      (RVT_BITS_PER_PAGE - 1)
 #define RVT_QPN_MASK		    IB_QPN_MASK
 

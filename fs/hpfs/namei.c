@@ -488,7 +488,7 @@ static int hpfs_symlink_read_folio(struct file *file, struct folio *folio)
 	hpfs_lock(i->i_sb);
 	if (!(fnode = hpfs_map_fnode(i->i_sb, i->i_ino, &bh)))
 		goto fail;
-	err = hpfs_read_ea(i->i_sb, fnode, "SYMLINK", link, PAGE_SIZE);
+	err = hpfs_read_ea(i->i_sb, fnode, "SYMLINK", link, PG_SIZE);
 	brelse(bh);
 fail:
 	hpfs_unlock(i->i_sb);

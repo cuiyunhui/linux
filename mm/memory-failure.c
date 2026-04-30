@@ -367,7 +367,7 @@ static unsigned long dev_pagemap_mapping_shift(struct vm_area_struct *vma,
 		return 0;
 	ptent = ptep_get(pte);
 	if (pte_present(ptent))
-		ret = PAGE_SHIFT;
+		ret = PG_SHIFT;
 	pte_unmap(pte);
 	return ret;
 }
@@ -704,11 +704,11 @@ static int check_hwpoisoned_entry(pte_t pte, unsigned long addr, short shift,
 			pfn = softleaf_to_pfn(entry);
 	}
 
-	mask = ~((1UL << (shift - PAGE_SHIFT)) - 1);
+	mask = ~((1UL << (shift - PG_SHIFT)) - 1);
 	if (!pfn || pfn != (poisoned_pfn & mask))
 		return 0;
 
-	hwpoison_vaddr = addr + ((poisoned_pfn - pfn) << PAGE_SHIFT);
+	hwpoison_vaddr = addr + ((poisoned_pfn - pfn) << PG_SHIFT);
 	set_to_kill(tk, hwpoison_vaddr, shift);
 	return 1;
 }
@@ -725,8 +725,8 @@ static int check_hwpoisoned_pmd_entry(pmd_t *pmdp, unsigned long addr,
 		return 0;
 	pfn = pmd_pfn(pmd);
 	if (pfn <= hwp->pfn && hwp->pfn < pfn + HPAGE_PMD_NR) {
-		hwpoison_vaddr = addr + ((hwp->pfn - pfn) << PAGE_SHIFT);
-		set_to_kill(&hwp->tk, hwpoison_vaddr, PAGE_SHIFT);
+		hwpoison_vaddr = addr + ((hwp->pfn - pfn) << PG_SHIFT);
+		set_to_kill(&hwp->tk, hwpoison_vaddr, PG_SHIFT);
 		return 1;
 	}
 	return 0;
@@ -759,8 +759,8 @@ static int hwpoison_pte_range(pmd_t *pmdp, unsigned long addr,
 	if (!ptep)
 		goto out;
 
-	for (; addr != end; ptep++, addr += PAGE_SIZE) {
-		ret = check_hwpoisoned_entry(ptep_get(ptep), addr, PAGE_SHIFT,
+	for (; addr != end; ptep++, addr += PG_SIZE) {
+		ret = check_hwpoisoned_entry(ptep_get(ptep), addr, PG_SHIFT,
 					     hwp->pfn, &hwp->tk);
 		if (ret == 1)
 			break;
@@ -1698,7 +1698,7 @@ static void unmap_and_kill(struct list_head *to_kill, unsigned long pfn,
 		 * mapping being torn down is communicated in siginfo, see
 		 * kill_proc()
 		 */
-		loff_t start = ((loff_t)index << PAGE_SHIFT) & ~(size - 1);
+		loff_t start = ((loff_t)index << PG_SHIFT) & ~(size - 1);
 
 		unmap_mapping_range(mapping, start, size, 0);
 	}
@@ -2222,7 +2222,7 @@ static void add_to_kill_pgoff(struct task_struct *tsk,
 
 	/* Check for pgoff not backed by struct page */
 	tk->addr = vma_address(vma, pgoff, 1);
-	tk->size_shift = PAGE_SHIFT;
+	tk->size_shift = PG_SHIFT;
 
 	if (tk->addr == -EFAULT)
 		pr_info("Unable to find address %lx in %s\n",

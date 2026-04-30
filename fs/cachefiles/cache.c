@@ -66,7 +66,7 @@ int cachefiles_add_cache(struct cachefiles_cache *cache)
 	    !(d_backing_inode(root)->i_opflags & IOP_XATTR) ||
 	    !root->d_sb->s_op->statfs ||
 	    !root->d_sb->s_op->sync_fs ||
-	    root->d_sb->s_blocksize > PAGE_SIZE)
+	    root->d_sb->s_blocksize > PG_SIZE)
 		goto error_unsupported;
 
 	ret = -EROFS;
@@ -89,7 +89,7 @@ int cachefiles_add_cache(struct cachefiles_cache *cache)
 		goto error_unsupported;
 
 	ret = -EOPNOTSUPP;
-	if (stats.f_bsize > PAGE_SIZE)
+	if (stats.f_bsize > PG_SIZE)
 		goto error_unsupported;
 
 	cache->bsize = stats.f_bsize;

@@ -57,8 +57,8 @@ void rdsdebug(char *fmt, ...)
 #define RDS_MAX_MSG_SIZE	((unsigned int)(1 << 20))
 
 #define RDS_CONG_MAP_BYTES	(65536 / 8)
-#define RDS_CONG_MAP_PAGES	(PAGE_ALIGN(RDS_CONG_MAP_BYTES) / PAGE_SIZE)
-#define RDS_CONG_MAP_PAGE_BITS	(PAGE_SIZE * 8)
+#define RDS_CONG_MAP_PAGES	(PG_ALIGN(RDS_CONG_MAP_BYTES) / PG_SIZE)
+#define RDS_CONG_MAP_PAGE_BITS	(PG_SIZE * 8)
 
 struct rds_cong_map {
 	struct rb_node		m_rb_node;

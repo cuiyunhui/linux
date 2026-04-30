@@ -37,7 +37,7 @@ MODULE_LICENSE("GPL v2");
 
 #define MAX_PACKET_SIZE		672 /* hardware specific */
 #define MAX_MEMORY_BUFFERS	DIV_ROUND_UP(MAX_QUEUE_LENGTH, \
-					     PAGE_SIZE / MAX_PACKET_SIZE)
+					     PG_SIZE / MAX_PACKET_SIZE)
 
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;
@@ -1015,7 +1015,7 @@ static int alloc_stream_buffers(struct ua101 *ua, struct ua101_stream *stream)
 	 * a smaller buffer only for the last chunk.
 	 */
 	remaining_packets = stream->queue_length;
-	packets_per_page = PAGE_SIZE / stream->max_packet_bytes;
+	packets_per_page = PG_SIZE / stream->max_packet_bytes;
 	for (i = 0; i < ARRAY_SIZE(stream->buffers); ++i) {
 		packets = min(remaining_packets, packets_per_page);
 		size = packets * stream->max_packet_bytes;

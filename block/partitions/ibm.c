@@ -181,7 +181,7 @@ static int find_vol1_partitions(struct parsed_partitions *state,
 	int secperblk;
 
 	snprintf(tmp, sizeof(tmp), "VOL1/%8s:", name);
-	strlcat(state->pp_buf, tmp, PAGE_SIZE);
+	strlcat(state->pp_buf, tmp, PG_SIZE);
 	/*
 	 * get start of VTOC from the disk label and then search for format1
 	 * and format8 labels
@@ -219,7 +219,7 @@ static int find_vol1_partitions(struct parsed_partitions *state,
 		blk++;
 		data = read_part_sector(state, blk * secperblk, &sect);
 	}
-	strlcat(state->pp_buf, "\n", PAGE_SIZE);
+	strlcat(state->pp_buf, "\n", PG_SIZE);
 
 	if (!data)
 		return -1;
@@ -241,7 +241,7 @@ static int find_lnx1_partitions(struct parsed_partitions *state,
 	int secperblk;
 
 	snprintf(tmp, sizeof(tmp), "LNX1/%8s:", name);
-	strlcat(state->pp_buf, tmp, PAGE_SIZE);
+	strlcat(state->pp_buf, tmp, PG_SIZE);
 	secperblk = blocksize >> 9;
 	if (label->lnx.ldl_version == 0xf2) {
 		size = label->lnx.formatted_blocks * secperblk;
@@ -258,7 +258,7 @@ static int find_lnx1_partitions(struct parsed_partitions *state,
 		size = nr_sectors;
 		if (size != geo_size) {
 			if (!info) {
-				strlcat(state->pp_buf, "\n", PAGE_SIZE);
+				strlcat(state->pp_buf, "\n", PG_SIZE);
 				return 1;
 			}
 			if (!strcmp(info->type, "ECKD"))
@@ -270,7 +270,7 @@ static int find_lnx1_partitions(struct parsed_partitions *state,
 	/* first and only partition starts in the first block after the label */
 	offset = labelsect + secperblk;
 	put_partition(state, 1, offset, size - offset);
-	strlcat(state->pp_buf, "\n", PAGE_SIZE);
+	strlcat(state->pp_buf, "\n", PG_SIZE);
 	return 1;
 }
 
@@ -292,13 +292,13 @@ static int find_cms1_partitions(struct parsed_partitions *state,
 	secperblk = blocksize >> 9;
 	if (label->cms.disk_offset != 0) {
 		snprintf(tmp, sizeof(tmp), "CMS1/%8s(MDSK):", name);
-		strlcat(state->pp_buf, tmp, PAGE_SIZE);
+		strlcat(state->pp_buf, tmp, PG_SIZE);
 		/* disk is reserved minidisk */
 		offset = label->cms.disk_offset * secperblk;
 		size = (label->cms.block_count - 1) * secperblk;
 	} else {
 		snprintf(tmp, sizeof(tmp), "CMS1/%8s:", name);
-		strlcat(state->pp_buf, tmp, PAGE_SIZE);
+		strlcat(state->pp_buf, tmp, PG_SIZE);
 		/*
 		 * Special case for FBA devices:
 		 * If an FBA device is CMS formatted with blocksize > 512 byte
@@ -314,7 +314,7 @@ static int find_cms1_partitions(struct parsed_partitions *state,
 	}
 
 	put_partition(state, 1, offset, size-offset);
-	strlcat(state->pp_buf, "\n", PAGE_SIZE);
+	strlcat(state->pp_buf, "\n", PG_SIZE);
 	return 1;
 }
 
@@ -391,11 +391,11 @@ int ibm_partition(struct parsed_partitions *state)
 		 */
 		res = 1;
 		if (info->format == DASD_FORMAT_LDL) {
-			strlcat(state->pp_buf, "(nonl)", PAGE_SIZE);
+			strlcat(state->pp_buf, "(nonl)", PG_SIZE);
 			size = nr_sectors;
 			offset = (info->label_block + 1) * (blocksize >> 9);
 			put_partition(state, 1, offset, size-offset);
-			strlcat(state->pp_buf, "\n", PAGE_SIZE);
+			strlcat(state->pp_buf, "\n", PG_SIZE);
 		}
 	} else
 		res = 0;

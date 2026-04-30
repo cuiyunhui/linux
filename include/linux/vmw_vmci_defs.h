@@ -83,13 +83,13 @@ enum {
  * number of queue pairs a guest can create.
  */
 #define VMCI_MAX_GUEST_QP_MEMORY ((size_t)(128 * 1024 * 1024))
-#define VMCI_MAX_GUEST_QP_COUNT  (VMCI_MAX_GUEST_QP_MEMORY / PAGE_SIZE / 2)
+#define VMCI_MAX_GUEST_QP_COUNT  (VMCI_MAX_GUEST_QP_MEMORY / PG_SIZE / 2)
 
 /*
  * There can be at most PAGE_SIZE doorbells since there is one doorbell
  * per byte in the doorbell bitmap page.
  */
-#define VMCI_MAX_GUEST_DOORBELL_COUNT PAGE_SIZE
+#define VMCI_MAX_GUEST_DOORBELL_COUNT PG_SIZE
 
 /*
  * Queues with pre-mapped data pages must be small, so that we don't pin

@@ -128,7 +128,7 @@ static struct damon_ctx *damon_sample_mtier_build_ctx(bool promote)
 	scheme = damon_new_scheme(
 			/* access pattern */
 			&(struct damos_access_pattern) {
-				.min_sz_region = PAGE_SIZE,
+				.min_sz_region = PG_SIZE,
 				.max_sz_region = ULONG_MAX,
 				.min_nr_accesses = promote ? 1 : 0,
 				.max_nr_accesses = promote ? UINT_MAX : 0,

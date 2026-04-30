@@ -18,7 +18,7 @@
 
 /* non-mmap()'able part of bpf_ringbuf (everything up to consumer page) */
 #define RINGBUF_PGOFF \
-	(offsetof(struct bpf_ringbuf, consumer_pos) >> PAGE_SHIFT)
+	(offsetof(struct bpf_ringbuf, consumer_pos) >> PG_SHIFT)
 /* consumer page and producer page */
 #define RINGBUF_POS_PAGES 2
 #define RINGBUF_NR_META_PAGES (RINGBUF_PGOFF + RINGBUF_POS_PAGES)
@@ -72,11 +72,11 @@ struct bpf_ringbuf {
 	 * validate each sample to ensure that they're correctly formatted, and
 	 * fully contained within the ring buffer.
 	 */
-	unsigned long consumer_pos __aligned(PAGE_SIZE);
-	unsigned long producer_pos __aligned(PAGE_SIZE);
+	unsigned long consumer_pos __aligned(PG_SIZE);
+	unsigned long producer_pos __aligned(PG_SIZE);
 	unsigned long pending_pos;
 	unsigned long overwrite_pos; /* position after the last overwritten record */
-	char data[] __aligned(PAGE_SIZE);
+	char data[] __aligned(PG_SIZE);
 };
 
 struct bpf_ringbuf_map {
@@ -95,7 +95,7 @@ static struct bpf_ringbuf *bpf_ringbuf_area_alloc(size_t data_sz, int numa_node)
 	const gfp_t flags = GFP_KERNEL_ACCOUNT | __GFP_RETRY_MAYFAIL |
 			    __GFP_NOWARN | __GFP_ZERO;
 	int nr_meta_pages = RINGBUF_NR_META_PAGES;
-	int nr_data_pages = data_sz >> PAGE_SHIFT;
+	int nr_data_pages = data_sz >> PG_SHIFT;
 	int nr_pages = nr_meta_pages + nr_data_pages;
 	struct page **pages, *page;
 	struct bpf_ringbuf *rb;
@@ -207,7 +207,7 @@ static struct bpf_map *ringbuf_map_alloc(union bpf_attr *attr)
 
 	if (attr->key_size || attr->value_size ||
 	    !is_power_of_2(attr->max_entries) ||
-	    !PAGE_ALIGNED(attr->max_entries))
+	    !PG_ALIGNED(attr->max_entries))
 		return ERR_PTR(-EINVAL);
 
 	rb_map = bpf_map_area_alloc(sizeof(*rb_map), NUMA_NO_NODE);
@@ -280,7 +280,7 @@ static int ringbuf_map_mmap_kern(struct bpf_map *map, struct vm_area_struct *vma
 
 	if (vma->vm_flags & VM_WRITE) {
 		/* allow writable mapping for the consumer_pos only */
-		if (vma->vm_pgoff != 0 || vma->vm_end - vma->vm_start != PAGE_SIZE)
+		if (vma->vm_pgoff != 0 || vma->vm_end - vma->vm_start != PG_SIZE)
 			return -EPERM;
 	}
 	/* remap_vmalloc_range() checks size and offset constraints */
@@ -367,9 +367,9 @@ static u64 ringbuf_map_mem_usage(const struct bpf_map *map)
 	u64 usage = sizeof(struct bpf_ringbuf_map);
 
 	rb = container_of(map, struct bpf_ringbuf_map, map)->rb;
-	usage += (u64)rb->nr_pages << PAGE_SHIFT;
+	usage += (u64)rb->nr_pages << PG_SHIFT;
 	nr_meta_pages = RINGBUF_NR_META_PAGES;
-	nr_data_pages = map->max_entries >> PAGE_SHIFT;
+	nr_data_pages = map->max_entries >> PG_SHIFT;
 	usage += (nr_meta_pages + 2 * nr_data_pages) * sizeof(struct page *);
 	return usage;
 }
@@ -413,7 +413,7 @@ const struct bpf_map_ops user_ringbuf_map_ops = {
 static size_t bpf_ringbuf_rec_pg_off(struct bpf_ringbuf *rb,
 				     struct bpf_ringbuf_hdr *hdr)
 {
-	return ((void *)hdr - (void *)rb) >> PAGE_SHIFT;
+	return ((void *)hdr - (void *)rb) >> PG_SHIFT;
 }
 
 /* Given pointer to ring buffer record header, restore pointer to struct
@@ -423,9 +423,9 @@ static struct bpf_ringbuf *
 bpf_ringbuf_restore_from_rec(struct bpf_ringbuf_hdr *hdr)
 {
 	unsigned long addr = (unsigned long)(void *)hdr;
-	unsigned long off = (unsigned long)hdr->pg_off << PAGE_SHIFT;
+	unsigned long off = (unsigned long)hdr->pg_off << PG_SHIFT;
 
-	return (void*)((addr & PAGE_MASK) - off);
+	return (void*)((addr & PG_MASK) - off);
 }
 
 static bool bpf_ringbuf_has_space(const struct bpf_ringbuf *rb,

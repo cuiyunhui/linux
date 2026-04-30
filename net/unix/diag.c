@@ -277,7 +277,7 @@ again:
 	if (err < 0) {
 		nlmsg_free(rep);
 		extra_len += 256;
-		if (extra_len >= PAGE_SIZE)
+		if (extra_len >= PG_SIZE)
 			goto out;
 
 		goto again;

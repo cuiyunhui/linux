@@ -36,8 +36,8 @@ static void __init kmsan_record_future_shadow_range(void *start, void *end)
 	KMSAN_WARN_ON((nstart >= nend) ||
 		      /* Virtual address 0 is valid on s390. */
 		      (!IS_ENABLED(CONFIG_S390) && !nstart) || !nend);
-	nstart = ALIGN_DOWN(nstart, PAGE_SIZE);
-	nend = ALIGN(nend, PAGE_SIZE);
+	nstart = ALIGN_DOWN(nstart, PG_SIZE);
+	nend = ALIGN(nend, PG_SIZE);
 
 	/*
 	 * Scan the existing ranges to see if any of them overlaps with

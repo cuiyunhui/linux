@@ -262,7 +262,7 @@ void dlm_print_one_mle(struct dlm_master_list_entry *mle)
 
 	buf = (char *) get_zeroed_page(GFP_ATOMIC);
 	if (buf) {
-		dump_mle(mle, buf, PAGE_SIZE - 1);
+		dump_mle(mle, buf, PG_SIZE - 1);
 		free_page((unsigned long)buf);
 	}
 }
@@ -331,7 +331,7 @@ static int debug_purgelist_open(struct inode *inode, struct file *file)
 	if (!buf)
 		goto bail;
 
-	i_size_write(inode, debug_purgelist_print(dlm, buf, PAGE_SIZE - 1));
+	i_size_write(inode, debug_purgelist_print(dlm, buf, PG_SIZE - 1));
 
 	file->private_data = buf;
 
@@ -388,7 +388,7 @@ static int debug_mle_open(struct inode *inode, struct file *file)
 	if (!buf)
 		goto bail;
 
-	i_size_write(inode, debug_mle_print(dlm, buf, PAGE_SIZE - 1));
+	i_size_write(inode, debug_mle_print(dlm, buf, PG_SIZE - 1));
 
 	file->private_data = buf;
 
@@ -561,7 +561,7 @@ static int debug_lockres_open(struct inode *inode, struct file *file)
 	struct debug_lockres *dl;
 	void *buf;
 
-	buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	buf = kmalloc(PG_SIZE, GFP_KERNEL);
 	if (!buf)
 		goto bail;
 
@@ -569,7 +569,7 @@ static int debug_lockres_open(struct inode *inode, struct file *file)
 	if (!dl)
 		goto bailfree;
 
-	dl->dl_len = PAGE_SIZE;
+	dl->dl_len = PG_SIZE;
 	dl->dl_buf = buf;
 
 	dlm_grab(dlm);
@@ -779,7 +779,7 @@ static int debug_state_open(struct inode *inode, struct file *file)
 	if (!buf)
 		goto bail;
 
-	i_size_write(inode, debug_state_print(dlm, buf, PAGE_SIZE - 1));
+	i_size_write(inode, debug_state_print(dlm, buf, PG_SIZE - 1));
 
 	file->private_data = buf;
 

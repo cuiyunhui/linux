@@ -40,8 +40,8 @@ static bool __init test_encode_decode(void)
 		size_t verif_size;
 
 		get_random_bytes(&addr, sizeof(addr));
-		if (addr < PAGE_SIZE)
-			addr = PAGE_SIZE;
+		if (addr < PG_SIZE)
+			addr = PG_SIZE;
 
 		if (WARN_ON(!check_encodable(addr, size)))
 			return false;

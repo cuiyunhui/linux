@@ -132,7 +132,7 @@ struct kho_vmalloc_hdr {
 };
 
 #define KHO_VMALLOC_SIZE				\
-	((PAGE_SIZE - sizeof(struct kho_vmalloc_hdr)) / \
+	((PG_SIZE - sizeof(struct kho_vmalloc_hdr)) / \
 	 sizeof(u64))
 
 /*
@@ -146,7 +146,7 @@ struct kho_vmalloc_chunk {
 	u64 phys[KHO_VMALLOC_SIZE];
 };
 
-static_assert(sizeof(struct kho_vmalloc_chunk) == PAGE_SIZE);
+static_assert(sizeof(struct kho_vmalloc_chunk) == PG_SIZE);
 
 /*
  * Describes a preserved vmalloc memory area, including the

@@ -70,7 +70,7 @@ nfsd_cache_size_limit(void)
 	unsigned int limit;
 	unsigned long low_pages = totalram_pages() - totalhigh_pages();
 
-	limit = (16 * int_sqrt(low_pages)) << (PAGE_SHIFT-10);
+	limit = (16 * int_sqrt(low_pages)) << (PG_SHIFT-10);
 	return min_t(unsigned int, limit, 256*1024);
 }
 
@@ -373,11 +373,11 @@ static __wsum nfsd_cache_csum(struct xdr_buf *buf, unsigned int start,
 	}
 
 	/* Continue into page array */
-	idx = subbuf.page_base / PAGE_SIZE;
-	base = subbuf.page_base & ~PAGE_MASK;
+	idx = subbuf.page_base / PG_SIZE;
+	base = subbuf.page_base & ~PG_MASK;
 	while (remaining) {
 		p = page_address(subbuf.pages[idx]) + base;
-		len = min_t(unsigned int, PAGE_SIZE - base, remaining);
+		len = min_t(unsigned int, PG_SIZE - base, remaining);
 		csum = csum_partial(p, len, csum);
 		remaining -= len;
 		base = 0;

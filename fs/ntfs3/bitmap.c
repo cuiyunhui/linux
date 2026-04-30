@@ -522,7 +522,7 @@ static int wnd_rescan(struct wnd_bitmap *wnd)
 	ra = kzalloc_obj(*ra, GFP_NOFS);
 	if (ra) {
 		file_ra_state_init(ra, mapping);
-		ra->ra_pages = (wnd->nbits / 8 + PAGE_SIZE - 1) >> PAGE_SHIFT;
+		ra->ra_pages = (wnd->nbits / 8 + PG_SIZE - 1) >> PG_SHIFT;
 	}
 
 	for (iw = 0; iw < wnd->nwnd; iw++) {
@@ -562,7 +562,7 @@ static int wnd_rescan(struct wnd_bitmap *wnd)
 		}
 
 		if (ra) {
-			pgoff_t idx = lbo >> PAGE_SHIFT;
+			pgoff_t idx = lbo >> PG_SHIFT;
 			if (!ra_has_index(ra, idx))
 				page_cache_sync_readahead(mapping, ra, NULL,
 							  idx, 1);

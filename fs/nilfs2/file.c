@@ -104,7 +104,7 @@ static vm_fault_t nilfs_page_mkwrite(struct vm_fault *vmf)
 		nilfs_transaction_abort(inode->i_sb);
 		goto out;
 	}
-	nilfs_set_file_dirty(inode, 1 << (PAGE_SHIFT - inode->i_blkbits));
+	nilfs_set_file_dirty(inode, 1 << (PG_SHIFT - inode->i_blkbits));
 	nilfs_transaction_commit(inode->i_sb);
 
  mapped:

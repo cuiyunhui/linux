@@ -25,7 +25,7 @@ static int coda_symlink_filler(struct file *file, struct folio *folio)
 	struct inode *inode = folio->mapping->host;
 	int error;
 	struct coda_inode_info *cii;
-	unsigned int len = PAGE_SIZE;
+	unsigned int len = PG_SIZE;
 	char *p = folio_address(folio);
 
 	cii = ITOC(inode);

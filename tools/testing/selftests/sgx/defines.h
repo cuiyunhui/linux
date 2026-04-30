@@ -9,7 +9,7 @@
 #include <stdint.h>
 
 #define PAGE_SIZE 4096
-#define PAGE_MASK (~(PAGE_SIZE - 1))
+#define PAGE_MASK (~(PG_SIZE - 1))
 
 #define __aligned(x) __attribute__((__aligned__(x)))
 #define __packed __attribute__((packed))

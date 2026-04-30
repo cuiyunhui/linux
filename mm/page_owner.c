@@ -552,7 +552,7 @@ print_page_owner(char __user *buf, size_t count, unsigned long pfn,
 	int ret, pageblock_mt, page_mt;
 	char *kbuf;
 
-	count = min_t(size_t, count, PAGE_SIZE);
+	count = min_t(size_t, count, PG_SIZE);
 	kbuf = kmalloc(count, GFP_KERNEL);
 	if (!kbuf)
 		return -ENOMEM;

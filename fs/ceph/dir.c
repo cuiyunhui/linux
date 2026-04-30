@@ -134,9 +134,9 @@ __dcache_find_get_entry(struct dentry *parent, u64 idx,
 	struct inode *dir = d_inode(parent);
 	struct ceph_client *cl = ceph_inode_to_client(dir);
 	struct dentry *dentry;
-	unsigned idx_mask = (PAGE_SIZE / sizeof(struct dentry *)) - 1;
+	unsigned idx_mask = (PG_SIZE / sizeof(struct dentry *)) - 1;
 	loff_t ptr_pos = idx * sizeof(struct dentry *);
-	pgoff_t ptr_pgoff = ptr_pos >> PAGE_SHIFT;
+	pgoff_t ptr_pgoff = ptr_pos >> PG_SHIFT;
 
 	if (ptr_pos >= i_size_read(dir))
 		return NULL;

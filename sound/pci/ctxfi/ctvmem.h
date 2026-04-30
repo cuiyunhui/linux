@@ -27,7 +27,7 @@
  */
 #define CT_PAGE_SIZE	4096
 #define CT_PAGE_SHIFT	12
-#define CT_PAGE_MASK	(~(PAGE_SIZE - 1))
+#define CT_PAGE_MASK	(~(PG_SIZE - 1))
 #define CT_PAGE_ALIGN(addr)	ALIGN(addr, CT_PAGE_SIZE)
 
 struct ct_vm_block {

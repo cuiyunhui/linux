@@ -33,7 +33,7 @@
 
 #define PREALLOC_DMA_DEBUG_ENTRIES (1 << 16)
 /* If the pool runs out, add this many new entries at once */
-#define DMA_DEBUG_DYNAMIC_ENTRIES (PAGE_SIZE / sizeof(struct dma_debug_entry))
+#define DMA_DEBUG_DYNAMIC_ENTRIES (PG_SIZE / sizeof(struct dma_debug_entry))
 
 enum {
 	dma_debug_single,
@@ -418,13 +418,13 @@ static void hash_bucket_del(struct dma_debug_entry *entry)
 static RADIX_TREE(dma_active_cacheline, GFP_ATOMIC | __GFP_NOWARN);
 static DEFINE_SPINLOCK(radix_lock);
 #define ACTIVE_CACHELINE_MAX_OVERLAP ((1 << RADIX_TREE_MAX_TAGS) - 1)
-#define CACHELINE_PER_PAGE_SHIFT (PAGE_SHIFT - L1_CACHE_SHIFT)
+#define CACHELINE_PER_PAGE_SHIFT (PG_SHIFT - L1_CACHE_SHIFT)
 #define CACHELINES_PER_PAGE (1 << CACHELINE_PER_PAGE_SHIFT)
 
 static phys_addr_t to_cacheline_number(struct dma_debug_entry *entry)
 {
-	return ((entry->paddr >> PAGE_SHIFT) << CACHELINE_PER_PAGE_SHIFT) +
-		(offset_in_page(entry->paddr) >> L1_CACHE_SHIFT);
+	return ((entry->paddr >> PG_SHIFT) << CACHELINE_PER_PAGE_SHIFT) +
+		(offset_in_pg(entry->paddr) >> L1_CACHE_SHIFT);
 }
 
 static int active_cacheline_read_overlap(phys_addr_t cln)
@@ -1098,8 +1098,8 @@ static void check_for_stack(struct device *dev, phys_addr_t phys)
 			    page_to_pfn(stack_vm_area->pages[i]))
 				continue;
 
-			addr = (u8 *)current->stack + i * PAGE_SIZE +
-			       (phys % PAGE_SIZE);
+			addr = (u8 *)current->stack + i * PG_SIZE +
+			       (phys % PG_SIZE);
 			err_printk(dev, NULL, "device driver maps memory from stack [probable addr=%p]\n", addr);
 			break;
 		}
@@ -1411,7 +1411,7 @@ static phys_addr_t virt_to_paddr(void *virt)
 	else
 		page = virt_to_page(virt);
 
-	return page_to_phys(page) + offset_in_page(virt);
+	return page_to_phys(page) + offset_in_pg(virt);
 }
 
 void debug_dma_alloc_coherent(struct device *dev, size_t size,

@@ -397,7 +397,7 @@ int __add_pages(int nid, unsigned long pfn, unsigned long nr_pages,
 	if (WARN_ON_ONCE(!pgprot_val(params->pgprot)))
 		return -EINVAL;
 
-	VM_BUG_ON(!mhp_range_allowed(PFN_PHYS(pfn), nr_pages * PAGE_SIZE, false));
+	VM_BUG_ON(!mhp_range_allowed(PFN_PHYS(pfn), nr_pages * PG_SIZE, false));
 
 	if (altmap) {
 		/*
@@ -1247,8 +1247,8 @@ int online_pages(unsigned long pfn, unsigned long nr_pages,
 
 failed_addition:
 	pr_debug("online_pages [mem %#010llx-%#010llx] failed\n",
-		 (unsigned long long) pfn << PAGE_SHIFT,
-		 (((unsigned long long) pfn + nr_pages) << PAGE_SHIFT) - 1);
+		 (unsigned long long) pfn << PG_SHIFT,
+		 (((unsigned long long) pfn + nr_pages) << PG_SHIFT) - 1);
 	memory_notify(MEM_CANCEL_ONLINE, &mem_arg);
 	if (node_arg.nid != NUMA_NO_NODE)
 		node_notify(NODE_CANCEL_ADDING_FIRST_MEMORY, &node_arg);
@@ -1392,7 +1392,7 @@ bool mhp_supports_memmap_on_memory(void)
 	 * Make sure the vmemmap allocation is fully contained
 	 * so that we always allocate vmemmap memory from altmap area.
 	 */
-	if (!IS_ALIGNED(vmemmap_size, PAGE_SIZE))
+	if (!IS_ALIGNED(vmemmap_size, PG_SIZE))
 		return false;
 
 	/*
@@ -2110,8 +2110,8 @@ failed_removal_pcplists_disabled:
 	zone_pcp_enable(zone);
 failed_removal:
 	pr_debug("memory offlining [mem %#010llx-%#010llx] failed due to %s\n",
-		 (unsigned long long) start_pfn << PAGE_SHIFT,
-		 ((unsigned long long) end_pfn << PAGE_SHIFT) - 1,
+		 (unsigned long long) start_pfn << PG_SHIFT,
+		 ((unsigned long long) end_pfn << PG_SHIFT) - 1,
 		 reason);
 	return ret;
 }

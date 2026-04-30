@@ -353,9 +353,9 @@ static const struct snd_pcm_hardware aaci_hw_info = {
 	.channels_max		= 2,
 	.buffer_bytes_max	= 64 * 1024,
 	.period_bytes_min	= 256,
-	.period_bytes_max	= PAGE_SIZE,
+	.period_bytes_max	= PG_SIZE,
 	.periods_min		= 4,
-	.periods_max		= PAGE_SIZE / 16,
+	.periods_max		= PG_SIZE / 16,
 };
 
 /*

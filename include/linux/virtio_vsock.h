@@ -83,7 +83,7 @@ virtio_vsock_alloc_linear_skb(unsigned int size, gfp_t mask)
 
 static inline struct sk_buff *virtio_vsock_alloc_skb(unsigned int size, gfp_t mask)
 {
-	if (size <= SKB_WITH_OVERHEAD(PAGE_SIZE << PAGE_ALLOC_COSTLY_ORDER))
+	if (size <= SKB_WITH_OVERHEAD(PG_SIZE << PAGE_ALLOC_COSTLY_ORDER))
 		return virtio_vsock_alloc_linear_skb(size, mask);
 
 	size -= VIRTIO_VSOCK_SKB_HEADROOM;

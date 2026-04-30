@@ -1611,7 +1611,7 @@ static int pcxhr_probe(struct pci_dev *pci,
 	}
 
 	/* create hostport purgebuffer */
-	size = PAGE_ALIGN(sizeof(struct pcxhr_hostport));
+	size = PG_ALIGN(sizeof(struct pcxhr_hostport));
 	if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, &pci->dev,
 				size, &mgr->hostport) < 0) {
 		pcxhr_free(mgr);

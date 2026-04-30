@@ -345,7 +345,7 @@ static void page_alloc_oob_right(struct kunit *test)
 	char *ptr;
 	struct page *pages;
 	size_t order = 4;
-	size_t size = (1UL << (PAGE_SHIFT + order));
+	size_t size = (1UL << (PG_SHIFT + order));
 
 	/*
 	 * With generic KASAN page allocations have no redzones, thus
@@ -1000,7 +1000,7 @@ static void kfree_via_page(struct kunit *test)
 	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, ptr);
 
 	page = virt_to_page(ptr);
-	offset = offset_in_page(ptr);
+	offset = offset_in_pg(ptr);
 	kfree(page_address(page) + offset);
 }
 
@@ -1814,7 +1814,7 @@ static void vmalloc_helpers_tags(struct kunit *test)
 	if (!kasan_vmalloc_enabled())
 		kunit_skip(test, "Test requires kasan.vmalloc=on");
 
-	ptr = vmalloc(PAGE_SIZE);
+	ptr = vmalloc(PG_SIZE);
 	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, ptr);
 
 	/* Check that the returned pointer is tagged. */
@@ -1867,7 +1867,7 @@ static void vmalloc_oob(struct kunit *test)
 {
 	char *v_ptr, *p_ptr;
 	struct page *page;
-	size_t size = PAGE_SIZE / 2 - KASAN_GRANULE_SIZE - 5;
+	size_t size = PG_SIZE / 2 - KASAN_GRANULE_SIZE - 5;
 
 	KASAN_TEST_NEEDS_CONFIG_ON(test, CONFIG_KASAN_VMALLOC);
 
@@ -2157,7 +2157,7 @@ static void copy_user_test_oob(struct kunit *test)
 	kmem = kunit_kmalloc(test, size, GFP_KERNEL);
 	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, kmem);
 
-	useraddr = kunit_vm_mmap(test, NULL, 0, PAGE_SIZE,
+	useraddr = kunit_vm_mmap(test, NULL, 0, PG_SIZE,
 					PROT_READ | PROT_WRITE | PROT_EXEC,
 					MAP_ANONYMOUS | MAP_PRIVATE, 0);
 	KUNIT_ASSERT_NE_MSG(test, useraddr, 0,

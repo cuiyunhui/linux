@@ -407,7 +407,7 @@ static int mmp_pcm_mmap(struct snd_soc_component *component,
 	vm_flags_set(vma, VM_DONTEXPAND | VM_DONTDUMP);
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 	return remap_pfn_range(vma, vma->vm_start,
-		substream->dma_buffer.addr >> PAGE_SHIFT,
+		substream->dma_buffer.addr >> PG_SHIFT,
 		vma->vm_end - vma->vm_start, vma->vm_page_prot);
 }
 

@@ -128,7 +128,7 @@ int rxrpc_server_keyring(struct rxrpc_sock *rx, sockptr_t optval, int optlen)
 	if (rx->securities)
 		return -EINVAL;
 
-	if (optlen <= 0 || optlen > PAGE_SIZE - 1)
+	if (optlen <= 0 || optlen > PG_SIZE - 1)
 		return -EINVAL;
 
 	description = memdup_sockptr_nul(optval, optlen);

@@ -301,7 +301,7 @@ static inline bool pipe_buf_try_steal(struct pipe_inode_info *pipe,
 
 /* Differs from PIPE_BUF in that PIPE_SIZE is the length of the actual
    memory allocation, whereas PIPE_BUF makes atomicity guarantees.  */
-#define PIPE_SIZE		PAGE_SIZE
+#define PIPE_SIZE		PG_SIZE
 
 /* Pipe lock and unlock operations */
 void pipe_lock(struct pipe_inode_info *);

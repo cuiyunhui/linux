@@ -36,7 +36,7 @@ static const struct snd_pcm_hardware bcm63xx_pcm_hardware = {
 	.formats = SNDRV_PCM_FMTBIT_S32_LE, /* support S32 only */
 	.period_bytes_max = 8192 - 32,
 	.periods_min = 1,
-	.periods_max = PAGE_SIZE/sizeof(struct i2s_dma_desc),
+	.periods_max = PG_SIZE/sizeof(struct i2s_dma_desc),
 	.buffer_bytes_max = 128 * 1024,
 	.fifo_size = 32,
 };

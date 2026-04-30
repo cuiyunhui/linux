@@ -26,7 +26,7 @@
 #include <linux/ceph/debugfs.h>
 #include <trace/events/ceph.h>
 
-#define RECONNECT_MAX_SIZE (INT_MAX - PAGE_SIZE)
+#define RECONNECT_MAX_SIZE (INT_MAX - PG_SIZE)
 
 /*
  * A cluster of MDS (metadata server) daemons is responsible for
@@ -2333,7 +2333,7 @@ again:
 	while (!list_empty(&tmp_list)) {
 		if (!msg) {
 			msg = ceph_msg_new(CEPH_MSG_CLIENT_CAPRELEASE,
-					PAGE_SIZE, GFP_NOFS, false);
+					PG_SIZE, GFP_NOFS, false);
 			if (!msg)
 				goto out_err;
 			head = msg->front.iov_base;
@@ -2560,10 +2560,10 @@ int ceph_alloc_readdir_reply_buffer(struct ceph_mds_request *req,
 	if (!rinfo->dir_entries || unlikely(order < 0))
 		return -ENOMEM;
 
-	num_entries = (PAGE_SIZE << order) / size;
+	num_entries = (PG_SIZE << order) / size;
 	num_entries = min(num_entries, opt->max_readdir);
 
-	rinfo->dir_buf_size = PAGE_SIZE << order;
+	rinfo->dir_buf_size = PG_SIZE << order;
 	req->r_num_caps = num_entries + 1;
 	req->r_args.readdir.max_entries = cpu_to_le32(num_entries);
 	req->r_args.readdir.max_bytes = cpu_to_le32(opt->max_readdir_bytes);

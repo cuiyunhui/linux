@@ -723,7 +723,7 @@ static void zswap_entry_free(struct zswap_entry *entry)
 		obj_cgroup_uncharge_zswap(entry->objcg, entry->length);
 		obj_cgroup_put(entry->objcg);
 	}
-	if (entry->length == PAGE_SIZE)
+	if (entry->length == PG_SIZE)
 		atomic_long_dec(&zswap_stored_incompressible_pages);
 	zswap_entry_cache_free(entry);
 	atomic_long_dec(&zswap_stored_pages);
@@ -741,7 +741,7 @@ static int zswap_cpu_comp_prepare(unsigned int cpu, struct hlist_node *node)
 	u8 *buffer = NULL;
 	int ret;
 
-	buffer = kmalloc_node(PAGE_SIZE, GFP_KERNEL, cpu_to_node(cpu));
+	buffer = kmalloc_node(PG_SIZE, GFP_KERNEL, cpu_to_node(cpu));
 	if (!buffer) {
 		ret = -ENOMEM;
 		goto fail;
@@ -856,7 +856,7 @@ static bool zswap_compress(struct page *page, struct zswap_entry *entry,
 	struct crypto_acomp_ctx *acomp_ctx;
 	struct scatterlist input, output;
 	int comp_ret = 0, alloc_ret = 0;
-	unsigned int dlen = PAGE_SIZE;
+	unsigned int dlen = PG_SIZE;
 	unsigned long handle;
 	gfp_t gfp;
 	u8 *dst;
@@ -865,10 +865,11 @@ static bool zswap_compress(struct page *page, struct zswap_entry *entry,
 	acomp_ctx = acomp_ctx_get_cpu_lock(pool);
 	dst = acomp_ctx->buffer;
 	sg_init_table(&input, 1);
-	sg_set_page(&input, page, PAGE_SIZE, 0);
+	sg_set_page(&input, page, PG_SIZE, 0);
 
-	sg_init_one(&output, dst, PAGE_SIZE);
-	acomp_request_set_params(acomp_ctx->req, &input, &output, PAGE_SIZE, dlen);
+	sg_init_one(&output, dst, PG_SIZE);
+	acomp_request_set_params(acomp_ctx->req, &input, &output, PG_SIZE,
+				 dlen);
 
 	/*
 	 * it maybe looks a little bit silly that we send an asynchronous request,
@@ -892,14 +893,14 @@ static bool zswap_compress(struct page *page, struct zswap_entry *entry,
 	 * only adds metadata overhead.  swap_writeout() will put the page back
 	 * to the active LRU list in the case.
 	 */
-	if (comp_ret || !dlen || dlen >= PAGE_SIZE) {
+	if (comp_ret || !dlen || dlen >= PG_SIZE) {
 		if (!mem_cgroup_zswap_writeback_enabled(
 					folio_memcg(page_folio(page)))) {
 			comp_ret = comp_ret ? comp_ret : -EINVAL;
 			goto unlock;
 		}
 		comp_ret = 0;
-		dlen = PAGE_SIZE;
+		dlen = PG_SIZE;
 		dst = kmap_local_page(page);
 		mapped = true;
 	}
@@ -941,21 +942,21 @@ static bool zswap_decompress(struct zswap_entry *entry, struct folio *folio)
 	zs_obj_read_sg_begin(pool->zs_pool, entry->handle, input, entry->length);
 
 	/* zswap entries of length PAGE_SIZE are not compressed. */
-	if (entry->length == PAGE_SIZE) {
+	if (entry->length == PG_SIZE) {
 		void *dst;
 
-		WARN_ON_ONCE(input->length != PAGE_SIZE);
+		WARN_ON_ONCE(input->length != PG_SIZE);
 
 		dst = kmap_local_folio(folio, 0);
-		memcpy_from_sglist(dst, input, 0, PAGE_SIZE);
-		dlen = PAGE_SIZE;
+		memcpy_from_sglist(dst, input, 0, PG_SIZE);
+		dlen = PG_SIZE;
 		kunmap_local(dst);
 		flush_dcache_folio(folio);
 	} else {
 		sg_init_table(&output, 1);
-		sg_set_folio(&output, folio, PAGE_SIZE, 0);
+		sg_set_folio(&output, folio, PG_SIZE, 0);
 		acomp_request_set_params(acomp_ctx->req, input, &output,
-					 entry->length, PAGE_SIZE);
+					 entry->length, PG_SIZE);
 		ret = crypto_acomp_decompress(acomp_ctx->req);
 		ret = crypto_wait_req(ret, &acomp_ctx->wait);
 		dlen = acomp_ctx->req->dlen;
@@ -964,7 +965,7 @@ static bool zswap_decompress(struct zswap_entry *entry, struct folio *folio)
 	zs_obj_read_sg_end(pool->zs_pool, entry->handle);
 	acomp_ctx_put_unlock(acomp_ctx);
 
-	if (!ret && dlen == PAGE_SIZE)
+	if (!ret && dlen == PG_SIZE)
 		return true;
 
 	zswap_decompress_fail++;
@@ -1230,7 +1231,7 @@ static unsigned long zswap_shrinker_count(struct shrinker *shrinker,
 	 */
 	if (!mem_cgroup_disabled()) {
 		mem_cgroup_flush_stats(memcg);
-		nr_backing = memcg_page_state(memcg, MEMCG_ZSWAP_B) >> PAGE_SHIFT;
+		nr_backing = memcg_page_state(memcg, MEMCG_ZSWAP_B) >> PG_SHIFT;
 		nr_stored = memcg_page_state(memcg, MEMCG_ZSWAPPED);
 	} else {
 		nr_backing = zswap_total_pages();
@@ -1454,7 +1455,7 @@ static bool zswap_store_page(struct page *page,
 		obj_cgroup_charge_zswap(objcg, entry->length);
 	}
 	atomic_long_inc(&zswap_stored_pages);
-	if (entry->length == PAGE_SIZE)
+	if (entry->length == PG_SIZE)
 		atomic_long_inc(&zswap_stored_incompressible_pages);
 
 	/*
@@ -1712,7 +1713,7 @@ static struct dentry *zswap_debugfs_root;
 
 static int debugfs_get_total_size(void *data, u64 *val)
 {
-	*val = zswap_total_pages() * PAGE_SIZE;
+	*val = zswap_total_pages() * PG_SIZE;
 	return 0;
 }
 DEFINE_DEBUGFS_ATTRIBUTE(total_size_fops, debugfs_get_total_size, NULL, "%llu\n");

@@ -2188,7 +2188,7 @@ static int __init fanotify_user_setup(void)
 	 * a lot cheaper than inode marks, but there is no reason for a user
 	 * to have many of those, so calculate by the cost of inode marks.
 	 */
-	max_marks = (((si.totalram - si.totalhigh) / 100) << PAGE_SHIFT) /
+	max_marks = (((si.totalram - si.totalhigh) / 100) << PG_SHIFT) /
 		    INODE_MARK_COST;
 	max_marks = clamp(max_marks, FANOTIFY_OLD_DEFAULT_MAX_MARKS,
 				     FANOTIFY_DEFAULT_MAX_USER_MARKS);

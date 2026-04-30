@@ -19,12 +19,12 @@ static int btf_sysfs_vmlinux_mmap(struct file *filp, struct kobject *kobj,
 				  const struct bin_attribute *attr,
 				  struct vm_area_struct *vma)
 {
-	unsigned long pages = PAGE_ALIGN(attr->size) >> PAGE_SHIFT;
+	unsigned long pages = PG_ALIGN(attr->size) >> PG_SHIFT;
 	size_t vm_size = vma->vm_end - vma->vm_start;
 	phys_addr_t addr = __pa_symbol(__start_BTF);
-	unsigned long pfn = addr >> PAGE_SHIFT;
+	unsigned long pfn = addr >> PG_SHIFT;
 
-	if (attr->private != __start_BTF || !PAGE_ALIGNED(addr))
+	if (attr->private != __start_BTF || !PG_ALIGNED(addr))
 		return -EINVAL;
 
 	if (vma->vm_pgoff)
@@ -36,7 +36,7 @@ static int btf_sysfs_vmlinux_mmap(struct file *filp, struct kobject *kobj,
 	if (pfn + pages < pfn)
 		return -EINVAL;
 
-	if ((vm_size >> PAGE_SHIFT) > pages)
+	if ((vm_size >> PG_SHIFT) > pages)
 		return -EINVAL;
 
 	vm_flags_mod(vma, VM_DONTDUMP, VM_MAYEXEC | VM_MAYWRITE);

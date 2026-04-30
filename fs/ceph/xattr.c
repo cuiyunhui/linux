@@ -1393,7 +1393,7 @@ int ceph_security_init_secctx(struct dentry *dentry, umode_t mode,
 		pagelist = ceph_pagelist_alloc(GFP_KERNEL);
 		if (!pagelist)
 			goto out;
-		err = ceph_pagelist_reserve(pagelist, PAGE_SIZE);
+		err = ceph_pagelist_reserve(pagelist, PG_SIZE);
 		if (err)
 			goto out;
 		ceph_pagelist_encode_32(pagelist, 1);

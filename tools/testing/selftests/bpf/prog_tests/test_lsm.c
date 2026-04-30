@@ -17,7 +17,7 @@
 char *CMD_ARGS[] = {"true", NULL};
 
 #define GET_PAGE_ADDR(ADDR, PAGE_SIZE)					\
-	(char *)(((unsigned long) (ADDR + PAGE_SIZE)) & ~(PAGE_SIZE-1))
+	(char *)(((unsigned long) (ADDR + PG_SIZE)) & ~(PG_SIZE-1))
 
 int stack_mprotect(void)
 {

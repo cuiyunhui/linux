@@ -137,7 +137,7 @@ static inline bool kasan_requires_meta(void)
 
 #define KASAN_GRANULE_MASK	(KASAN_GRANULE_SIZE - 1)
 
-#define KASAN_MEMORY_PER_SHADOW_PAGE	(KASAN_GRANULE_SIZE << PAGE_SHIFT)
+#define KASAN_MEMORY_PER_SHADOW_PAGE	(KASAN_GRANULE_SIZE << PG_SHIFT)
 
 #ifdef CONFIG_KASAN_GENERIC
 #define KASAN_PAGE_FREE		0xFF  /* freed page */
