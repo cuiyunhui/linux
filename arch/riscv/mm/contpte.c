@@ -29,6 +29,21 @@ static inline unsigned int napotpte_order(void)
 	return NAPOT_CONT64KB_ORDER;
 }
 
+static inline unsigned int napotpte_order_from_pte(pte_t pte)
+{
+	return napot_cont_order(pte);
+}
+
+static inline unsigned long napotpte_size_order(unsigned int order)
+{
+	return napot_cont_size(order);
+}
+
+static inline unsigned int napotpte_pte_num_order(unsigned int order)
+{
+	return napot_pte_num(order);
+}
+
 static inline unsigned long napotpte_size(void)
 {
 	return napot_cont_size(napotpte_order());
@@ -41,12 +56,24 @@ static inline unsigned int napotpte_pte_num(void)
 
 static inline unsigned long napot_align_addr(unsigned long addr)
 {
-	return ALIGN_DOWN(addr, napotpte_size());
+	return ALIGN_DOWN(addr, napotpte_size_order(napotpte_order()));
+}
+
+static inline unsigned long napot_align_addr_order(unsigned long addr,
+						   unsigned int order)
+{
+	return ALIGN_DOWN(addr, napotpte_size_order(order));
 }
 
 static inline pte_t *napot_align_ptep(pte_t *ptep)
 {
-	return PTR_ALIGN_DOWN(ptep, napotpte_pte_num() * sizeof(*ptep));
+	return PTR_ALIGN_DOWN(ptep,
+			      napotpte_pte_num_order(napotpte_order()) * sizeof(*ptep));
+}
+
+static inline pte_t *napot_align_ptep_order(pte_t *ptep, unsigned int order)
+{
+	return PTR_ALIGN_DOWN(ptep, napotpte_pte_num_order(order) * sizeof(*ptep));
 }
 
 static inline pte_t pte_mask_ad(pte_t pte)
@@ -83,12 +110,14 @@ static inline void napotpte_clear_young_dirty_pte(pte_t *ptep, cydp_t flags)
 static inline pte_t napotpte_subpte(pte_t *ptep, pte_t pte)
 {
 	unsigned long pfn;
+	unsigned int order;
 	pgprot_t prot;
 
 	if (!pte_present_napot(pte))
 		return pte;
 
-	pfn = pte_pfn(pte) + (ptep - napot_align_ptep(ptep));
+	order = napotpte_order_from_pte(pte);
+	pfn = pte_pfn(pte) + (ptep - napot_align_ptep_order(ptep, order));
 	prot = __pgprot(pte_protval_no_pfn_no_napot(pte));
 
 	return pfn_pte(pfn, prot);
@@ -127,16 +156,16 @@ static pte_t __get_and_clear_full_ptes(struct mm_struct *mm,
 }
 
 static void napotpte_convert(struct mm_struct *mm, unsigned long addr,
-			     pte_t *ptep, pte_t target)
+			     pte_t *ptep, pte_t target, unsigned int order)
 {
 	unsigned long start_addr, ptent_addr;
 	pte_t *start_ptep;
 	pte_t ptent, pte;
 	unsigned int i, nr;
 
-	start_addr = napot_align_addr(addr);
-	start_ptep = napot_align_ptep(ptep);
-	nr = napotpte_pte_num();
+	start_addr = napot_align_addr_order(addr, order);
+	start_ptep = napot_align_ptep_order(ptep, order);
+	nr = napotpte_pte_num_order(order);
 
 	for (i = 0; i < nr; i++) {
 		ptent_addr = start_addr + i * PAGE_SIZE;
@@ -200,14 +229,15 @@ static bool napotpte_can_modify_prot_block(struct mm_struct *mm,
 	if (!napot_hw_supported() || !mm_is_user(mm))
 		return false;
 
-	if (nr != napotpte_pte_num())
-		return false;
-
-	if (addr != napot_align_addr(addr) || ptep != napot_align_ptep(ptep))
-		return false;
-
 	raw = READ_ONCE(*ptep);
 	if (!pte_present_napot(raw) || pte_special(raw))
+		return false;
+
+	if (nr != napotpte_pte_num_order(napotpte_order_from_pte(raw)))
+		return false;
+
+	if (addr != napot_align_addr_order(addr, napotpte_order_from_pte(raw)) ||
+	    ptep != napot_align_ptep_order(ptep, napotpte_order_from_pte(raw)))
 		return false;
 
 	for (i = 0; i < nr; i++) {
@@ -267,7 +297,8 @@ void modify_prot_commit_ptes(struct vm_area_struct *vma, unsigned long addr,
 }
 
 static inline pte_t
-napotpte_normalize_batch_pte(pte_t *ptep, pte_t orig_pte, fpb_t flags)
+napotpte_normalize_batch_pte(pte_t *ptep, pte_t orig_pte, fpb_t flags,
+				     unsigned int order)
 {
 	unsigned long pfn;
 	pgprot_t prot;
@@ -276,21 +307,22 @@ napotpte_normalize_batch_pte(pte_t *ptep, pte_t orig_pte, fpb_t flags)
 	if (pte_present_napot(orig_pte))
 		return __pte_batch_clear_ignored(orig_pte, flags);
 
-	off = ptep - napot_align_ptep(ptep);
+	off = ptep - napot_align_ptep_order(ptep, order);
 	pfn = pte_pfn(orig_pte) - off;
 	prot = __pgprot(pte_protval_no_pfn_no_napot(orig_pte));
 
 	return __pte_batch_clear_ignored(pte_mknapot(pfn_pte(pfn, prot),
-					     napotpte_order()), flags);
+					     order), flags);
 }
 
-static bool napotpte_all_subptes_same(pte_t *ptep, pte_t expected_pte)
+static bool napotpte_all_subptes_same(pte_t *ptep, pte_t expected_pte,
+				      unsigned int order)
 {
 	pte_t *start;
 	unsigned int i, nr;
 
-	start = napot_align_ptep(ptep);
-	nr = napotpte_pte_num();
+	start = napot_align_ptep_order(ptep, order);
+	nr = napotpte_pte_num_order(order);
 
 	for (i = 0; i < nr; i++) {
 		if (!pte_same(READ_ONCE(start[i]), expected_pte))
@@ -300,8 +332,9 @@ static bool napotpte_all_subptes_same(pte_t *ptep, pte_t expected_pte)
 	return true;
 }
 
-void __napotpte_try_fold(struct mm_struct *mm, unsigned long addr,
-			 pte_t *ptep, pte_t pte)
+static bool napotpte_try_fold_order(struct mm_struct *mm, unsigned long addr,
+					   pte_t *ptep, pte_t pte,
+					   unsigned int order)
 {
 	struct page *page;
 	struct folio *folio;
@@ -313,12 +346,6 @@ void __napotpte_try_fold(struct mm_struct *mm, unsigned long addr,
 	pte_t *start;
 	unsigned int i, nr;
 
-	if (!napot_hw_supported() || !mm_is_user(mm))
-		return;
-
-	if (!pte_present(pte) || pte_napot(pte) || pte_special(pte))
-		return;
-
 	/*
 	 * Driver __GFP_COMP pages inserted by vm_insert_page() have valid
 	 * compound metadata. Fold them only after verifying the whole supported
@@ -328,13 +355,13 @@ void __napotpte_try_fold(struct mm_struct *mm, unsigned long addr,
 	folio = page_folio(page);
 	folio_start = addr - (page - &folio->page) * PAGE_SIZE;
 	folio_end = folio_start + folio_nr_pages(folio) * PAGE_SIZE;
-	cont_start = napot_align_addr(addr);
-	cont_end = cont_start + napotpte_size();
+	cont_start = napot_align_addr_order(addr, order);
+	cont_end = cont_start + napotpte_size_order(order);
 	if (folio_start > cont_start || folio_end < cont_end)
-		return;
+		return false;
 
-	nr = napotpte_pte_num();
-	start = napot_align_ptep(ptep);
+	nr = napotpte_pte_num_order(order);
+	start = napot_align_ptep_order(ptep, order);
 
 	pfn = ALIGN_DOWN(pte_pfn(pte), nr);
 	prot = pte_pgprot(pte_mask_ad(pte));
@@ -348,12 +375,31 @@ void __napotpte_try_fold(struct mm_struct *mm, unsigned long addr,
 	for (i = 0; i < nr; i++) {
 		cur = READ_ONCE(start[i]);
 		if (pte_val(pte_mask_ad(cur)) != pte_val(expected))
-			return;
+			return false;
 		pte_val(expected) += 1UL << _PAGE_PFN_SHIFT;
 	}
 
-	expected = pte_mknapot(pfn_pte(pfn, prot), napotpte_order());
-	napotpte_convert(mm, addr, ptep, expected);
+	expected = pte_mknapot(pfn_pte(pfn, prot), order);
+	napotpte_convert(mm, addr, ptep, expected, order);
+
+	return true;
+}
+
+void __napotpte_try_fold(struct mm_struct *mm, unsigned long addr,
+			 pte_t *ptep, pte_t pte)
+{
+	unsigned int order;
+
+	if (!napot_hw_supported() || !mm_is_user(mm))
+		return;
+
+	if (!pte_present(pte) || pte_napot(pte) || pte_special(pte))
+		return;
+
+	for_each_napot_order_rev(order) {
+		if (napotpte_try_fold_order(mm, addr, ptep, pte, order))
+			return;
+	}
 }
 EXPORT_SYMBOL(__napotpte_try_fold);
 
@@ -362,15 +408,17 @@ void __napotpte_try_unfold(struct mm_struct *mm, unsigned long addr,
 {
 	pte_t target;
 	pgprot_t prot;
+	unsigned int order;
 
 	if (!napot_hw_supported() || !mm_is_user(mm) ||
 	    !pte_present_napot(pte))
 		return;
 
+	order = napotpte_order_from_pte(pte);
 	prot = __pgprot(pte_protval_no_pfn_no_napot(pte));
 	target = pfn_pte(pte_pfn(pte), prot);
 
-	napotpte_convert(mm, addr, ptep, target);
+	napotpte_convert(mm, addr, ptep, target, order);
 }
 EXPORT_SYMBOL(__napotpte_try_unfold);
 
@@ -385,14 +433,15 @@ pte_t napotpte_ptep_get(pte_t *ptep, pte_t orig_pte)
 
 	pte_t pte, cur;
 	pte_t *start;
-	unsigned int i, nr;
+	unsigned int i, nr, order;
 
 	if (!napot_hw_supported() || !pte_present_napot(orig_pte))
 		return orig_pte;
 
 	pte = orig_pte;
-	start = napot_align_ptep(ptep);
-	nr = napotpte_pte_num();
+	order = napotpte_order_from_pte(orig_pte);
+	start = napot_align_ptep_order(ptep, order);
+	nr = napotpte_pte_num_order(order);
 
 	for (i = 0; i < nr; i++) {
 		cur = READ_ONCE(start[i]);
@@ -436,19 +485,19 @@ pte_t napotpte_ptep_get_lockless(pte_t *orig_ptep)
 	 */
 	pte_t orig_pte, pte;
 	pte_t *ptep;
-	unsigned int i, nr;
+	unsigned int i, nr, order;
 
 	if (!napot_hw_supported())
 		return READ_ONCE(*orig_ptep);
-
-	nr = napotpte_pte_num();
 
 retry:
 	orig_pte = READ_ONCE(*orig_ptep);
 	if (!pte_present_napot(orig_pte))
 		return orig_pte;
 
-	ptep = napot_align_ptep(orig_ptep);
+	order = napotpte_order_from_pte(orig_pte);
+	nr = napotpte_pte_num_order(order);
+	ptep = napot_align_ptep_order(orig_ptep, order);
 
 	for (i = 0; i < nr; i++, ptep++) {
 		pte = READ_ONCE(*ptep);
@@ -509,7 +558,7 @@ unsigned int napotpte_pte_batch_hint_from_pte(pte_t *ptep, pte_t orig_pte,
 {
 	pte_t batch_pte, pte;
 	pte_t *start;
-	unsigned int i, nr, off;
+	unsigned int i, nr, off, order;
 
 	if (!napot_hw_supported())
 		return 1;
@@ -528,10 +577,15 @@ unsigned int napotpte_pte_batch_hint_from_pte(pte_t *ptep, pte_t orig_pte,
 	 * batching code, and only return a multi-entry hint if every remaining
 	 * raw PTE in the folded block still matches.
 	 */
-	batch_pte = napotpte_normalize_batch_pte(ptep, orig_pte, flags);
+	if (pte_present_napot(orig_pte))
+		order = napotpte_order_from_pte(orig_pte);
+	else
+		order = napotpte_order_from_pte(READ_ONCE(*ptep));
 
-	start = napot_align_ptep(ptep);
-	nr = napotpte_pte_num();
+	batch_pte = napotpte_normalize_batch_pte(ptep, orig_pte, flags, order);
+
+	start = napot_align_ptep_order(ptep, order);
+	nr = napotpte_pte_num_order(order);
 	off = ptep - start;
 
 	for (i = off; i < nr; i++) {
@@ -550,13 +604,15 @@ static void napotpte_try_unfold_range(struct mm_struct *mm,
 {
 	unsigned long next;
 	pte_t pte;
-	unsigned int chunk;
+	unsigned int chunk, order;
 
 	while (nr) {
 		pte = READ_ONCE(*ptep);
 		if (pte_present_napot(pte)) {
+			order = napotpte_order_from_pte(pte);
 			__napotpte_try_unfold(mm, addr, ptep, pte);
-			next = napot_align_addr(addr) + napotpte_size();
+			next = napot_align_addr_order(addr, order) +
+			       napotpte_size_order(order);
 			chunk = (next - addr) >> PAGE_SHIFT;
 		} else {
 			chunk = 1;
@@ -576,60 +632,76 @@ static void napotpte_try_unfold_partial(struct mm_struct *mm,
 					unsigned int nr)
 {
 	pte_t pte;
+	unsigned int order;
 
-	if (ptep != napot_align_ptep(ptep) || nr < napotpte_pte_num()) {
-		pte = READ_ONCE(*ptep);
-		if (pte_present_napot(pte))
+	pte = READ_ONCE(*ptep);
+	if (pte_present_napot(pte)) {
+		order = napotpte_order_from_pte(pte);
+		if (ptep != napot_align_ptep_order(ptep, order) ||
+		    nr < napotpte_pte_num_order(order))
 			__napotpte_try_unfold(mm, addr, ptep, pte);
 	}
 
-	if (ptep + nr != napot_align_ptep(ptep + nr)) {
+	if (nr) {
 		unsigned long last_addr;
 		pte_t *last_ptep;
 
 		last_addr = addr + PAGE_SIZE * (nr - 1);
 		last_ptep = ptep + nr - 1;
 		pte = READ_ONCE(*last_ptep);
-		if (pte_present_napot(pte))
-			__napotpte_try_unfold(mm, last_addr, last_ptep, pte);
+		if (pte_present_napot(pte)) {
+			order = napotpte_order_from_pte(pte);
+			if (ptep + nr != napot_align_ptep_order(ptep + nr, order))
+				__napotpte_try_unfold(mm, last_addr, last_ptep, pte);
+		}
 	}
 }
 
 void napotpte_set_ptes(struct mm_struct *mm, unsigned long addr,
 		       pte_t *ptep, pte_t pte, unsigned int nr)
 {
-	unsigned long next, end;
-	unsigned long pfn, size, boundary;
+	unsigned long end;
+	unsigned long pfn, size;
 	pgprot_t prot;
-	unsigned int chunk, i;
+	unsigned int chunk, i, order;
 	pte_t cur;
+	bool folded;
 
 	if (!napot_hw_supported() || !mm_is_user(mm)) {
 		__set_ptes(mm, addr, ptep, pte, nr);
 		return;
 	}
 
-	size = napotpte_size();
 	end = addr + ((unsigned long)nr << PAGE_SHIFT);
 	pfn = pte_pfn(pte);
 	prot = __pgprot(pte_protval_no_pfn_no_napot(pte));
 
 	do {
-		boundary = (addr + size) & ~(size - 1);
-		next = (boundary - 1 < end - 1) ? boundary : end;
-		chunk = (next - addr) >> PAGE_SHIFT;
+		folded = false;
+		for_each_napot_order_rev(order) {
+			size = napotpte_size_order(order);
+			chunk = napotpte_pte_num_order(order);
 
-		cur = pfn_pte(pfn, prot);
-		if (((addr | next | (pfn << PAGE_SHIFT)) & (size - 1)) == 0) {
-			cur = pte_mknapot(cur, napotpte_order());
+			if (addr + size > end)
+				continue;
+			if (((addr | (pfn << PAGE_SHIFT)) & (size - 1)) != 0)
+				continue;
+
+			cur = pte_mknapot(pfn_pte(pfn, prot), order);
 			page_table_check_ptes_set(mm, addr, ptep, cur, chunk);
 			for (i = 0; i < chunk; i++)
 				__set_pte_at(mm, ptep + i, cur);
-		} else {
-			__set_ptes(mm, addr, ptep, cur, chunk);
+
+			folded = true;
+			break;
 		}
 
-		addr = next;
+		if (!folded) {
+			chunk = 1;
+			__set_ptes(mm, addr, ptep, pfn_pte(pfn, prot), chunk);
+		}
+
+		addr += (unsigned long)chunk << PAGE_SHIFT;
 		ptep += chunk;
 		pfn += chunk;
 	} while (addr != end);
@@ -673,7 +745,8 @@ void napotpte_clear_young_dirty_ptes(struct vm_area_struct *vma,
 {
 	struct mm_struct *mm;
 	unsigned long start, end;
-	unsigned int total;
+	unsigned int total, order;
+	pte_t pte;
 
 	mm = vma->vm_mm;
 	if (!napot_hw_supported() || !mm_is_user(mm)) {
@@ -684,12 +757,17 @@ void napotpte_clear_young_dirty_ptes(struct vm_area_struct *vma,
 	start = addr;
 	end = start + nr * PAGE_SIZE;
 
-	if (pte_present_napot(READ_ONCE(*(ptep + nr - 1))))
-		end = ALIGN(end, napotpte_size());
+	pte = READ_ONCE(*(ptep + nr - 1));
+	if (pte_present_napot(pte)) {
+		order = napotpte_order_from_pte(pte);
+		end = ALIGN(end, napotpte_size_order(order));
+	}
 
-	if (pte_present_napot(READ_ONCE(*ptep))) {
-		start = napot_align_addr(start);
-		ptep = napot_align_ptep(ptep);
+	pte = READ_ONCE(*ptep);
+	if (pte_present_napot(pte)) {
+		order = napotpte_order_from_pte(pte);
+		start = napot_align_addr_order(start, order);
+		ptep = napot_align_ptep_order(ptep, order);
 	}
 
 	total = (end - start) >> PAGE_SHIFT;
@@ -724,18 +802,19 @@ int napotpte_ptep_set_access_flags(struct vm_area_struct *vma,
 	pte_t *start;
 	pgprot_t prot;
 	unsigned long start_addr;
-	unsigned int i, nr;
+	unsigned int i, nr, order;
 	bool changed;
 
 	raw_pte = READ_ONCE(*ptep);
 	if (!napot_hw_supported() || !pte_present_napot(raw_pte))
 		return 0;
 
+	order = napotpte_order_from_pte(raw_pte);
 	prot = pte_pgprot(entry);
 	napot_pte = pfn_pte(pte_pfn(raw_pte), prot);
-	napot_pte = pte_mknapot(napot_pte, napotpte_order());
+	napot_pte = pte_mknapot(napot_pte, order);
 
-	if (napotpte_all_subptes_same(ptep, napot_pte))
+	if (napotpte_all_subptes_same(ptep, napot_pte, order))
 		return !riscv_has_extension_unlikely(RISCV_ISA_EXT_SVVPTC);
 
 	if (pte_write(raw_pte) != pte_write(napot_pte)) {
@@ -746,10 +825,10 @@ int napotpte_ptep_set_access_flags(struct vm_area_struct *vma,
 					      dirty);
 	}
 
-	start = napot_align_ptep(ptep);
-	address = napot_align_addr(address);
+	start = napot_align_ptep_order(ptep, order);
+	address = napot_align_addr_order(address, order);
 	start_addr = address;
-	nr = napotpte_pte_num();
+	nr = napotpte_pte_num_order(order);
 	changed = false;
 
 	for (i = 0; i < nr; i++, start++, address += PAGE_SIZE) {
@@ -758,7 +837,8 @@ int napotpte_ptep_set_access_flags(struct vm_area_struct *vma,
 	}
 
 	if (changed)
-		flush_tlb_range(vma, start_addr, start_addr + napotpte_size());
+		flush_tlb_range(vma, start_addr,
+				start_addr + napotpte_size_order(order));
 
 	return changed;
 }
@@ -768,14 +848,17 @@ int napotpte_ptep_test_and_clear_young(struct vm_area_struct *vma,
 				       unsigned long address, pte_t *ptep)
 {
 	pte_t *start;
-	unsigned int i, nr;
+	pte_t pte;
+	unsigned int i, nr, order;
 	int young;
 
-	if (!napot_hw_supported() || !pte_present_napot(READ_ONCE(*ptep)))
+	pte = READ_ONCE(*ptep);
+	if (!napot_hw_supported() || !pte_present_napot(pte))
 		return 0;
 
-	start = napot_align_ptep(ptep);
-	nr = napotpte_pte_num();
+	order = napotpte_order_from_pte(pte);
+	start = napot_align_ptep_order(ptep, order);
+	nr = napotpte_pte_num_order(order);
 	young = 0;
 
 	for (i = 0; i < nr; i++)
@@ -790,14 +873,23 @@ int napotpte_ptep_clear_flush_young(struct vm_area_struct *vma,
 				    unsigned long address, pte_t *ptep)
 {
 	unsigned long start_addr;
+	pte_t pte;
+	unsigned int order;
 	int young;
+
+	pte = READ_ONCE(*ptep);
+	if (!napot_hw_supported() || !pte_present_napot(pte))
+		return 0;
+
+	order = napotpte_order_from_pte(pte);
 
 	young = napotpte_ptep_test_and_clear_young(vma, address, ptep);
 	if (!young)
 		return 0;
 
-	start_addr = napot_align_addr(address);
-	flush_tlb_range(vma, start_addr, start_addr + napotpte_size());
+	start_addr = napot_align_addr_order(address, order);
+	flush_tlb_range(vma, start_addr,
+				start_addr + napotpte_size_order(order));
 
 	return young;
 }

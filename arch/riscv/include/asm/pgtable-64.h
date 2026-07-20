@@ -86,11 +86,15 @@ typedef struct {
 #define _PAGE_NAPOT_SHIFT	63
 #define _PAGE_NAPOT		BIT(_PAGE_NAPOT_SHIFT)
 /*
- * Only 64KB (order 4) napot ptes supported.
+ * Svnapot can encode naturally aligned NAPOT ranges. Support 16KB,
+ * 32KB and 64KB contiguous PTE ranges; larger sizes remain unsupported
+ * by this contpte implementation.
  */
-#define NAPOT_CONT_ORDER_BASE 4
+#define NAPOT_CONT_ORDER_BASE 2
 enum napot_cont_order {
-	NAPOT_CONT64KB_ORDER = NAPOT_CONT_ORDER_BASE,
+	NAPOT_CONT16KB_ORDER = NAPOT_CONT_ORDER_BASE,
+	NAPOT_CONT32KB_ORDER,
+	NAPOT_CONT64KB_ORDER,
 	NAPOT_ORDER_MAX,
 };
 
