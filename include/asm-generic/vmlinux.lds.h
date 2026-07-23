@@ -1089,7 +1089,7 @@
  */
 #define PERCPU_INPUT(cacheline)						\
 	__per_cpu_start = .;						\
-	. = ALIGN(PTE_SIZE);						\
+	. = ALIGN(PG_SIZE);						\
 	*(.data..percpu..page_aligned)					\
 	. = ALIGN(cacheline);						\
 	__per_cpu_hot_start = .;					\
@@ -1113,7 +1113,7 @@
  * sharing between subsections for different purposes.
  */
 #define PERCPU_SECTION(cacheline)					\
-	. = ALIGN(PTE_SIZE);						\
+	. = ALIGN(PG_SIZE);						\
 	.data..percpu	: AT(ADDR(.data..percpu) - LOAD_OFFSET) {	\
 		PERCPU_INPUT(cacheline)					\
 	}
