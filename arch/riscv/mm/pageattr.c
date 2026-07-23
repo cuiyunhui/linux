@@ -162,7 +162,7 @@ static int __split_linear_mapping_pud(p4d_t *p4dp,
 			pmdp_new = (pmd_t *)page_address(pmd_page);
 			for (i = 0; i < PTRS_PER_PMD; ++i, ++pmdp_new)
 				set_pmd(pmdp_new,
-					pfn_pmd(pfn + ((i * PMD_SIZE) >> PAGE_SHIFT), prot));
+					pfn_pmd(pfn + ((i * PMD_SIZE) >> PTE_SHIFT), prot));
 
 			smp_wmb();
 
@@ -215,7 +215,7 @@ static int __split_linear_mapping_p4d(pgd_t *pgdp,
 			pudp_new = (pud_t *)page_address(pud_page);
 			for (i = 0; i < PTRS_PER_PUD; ++i, ++pudp_new)
 				set_pud(pudp_new,
-					pfn_pud(pfn + ((i * PUD_SIZE) >> PAGE_SHIFT), prot));
+					pfn_pud(pfn + ((i * PUD_SIZE) >> PTE_SHIFT), prot));
 
 			/*
 			 * Make sure the pud filling is not reordered with the
@@ -264,7 +264,7 @@ static int __set_memory(unsigned long addr, int numpages, pgprot_t set_mask,
 {
 	int ret;
 	unsigned long start = addr;
-	unsigned long end = start + PAGE_SIZE * numpages;
+	unsigned long end = start + PTE_SIZE * numpages;
 	unsigned long __maybe_unused lm_start;
 	unsigned long __maybe_unused lm_end;
 	struct pageattr_masks masks = {
@@ -289,11 +289,11 @@ static int __set_memory(unsigned long addr, int numpages, pgprot_t set_mask,
 		int i, page_start;
 
 		area = find_vm_area((void *)start);
-		page_start = (start - (unsigned long)area->addr) >> PAGE_SHIFT;
+		page_start = (start - (unsigned long)area->addr) >> PTE_SHIFT;
 
 		for (i = page_start; i < page_start + numpages; ++i) {
 			lm_start = (unsigned long)page_address(area->pages[i]);
-			lm_end = lm_start + PAGE_SIZE;
+			lm_end = lm_start + PTE_SIZE;
 
 			ret = split_linear_mapping(lm_start, lm_end);
 			if (ret)
@@ -424,7 +424,7 @@ void __kernel_map_pages(struct page *page, int numpages, int enable)
 		return;
 
 	unsigned long start = (unsigned long)page_address(page);
-	unsigned long size = PAGE_SIZE * numpages;
+	unsigned long size = PTE_SIZE * numpages;
 
 	apply_to_existing_page_range(&init_mm, start, size, debug_pagealloc_set_page, &enable);
 

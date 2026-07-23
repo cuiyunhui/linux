@@ -32,7 +32,7 @@ static void __init kasan_populate_pte(pmd_t *pmd, unsigned long vaddr, unsigned 
 	pte_t *ptep, *p;
 
 	if (pmd_none(pmdp_get(pmd))) {
-		p = memblock_alloc_or_panic(PTRS_PER_PTE * sizeof(pte_t), PAGE_SIZE);
+		p = memblock_alloc_or_panic(PTRS_PER_PTE * sizeof(pte_t), PTE_SIZE);
 		set_pmd(pmd, pfn_pmd(PFN_DOWN(__pa(p)), PAGE_TABLE));
 	}
 
@@ -40,11 +40,11 @@ static void __init kasan_populate_pte(pmd_t *pmd, unsigned long vaddr, unsigned 
 
 	do {
 		if (pte_none(ptep_get(ptep))) {
-			phys_addr = memblock_phys_alloc(PAGE_SIZE, PAGE_SIZE);
+			phys_addr = memblock_phys_alloc(PTE_SIZE, PTE_SIZE);
 			set_pte(ptep, pfn_pte(PFN_DOWN(phys_addr), PAGE_KERNEL));
-			memset(__va(phys_addr), KASAN_SHADOW_INIT, PAGE_SIZE);
+			memset(__va(phys_addr), KASAN_SHADOW_INIT, PTE_SIZE);
 		}
-	} while (ptep++, vaddr += PAGE_SIZE, vaddr != end);
+	} while (ptep++, vaddr += PTE_SIZE, vaddr != end);
 }
 
 static void __init kasan_populate_pmd(pud_t *pud, unsigned long vaddr, unsigned long end)
@@ -54,7 +54,7 @@ static void __init kasan_populate_pmd(pud_t *pud, unsigned long vaddr, unsigned 
 	unsigned long next;
 
 	if (pud_none(pudp_get(pud))) {
-		p = memblock_alloc_or_panic(PTRS_PER_PMD * sizeof(pmd_t), PAGE_SIZE);
+		p = memblock_alloc_or_panic(PTRS_PER_PMD * sizeof(pmd_t), PTE_SIZE);
 		set_pud(pud, pfn_pud(PFN_DOWN(__pa(p)), PAGE_TABLE));
 	}
 
@@ -85,7 +85,7 @@ static void __init kasan_populate_pud(p4d_t *p4d,
 	unsigned long next;
 
 	if (p4d_none(p4dp_get(p4d))) {
-		p = memblock_alloc_or_panic(PTRS_PER_PUD * sizeof(pud_t), PAGE_SIZE);
+		p = memblock_alloc_or_panic(PTRS_PER_PUD * sizeof(pud_t), PTE_SIZE);
 		set_p4d(p4d, pfn_p4d(PFN_DOWN(__pa(p)), PAGE_TABLE));
 	}
 
@@ -116,7 +116,7 @@ static void __init kasan_populate_p4d(pgd_t *pgd,
 	unsigned long next;
 
 	if (pgd_none(pgdp_get(pgd))) {
-		p = memblock_alloc_or_panic(PTRS_PER_P4D * sizeof(p4d_t), PAGE_SIZE);
+		p = memblock_alloc_or_panic(PTRS_PER_P4D * sizeof(p4d_t), PTE_SIZE);
 		set_pgd(pgd, pfn_pgd(PFN_DOWN(__pa(p)), PAGE_TABLE));
 	}
 
@@ -368,7 +368,7 @@ void __init kasan_swapper_init(void)
 
 static void __init kasan_populate(void *start, void *end)
 {
-	unsigned long vaddr = (unsigned long)start & PAGE_MASK;
+	unsigned long vaddr = (unsigned long)start & PTE_MASK;
 	unsigned long vend = PAGE_ALIGN((unsigned long)end);
 
 	kasan_populate_pgd(pgd_offset_k(vaddr), vaddr, vend);
@@ -385,7 +385,7 @@ static void __init kasan_shallow_populate_pud(p4d_t *p4d,
 		next = pud_addr_end(vaddr, end);
 
 		if (pud_none(pudp_get(pud_k))) {
-			p = memblock_alloc_or_panic(PAGE_SIZE, PAGE_SIZE);
+			p = memblock_alloc_or_panic(PTE_SIZE, PTE_SIZE);
 			set_pud(pud_k, pfn_pud(PFN_DOWN(__pa(p)), PAGE_TABLE));
 			continue;
 		}
@@ -405,7 +405,7 @@ static void __init kasan_shallow_populate_p4d(pgd_t *pgd,
 		next = p4d_addr_end(vaddr, end);
 
 		if (p4d_none(p4dp_get(p4d_k))) {
-			p = memblock_alloc_or_panic(PAGE_SIZE, PAGE_SIZE);
+			p = memblock_alloc_or_panic(PTE_SIZE, PTE_SIZE);
 			set_p4d(p4d_k, pfn_p4d(PFN_DOWN(__pa(p)), PAGE_TABLE));
 			continue;
 		}
@@ -424,7 +424,7 @@ static void __init kasan_shallow_populate_pgd(unsigned long vaddr, unsigned long
 		next = pgd_addr_end(vaddr, end);
 
 		if (pgd_none(pgdp_get(pgd_k))) {
-			p = memblock_alloc_or_panic(PAGE_SIZE, PAGE_SIZE);
+			p = memblock_alloc_or_panic(PTE_SIZE, PTE_SIZE);
 			set_pgd(pgd_k, pfn_pgd(PFN_DOWN(__pa(p)), PAGE_TABLE));
 			continue;
 		}
@@ -435,7 +435,7 @@ static void __init kasan_shallow_populate_pgd(unsigned long vaddr, unsigned long
 
 static void __init kasan_shallow_populate(void *start, void *end)
 {
-	unsigned long vaddr = (unsigned long)start & PAGE_MASK;
+	unsigned long vaddr = (unsigned long)start & PTE_MASK;
 	unsigned long vend = PAGE_ALIGN((unsigned long)end);
 
 	kasan_shallow_populate_pgd(vaddr, vend);
@@ -528,7 +528,7 @@ void __init kasan_init(void)
 			       __pgprot(_PAGE_PRESENT | _PAGE_READ |
 					_PAGE_ACCESSED)));
 
-	memset(kasan_early_shadow_page, KASAN_SHADOW_INIT, PAGE_SIZE);
+	memset(kasan_early_shadow_page, KASAN_SHADOW_INIT, PTE_SIZE);
 	init_task.kasan_depth = 0;
 
 	csr_write(CSR_SATP, PFN_DOWN(__pa(swapper_pg_dir)) | satp_mode);

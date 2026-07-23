@@ -38,7 +38,7 @@ static void show_pte(unsigned long addr)
 		mm = &init_mm;
 
 	pr_alert("Current %s pgtable: %luK pagesize, %d-bit VAs, pgdp=0x%016llx\n",
-		 current->comm, PAGE_SIZE / SZ_1K, VA_BITS,
+		 current->comm, PTE_SIZE / SZ_1K, VA_BITS,
 		 mm == &init_mm ? (u64)__pa_symbol(mm->pgd) : virt_to_phys(mm->pgd));
 
 	pgdp = pgd_offset(mm, addr);
@@ -102,7 +102,7 @@ static inline void no_context(struct pt_regs *regs, unsigned long addr)
 	 * Oops. The kernel tried to access some bad page. We'll have to
 	 * terminate things with extreme prejudice.
 	 */
-	if (addr < PAGE_SIZE)
+	if (addr < PTE_SIZE)
 		msg = "NULL pointer dereference";
 	else {
 		if (kfence_handle_page_fault(addr, regs->cause == EXC_STORE_PAGE_FAULT, regs))

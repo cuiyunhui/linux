@@ -69,7 +69,7 @@ unsigned long vmemmap_start_pfn __ro_after_init;
 EXPORT_SYMBOL(vmemmap_start_pfn);
 #endif
 
-unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)]
+unsigned long empty_zero_page[PG_SIZE / sizeof(unsigned long)]
 							__page_aligned_bss;
 EXPORT_SYMBOL(empty_zero_page);
 
@@ -204,7 +204,7 @@ static int __init early_mem(char *p)
 	if (!p)
 		return 1;
 
-	size = memparse(p, &p) & PAGE_MASK;
+	size = memparse(p, &p) & PTE_MASK;
 	memory_limit = min_t(u64, size, memory_limit);
 
 	pr_notice("Memory limited to %lldMB\n", (u64)memory_limit >> 20);
@@ -245,7 +245,7 @@ static void __init setup_bootmem(void)
 	if (!IS_ENABLED(CONFIG_XIP_KERNEL)) {
 		phys_ram_base = memblock_start_of_DRAM() & PMD_MASK;
 #ifdef CONFIG_SPARSEMEM_VMEMMAP
-		vmemmap_start_pfn = round_down(phys_ram_base, VMEMMAP_ADDR_ALIGN) >> PAGE_SHIFT;
+		vmemmap_start_pfn = round_down(phys_ram_base, VMEMMAP_ADDR_ALIGN) >> PTE_SHIFT;
 #endif
 	}
 
@@ -272,17 +272,17 @@ static void __init setup_bootmem(void)
 
 	/*
 	 * Reserve physical address space that would be mapped to virtual
-	 * addresses greater than (void *)(-PAGE_SIZE) because:
+	 * addresses greater than (void *)(-PTE_SIZE) because:
 	 *  - This memory would overlap with ERR_PTR
 	 *  - This memory belongs to high memory, which is not supported
 	 *
 	 * This is not applicable to 64-bit kernel, because virtual addresses
-	 * after (void *)(-PAGE_SIZE) are not linearly mapped: they are
+	 * after (void *)(-PTE_SIZE) are not linearly mapped: they are
 	 * occupied by kernel mapping. Also it is unrealistic for high memory
 	 * to exist on 64-bit platforms.
 	 */
 	if (!IS_ENABLED(CONFIG_64BIT)) {
-		max_mapped_addr = __va_to_pa_nodebug(-PAGE_SIZE);
+		max_mapped_addr = __va_to_pa_nodebug(-PTE_SIZE);
 		memblock_reserve(max_mapped_addr, (phys_addr_t)-max_mapped_addr);
 	}
 
@@ -358,7 +358,7 @@ pgd_t swapper_pg_dir[PTRS_PER_PGD] __page_aligned_bss;
 pgd_t trampoline_pg_dir[PTRS_PER_PGD] __page_aligned_bss;
 static pte_t fixmap_pte[PTRS_PER_PTE] __page_aligned_bss;
 
-pgd_t early_pg_dir[PTRS_PER_PGD] __initdata __aligned(PAGE_SIZE);
+pgd_t early_pg_dir[PTRS_PER_PGD] __initdata __aligned(PTE_SIZE);
 
 #ifdef CONFIG_XIP_KERNEL
 #define pt_ops			(*(struct pt_alloc_ops *)XIP_FIXUP(&pt_ops))
@@ -397,7 +397,7 @@ void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot)
 	ptep = &fixmap_pte[pte_index(addr)];
 
 	if (pgprot_val(prot))
-		set_pte(ptep, pfn_pte(phys >> PAGE_SHIFT, prot));
+		set_pte(ptep, pfn_pte(phys >> PTE_SHIFT, prot));
 	else
 		pte_clear(&init_mm, addr, ptep);
 	local_flush_tlb_page(addr);
@@ -430,7 +430,7 @@ static inline phys_addr_t __init alloc_pte_early(uintptr_t va)
 
 static inline phys_addr_t __init alloc_pte_fixmap(uintptr_t va)
 {
-	return memblock_phys_alloc(PAGE_SIZE, PAGE_SIZE);
+	return memblock_phys_alloc(PTE_SIZE, PTE_SIZE);
 }
 
 static phys_addr_t __meminit alloc_pte_late(uintptr_t va)
@@ -451,7 +451,7 @@ static void __meminit create_pte_mapping(pte_t *ptep, uintptr_t va, phys_addr_t 
 {
 	uintptr_t pte_idx = pte_index(va);
 
-	BUG_ON(sz != PAGE_SIZE);
+	BUG_ON(sz != PTE_SIZE);
 
 	if (pte_none(ptep[pte_idx]))
 		ptep[pte_idx] = pfn_pte(PFN_DOWN(pa), prot);
@@ -461,7 +461,7 @@ static void __meminit create_pte_mapping(pte_t *ptep, uintptr_t va, phys_addr_t 
 
 static pmd_t trampoline_pmd[PTRS_PER_PMD] __page_aligned_bss;
 static pmd_t fixmap_pmd[PTRS_PER_PMD] __page_aligned_bss;
-static pmd_t early_pmd[PTRS_PER_PMD] __initdata __aligned(PAGE_SIZE);
+static pmd_t early_pmd[PTRS_PER_PMD] __initdata __aligned(PTE_SIZE);
 
 #ifdef CONFIG_XIP_KERNEL
 #define trampoline_pmd ((pmd_t *)XIP_FIXUP(trampoline_pmd))
@@ -471,7 +471,7 @@ static pmd_t early_pmd[PTRS_PER_PMD] __initdata __aligned(PAGE_SIZE);
 
 static p4d_t trampoline_p4d[PTRS_PER_P4D] __page_aligned_bss;
 static p4d_t fixmap_p4d[PTRS_PER_P4D] __page_aligned_bss;
-static p4d_t early_p4d[PTRS_PER_P4D] __initdata __aligned(PAGE_SIZE);
+static p4d_t early_p4d[PTRS_PER_P4D] __initdata __aligned(PTE_SIZE);
 
 #ifdef CONFIG_XIP_KERNEL
 #define trampoline_p4d ((p4d_t *)XIP_FIXUP(trampoline_p4d))
@@ -481,7 +481,7 @@ static p4d_t early_p4d[PTRS_PER_P4D] __initdata __aligned(PAGE_SIZE);
 
 static pud_t trampoline_pud[PTRS_PER_PUD] __page_aligned_bss;
 static pud_t fixmap_pud[PTRS_PER_PUD] __page_aligned_bss;
-static pud_t early_pud[PTRS_PER_PUD] __initdata __aligned(PAGE_SIZE);
+static pud_t early_pud[PTRS_PER_PUD] __initdata __aligned(PTE_SIZE);
 
 #ifdef CONFIG_XIP_KERNEL
 #define trampoline_pud ((pud_t *)XIP_FIXUP(trampoline_pud))
@@ -515,7 +515,7 @@ static phys_addr_t __init alloc_pmd_early(uintptr_t va)
 
 static phys_addr_t __init alloc_pmd_fixmap(uintptr_t va)
 {
-	return memblock_phys_alloc(PAGE_SIZE, PAGE_SIZE);
+	return memblock_phys_alloc(PTE_SIZE, PTE_SIZE);
 }
 
 static phys_addr_t __meminit alloc_pmd_late(uintptr_t va)
@@ -545,7 +545,7 @@ static void __meminit create_pmd_mapping(pmd_t *pmdp,
 		pte_phys = pt_ops.alloc_pte(va);
 		pmdp[pmd_idx] = pfn_pmd(PFN_DOWN(pte_phys), PAGE_TABLE);
 		ptep = pt_ops.get_pte_virt(pte_phys);
-		memset(ptep, 0, PAGE_SIZE);
+		memset(ptep, 0, PTE_SIZE);
 	} else {
 		pte_phys = PFN_PHYS(_pmd_pfn(pmdp[pmd_idx]));
 		ptep = pt_ops.get_pte_virt(pte_phys);
@@ -580,7 +580,7 @@ static phys_addr_t __init alloc_pud_early(uintptr_t va)
 
 static phys_addr_t __init alloc_pud_fixmap(uintptr_t va)
 {
-	return memblock_phys_alloc(PAGE_SIZE, PAGE_SIZE);
+	return memblock_phys_alloc(PTE_SIZE, PTE_SIZE);
 }
 
 static phys_addr_t __meminit alloc_pud_late(uintptr_t va)
@@ -618,7 +618,7 @@ static phys_addr_t __init alloc_p4d_early(uintptr_t va)
 
 static phys_addr_t __init alloc_p4d_fixmap(uintptr_t va)
 {
-	return memblock_phys_alloc(PAGE_SIZE, PAGE_SIZE);
+	return memblock_phys_alloc(PTE_SIZE, PTE_SIZE);
 }
 
 static phys_addr_t __meminit alloc_p4d_late(uintptr_t va)
@@ -647,7 +647,7 @@ static void __meminit create_pud_mapping(pud_t *pudp, uintptr_t va, phys_addr_t 
 		next_phys = pt_ops.alloc_pmd(va);
 		pudp[pud_index] = pfn_pud(PFN_DOWN(next_phys), PAGE_TABLE);
 		nextp = pt_ops.get_pmd_virt(next_phys);
-		memset(nextp, 0, PAGE_SIZE);
+		memset(nextp, 0, PTE_SIZE);
 	} else {
 		next_phys = PFN_PHYS(_pud_pfn(pudp[pud_index]));
 		nextp = pt_ops.get_pmd_virt(next_phys);
@@ -673,7 +673,7 @@ static void __meminit create_p4d_mapping(p4d_t *p4dp, uintptr_t va, phys_addr_t 
 		next_phys = pt_ops.alloc_pud(va);
 		p4dp[p4d_index] = pfn_p4d(PFN_DOWN(next_phys), PAGE_TABLE);
 		nextp = pt_ops.get_pud_virt(next_phys);
-		memset(nextp, 0, PAGE_SIZE);
+		memset(nextp, 0, PTE_SIZE);
 	} else {
 		next_phys = PFN_PHYS(_p4d_pfn(p4dp[p4d_index]));
 		nextp = pt_ops.get_pud_virt(next_phys);
@@ -730,7 +730,7 @@ void __meminit create_pgd_mapping(pgd_t *pgdp, uintptr_t va, phys_addr_t pa, phy
 		next_phys = alloc_pgd_next(va);
 		pgdp[pgd_idx] = pfn_pgd(PFN_DOWN(next_phys), PAGE_TABLE);
 		nextp = get_pgd_next_virt(next_phys);
-		memset(nextp, 0, PAGE_SIZE);
+		memset(nextp, 0, PTE_SIZE);
 	} else {
 		next_phys = PFN_PHYS(_pgd_pfn(pgdp[pgd_idx]));
 		nextp = get_pgd_next_virt(next_phys);
@@ -742,7 +742,7 @@ void __meminit create_pgd_mapping(pgd_t *pgdp, uintptr_t va, phys_addr_t pa, phy
 static uintptr_t __meminit best_map_size(phys_addr_t pa, uintptr_t va, phys_addr_t size)
 {
 	if (debug_pagealloc_enabled())
-		return PAGE_SIZE;
+		return PTE_SIZE;
 
 	if (pgtable_l5_enabled &&
 	    !(pa & (P4D_SIZE - 1)) && !(va & (P4D_SIZE - 1)) && size >= P4D_SIZE)
@@ -756,7 +756,7 @@ static uintptr_t __meminit best_map_size(phys_addr_t pa, uintptr_t va, phys_addr
 	    !(pa & (PMD_SIZE - 1)) && !(va & (PMD_SIZE - 1)) && size >= PMD_SIZE)
 		return PMD_SIZE;
 
-	return PAGE_SIZE;
+	return PTE_SIZE;
 }
 
 #ifdef CONFIG_XIP_KERNEL
@@ -843,7 +843,7 @@ early_param("no5lvl", print_no5lvl);
 
 static void __init set_mmap_rnd_bits_max(void)
 {
-	mmap_rnd_bits_max = MMAP_VA_BITS - PAGE_SHIFT - 3;
+	mmap_rnd_bits_max = MMAP_VA_BITS - PTE_SHIFT - 3;
 }
 
 /*
@@ -903,16 +903,16 @@ retry:
 	if (hw_satp != identity_satp) {
 		if (pgtable_l5_enabled) {
 			disable_pgtable_l5();
-			memset(early_pg_dir, 0, PAGE_SIZE);
+			memset(early_pg_dir, 0, PTE_SIZE);
 			goto retry;
 		}
 		disable_pgtable_l4();
 	}
 
-	memset(early_pg_dir, 0, PAGE_SIZE);
-	memset(early_p4d, 0, PAGE_SIZE);
-	memset(early_pud, 0, PAGE_SIZE);
-	memset(early_pmd, 0, PAGE_SIZE);
+	memset(early_pg_dir, 0, PTE_SIZE);
+	memset(early_p4d, 0, PTE_SIZE);
+	memset(early_pud, 0, PTE_SIZE);
+	memset(early_pmd, 0, PTE_SIZE);
 }
 #endif
 
@@ -982,7 +982,7 @@ static void __init create_fdt_early_page_table(uintptr_t fix_fdt_va,
 	uintptr_t pa = dtb_pa & ~(PMD_SIZE - 1);
 
 	/* Make sure the fdt fixmap address is always aligned on PMD size */
-	BUILD_BUG_ON(FIX_FDT % (PMD_SIZE / PAGE_SIZE));
+	BUILD_BUG_ON(FIX_FDT % (PMD_SIZE / PTE_SIZE));
 
 	/* In 32-bit only, the fdt lies in its own PGD */
 	if (!IS_ENABLED(CONFIG_64BIT)) {
@@ -1116,7 +1116,7 @@ asmlinkage void __init setup_vm(uintptr_t dtb_pa)
 
 	phys_ram_base = CONFIG_PHYS_RAM_BASE;
 #ifdef CONFIG_SPARSEMEM_VMEMMAP
-	vmemmap_start_pfn = round_down(phys_ram_base, VMEMMAP_ADDR_ALIGN) >> PAGE_SHIFT;
+	vmemmap_start_pfn = round_down(phys_ram_base, VMEMMAP_ADDR_ALIGN) >> PTE_SHIFT;
 #endif
 	kernel_map.phys_addr = (uintptr_t)CONFIG_PHYS_RAM_BASE;
 	kernel_map.size = (uintptr_t)(&_end) - (uintptr_t)(&_start);
@@ -1294,11 +1294,11 @@ static void __init create_linear_mapping_page_table(void)
 
 #ifdef CONFIG_KFENCE
 	/*
-	 *  kfence pool must be backed by PAGE_SIZE mappings, so allocate it
+	 *  kfence pool must be backed by PTE_SIZE mappings, so allocate it
 	 *  before we setup the linear mapping so that we avoid using hugepages
 	 *  for this region.
 	 */
-	kfence_pool = memblock_phys_alloc(KFENCE_POOL_SIZE, PAGE_SIZE);
+	kfence_pool = memblock_phys_alloc(KFENCE_POOL_SIZE, PTE_SIZE);
 	BUG_ON(!kfence_pool);
 
 	memblock_mark_nomap(kfence_pool, KFENCE_POOL_SIZE);
@@ -1325,7 +1325,7 @@ static void __init create_linear_mapping_page_table(void)
 #endif
 
 #ifdef CONFIG_KFENCE
-	create_linear_mapping_range(kfence_pool, kfence_pool + KFENCE_POOL_SIZE, PAGE_SIZE, NULL);
+	create_linear_mapping_range(kfence_pool, kfence_pool + KFENCE_POOL_SIZE, PTE_SIZE, NULL);
 
 	memblock_clear_nomap(kfence_pool, KFENCE_POOL_SIZE);
 #endif
@@ -1426,7 +1426,7 @@ void __init paging_init(void)
 
 void __init misc_mem_init(void)
 {
-	early_memtest(min_low_pfn << PAGE_SHIFT, max_low_pfn << PAGE_SHIFT);
+	early_memtest(min_low_pfn << PTE_SHIFT, max_low_pfn << PTE_SHIFT);
 	arch_numa_init();
 #ifdef CONFIG_SPARSEMEM_VMEMMAP
 	/* The entire VMEMMAP region has been populated. Flush TLB for this region */
@@ -1553,7 +1553,7 @@ struct execmem_info __init *execmem_arch_setup(void)
 				.start	= BPF_JIT_REGION_START,
 				.end	= BPF_JIT_REGION_END,
 				.pgprot	= PAGE_KERNEL,
-				.alignment = PAGE_SIZE,
+				.alignment = PG_SIZE,
 			},
 		},
 	};
@@ -1632,7 +1632,7 @@ static void __meminit free_vmemmap_storage(struct page *page, size_t size,
 	int order = get_order(size);
 
 	if (altmap) {
-		vmem_altmap_free(altmap, size >> PAGE_SHIFT);
+		vmem_altmap_free(altmap, size >> PTE_SHIFT);
 		return;
 	}
 
@@ -1654,7 +1654,7 @@ static void __meminit remove_pte_mapping(pte_t *pte_base, unsigned long addr, un
 	pte_t *ptep, pte;
 
 	for (; addr < end; addr = next) {
-		next = (addr + PAGE_SIZE) & PAGE_MASK;
+		next = (addr + PTE_SIZE) & PTE_MASK;
 		if (next > end)
 			next = end;
 
@@ -1665,7 +1665,7 @@ static void __meminit remove_pte_mapping(pte_t *pte_base, unsigned long addr, un
 
 		pte_clear(&init_mm, addr, ptep);
 		if (is_vmemmap)
-			free_vmemmap_storage(pte_page(pte), PAGE_SIZE, altmap);
+			free_vmemmap_storage(pte_page(pte), PTE_SIZE, altmap);
 	}
 }
 
@@ -1804,7 +1804,7 @@ int __ref arch_add_memory(int nid, u64 start, u64 size, struct mhp_params *param
 	int ret = 0;
 
 	create_linear_mapping_range(start, start + size, 0, &params->pgprot);
-	ret = __add_pages(nid, start >> PAGE_SHIFT, size >> PAGE_SHIFT, params);
+	ret = __add_pages(nid, start >> PTE_SHIFT, size >> PTE_SHIFT, params);
 	if (ret) {
 		remove_linear_mapping(start, size);
 		goto out;
@@ -1820,7 +1820,7 @@ int __ref arch_add_memory(int nid, u64 start, u64 size, struct mhp_params *param
 
 void __ref arch_remove_memory(u64 start, u64 size, struct vmem_altmap *altmap)
 {
-	__remove_pages(start >> PAGE_SHIFT, size >> PAGE_SHIFT, altmap);
+	__remove_pages(start >> PTE_SHIFT, size >> PTE_SHIFT, altmap);
 	remove_linear_mapping(start, size);
 	flush_tlb_all();
 }

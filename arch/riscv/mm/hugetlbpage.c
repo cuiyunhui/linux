@@ -157,7 +157,7 @@ static pte_t get_clear_contig(struct mm_struct *mm,
 	present = pte_present(pte);
 	while (--ncontig) {
 		ptep++;
-		addr += PAGE_SIZE;
+		addr += PTE_SIZE;
 		tmp_pte = ptep_get_and_clear(mm, addr, ptep);
 		if (present) {
 			if (pte_dirty(tmp_pte))
@@ -179,7 +179,7 @@ static pte_t get_clear_contig_flush(struct mm_struct *mm,
 	bool valid = !pte_none(orig_pte);
 
 	if (valid)
-		flush_tlb_range(&vma, addr, addr + (PAGE_SIZE * pte_num));
+		flush_tlb_range(&vma, addr, addr + (PTE_SIZE * pte_num));
 
 	return orig_pte;
 }
@@ -228,7 +228,7 @@ static int num_contig_ptes_from_size(unsigned long sz, size_t *pgsize)
 	else if (sz >= PMD_SIZE)
 		hugepage_shift = PMD_SHIFT;
 	else
-		hugepage_shift = PAGE_SHIFT;
+		hugepage_shift = PTE_SHIFT;
 
 	*pgsize = 1 << hugepage_shift;
 
@@ -296,7 +296,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
 	if (pte_young(orig_pte))
 		pte = pte_mkyoung(pte);
 
-	for (i = 0; i < pte_num; i++, addr += PAGE_SIZE, ptep++)
+	for (i = 0; i < pte_num; i++, addr += PTE_SIZE, ptep++)
 		set_pte_at(mm, addr, ptep, pte);
 
 	return true;
@@ -339,7 +339,7 @@ void huge_ptep_set_wrprotect(struct mm_struct *mm,
 
 	orig_pte = pte_wrprotect(orig_pte);
 
-	for (i = 0; i < pte_num; i++, addr += PAGE_SIZE, ptep++)
+	for (i = 0; i < pte_num; i++, addr += PTE_SIZE, ptep++)
 		set_pte_at(mm, addr, ptep, orig_pte);
 }
 
@@ -415,7 +415,7 @@ static bool is_napot_size(unsigned long size)
 
 static bool __hugetlb_valid_size(unsigned long size)
 {
-	if (size == HPAGE_SIZE)
+	if (size == HPTE_SIZE)
 		return true;
 	else if (IS_ENABLED(CONFIG_64BIT) && size == PUD_SIZE)
 		return true;
@@ -442,7 +442,7 @@ static __init int gigantic_pages_init(void)
 {
 	/* With CONTIG_ALLOC, we can allocate gigantic pages at runtime */
 	if (IS_ENABLED(CONFIG_64BIT))
-		hugetlb_add_hstate(PUD_SHIFT - PAGE_SHIFT);
+		hugetlb_add_hstate(PUD_SHIFT - PTE_SHIFT);
 	return 0;
 }
 arch_initcall(gigantic_pages_init);
@@ -451,7 +451,7 @@ arch_initcall(gigantic_pages_init);
 unsigned int __init arch_hugetlb_cma_order(void)
 {
 	if (IS_ENABLED(CONFIG_64BIT))
-		return PUD_SHIFT - PAGE_SHIFT;
+		return PUD_SHIFT - PTE_SHIFT;
 
 	return 0;
 }
