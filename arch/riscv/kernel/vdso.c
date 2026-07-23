@@ -44,6 +44,7 @@ static int vdso_mremap(const struct vm_special_mapping *sm,
 static void __init __vdso_init(struct __vdso_info *vdso_info)
 {
 	unsigned int i;
+	unsigned long vdso_pg_pages;
 	struct page **vdso_pagelist;
 	unsigned long pfn;
 
@@ -55,15 +56,16 @@ static void __init __vdso_init(struct __vdso_info *vdso_info)
 		vdso_info->vdso_code_start) >>
 		PTE_SHIFT;
 
-	vdso_pagelist = kzalloc_objs(struct page *, vdso_info->vdso_pages);
+	vdso_pg_pages = DIV_ROUND_UP(vdso_info->vdso_pages, PTES_PER_PAGE);
+	vdso_pagelist = kzalloc_objs(struct page *, vdso_pg_pages);
 	if (vdso_pagelist == NULL)
 		panic("vDSO kcalloc failed!\n");
 
 	/* Grab the vDSO code pages. */
 	pfn = sym_to_pfn(vdso_info->vdso_code_start);
 
-	for (i = 0; i < vdso_info->vdso_pages; i++)
-		vdso_pagelist[i] = pfn_to_page(pfn + i);
+	for (i = 0; i < vdso_pg_pages; i++)
+		vdso_pagelist[i] = pfn_to_page(pfn + i * PTES_PER_PAGE);
 
 	vdso_info->cm->pages = vdso_pagelist;
 }

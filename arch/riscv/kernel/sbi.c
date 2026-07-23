@@ -10,6 +10,7 @@
 #include <linux/mm.h>
 #include <linux/pm.h>
 #include <linux/reboot.h>
+#include <linux/vmalloc.h>
 #include <asm/sbi.h>
 #include <asm/smp.h>
 #include <asm/tlbflush.h>
@@ -597,7 +598,7 @@ int sbi_debug_console_write(const char *bytes, unsigned int num_bytes)
 		return -EOPNOTSUPP;
 
 	if (is_vmalloc_addr(bytes))
-		base_addr = page_to_phys(vmalloc_to_page(bytes)) +
+		base_addr = PFN_PHYS(vmalloc_to_pfn(bytes)) +
 			    offset_in_page(bytes);
 	else
 		base_addr = __pa(bytes);

@@ -376,13 +376,13 @@ int set_memory_nx(unsigned long addr, int numpages)
 
 int set_direct_map_invalid_noflush(struct page *page)
 {
-	return __set_memory((unsigned long)page_address(page), 1,
+	return __set_memory((unsigned long)page_address(page), PTES_PER_PAGE,
 			    __pgprot(0), __pgprot(_PAGE_PRESENT));
 }
 
 int set_direct_map_default_noflush(struct page *page)
 {
-	return __set_memory((unsigned long)page_address(page), 1,
+	return __set_memory((unsigned long)page_address(page), PTES_PER_PAGE,
 			    PAGE_KERNEL, __pgprot(_PAGE_EXEC));
 }
 
@@ -398,7 +398,8 @@ int set_direct_map_valid_noflush(struct page *page, unsigned nr, bool valid)
 		clear = __pgprot(_PAGE_PRESENT);
 	}
 
-	return __set_memory((unsigned long)page_address(page), nr, set, clear);
+	return __set_memory((unsigned long)page_address(page),
+			    nr * PTES_PER_PAGE, set, clear);
 }
 
 #ifdef CONFIG_DEBUG_PAGEALLOC
@@ -424,7 +425,7 @@ void __kernel_map_pages(struct page *page, int numpages, int enable)
 		return;
 
 	unsigned long start = (unsigned long)page_address(page);
-	unsigned long size = PTE_SIZE * numpages;
+	unsigned long size = PG_SIZE * numpages;
 
 	apply_to_existing_page_range(&init_mm, start, size, debug_pagealloc_set_page, &enable);
 

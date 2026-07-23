@@ -397,8 +397,11 @@ static __init int napot_hugetlbpages_init(void)
 	if (has_svnapot()) {
 		unsigned long order;
 
-		for_each_napot_order(order)
-			hugetlb_add_hstate(order);
+		for_each_napot_order(order) {
+			if (napot_cont_size(order) <= PG_SIZE)
+				continue;
+			hugetlb_add_hstate(napot_cont_shift(order) - PG_SHIFT);
+		}
 	}
 	return 0;
 }
@@ -415,11 +418,11 @@ static bool is_napot_size(unsigned long size)
 
 static bool __hugetlb_valid_size(unsigned long size)
 {
-	if (size == HPTE_SIZE)
+	if (size == HPAGE_SIZE)
 		return true;
 	else if (IS_ENABLED(CONFIG_64BIT) && size == PUD_SIZE)
 		return true;
-	else if (is_napot_size(size))
+	else if (size > PG_SIZE && is_napot_size(size))
 		return true;
 	else
 		return false;
@@ -442,7 +445,7 @@ static __init int gigantic_pages_init(void)
 {
 	/* With CONTIG_ALLOC, we can allocate gigantic pages at runtime */
 	if (IS_ENABLED(CONFIG_64BIT))
-		hugetlb_add_hstate(PUD_SHIFT - PTE_SHIFT);
+		hugetlb_add_hstate(PUD_SHIFT - PG_SHIFT);
 	return 0;
 }
 arch_initcall(gigantic_pages_init);
@@ -451,7 +454,7 @@ arch_initcall(gigantic_pages_init);
 unsigned int __init arch_hugetlb_cma_order(void)
 {
 	if (IS_ENABLED(CONFIG_64BIT))
-		return PUD_SHIFT - PTE_SHIFT;
+		return PUD_SHIFT - PG_SHIFT;
 
 	return 0;
 }

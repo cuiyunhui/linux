@@ -224,7 +224,7 @@ static inline bool page_range_contiguous(const struct page *page,
 #endif
 
 #define PTE_ALIGN(addr)		ALIGN(addr, PTE_SIZE)
-#define PTE_ALIGN_DOWN(addr)	ALIGN(addr, PTE_SIZE)
+#define PTE_ALIGN_DOWN(addr)	ALIGN_DOWN(addr, PTE_SIZE)
 #define PTE_ALIGNED(addr)	IS_ALIGNED((unsigned long)(addr), PTE_SIZE)
 
 #define PG_ALIGN(addr)		ALIGN(addr, PG_SIZE)

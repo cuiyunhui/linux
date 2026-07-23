@@ -6,6 +6,7 @@
 #include <linux/spinlock.h>
 #include <linux/mm.h>
 #include <linux/memory.h>
+#include <linux/vmalloc.h>
 #include <linux/string.h>
 #include <linux/uaccess.h>
 #include <linux/stop_machine.h>
@@ -47,10 +48,7 @@ static __always_inline void *patch_map(void *addr, const unsigned int fixmap)
 	if (core_kernel_text(uintaddr) || is_kernel_exittext(uintaddr)) {
 		phys = __pa_symbol(addr);
 	} else if (IS_ENABLED(CONFIG_STRICT_MODULE_RWX)) {
-		struct page *page = vmalloc_to_page(addr);
-
-		BUG_ON(!page);
-		phys = page_to_phys(page) + offset_in_page(addr);
+		phys = PFN_PHYS(vmalloc_to_pfn(addr)) + offset_in_page(addr);
 	} else {
 		return addr;
 	}
