@@ -18,7 +18,7 @@
 
 /* void clear_page(void *page) */
 SYM_FUNC_START(clear_page)
-	li	a2, PAGE_SIZE
+	li	a2, PG_SIZE
 
 	/*
 	 * If Zicboz isn't present, or somehow has a block
