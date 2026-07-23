@@ -1994,18 +1994,24 @@ unsigned long __init node_map_pfn_alignment(void)
 
 #ifdef CONFIG_DEFERRED_STRUCT_PAGE_INIT
 static void __init deferred_free_pages(unsigned long pfn,
-		unsigned long nr_pages)
+		unsigned long nr_ptes)
 {
+	unsigned long end_pfn = pfn + nr_ptes;
 	struct page *page;
+	unsigned long nr_pages;
 	unsigned long i;
 
-	if (!nr_pages)
+	pfn = round_up(pfn, PTES_PER_PAGE);
+	end_pfn = round_down(end_pfn, PTES_PER_PAGE);
+	if (pfn >= end_pfn)
 		return;
 
+	nr_pages = PTES_TO_PAGES(end_pfn - pfn);
 	page = pfn_to_page(pfn);
 
 	/* Free a large naturally-aligned chunk if possible */
-	if (nr_pages == MAX_ORDER_NR_PAGES && IS_MAX_ORDER_ALIGNED(pfn)) {
+	if (nr_pages == MAX_ORDER_NR_PAGES &&
+	    IS_ALIGNED(pfn, PAGES_TO_PTES(MAX_ORDER_NR_PAGES))) {
 		for (i = 0; i < nr_pages; i += pageblock_nr_pages)
 			init_pageblock_migratetype(page + i, MIGRATE_MOVABLE,
 					false);
@@ -2016,8 +2022,8 @@ static void __init deferred_free_pages(unsigned long pfn,
 	/* Accept chunks smaller than MAX_PAGE_ORDER upfront */
 	accept_memory(PFN_PHYS(pfn), nr_pages * PG_SIZE);
 
-	for (i = 0; i < nr_pages; i++, page++, pfn++) {
-		if (pageblock_aligned(pfn))
+	for (i = 0; i < nr_pages; i++, page++, pfn += PTES_PER_PAGE) {
+		if (IS_ALIGNED(pfn, PAGES_TO_PTES(pageblock_nr_pages)))
 			init_pageblock_migratetype(page, MIGRATE_MOVABLE,
 					false);
 		__free_pages_core(page, 0, MEMINIT_EARLY);
@@ -2043,12 +2049,18 @@ static unsigned long __init deferred_init_pages(struct zone *zone,
 		unsigned long pfn, unsigned long end_pfn)
 {
 	int nid = zone_to_nid(zone);
-	unsigned long nr_pages = end_pfn - pfn;
+	unsigned long nr_pages = 0;
 	int zid = zone_idx(zone);
-	struct page *page = pfn_to_page(pfn);
+	struct page *page;
 
-	for (; pfn < end_pfn; pfn++, page++)
+	pfn = round_up(pfn, PTES_PER_PAGE);
+	end_pfn = round_down(end_pfn, PTES_PER_PAGE);
+
+	for (; pfn < end_pfn; pfn += PTES_PER_PAGE) {
+		page = pfn_to_page(pfn);
 		__init_single_page(page, pfn, zid, nid);
+		nr_pages++;
+	}
 	return nr_pages;
 }
 
@@ -2085,8 +2097,11 @@ deferred_init_memmap_chunk(unsigned long start_pfn, unsigned long end_pfn,
 		epfn = min(epfn, end_pfn);
 
 		while (spfn < epfn) {
-			unsigned long mo_pfn = ALIGN(spfn + 1, MAX_ORDER_NR_PAGES);
-			unsigned long chunk_end = min(mo_pfn, epfn);
+			unsigned long mo_pfn;
+			unsigned long chunk_end;
+
+			mo_pfn = ALIGN(spfn + 1, PAGES_TO_PTES(MAX_ORDER_NR_PAGES));
+			chunk_end = min(mo_pfn, epfn);
 
 			nr_pages += deferred_init_pages(zone, spfn, chunk_end);
 			deferred_free_pages(spfn, chunk_end - spfn);
