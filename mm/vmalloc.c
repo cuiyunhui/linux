@@ -541,7 +541,7 @@ static int vmap_pages_pte_range(pmd_t *pmd, unsigned long addr,
 	lazy_mmu_mode_enable();
 
 	do {
-		struct page *page = pages[*nr];
+		struct page *page = pages[PTES_TO_PAGES(*nr)];
 
 		if (WARN_ON(!pte_none(ptep_get(pte)))) {
 			err = -EBUSY;
@@ -556,11 +556,9 @@ static int vmap_pages_pte_range(pmd_t *pmd, unsigned long addr,
 			break;
 		}
 
-		set_pte_at(&init_mm, addr, pte,
-			   mkpte(page, addr >> PTE_SHIFT, prot));
+		set_pte_at(&init_mm, addr, pte, mkpte(page, *nr, prot));
 		addr += PTE_SIZE;
-		if (!offset_in_pg(addr))
-			(*nr)++;
+		(*nr)++;
 	} while (pte++, addr != end);
 
 	lazy_mmu_mode_disable();
