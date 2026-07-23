@@ -44,7 +44,7 @@ static vm_fault_t vvar_fault(const struct vm_special_mapping *sm,
 	unsigned long addr, pfn;
 	vm_fault_t err;
 
-	switch ((vmf->pteoff - vma->vm_pteoff) / PTES_PER_PAGE) {
+	switch (vmf->pteoff - vma->vm_pteoff) {
 	case VDSO_TIME_PAGE_OFFSET:
 		if (!IS_ENABLED(CONFIG_GENERIC_GETTIMEOFDAY))
 			return VM_FAULT_SIGBUS;
@@ -54,7 +54,7 @@ static vm_fault_t vvar_fault(const struct vm_special_mapping *sm,
 			 * Fault in VVAR page too, since it will be accessed
 			 * to get clock data anyway.
 			 */
-			addr = vmf->address + VDSO_TIMENS_PAGE_OFFSET * PG_SIZE;
+			addr = vmf->address + VDSO_TIMENS_PAGE_OFFSET * PTE_SIZE;
 			err = vmf_insert_pfn(vma, addr, pfn);
 			if (unlikely(err & VM_FAULT_ERROR))
 				return err;
@@ -82,7 +82,7 @@ static vm_fault_t vvar_fault(const struct vm_special_mapping *sm,
 		if (!IS_ENABLED(CONFIG_ARCH_HAS_VDSO_ARCH_DATA))
 			return VM_FAULT_SIGBUS;
 		pfn = __phys_to_pfn(__pa_symbol(vdso_k_arch_data)) +
-			(vmf->pteoff - vma->vm_pteoff) / PTES_PER_PAGE - VDSO_ARCH_PAGES_START;
+				(vmf->pteoff - vma->vm_pteoff) - VDSO_ARCH_PAGES_START;
 		break;
 	default:
 		return VM_FAULT_SIGBUS;
@@ -98,7 +98,7 @@ const struct vm_special_mapping vdso_vvar_mapping = {
 
 struct vm_area_struct *vdso_install_vvar_mapping(struct mm_struct *mm, unsigned long addr)
 {
-	return _install_special_mapping(mm, addr, VDSO_NR_PAGES * PG_SIZE,
+	return _install_special_mapping(mm, addr, VDSO_NR_PAGES * PTE_SIZE,
 					VM_READ | VM_MAYREAD | VM_IO | VM_DONTDUMP |
 					VM_PFNMAP | VM_SEALED_SYSMAP,
 					&vdso_vvar_mapping);
