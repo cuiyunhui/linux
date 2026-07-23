@@ -22,7 +22,7 @@ static __always_inline int set_kernel_memory(char *startp, char *endp,
 {
 	unsigned long start = (unsigned long)startp;
 	unsigned long end = (unsigned long)endp;
-	int num_pages = PAGE_ALIGN(end - start) >> PAGE_SHIFT;
+	int num_pages = PTE_ALIGN(end - start) >> PTE_SHIFT;
 
 	return set_memory(start, num_pages);
 }

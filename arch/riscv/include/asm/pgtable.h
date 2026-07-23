@@ -30,9 +30,9 @@
 #endif
 
 /* Number of entries in the page global directory */
-#define PTRS_PER_PGD    (PAGE_SIZE / sizeof(pgd_t))
+#define PTRS_PER_PGD    (PTE_SIZE / sizeof(pgd_t))
 /* Number of entries in the page table */
-#define PTRS_PER_PTE    (PAGE_SIZE / sizeof(pte_t))
+#define PTRS_PER_PTE    (PTE_SIZE / sizeof(pte_t))
 
 /*
  * Half of the kernel address space (1/4 of the entries of the page global
@@ -82,7 +82,7 @@
 #endif
 
 #define VMEMMAP_SHIFT \
-	(VA_BITS - PAGE_SHIFT - 1 + STRUCT_PAGE_MAX_SHIFT)
+	(VA_BITS - PG_SHIFT - 1 + STRUCT_PAGE_MAX_SHIFT)
 #define VMEMMAP_SIZE	BIT(VMEMMAP_SHIFT)
 #define VMEMMAP_END	VMALLOC_START
 #define VMEMMAP_START	(VMALLOC_START - VMEMMAP_SIZE)
@@ -91,7 +91,8 @@
  * Define vmemmap for pfn_to_page & page_to_pfn calls. Needed if kernel
  * is configured with CONFIG_SPARSEMEM_VMEMMAP enabled.
  */
-#define vmemmap		((struct page *)VMEMMAP_START - vmemmap_start_pfn)
+#define vmemmap		((struct page *)VMEMMAP_START - \
+				 (vmemmap_start_pfn >> (PG_SHIFT - PTE_SHIFT)))
 
 #define PCI_IO_SIZE      SZ_16M
 #define PCI_IO_END       VMEMMAP_START
@@ -536,7 +537,7 @@ static inline pte_t pte_swp_clear_soft_dirty(pte_t pte)
 #ifdef CONFIG_RISCV_ISA_SVNAPOT
 #define pte_leaf_size(pte)	(pte_napot(pte) ?				\
 					napot_cont_size(napot_cont_order(pte)) :\
-					PAGE_SIZE)
+					PTE_SIZE)
 #endif
 
 #ifdef CONFIG_NUMA_BALANCING
@@ -589,7 +590,7 @@ static inline void update_mmu_cache_range(struct vm_fault *vmf,
 	 * the extra traps reduce performance.  So, eagerly SFENCE.VMA.
 	 */
 	while (nr--)
-		local_flush_tlb_page(address + nr * PAGE_SIZE);
+		local_flush_tlb_page(address + nr * PTE_SIZE);
 
 }
 #define update_mmu_cache(vma, addr, ptep) \
@@ -780,19 +781,19 @@ static inline pmd_t pmd_mkinvalid(pmd_t pmd)
 	return __pmd(pmd_val(pmd) & ~(_PAGE_PRESENT|_PAGE_PROT_NONE));
 }
 
-#define __pmd_to_phys(pmd)  (__page_val_to_pfn(pmd_val(pmd)) << PAGE_SHIFT)
+#define __pmd_to_phys(pmd)  (__page_val_to_pfn(pmd_val(pmd)) << PTE_SHIFT)
 
 static inline unsigned long pmd_pfn(pmd_t pmd)
 {
-	return ((__pmd_to_phys(pmd) & PMD_MASK) >> PAGE_SHIFT);
+	return ((__pmd_to_phys(pmd) & PMD_MASK) >> PTE_SHIFT);
 }
 
-#define __pud_to_phys(pud)  (__page_val_to_pfn(pud_val(pud)) << PAGE_SHIFT)
+#define __pud_to_phys(pud)  (__page_val_to_pfn(pud_val(pud)) << PTE_SHIFT)
 
 #define pud_pfn pud_pfn
 static inline unsigned long pud_pfn(pud_t pud)
 {
-	return ((__pud_to_phys(pud) & PUD_MASK) >> PAGE_SHIFT);
+	return ((__pud_to_phys(pud) & PUD_MASK) >> PTE_SHIFT);
 }
 
 #define pmd_pgprot pmd_pgprot
@@ -1247,7 +1248,7 @@ static inline pte_t pte_swp_clear_exclusive(pte_t pte)
 #define TASK_SIZE_64	(PGDIR_SIZE * PTRS_PER_PGD / 2)
 
 #ifdef CONFIG_COMPAT
-#define TASK_SIZE_32	(_AC(0x80000000, UL) - PAGE_SIZE)
+#define TASK_SIZE_32	(_AC(0x80000000, UL) - PTE_SIZE)
 #define TASK_SIZE	(is_compat_task() ? \
 			 TASK_SIZE_32 : TASK_SIZE_64)
 #else
@@ -1288,7 +1289,7 @@ void misc_mem_init(void);
  * ZERO_PAGE is a global shared page that is always zero,
  * used for zero-mapped memory areas, etc.
  */
-extern unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)];
+extern unsigned long empty_zero_page[PG_SIZE / sizeof(unsigned long)];
 #define ZERO_PAGE(vaddr) (virt_to_page(empty_zero_page))
 
 /*

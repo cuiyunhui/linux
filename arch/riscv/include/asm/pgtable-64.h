@@ -48,7 +48,7 @@ typedef struct {
 
 #define p4d_val(x)	((x).p4d)
 #define __p4d(x)	((p4d_t) { (x) })
-#define PTRS_PER_P4D	(PAGE_SIZE / sizeof(p4d_t))
+#define PTRS_PER_P4D	(PTE_SIZE / sizeof(p4d_t))
 
 /* Page Upper Directory entry */
 typedef struct {
@@ -57,7 +57,7 @@ typedef struct {
 
 #define pud_val(x)      ((x).pud)
 #define __pud(x)        ((pud_t) { (x) })
-#define PTRS_PER_PUD    (PAGE_SIZE / sizeof(pud_t))
+#define PTRS_PER_PUD    (PTE_SIZE / sizeof(pud_t))
 
 /* Page Middle Directory entry */
 typedef struct {
@@ -67,7 +67,7 @@ typedef struct {
 #define pmd_val(x)      ((x).pmd)
 #define __pmd(x)        ((pmd_t) { (x) })
 
-#define PTRS_PER_PMD    (PAGE_SIZE / sizeof(pmd_t))
+#define PTRS_PER_PMD    (PTE_SIZE / sizeof(pmd_t))
 
 #define MAX_POSSIBLE_PHYSMEM_BITS 56
 
@@ -101,7 +101,7 @@ enum napot_cont_order {
 	     order >= NAPOT_CONT_ORDER_BASE; order--)
 #define napot_cont_order(val)	(__builtin_ctzl((val.pte >> _PAGE_PFN_SHIFT) << 1))
 
-#define napot_cont_shift(order)	((order) + PAGE_SHIFT)
+#define napot_cont_shift(order)	((order) + PTE_SHIFT)
 #define napot_cont_size(order)	BIT(napot_cont_shift(order))
 #define napot_cont_mask(order)	(~(napot_cont_size(order) - 1UL))
 #define napot_pte_num(order)	BIT(order)

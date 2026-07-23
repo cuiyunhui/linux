@@ -19,7 +19,7 @@
 #define KASAN_STACK_ORDER	0
 #endif
 #define THREAD_SIZE_ORDER	(CONFIG_THREAD_SIZE_ORDER + KASAN_STACK_ORDER)
-#define THREAD_SIZE		(PAGE_SIZE << THREAD_SIZE_ORDER)
+#define THREAD_SIZE		(PG_SIZE << THREAD_SIZE_ORDER)
 
 /*
  * By aligning VMAP'd stacks to 2 * THREAD_SIZE, we can detect overflow by
@@ -32,7 +32,7 @@
 #define THREAD_ALIGN            THREAD_SIZE
 #endif
 
-#define THREAD_SHIFT            (PAGE_SHIFT + THREAD_SIZE_ORDER)
+#define THREAD_SHIFT            (PG_SHIFT + THREAD_SIZE_ORDER)
 #define OVERFLOW_STACK_SIZE     SZ_4K
 
 #define IRQ_STACK_SIZE		THREAD_SIZE

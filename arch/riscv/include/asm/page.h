@@ -17,7 +17,7 @@
 #define HPAGE_SHIFT		PMD_SHIFT
 #define HPAGE_SIZE		(_AC(1, UL) << HPAGE_SHIFT)
 #define HPAGE_MASK              (~(HPAGE_SIZE - 1))
-#define HUGETLB_PAGE_ORDER      (HPAGE_SHIFT - PAGE_SHIFT)
+#define HUGETLB_PAGE_ORDER      (HPAGE_SHIFT - PG_SHIFT)
 
 /*
  * PAGE_OFFSET -- the first address of the first page of memory.
@@ -46,9 +46,9 @@
 #ifdef CONFIG_RISCV_ISA_ZICBOZ
 void clear_page(void *page);
 #else
-#define clear_page(pgaddr)			memset((pgaddr), 0, PAGE_SIZE)
+#define clear_page(pgaddr)			memset((pgaddr), 0, PG_SIZE)
 #endif
-#define copy_page(to, from)			memcpy((to), (from), PAGE_SIZE)
+#define copy_page(to, from)			memcpy((to), (from), PG_SIZE)
 
 #define copy_user_page(vto, vfrom, vaddr, topg) copy_page(vto, vfrom)
 
@@ -194,7 +194,7 @@ unsigned long kaslr_offset(void);
 
 static __always_inline void *pfn_to_kaddr(unsigned long pfn)
 {
-	return __va(pfn << PAGE_SHIFT);
+	return __va(PFN_PHYS(pfn));
 }
 
 #endif /* __ASSEMBLER__ */

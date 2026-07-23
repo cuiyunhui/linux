@@ -42,7 +42,7 @@ extern bool compat_elf_check_arch(Elf32_Ehdr *hdr);
 
 #define CORE_DUMP_USE_REGSET
 #define ELF_FDPIC_CORE_EFLAGS	0
-#define ELF_EXEC_PAGESIZE	(PAGE_SIZE)
+#define ELF_EXEC_PAGESIZE	(PTE_SIZE)
 
 /*
  * This is the location that an ET_DYN program is loaded if exec'ed.  Typical
@@ -54,8 +54,8 @@ extern bool compat_elf_check_arch(Elf32_Ehdr *hdr);
 
 #ifdef CONFIG_64BIT
 #define STACK_RND_MASK		(is_compat_task() ? \
-				 0x7ff >> (PAGE_SHIFT - 12) : \
-				 0x3ffff >> (PAGE_SHIFT - 12))
+				 0x7ff >> (PTE_SHIFT - 12) : \
+				 0x3ffff >> (PTE_SHIFT - 12))
 #endif
 
 /*
