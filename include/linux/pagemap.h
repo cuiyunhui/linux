@@ -1079,7 +1079,7 @@ static inline unsigned long linear_pte_index(const struct vm_area_struct *vma,
 	return pteoff;
 }
 
-#if PTE_SIZE == PG_SIZE
+#if PTE_SIZE == PG_SIZE || defined(CONFIG_RISCV)
 /* To be removed after conversion is done */
 #define linear_page_index linear_pte_index
 #endif
