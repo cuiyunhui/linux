@@ -231,10 +231,10 @@ static inline bool page_range_contiguous(const struct page *page,
 #define PG_ALIGN_DOWN(addr)	ALIGN_DOWN(addr, PG_SIZE)
 #define PG_ALIGNED(addr)	IS_ALIGNED((unsigned long)(addr), PG_SIZE)
 
-#if PTE_SIZE == PG_SIZE
-#define PAGE_ALIGN		PG_ALIGN
-#define PAGE_ALIGN_DOWN		PG_ALIGN_DOWN
-#define PAGE_ALIGNED		PG_ALIGNED
+#if PG_SIZE == PTE_SIZE || defined(CONFIG_RISCV)
+#define PAGE_ALIGN		PTE_ALIGN
+#define PAGE_ALIGN_DOWN		PTE_ALIGN_DOWN
+#define PAGE_ALIGNED		PTE_ALIGNED
 #endif
 
 /**
@@ -706,7 +706,7 @@ struct vm_fault {
 		gfp_t gfp_mask;			/* gfp mask to be used for allocations */
 		union {
 			unsigned long pteoff;	/* Logical PTE offset based on vma */
-#if PTE_SIZE == PG_SIZE
+#if PG_SIZE == PTE_SIZE || defined(CONFIG_RISCV)
 			pgoff_t pgoff;		/* to be removed after conversion is done */
 #endif
 		};
@@ -2277,7 +2277,7 @@ static inline struct folio *pfn_folio(unsigned long pfn)
 
 #define offset_in_pte(p)	((unsigned long)(p) & ~PTE_MASK)
 #define offset_in_pg(p)		((unsigned long)(p) & ~PG_MASK)
-#if PTE_SIZE == PG_SIZE
+#if PG_SIZE == PTE_SIZE || defined(CONFIG_RISCV)
 #define offset_in_page(p)	((unsigned long)(p) & ~PAGE_MASK)
 #endif
 #define offset_in_folio(folio, p) ((unsigned long)(p) & (folio_size(folio) - 1))
@@ -2310,7 +2310,7 @@ static inline pte_t folio_mkpte(const struct folio *folio, unsigned long pteoff,
 	return pfn_pte(folio_pfn(folio) + off, pgprot);
 }
 
-#if PTE_SIZE == PG_SIZE
+#if PG_SIZE == PTE_SIZE || defined(CONFIG_RISCV)
 static inline pte_t mk_pte(const struct page *page, pgprot_t pgprot)
 {
 	return mkpte(page, 0, pgprot);

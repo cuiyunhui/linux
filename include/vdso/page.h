@@ -52,6 +52,14 @@
 #define PAGE_SHIFT	PG_SHIFT
 #define PAGE_SIZE	PG_SIZE
 #define PAGE_MASK	PG_MASK
+#elif defined(CONFIG_RISCV)
+/*
+ * RISC-V still has architecture and driver users that describe hardware
+ * translation granularity with PAGE_* while PG_SIZE bring-up is ongoing.
+ */
+#define PAGE_SHIFT	PTE_SHIFT
+#define PAGE_SIZE	PTE_SIZE
+#define PAGE_MASK	PTE_MASK
 #endif
 
 #endif	/* __VDSO_PAGE_H */

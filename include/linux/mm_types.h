@@ -709,7 +709,7 @@ struct vm_region {
 	unsigned long	vm_top;		/* region allocated to here */
 	union {
 		unsigned long vm_pteoff; /* the offset in vm_file corresponding to vm_start */
-#if PTE_SIZE == PG_SIZE
+#if PG_SIZE == PTE_SIZE || defined(CONFIG_RISCV)
 		unsigned long vm_pgoff;  /* to be removed after conversion is done */
 #endif
 	};
@@ -984,7 +984,7 @@ struct vm_area_struct {
 	union {
 		unsigned long vm_pteoff; /* Offset (within vm_file) in PTE_SIZE
 					    units */
-#if PTE_SIZE == PG_SIZE
+#if PG_SIZE == PTE_SIZE || defined(CONFIG_RISCV)
 		unsigned long vm_pgoff;  /* to be removed after conversion is done */
 #endif
 	};
