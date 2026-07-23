@@ -17,7 +17,7 @@
 #include <vdso/datapage.h>
 #include <vdso/vsyscall.h>
 
-#define VVAR_SIZE  (VDSO_NR_PAGES << PAGE_SHIFT)
+#define VVAR_SIZE  (VDSO_NR_PAGES << PTE_SHIFT)
 
 struct __vdso_info {
 	const char *name;
@@ -53,7 +53,7 @@ static void __init __vdso_init(struct __vdso_info *vdso_info)
 	vdso_info->vdso_pages = (
 		vdso_info->vdso_code_end -
 		vdso_info->vdso_code_start) >>
-		PAGE_SHIFT;
+		PTE_SHIFT;
 
 	vdso_pagelist = kzalloc_objs(struct page *, vdso_info->vdso_pages);
 	if (vdso_pagelist == NULL)
@@ -122,7 +122,7 @@ static int __setup_additional_pages(struct mm_struct *mm,
 
 	BUILD_BUG_ON(VDSO_NR_PAGES != __VDSO_PAGES);
 
-	vdso_text_len = vdso_info->vdso_pages << PAGE_SHIFT;
+	vdso_text_len = vdso_info->vdso_pages << PTE_SHIFT;
 	/* Be sure to map the data page */
 	vdso_mapping_len = vdso_text_len + VVAR_SIZE;
 

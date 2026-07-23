@@ -14,7 +14,7 @@ static long riscv_sys_mmap(unsigned long addr, unsigned long len,
 			   unsigned long fd, unsigned long offset,
 			   unsigned long page_shift_offset)
 {
-	if (unlikely(offset & (~PAGE_MASK >> page_shift_offset)))
+	if (unlikely(offset & (~PTE_MASK >> page_shift_offset)))
 		return -EINVAL;
 
 	/*
@@ -27,7 +27,7 @@ static long riscv_sys_mmap(unsigned long addr, unsigned long len,
 		prot |= PROT_READ;
 
 	return ksys_mmap_pgoff(addr, len, prot, flags, fd,
-			       offset >> (PAGE_SHIFT - page_shift_offset));
+			       offset >> (PTE_SHIFT - page_shift_offset));
 }
 
 #ifdef CONFIG_64BIT
@@ -46,7 +46,7 @@ SYSCALL_DEFINE6(mmap2, unsigned long, addr, unsigned long, len,
 {
 	/*
 	 * Note that the shift for mmap2 is constant (12),
-	 * regardless of PAGE_SIZE
+	 * regardless of PTE_SIZE
 	 */
 	return riscv_sys_mmap(addr, len, prot, flags, fd, offset, 12);
 }

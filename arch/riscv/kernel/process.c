@@ -109,7 +109,7 @@ void show_regs(struct pt_regs *regs)
 unsigned long arch_align_stack(unsigned long sp)
 {
 	if (!(current->personality & ADDR_NO_RANDOMIZE) && randomize_va_space)
-		sp -= get_random_u32_below(PAGE_SIZE);
+		sp -= get_random_u32_below(PTE_SIZE);
 	return sp & ~0xf;
 }
 

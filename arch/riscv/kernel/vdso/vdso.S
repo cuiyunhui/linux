@@ -14,10 +14,10 @@
 	__PAGE_ALIGNED_DATA
 
 	.globl vdso_start, vdso_end
-	.balign PAGE_SIZE
+	.balign PTE_SIZE
 vdso_start:
 	.incbin __VDSO_PATH
-	.balign PAGE_SIZE
+	.balign PTE_SIZE
 vdso_end:
 
 	.previous
