@@ -166,7 +166,7 @@ void __init setup_per_cpu_areas(void)
 		 * what the legacy allocator did.
 		 */
 		rc = pcpu_embed_first_chunk(PERCPU_MODULE_RESERVE,
-					    PERCPU_DYNAMIC_RESERVE, PAGE_SIZE,
+					    PERCPU_DYNAMIC_RESERVE, PG_SIZE,
 					    pcpu_cpu_distance,
 					    early_cpu_to_node);
 #ifdef CONFIG_NEED_PER_CPU_PAGE_FIRST_CHUNK
