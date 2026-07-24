@@ -286,13 +286,15 @@ static int __set_memory(unsigned long addr, int numpages, pgprot_t set_mask,
 
 	if (is_vmalloc_or_module_addr((void *)start)) {
 		struct vm_struct *area = NULL;
-		int i, page_start;
+		int i, pte_start;
 
 		area = find_vm_area((void *)start);
-		page_start = (start - (unsigned long)area->addr) >> PTE_SHIFT;
+		pte_start = (start - (unsigned long)area->addr) >> PTE_SHIFT;
 
-		for (i = page_start; i < page_start + numpages; ++i) {
-			lm_start = (unsigned long)page_address(area->pages[i]);
+		for (i = pte_start; i < pte_start + numpages; ++i) {
+			lm_start = (unsigned long)
+				page_address(area->pages[PTES_TO_PAGES(i)]);
+			lm_start += (i % PTES_PER_PAGE) << PTE_SHIFT;
 			lm_end = lm_start + PTE_SIZE;
 
 			ret = split_linear_mapping(lm_start, lm_end);
