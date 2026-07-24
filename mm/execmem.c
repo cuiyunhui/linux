@@ -136,7 +136,7 @@ err_restore:
 
 static int execmem_force_rw(void *ptr, size_t size)
 {
-	unsigned int nr = PG_ALIGN(size) >> PG_SHIFT;
+	unsigned int nr = PTE_ALIGN(size) >> PTE_SHIFT;
 	unsigned long addr = (unsigned long)ptr;
 	int ret;
 
@@ -149,7 +149,7 @@ static int execmem_force_rw(void *ptr, size_t size)
 
 int execmem_restore_rox(void *ptr, size_t size)
 {
-	unsigned int nr = PG_ALIGN(size) >> PG_SHIFT;
+	unsigned int nr = PTE_ALIGN(size) >> PTE_SHIFT;
 	unsigned long addr = (unsigned long)ptr;
 
 	return set_memory_rox(addr, nr);
@@ -303,7 +303,8 @@ static int execmem_cache_populate(struct execmem_range *range, size_t size)
 	/* fill memory with instructions that will trap */
 	execmem_fill_trapping_insns(p, alloc_size);
 
-	err = set_memory_rox((unsigned long)p, vm->nr_pages);
+	err = set_memory_rox((unsigned long)p,
+			     PTE_ALIGN(alloc_size) >> PTE_SHIFT);
 	if (err)
 		goto err_free_mem;
 

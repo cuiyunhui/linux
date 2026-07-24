@@ -1830,9 +1830,9 @@ static void vmalloc_helpers_tags(struct kunit *test)
 		int rv;
 
 		/* Make sure vmalloc'ed memory permissions can be changed. */
-		rv = set_memory_ro((unsigned long)ptr, 1);
+		rv = set_memory_ro((unsigned long)ptr, PTES_PER_PAGE);
 		KUNIT_ASSERT_GE(test, rv, 0);
-		rv = set_memory_rw((unsigned long)ptr, 1);
+		rv = set_memory_rw((unsigned long)ptr, PTES_PER_PAGE);
 		KUNIT_ASSERT_GE(test, rv, 0);
 	}
 #endif

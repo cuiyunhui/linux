@@ -346,7 +346,7 @@ static unsigned long relocate_restore_code(void)
 	copy_page(page, hibernate_core_restore_code);
 
 	/* Make the page containing the relocated code executable. */
-	set_memory_x((unsigned long)page, 1);
+	set_memory_x((unsigned long)page, PTES_PER_PAGE);
 
 	return (unsigned long)page;
 }

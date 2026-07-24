@@ -72,7 +72,7 @@ machine_kexec_prepare(struct kimage *image)
 			riscv_kexec_relocate_size);
 
 		/* Mark the control page executable */
-		set_memory_x((unsigned long) control_code_buffer, 1);
+		set_memory_x((unsigned long)control_code_buffer, PTES_PER_PAGE);
 	}
 
 	return 0;

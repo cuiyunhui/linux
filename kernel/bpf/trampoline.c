@@ -1363,7 +1363,7 @@ void __weak arch_free_bpf_trampoline(void *image, unsigned int size)
 int __weak arch_protect_bpf_trampoline(void *image, unsigned int size)
 {
 	WARN_ON_ONCE(size > PG_SIZE);
-	return set_memory_rox((long)image, 1);
+	return set_memory_rox((long)image, PTE_ALIGN(size) >> PTE_SHIFT);
 }
 
 int __weak arch_bpf_trampoline_size(const struct btf_func_model *m, u32 flags,

@@ -61,14 +61,14 @@ static inline void hibernate_restore_protection_end(void)
 static inline int __must_check hibernate_restore_protect_page(void *page_address)
 {
 	if (hibernate_restore_protection_active)
-		return set_memory_ro((unsigned long)page_address, 1);
+		return set_memory_ro((unsigned long)page_address, PTES_PER_PAGE);
 	return 0;
 }
 
 static inline int hibernate_restore_unprotect_page(void *page_address)
 {
 	if (hibernate_restore_protection_active)
-		return set_memory_rw((unsigned long)page_address, 1);
+		return set_memory_rw((unsigned long)page_address, PTES_PER_PAGE);
 	return 0;
 }
 #else
