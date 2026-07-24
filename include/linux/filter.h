@@ -1079,7 +1079,7 @@ static inline int __must_check bpf_prog_lock_ro(struct bpf_prog *fp)
 #ifndef CONFIG_BPF_JIT_ALWAYS_ON
 	if (!fp->jited) {
 		set_vm_flush_reset_perms(fp);
-		return set_memory_ro((unsigned long)fp, fp->pages);
+		return set_memory_ro((unsigned long)fp, PAGES_TO_PTES(fp->pages));
 	}
 #endif
 	return 0;
@@ -1089,7 +1089,8 @@ static inline int __must_check
 bpf_jit_binary_lock_ro(struct bpf_binary_header *hdr)
 {
 	set_vm_flush_reset_perms(hdr);
-	return set_memory_rox((unsigned long)hdr, hdr->size >> PG_SHIFT);
+	return set_memory_rox((unsigned long)hdr,
+			      PTE_ALIGN(hdr->size) >> PTE_SHIFT);
 }
 
 int sk_filter_trim_cap(struct sock *sk, struct sk_buff *skb, unsigned int cap,

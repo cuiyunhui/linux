@@ -921,7 +921,7 @@ static struct bpf_prog_pack *alloc_new_pack(bpf_jit_fill_hole_t bpf_fill_ill_ins
 
 	set_vm_flush_reset_perms(pack->ptr);
 	err = set_memory_rox((unsigned long)pack->ptr,
-			     BPF_PROG_PACK_SIZE / PG_SIZE);
+			     PTE_ALIGN(BPF_PROG_PACK_SIZE) >> PTE_SHIFT);
 	if (err)
 		goto out;
 	list_add_tail(&pack->list, &pack_list);
@@ -950,7 +950,7 @@ void *bpf_prog_pack_alloc(u32 size, bpf_jit_fill_hole_t bpf_fill_ill_insns)
 			bpf_fill_ill_insns(ptr, size);
 			set_vm_flush_reset_perms(ptr);
 			err = set_memory_rox((unsigned long)ptr,
-					     size / PG_SIZE);
+					     PTE_ALIGN(size) >> PTE_SHIFT);
 			if (err) {
 				bpf_jit_free_exec(ptr);
 				ptr = NULL;
