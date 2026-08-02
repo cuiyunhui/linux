@@ -1102,8 +1102,8 @@ SYSCALL_DEFINE5(remap_file_pages, unsigned long, start, unsigned long, size,
 
 	if (prot)
 		return ret;
-	start = start & PG_MASK;
-	size = size & PG_MASK;
+	start = start & PTE_MASK;
+	size = size & PTE_MASK;
 
 	if (start + size <= start)
 		return ret;
