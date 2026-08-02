@@ -1657,6 +1657,7 @@ void folio_add_new_anon_rmap(struct folio *folio, struct vm_area_struct *vma,
 	if (likely(!folio_test_large(folio))) {
 		/* increment count (starts at -1) */
 		atomic_set(&folio->_mapcount, 0);
+		nr = 1;
 		if (exclusive)
 			SetPageAnonExclusive(&folio->page);
 	} else if (!folio_test_pmd_mappable(folio)) {
@@ -2016,13 +2017,15 @@ static inline unsigned int folio_unmap_pte_batch(struct folio *folio,
 		return 1;
 
 	/*
-	 * With PG_SIZE > PTE_SIZE, even an order-0 folio spans multiple
-	 * hardware PTEs. Reclaim must unmap all matching sibling PTEs as a
-	 * single batch, otherwise only one PTE mapcount/refcount is dropped
-	 * and the folio can later reach the free path with a non-zero
-	 * mapcount (Bad page: refcount:0 mapcount:PTES_PER_PAGE).
+	 * Do not batch order-0 PG_SIZE folios when a base page is represented
+	 * by multiple hardware PTEs.  The generic PTE-batch helper assumes a
+	 * conventional large-folio layout; with RISC-V 64K base pages split into
+	 * 4K PTEs, truncate/fsstress showed adjacent base folios getting
+	 * mismatched mapcounts (one over-subtracted, the next left mapped) when
+	 * reclaim/truncate batched these order-0 file folios.  Unmapping one PTE
+	 * at a time is slower but keeps rmap/refcount accounting exact.
 	 */
-	if (folio_nr_ptes(folio) <= 1)
+	if (!folio_test_large(folio) || folio_nr_ptes(folio) <= 1)
 		return 1;
 
 	/* We may only batch within a single VMA and a single page table. */
@@ -2183,7 +2186,7 @@ static bool try_to_unmap_one(struct folio *folio, struct vm_area_struct *vma,
 			VM_WARN_ON_FOLIO(folio_test_hugetlb(folio), folio);
 		}
 
-		subpage = folio_page(folio, pfn - folio_pfn(folio));
+		subpage = pfn_to_page(pfn);
 		address = pvmw.address;
 		anon_exclusive = folio_test_anon(folio) &&
 				 PageAnonExclusive(subpage);
@@ -2384,8 +2387,8 @@ static bool try_to_unmap_one(struct folio *folio, struct vm_area_struct *vma,
 					list_add(&mm->mmlist, &init_mm.mmlist);
 				spin_unlock(&mmlist_lock);
 			}
-			dec_mm_counter(mm, MM_ANONPAGES);
-			inc_mm_counter(mm, MM_SWAPENTS);
+			add_mm_counter(mm, MM_ANONPAGES, -nr_pages);
+			add_mm_counter(mm, MM_SWAPENTS, nr_pages);
 			swp_pte = swp_entry_to_pte(entry);
 			if (anon_exclusive)
 				swp_pte = pte_swp_mkexclusive(swp_pte);
@@ -2558,7 +2561,7 @@ static bool try_to_migrate_one(struct folio *folio, struct vm_area_struct *vma,
 			else
 				pfn = softleaf_to_pfn(softleaf_from_pmd(pmdval));
 
-			subpage = folio_page(folio, pfn - folio_pfn(folio));
+			subpage = pfn_to_page(pfn);
 
 			VM_BUG_ON_FOLIO(folio_test_hugetlb(folio) ||
 					!folio_test_pmd_mappable(folio), folio);
@@ -2589,7 +2592,7 @@ static bool try_to_migrate_one(struct folio *folio, struct vm_area_struct *vma,
 			VM_WARN_ON_FOLIO(folio_test_hugetlb(folio), folio);
 		}
 
-		subpage = folio_page(folio, pfn - folio_pfn(folio));
+		subpage = pfn_to_page(pfn);
 		address = pvmw.address;
 		anon_exclusive = folio_test_anon(folio) &&
 				 PageAnonExclusive(subpage);
@@ -2750,14 +2753,11 @@ static bool try_to_migrate_one(struct folio *folio, struct vm_area_struct *vma,
 			 * pte is removed and then restart fault handling.
 			 */
 			if (writable)
-				entry = make_writable_migration_entry(
-							page_to_pfn(subpage));
+				entry = make_writable_migration_entry(pfn);
 			else if (anon_exclusive)
-				entry = make_readable_exclusive_migration_entry(
-							page_to_pfn(subpage));
+				entry = make_readable_exclusive_migration_entry(pfn);
 			else
-				entry = make_readable_migration_entry(
-							page_to_pfn(subpage));
+				entry = make_readable_migration_entry(pfn);
 			if (likely(pte_present(pteval))) {
 				if (pte_young(pteval))
 					entry = make_migration_entry_young(entry);

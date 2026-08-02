@@ -604,8 +604,9 @@ static __always_inline int __folio_try_dup_anon_rmap(struct folio *folio,
 	case PGTABLE_LEVEL_PTE:
 		if (unlikely(maybe_pinned)) {
 			for (i = 0; i < nr_ptes; i++) {
-				int pfn = page_to_pfn(page) + i;
-				if (PageAnonExclusive(folio_page(folio, pfn % folio_nr_ptes(folio))))
+				unsigned long pfn = page_to_pfn(page) + i;
+
+				if (PageAnonExclusive(pfn_to_page(pfn)))
 					return -EBUSY;
 			}
 		}
