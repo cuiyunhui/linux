@@ -1939,13 +1939,22 @@ long populate_vma_page_range(struct vm_area_struct *vma,
 long faultin_page_range(struct mm_struct *mm, unsigned long start,
 			unsigned long end, bool write, int *locked)
 {
-	unsigned long nr_pages = (end - start) / PG_SIZE;
+	unsigned long nr_pages = DIV_ROUND_UP(end - start, PG_SIZE);
 	int gup_flags;
 	long ret;
 
-	VM_WARN_ON_ONCE(!PG_ALIGNED(start));
-	VM_WARN_ON_ONCE(!PG_ALIGNED(end));
+	VM_WARN_ON_ONCE(!PTE_ALIGNED(start));
+	VM_WARN_ON_ONCE(!PTE_ALIGNED(end));
 	mmap_assert_locked(mm);
+
+	if (fatal_signal_pending(current))
+		return -EINTR;
+	/*
+	 * Keep MADV_POPULATE-style prefaulting killable.  A single very large
+	 * GUP batch can otherwise run for minutes before observing SIGKILL,
+	 * which breaks stress timeout/cleanup on PG_SIZE > PTE_SIZE systems.
+	 */
+	nr_pages = min_t(unsigned long, nr_pages, SZ_16M >> PG_SHIFT);
 
 	/*
 	 * FOLL_TOUCH: Mark page accessed and thereby young; will also mark

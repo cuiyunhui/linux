@@ -970,6 +970,9 @@ static long madvise_populate(struct madvise_behavior *madv_behavior)
 	long pages;
 
 	while (start < end) {
+		if (fatal_signal_pending(current))
+			return -EINTR;
+
 		/* Populate (prefault) page tables readable/writable. */
 		pages = faultin_page_range(mm, start, end, write, &locked);
 		if (!locked) {
@@ -994,6 +997,8 @@ static long madvise_populate(struct madvise_behavior *madv_behavior)
 				return -ENOMEM;
 			}
 		}
+		if (!pages)
+			return -ENOMEM;
 		start += pages * PG_SIZE;
 	}
 	return 0;
