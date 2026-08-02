@@ -5911,13 +5911,13 @@ vm_fault_t finish_fault(struct vm_fault *vmf)
 				    vmf->address, is_cow);
 }
 
-static unsigned long fault_around_pages __read_mostly =
-	65536 >> PG_SHIFT;
+static unsigned long fault_around_ptes __read_mostly =
+	65536 >> PTE_SHIFT;
 
 #ifdef CONFIG_DEBUG_FS
 static int fault_around_bytes_get(void *data, u64 *val)
 {
-	*val = fault_around_pages << PG_SHIFT;
+	*val = fault_around_ptes << PTE_SHIFT;
 	return 0;
 }
 
@@ -5935,11 +5935,10 @@ static int fault_around_bytes_set(void *data, u64 val)
 		return -EINVAL;
 
 	/*
-	 * The minimum value is 1 PG_SIZE; below that there is no fault-around
-	 * at all.  See should_fault_around().
+	 * A single PTE-sized page disables fault-around.
 	 */
-	val = max(val, PG_SIZE);
-	fault_around_pages = rounddown_pow_of_two(val) >> PG_SHIFT;
+	val = max(val, PTE_SIZE);
+	fault_around_ptes = rounddown_pow_of_two(val) >> PTE_SHIFT;
 
 	return 0;
 }
@@ -5966,18 +5965,17 @@ late_initcall(fault_around_debugfs);
  * This function doesn't cross VMA or page table boundaries, in order to call
  * map_pages() and acquire a PTE lock only once.
  *
- * fault_around_pages defines how many pages we'll try to map.
+ * fault_around_ptes defines how many PTE-sized pages we'll try to map.
  * do_fault_around() expects it to be set to a power of two less than or equal
  * to PTRS_PER_PTE.
  *
  * The virtual address of the area that we map is naturally aligned to
- * fault_around_pages * PG_SIZE rounded down to the machine page size
- * (and therefore to page order).  This way it's easier to guarantee
- * that we don't cross page table boundaries.
+ * fault_around_ptes * PTE_SIZE. This way it's easier to guarantee that we
+ * don't cross page table boundaries.
  */
 static vm_fault_t do_fault_around(struct vm_fault *vmf)
 {
-	unsigned long nr_ptes = PAGES_TO_PTES(READ_ONCE(fault_around_pages));
+	unsigned long nr_ptes = READ_ONCE(fault_around_ptes);
 	unsigned long pte_off = pte_index(vmf->address);
 	/* The page offset of vmf->address within the VMA. */
 	unsigned long vma_off = vmf->pteoff - vmf->vma->vm_pteoff;
@@ -6017,17 +6015,8 @@ static inline bool should_fault_around(struct vm_fault *vmf)
 	if (uffd_disable_fault_around(vmf->vma))
 		return false;
 
-	/*
-	 * Keep file mmap faults precise on PG_SIZE > PTE_SIZE systems.
-	 * A page-cache folio spans multiple independently addressable user
-	 * PTEs; batching those PTEs in fault-around has shown stale/wrong
-	 * sub-page exposure under fsstress mmap/truncate/writeback races.
-	 */
-	if (PTES_PER_PAGE > 1 && vmf->vma->vm_file)
-		return false;
-
-	/* A single page implies no faulting 'around' at all. */
-	return fault_around_pages > 1;
+	/* A single PTE implies no faulting 'around' at all. */
+	return READ_ONCE(fault_around_ptes) > 1;
 }
 
 static vm_fault_t do_read_fault(struct vm_fault *vmf)
