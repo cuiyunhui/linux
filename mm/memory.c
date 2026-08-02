@@ -3801,79 +3801,6 @@ pte_install_clamp(struct vm_fault *vmf, unsigned long fault_idx, unsigned long m
  *   held to the old page, as well as updating the rmap.
  * - In any case, unlock the PTL and drop the reference we took to the old page.
  */
-/*
- * install_cow_siblings - map sibling PTEs in a PG to a freshly-COW'd folio
- *
- * After a COW fault installs the primary PTE, this replaces the remaining
- * sibling PTEs in the same PG (the intersection of one PG, one folio, one
- * VMA, one PT page) with mappings into @new_folio.  Handles pte_none
- * entries (not yet faulted) and file-backed entries (read-fault mapped,
- * torn down with counter moved).  Swap entries and anon entries (a
- * prior CoW that did not extend across this slot — typically because
- * the VMA was sub-PG at the time and was later resized) are left
- * alone: the new_folio's slot for those PTEs stays unused, and the
- * existing entry keeps mapping its current data.
- *
- * Called with PTL held.  Returns the number of sibling PTEs installed
- * (the primary PTE is the caller's responsibility).
- */
-static int install_cow_siblings(struct vm_fault *vmf,
-				struct folio *new_folio, bool unshare)
-{
-	struct vm_area_struct *vma = vmf->vma;
-	struct mm_struct *mm = vma->vm_mm;
-	unsigned long pg_sub = vmf->pteoff % PTES_PER_PAGE;
-	struct pte_install_clamp clamp = pte_install_clamp(vmf, pg_sub,
-							   PTES_PER_PAGE);
-	int extra = 0;
-	long i;
-
-	for (i = -(long)clamp.left; i < (long)clamp.right; i++) {
-		pte_t *ptep, old_pte, sibling;
-		struct page *old_pg;
-		struct folio *old_f;
-		unsigned long addr_i = vmf->address + i * PTE_SIZE;
-
-		if (i == 0)
-			continue;
-
-		ptep = vmf->pte + i;
-		old_pte = ptep_get(ptep);
-
-		sibling = folio_mkpte(new_folio, vmf->pteoff + i,
-				      vma->vm_page_prot);
-		sibling = pte_sw_mkyoung(sibling);
-		if (!unshare)
-			sibling = maybe_mkwrite(pte_mkdirty(sibling), vma);
-
-		if (pte_none(old_pte)) {
-			set_pte_at(mm, addr_i, ptep, sibling);
-			inc_mm_counter(mm, MM_ANONPAGES);
-			extra++;
-			continue;
-		}
-
-		if (!pte_present(old_pte))
-			continue; /* swap entry — leave alone */
-
-		old_pg = pte_page(old_pte);
-		old_f = page_folio(old_pg);
-
-		if (folio_test_anon(old_f))
-			continue; /* prior CoW — leave alone */
-
-		ptep_clear_flush(vma, addr_i, ptep);
-		folio_remove_rmap_pte(old_f, old_pg, vma);
-		dec_mm_counter(mm, mm_counter_file(old_f));
-		inc_mm_counter(mm, MM_ANONPAGES);
-		folio_put(old_f);
-
-		set_pte_at(mm, addr_i, ptep, sibling);
-		extra++;
-	}
-	return extra;
-}
-
 static vm_fault_t wp_page_copy(struct vm_fault *vmf)
 {
 	const bool unshare = vmf->flags & FAULT_FLAG_UNSHARE;
@@ -3972,18 +3899,11 @@ static vm_fault_t wp_page_copy(struct vm_fault *vmf)
 		}
 
 		/*
-		 * When PG_SIZE > PTE_SIZE, map all sibling PTEs in the
-		 * same PG_SIZE range to the new COW page.  This ensures
-		 * writes to different sub-pages accumulate on one copy.
+		 * Only the faulting PTE-sized subpage has been copied into the
+		 * new folio.  Do not install sibling PTEs here: mapping them to
+		 * the new anonymous folio would expose uninitialised subpages in
+		 * place of the original file contents.
 		 */
-		if (PTES_PER_PAGE > 1 && old_folio && vma->vm_file) {
-			int extra = install_cow_siblings(vmf, new_folio,
-							 unshare);
-			if (extra) {
-				folio_ref_add(new_folio, extra);
-				atomic_add(extra, &new_folio->_mapcount);
-			}
-		}
 
 		/* Free the old page.. */
 		new_folio = old_folio;
@@ -5922,9 +5842,7 @@ vm_fault_t finish_fault(struct vm_fault *vmf)
 			return VM_FAULT_OOM;
 	}
 
-	if (is_cow && PTES_PER_PAGE > 1 && vma->vm_file)
-		nr_ptes = PTES_PER_PAGE;
-	else if (is_cow)
+	if (is_cow || vma->vm_file)
 		nr_ptes = 1;
 	else
 		nr_ptes = folio_nr_ptes(folio);
@@ -6074,6 +5992,15 @@ static inline bool should_fault_around(struct vm_fault *vmf)
 		return false;
 
 	if (uffd_disable_fault_around(vmf->vma))
+		return false;
+
+	/*
+	 * Keep file mmap faults precise on PG_SIZE > PTE_SIZE systems.
+	 * A page-cache folio spans multiple independently addressable user
+	 * PTEs; batching those PTEs in fault-around has shown stale/wrong
+	 * sub-page exposure under fsstress mmap/truncate/writeback races.
+	 */
+	if (PTES_PER_PAGE > 1 && vmf->vma->vm_file)
 		return false;
 
 	/* A single page implies no faulting 'around' at all. */
