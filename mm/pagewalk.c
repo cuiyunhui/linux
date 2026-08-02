@@ -813,16 +813,14 @@ int walk_page_mapping(struct address_space *mapping, pgoff_t first_index,
 	lockdep_assert_held(&mapping->i_mmap_rwsem);
 	vma_interval_tree_foreach(vma, &mapping->i_mmap, first_index,
 				  first_index + nr - 1) {
-		/* Clip to the vma */
+		/* Clip to the vma. first_index/nr are PG-sized page-cache indices. */
 		vba = vma->vm_pteoff;
-		vea = vba + vma_pages(vma) * PTES_PER_PAGE;
-		cba = first_index;
-		cba = max(cba, vba);
-		cea = first_index + nr;
-		cea = min(cea, vea);
+		vea = vba + vma_ptes(vma);
+		cba = max(PAGES_TO_PTES(first_index), vba);
+		cea = min(PAGES_TO_PTES(first_index + nr), vea);
 
-		start_addr = ((cba - vba) << PG_SHIFT) + vma->vm_start;
-		end_addr = ((cea - vba) << PG_SHIFT) + vma->vm_start;
+		start_addr = ((cba - vba) << PTE_SHIFT) + vma->vm_start;
+		end_addr = ((cea - vba) << PTE_SHIFT) + vma->vm_start;
 		if (start_addr >= end_addr)
 			continue;
 

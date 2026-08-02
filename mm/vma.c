@@ -218,7 +218,7 @@ static bool can_vma_merge_after(struct vma_merge_struct *vmg)
 {
 	if (is_mergeable_vma(vmg, /* merge_next = */ false) &&
 	    is_mergeable_anon_vma(vmg, /* merge_next = */ false)) {
-		if (vmg->prev->vm_pteoff + PTES_PER_PAGE * vma_pages(vmg->prev) == vmg->pteoff)
+		if (vmg->prev->vm_pteoff + vma_ptes(vmg->prev) == vmg->pteoff)
 			return true;
 	}
 	return false;
@@ -706,10 +706,12 @@ static void vmg_adjust_set_range(struct vma_merge_struct *vmg)
 
 	if (vmg->__adjust_middle_start) {
 		adjust = vmg->middle;
-		pteoff = adjust->vm_pteoff + PHYS_PFN(vmg->end - adjust->vm_start);
+		pteoff = adjust->vm_pteoff +
+			((vmg->end - adjust->vm_start) >> PTE_SHIFT);
 	} else if (vmg->__adjust_next_start) {
 		adjust = vmg->next;
-		pteoff = adjust->vm_pteoff - PHYS_PFN(adjust->vm_start - vmg->end);
+		pteoff = adjust->vm_pteoff -
+			((adjust->vm_start - vmg->end) >> PTE_SHIFT);
 	} else {
 		return;
 	}
