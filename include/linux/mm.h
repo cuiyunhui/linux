@@ -4041,7 +4041,7 @@ static inline unsigned long vm_end_gap(const struct vm_area_struct *vma)
 
 static inline unsigned long vma_pages(const struct vm_area_struct *vma)
 {
-	return (vma->vm_end - vma->vm_start) >> PG_SHIFT;
+	return (vma->vm_end - vma->vm_start) >> PTE_SHIFT;
 }
 
 static inline unsigned long vma_ptes(const struct vm_area_struct *vma)

@@ -125,7 +125,7 @@ static void prot_commit_flush_ptes(struct vm_area_struct *vma, unsigned long add
 	 * Advance the position in the batch by idx; note that if idx > 0,
 	 * then the nr_ptes passed here is <= batch size - idx.
 	 */
-	addr += idx * PG_SIZE;
+	addr += idx * PTE_SIZE;
 	ptep += idx;
 	oldpte = pte_advance_pfn(oldpte, idx);
 	ptent = pte_advance_pfn(ptent, idx);
@@ -149,7 +149,8 @@ static int page_anon_exclusive_sub_batch(int start_idx, int max_len,
 	int idx;
 
 	for (idx = start_idx + 1; idx < start_idx + max_len; ++idx) {
-		if (expected_anon_exclusive != PageAnonExclusive(first_page + idx))
+		if (expected_anon_exclusive !=
+		    PageAnonExclusive(pfn_to_page(page_to_pfn(first_page) + idx)))
 			break;
 	}
 	return idx - start_idx;
@@ -170,17 +171,21 @@ static int page_anon_exclusive_sub_batch(int start_idx, int max_len,
  * retrieve sub-batches.
  */
 static void commit_anon_folio_batch(struct vm_area_struct *vma,
-		struct folio *folio, struct page *first_page, unsigned long addr, pte_t *ptep,
-		pte_t oldpte, pte_t ptent, int nr_ptes, struct mmu_gather *tlb)
+		struct folio *folio, struct page *first_page, unsigned long addr,
+		pte_t *ptep, pte_t oldpte, pte_t ptent, int nr_ptes,
+		struct mmu_gather *tlb)
 {
+	struct page *pte_page;
 	bool expected_anon_exclusive;
 	int sub_batch_idx = 0;
 	int len;
 
 	while (nr_ptes) {
-		expected_anon_exclusive = PageAnonExclusive(first_page + sub_batch_idx);
+		pte_page = pfn_to_page(page_to_pfn(first_page) +
+				       sub_batch_idx);
+		expected_anon_exclusive = PageAnonExclusive(pte_page);
 		len = page_anon_exclusive_sub_batch(sub_batch_idx, nr_ptes,
-					first_page, expected_anon_exclusive);
+				first_page, expected_anon_exclusive);
 		prot_commit_flush_ptes(vma, addr, ptep, oldpte, ptent, len,
 				       sub_batch_idx, expected_anon_exclusive, tlb);
 		sub_batch_idx += len;
@@ -224,7 +229,7 @@ static long change_pte_range(struct mmu_gather *tlb,
 	bool uffd_wp_resolve = cp_flags & MM_CP_UFFD_WP_RESOLVE;
 	int nr_ptes;
 
-	tlb_change_page_size(tlb, PG_SIZE);
+	tlb_change_page_size(tlb, PTE_SIZE);
 	pte = pte_offset_map_lock(vma->vm_mm, pmd, addr, &ptl);
 	if (!pte)
 		return -EAGAIN;
@@ -698,7 +703,7 @@ mprotect_fixup(struct vma_iterator *vmi, struct mmu_gather *tlb,
 {
 	struct mm_struct *mm = vma->vm_mm;
 	vm_flags_t oldflags = READ_ONCE(vma->vm_flags);
-	long nrpages = (end - start) >> PG_SHIFT;
+	long nrpages = (end - start) >> PTE_SHIFT;
 	unsigned int mm_cp_flags = 0;
 	unsigned long charged = 0;
 	int error;

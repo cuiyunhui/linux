@@ -514,7 +514,7 @@ int __account_locked_vm(struct mm_struct *mm, unsigned long pages, bool inc,
 	locked_vm = mm->locked_vm;
 	if (inc) {
 		if (!bypass_rlim) {
-			limit = task_rlimit(task, RLIMIT_MEMLOCK) >> PG_SHIFT;
+			limit = task_rlimit(task, RLIMIT_MEMLOCK) >> PTE_SHIFT;
 			if (locked_vm + pages > limit)
 				ret = -ENOMEM;
 		}
@@ -526,8 +526,8 @@ int __account_locked_vm(struct mm_struct *mm, unsigned long pages, bool inc,
 	}
 
 	pr_debug("%s: [%d] caller %ps %c%lu %lu/%lu%s\n", __func__, task->pid,
-		 (void *)_RET_IP_, (inc) ? '+' : '-', pages << PG_SHIFT,
-		 locked_vm << PG_SHIFT, task_rlimit(task, RLIMIT_MEMLOCK),
+		 (void *)_RET_IP_, (inc) ? '+' : '-', pages << PTE_SHIFT,
+		 locked_vm << PTE_SHIFT, task_rlimit(task, RLIMIT_MEMLOCK),
 		 ret ? " - exceeded" : "");
 
 	return ret;
@@ -877,9 +877,9 @@ unsigned long vm_commit_limit(void)
 	unsigned long allowed;
 
 	if (sysctl_overcommit_kbytes)
-		allowed = sysctl_overcommit_kbytes >> (PG_SHIFT - 10);
+		allowed = sysctl_overcommit_kbytes >> (PTE_SHIFT - 10);
 	else
-		allowed = ((totalram_pages() - hugetlb_total_pages())
+		allowed = (PAGES_TO_PTES(totalram_pages() - hugetlb_total_pages())
 			   * sysctl_overcommit_ratio / 100);
 	allowed += total_swap_pages;
 
@@ -941,7 +941,7 @@ int __vm_enough_memory(const struct mm_struct *mm, long pages, int cap_sys_admin
 		return 0;
 
 	if (sysctl_overcommit_memory == OVERCOMMIT_GUESS) {
-		if (pages > totalram_pages() + total_swap_pages)
+		if (pages > PAGES_TO_PTES(totalram_pages()) + total_swap_pages)
 			goto error;
 		return 0;
 	}
@@ -951,13 +951,13 @@ int __vm_enough_memory(const struct mm_struct *mm, long pages, int cap_sys_admin
 	 * Reserve some for root
 	 */
 	if (!cap_sys_admin)
-		allowed -= sysctl_admin_reserve_kbytes >> (PG_SHIFT - 10);
+		allowed -= sysctl_admin_reserve_kbytes >> (PTE_SHIFT - 10);
 
 	/*
 	 * Don't let a single process grow so big a user can't recover
 	 */
 	if (mm) {
-		long reserve = sysctl_user_reserve_kbytes >> (PG_SHIFT - 10);
+		long reserve = sysctl_user_reserve_kbytes >> (PTE_SHIFT - 10);
 
 		allowed -= min_t(long, mm->total_vm / 32, reserve);
 	}
@@ -965,7 +965,7 @@ int __vm_enough_memory(const struct mm_struct *mm, long pages, int cap_sys_admin
 	if (percpu_counter_read_positive(&vm_committed_as) < allowed)
 		return 0;
 error:
-	bytes_failed = pages << PG_SHIFT;
+	bytes_failed = pages << PTE_SHIFT;
 	pr_warn_ratelimited("%s: pid: %d, comm: %s, bytes: %lu not enough memory for the allocation\n",
 			    __func__, current->pid, current->comm, bytes_failed);
 	vm_unacct_memory(pages);

@@ -705,8 +705,8 @@ static int queue_folios_pte_range(pmd_t *pmd, unsigned long addr,
 		walk->action = ACTION_AGAIN;
 		return 0;
 	}
-	for (; addr != end; pte += nr, addr += nr * PG_SIZE) {
-		max_nr = (end - addr) >> PG_SHIFT;
+	for (; addr != end; pte += nr, addr += nr * PTE_SIZE) {
+		max_nr = (end - addr) >> PTE_SHIFT;
 		nr = 1;
 		ptent = ptep_get(pte);
 		if (pte_none(ptent))

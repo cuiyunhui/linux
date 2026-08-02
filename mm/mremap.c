@@ -985,9 +985,9 @@ static bool vrm_calc_charge(struct vma_remap_struct *vrm)
 	 * the length of the new one. Otherwise it's just the delta in size.
 	 */
 	if (vrm->flags & MREMAP_DONTUNMAP)
-		charged = vrm->new_len >> PG_SHIFT;
+		charged = vrm->new_len >> PTE_SHIFT;
 	else
-		charged = vrm->delta >> PG_SHIFT;
+		charged = vrm->delta >> PTE_SHIFT;
 
 
 	/* This accounts 'charged' pages of memory. */
@@ -1019,7 +1019,7 @@ static void vrm_uncharge(struct vma_remap_struct *vrm)
 static void vrm_stat_account(struct vma_remap_struct *vrm,
 			     unsigned long bytes)
 {
-	unsigned long pages = bytes >> PG_SHIFT;
+	unsigned long pages = bytes >> PTE_SHIFT;
 	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma = vrm->vma;
 
@@ -1128,7 +1128,7 @@ static void unmap_source_vma(struct vma_remap_struct *vrm)
 	vrm->vmi_needs_invalidate = true;
 	if (err) {
 		/* OOM: unable to split vma, just get accounts right */
-		vm_acct_memory(len >> PG_SHIFT);
+		vm_acct_memory(len >> PTE_SHIFT);
 		return;
 	}
 
@@ -1403,7 +1403,7 @@ static unsigned long mremap_to(struct vma_remap_struct *vrm)
 	/* MREMAP_DONTUNMAP expands by old_len since old_len == new_len */
 	if (vrm->flags & MREMAP_DONTUNMAP) {
 		vm_flags_t vm_flags = vrm->vma->vm_flags;
-		unsigned long pages = vrm->old_len >> PG_SHIFT;
+		unsigned long pages = vrm->old_len >> PTE_SHIFT;
 
 		if (!may_expand_vm(mm, vm_flags, pages))
 			return -ENOMEM;
@@ -1743,7 +1743,7 @@ static int check_prep_vma(struct vma_remap_struct *vrm)
 	if (!mlock_future_ok(mm, vma->vm_flags & VM_LOCKED, vrm->delta))
 		return -EAGAIN;
 
-	if (!may_expand_vm(mm, vma->vm_flags, vrm->delta >> PG_SHIFT))
+	if (!may_expand_vm(mm, vma->vm_flags, vrm->delta >> PTE_SHIFT))
 		return -ENOMEM;
 
 	return 0;

@@ -1635,7 +1635,7 @@ static void pagetypeinfo_showblockcount_print(struct seq_file *m,
 	unsigned long end_pfn = zone_end_pfn(zone);
 	unsigned long count[MIGRATE_TYPES] = { 0, };
 
-	for (pfn = start_pfn; pfn < end_pfn; pfn += pageblock_nr_pages) {
+	for (pfn = start_pfn; pfn < end_pfn; pfn += pageblock_nr_ptes) {
 		struct page *page;
 
 		page = pfn_to_online_page(pfn);

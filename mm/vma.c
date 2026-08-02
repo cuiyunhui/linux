@@ -2874,13 +2874,13 @@ int do_brk_flags(struct vma_iterator *vmi, struct vm_area_struct *vma,
 	 */
 	vm_flags |= VM_DATA_DEFAULT_FLAGS | VM_ACCOUNT | mm->def_flags;
 	vm_flags = ksm_vma_flags(mm, NULL, vm_flags);
-	if (!may_expand_vm(mm, vm_flags, len >> PG_SHIFT))
+	if (!may_expand_vm(mm, vm_flags, len >> PTE_SHIFT))
 		return -ENOMEM;
 
 	if (mm->map_count > sysctl_max_map_count)
 		return -ENOMEM;
 
-	if (security_vm_enough_memory_mm(mm, len >> PG_SHIFT))
+	if (security_vm_enough_memory_mm(mm, len >> PTE_SHIFT))
 		return -ENOMEM;
 
 	/*
@@ -2919,10 +2919,10 @@ int do_brk_flags(struct vma_iterator *vmi, struct vm_area_struct *vma,
 	validate_mm(mm);
 out:
 	perf_event_mmap(vma);
-	mm->total_vm += len >> PG_SHIFT;
-	mm->data_vm += len >> PG_SHIFT;
+	mm->total_vm += len >> PTE_SHIFT;
+	mm->data_vm += len >> PTE_SHIFT;
 	if (vm_flags & VM_LOCKED)
-		mm->locked_vm += (len >> PG_SHIFT);
+		mm->locked_vm += (len >> PTE_SHIFT);
 	if (pgtable_supports_soft_dirty())
 		vm_flags_set(vma, VM_SOFTDIRTY);
 	return 0;
@@ -2930,7 +2930,7 @@ out:
 mas_store_fail:
 	vm_area_free(vma);
 unacct_fail:
-	vm_unacct_memory(len >> PG_SHIFT);
+	vm_unacct_memory(len >> PTE_SHIFT);
 	return -ENOMEM;
 }
 
@@ -3063,7 +3063,7 @@ static int acct_stack_growth(struct vm_area_struct *vma,
 		return -ENOMEM;
 
 	/* mlock limit tests */
-	if (!mlock_future_ok(mm, vma->vm_flags & VM_LOCKED, grow << PG_SHIFT))
+	if (!mlock_future_ok(mm, vma->vm_flags & VM_LOCKED, grow << PTE_SHIFT))
 		return -ENOMEM;
 
 	/* Check to ensure the stack will not grow into a hugetlb-only region */
@@ -3101,10 +3101,10 @@ int expand_upwards(struct vm_area_struct *vma, unsigned long address)
 	mmap_assert_write_locked(mm);
 
 	/* Guard against exceeding limits of the address space. */
-	address &= PG_MASK;
-	if (address >= (TASK_SIZE & PG_MASK))
+	address = PTE_ALIGN_DOWN(address);
+	if (address >= PTE_ALIGN_DOWN(TASK_SIZE))
 		return -ENOMEM;
-	address += PG_SIZE;
+	address += PTE_SIZE;
 
 	/* Enforce stack_guard_gap */
 	gap_addr = address + stack_guard_gap;
@@ -3143,10 +3143,10 @@ int expand_upwards(struct vm_area_struct *vma, unsigned long address)
 		unsigned long size, grow;
 
 		size = address - vma->vm_start;
-		grow = (address - vma->vm_end) >> PG_SHIFT;
+		grow = (address - vma->vm_end) >> PTE_SHIFT;
 
 		error = -ENOMEM;
-		if (vma->vm_pgoff + (size >> PG_SHIFT) >= vma->vm_pgoff) {
+		if (vma->vm_pteoff + (size >> PTE_SHIFT) >= vma->vm_pteoff) {
 			error = acct_stack_growth(vma, size, grow);
 			if (!error) {
 				if (vma->vm_flags & VM_LOCKED)
@@ -3185,7 +3185,7 @@ int expand_downwards(struct vm_area_struct *vma, unsigned long address)
 
 	mmap_assert_write_locked(mm);
 
-	address &= PG_MASK;
+	address = PTE_ALIGN_DOWN(address);
 	if (address < mmap_min_addr || address < FIRST_USER_ADDRESS)
 		return -EPERM;
 
@@ -3222,10 +3222,10 @@ int expand_downwards(struct vm_area_struct *vma, unsigned long address)
 		unsigned long size, grow;
 
 		size = vma->vm_end - address;
-		grow = (vma->vm_start - address) >> PG_SHIFT;
+		grow = (vma->vm_start - address) >> PTE_SHIFT;
 
 		error = -ENOMEM;
-		if (grow <= vma->vm_pteoff * PTES_PER_PAGE) {
+		if (grow <= vma->vm_pteoff) {
 			error = acct_stack_growth(vma, size, grow);
 			if (!error) {
 				if (vma->vm_flags & VM_LOCKED)
@@ -3233,7 +3233,7 @@ int expand_downwards(struct vm_area_struct *vma, unsigned long address)
 				vm_stat_account(mm, vma->vm_flags, grow);
 				anon_vma_interval_tree_pre_update_vma(vma);
 				vma->vm_start = address;
-				vma->vm_pteoff -= grow * PTES_PER_PAGE;
+				vma->vm_pteoff -= grow;
 				/* Overwrite old entry in mtree. */
 				vma_iter_store_overwrite(&vmi, vma);
 				anon_vma_interval_tree_post_update_vma(vma);

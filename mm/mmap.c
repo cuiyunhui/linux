@@ -234,11 +234,11 @@ bool mlock_future_ok(const struct mm_struct *mm, bool is_vma_locked,
 	if (!is_vma_locked || capable(CAP_IPC_LOCK))
 		return true;
 
-	locked_pages = bytes >> PG_SHIFT;
+	locked_pages = bytes >> PTE_SHIFT;
 	locked_pages += mm->locked_vm;
 
 	limit_pages = rlimit(RLIMIT_MEMLOCK);
-	limit_pages >>= PG_SHIFT;
+	limit_pages >>= PTE_SHIFT;
 
 	return locked_pages <= limit_pages;
 }
@@ -1339,19 +1339,19 @@ destroy:
  */
 bool may_expand_vm(struct mm_struct *mm, vm_flags_t flags, unsigned long npages)
 {
-	if (mm->total_vm + npages > rlimit(RLIMIT_AS) >> PG_SHIFT)
+	if (mm->total_vm + npages > rlimit(RLIMIT_AS) >> PTE_SHIFT)
 		return false;
 
 	if (is_data_mapping(flags) &&
-	    mm->data_vm + npages > rlimit(RLIMIT_DATA) >> PG_SHIFT) {
+	    mm->data_vm + npages > rlimit(RLIMIT_DATA) >> PTE_SHIFT) {
 		/* Workaround for Valgrind */
 		if (rlimit(RLIMIT_DATA) == 0 &&
-		    mm->data_vm + npages <= rlimit_max(RLIMIT_DATA) >> PG_SHIFT)
+		    mm->data_vm + npages <= rlimit_max(RLIMIT_DATA) >> PTE_SHIFT)
 			return true;
 
 		pr_warn_once("%s (%d): VmData %lu exceed data ulimit %lu. Update limits%s.\n",
 			     current->comm, current->pid,
-			     (mm->data_vm + npages) << PG_SHIFT,
+			     (mm->data_vm + npages) << PTE_SHIFT,
 			     rlimit(RLIMIT_DATA),
 			     ignore_rlimit_data ? "" : " or use boot option ignore_rlimit_data");
 
@@ -1480,7 +1480,7 @@ static struct vm_area_struct *__install_special_mapping(
 	if (ret)
 		goto out;
 
-	vm_stat_account(mm, vma->vm_flags, len >> PG_SHIFT);
+	vm_stat_account(mm, vma->vm_flags, len >> PTE_SHIFT);
 
 	perf_event_mmap(vma);
 
