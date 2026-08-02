@@ -46,7 +46,14 @@ SYSCALL_DEFINE3(msync, unsigned long, start, size_t, len, int, flags)
 	if ((flags & MS_ASYNC) && (flags & MS_SYNC))
 		goto out;
 	error = -ENOMEM;
-	len = (len + ~PG_MASK) & PG_MASK;
+	/*
+	 * msync() is a userspace ABI operating on PTE-sized virtual
+	 * address ranges.  With PG_SIZE > PTE_SIZE, rounding the length
+	 * to PG_SIZE can extend the requested interval into an unmapped
+	 * neighbouring VMA hole and incorrectly return -ENOMEM for a
+	 * valid 4K-granular range.
+	 */
+	len = PTE_ALIGN(len);
 	end = start + len;
 	if (end < start)
 		goto out;
