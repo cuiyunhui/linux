@@ -64,8 +64,10 @@ static inline bool is_via_compact_memory(int order) { return false; }
 #define CREATE_TRACE_POINTS
 #include <trace/events/compaction.h>
 
-#define block_start_pfn(pfn, order)	round_down(pfn, 1UL << (order))
-#define block_end_pfn(pfn, order)	ALIGN((pfn) + 1, 1UL << (order))
+#define block_start_pfn(pfn, order)					\
+	round_down(pfn, PAGES_TO_PTES(1UL << (order)))
+#define block_end_pfn(pfn, order)					\
+	ALIGN((pfn) + 1, PAGES_TO_PTES(1UL << (order)))
 
 /*
  * Page order with-respect-to which proactive compaction
@@ -575,7 +577,8 @@ static unsigned long isolate_freepages_block(struct compact_control *cc,
 	page = pfn_to_page(blockpfn);
 
 	/* Isolate free pages. */
-	for (; blockpfn < end_pfn; blockpfn += stride, page += stride) {
+	for (; blockpfn < end_pfn;
+	     blockpfn += PAGES_TO_PTES(stride), page += stride) {
 		int isolated;
 
 		/*
@@ -583,7 +586,7 @@ static unsigned long isolate_freepages_block(struct compact_control *cc,
 		 * contention, to give chance to IRQs. Abort if fatal signal
 		 * pending.
 		 */
-		if (!(blockpfn % COMPACT_CLUSTER_MAX)
+		if (!(blockpfn % PAGES_TO_PTES(COMPACT_CLUSTER_MAX))
 		    && compact_unlock_should_abort(&cc->zone->lock, flags,
 								&locked, cc))
 			break;
@@ -600,8 +603,9 @@ static unsigned long isolate_freepages_block(struct compact_control *cc,
 			const unsigned int order = compound_order(page);
 
 			if ((order <= MAX_PAGE_ORDER) &&
-			    (blockpfn + (1UL << order) <= end_pfn)) {
-				blockpfn += (1UL << order) - 1;
+			    (blockpfn + PAGES_TO_PTES(1UL << order) <=
+			     end_pfn)) {
+				blockpfn += PAGES_TO_PTES((1UL << order) - 1);
 				page += (1UL << order) - 1;
 				nr_scanned += (1UL << order) - 1;
 			}
@@ -635,11 +639,11 @@ static unsigned long isolate_freepages_block(struct compact_control *cc,
 		list_add_tail(&page->lru, &freelist[order]);
 
 		if (!strict && cc->nr_migratepages <= cc->nr_freepages) {
-			blockpfn += isolated;
+			blockpfn += PAGES_TO_PTES(isolated);
 			break;
 		}
 		/* Advance to the end of split page */
-		blockpfn += isolated - 1;
+		blockpfn += PAGES_TO_PTES(isolated - 1);
 		page += isolated - 1;
 		continue;
 
@@ -708,9 +712,10 @@ isolate_freepages_range(struct compact_control *cc,
 		block_start_pfn = cc->zone->zone_start_pfn;
 	block_end_pfn = pageblock_end_pfn(pfn);
 
-	for (; pfn < end_pfn; pfn += isolated,
-				block_start_pfn = block_end_pfn,
-				block_end_pfn += pageblock_nr_ptes) {
+	for (; pfn < end_pfn;
+	     pfn += PAGES_TO_PTES(isolated),
+	     block_start_pfn = block_end_pfn,
+	     block_end_pfn += pageblock_nr_ptes) {
 		/* Protect pfn from changing by isolate_freepages_block */
 		unsigned long isolate_start_pfn = pfn;
 
@@ -882,7 +887,7 @@ isolate_migratepages_block(struct compact_control *cc, unsigned long low_pfn,
 	}
 
 	/* Time to isolate some pages for migration */
-	for (; low_pfn < end_pfn; low_pfn++) {
+	for (; low_pfn < end_pfn; low_pfn += PTES_PER_PAGE) {
 		bool is_dirty, is_unevictable;
 
 		if (skip_on_failure && low_pfn >= next_skip_pfn) {
@@ -912,7 +917,7 @@ isolate_migratepages_block(struct compact_control *cc, unsigned long low_pfn,
 		 * contention, to give chance to IRQs. Abort completely if
 		 * a fatal signal is pending.
 		 */
-		if (!(low_pfn % COMPACT_CLUSTER_MAX)) {
+		if (!(low_pfn % PAGES_TO_PTES(COMPACT_CLUSTER_MAX))) {
 			if (locked) {
 				unlock_page_lruvec_irqrestore(locked, flags);
 				locked = NULL;
@@ -958,7 +963,7 @@ isolate_migratepages_block(struct compact_control *cc, unsigned long low_pfn,
 			if (!cc->alloc_contig) {
 
 				if (order <= MAX_PAGE_ORDER) {
-					low_pfn += (1UL << order) - 1;
+					low_pfn += PAGES_TO_PTES((1UL << order) - 1);
 					nr_scanned += (1UL << order) - 1;
 				}
 				goto isolate_fail;
@@ -980,7 +985,7 @@ isolate_migratepages_block(struct compact_control *cc, unsigned long low_pfn,
 				 /* Do not report -EBUSY down the chain */
 				if (ret == -EBUSY)
 					ret = 0;
-				low_pfn += (1UL << order) - 1;
+				low_pfn += PAGES_TO_PTES((1UL << order) - 1);
 				nr_scanned += (1UL << order) - 1;
 				goto isolate_fail;
 			}
@@ -991,7 +996,7 @@ isolate_migratepages_block(struct compact_control *cc, unsigned long low_pfn,
 				 * on the cc->migratepages list.
 				 */
 				low_pfn += PAGES_TO_PTES(folio_nr_pages(folio) -
-						folio_page_idx(folio, page)) - 1;
+						folio_page_idx(folio, page) - 1);
 				goto isolate_success_no_list;
 			}
 
@@ -1018,7 +1023,8 @@ isolate_migratepages_block(struct compact_control *cc, unsigned long low_pfn,
 			 * valid order range to prevent low_pfn overflow.
 			 */
 			if (freepage_order > 0 && freepage_order <= MAX_PAGE_ORDER) {
-				low_pfn += (1UL << freepage_order) - 1;
+				low_pfn +=
+					PAGES_TO_PTES((1UL << freepage_order) - 1);
 				nr_scanned += (1UL << freepage_order) - 1;
 			}
 			continue;
@@ -1038,7 +1044,7 @@ isolate_migratepages_block(struct compact_control *cc, unsigned long low_pfn,
 			/* Skip based on page order and compaction target order. */
 			if (skip_isolation_on_order(order, cc->order)) {
 				if (order <= MAX_PAGE_ORDER) {
-					low_pfn += (1UL << order) - 1;
+					low_pfn += PAGES_TO_PTES((1UL << order) - 1);
 					nr_scanned += (1UL << order) - 1;
 				}
 				goto isolate_fail;
@@ -1187,7 +1193,8 @@ isolate_migratepages_block(struct compact_control *cc, unsigned long low_pfn,
 			if (unlikely(skip_isolation_on_order(folio_order(folio),
 							     cc->order) &&
 				     !cc->alloc_contig)) {
-				low_pfn += PAGES_TO_PTES(folio_nr_pages(folio)) - 1;
+				low_pfn +=
+					PAGES_TO_PTES(folio_nr_pages(folio) - 1);
 				nr_scanned += folio_nr_pages(folio) - 1;
 				folio_set_lru(folio);
 				goto isolate_fail_put;
@@ -1196,7 +1203,7 @@ isolate_migratepages_block(struct compact_control *cc, unsigned long low_pfn,
 
 		/* The folio is taken off the LRU */
 		if (folio_test_large(folio))
-			low_pfn += PAGES_TO_PTES(folio_nr_pages(folio)) - 1;
+			low_pfn += PAGES_TO_PTES(folio_nr_pages(folio) - 1);
 
 		/* Successfully isolated */
 		lruvec_del_folio(lruvec, folio);
@@ -1219,7 +1226,7 @@ isolate_success_no_list:
 		 */
 		if (cc->nr_migratepages >= COMPACT_CLUSTER_MAX &&
 		    !cc->finish_pageblock && !cc->contended) {
-			++low_pfn;
+			low_pfn += PTES_PER_PAGE;
 			break;
 		}
 
@@ -1253,12 +1260,12 @@ isolate_fail:
 		}
 
 		if (low_pfn < next_skip_pfn) {
-			low_pfn = next_skip_pfn - 1;
+			low_pfn = next_skip_pfn - PTES_PER_PAGE;
 			/*
 			 * The check near the loop beginning would have updated
 			 * next_skip_pfn too, but this is a bit simpler.
 			 */
-			next_skip_pfn += 1UL << cc->order;
+			next_skip_pfn += PAGES_TO_PTES(1UL << cc->order);
 		}
 
 		if (ret == -ENOMEM)
