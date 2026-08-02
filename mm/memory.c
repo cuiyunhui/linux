@@ -3194,8 +3194,8 @@ int vm_iomap_memory(struct vm_area_struct *vma, phys_addr_t start, unsigned long
 	 * but we've historically allowed it because IO memory might
 	 * just have smaller alignment.
 	 */
-	len += start & ~PG_MASK;
-	pfn = start >> PG_SHIFT;
+	len += start & (PTE_SIZE - 1);
+	pfn = start >> PTE_SHIFT;
 	ptes = (len + ~PTE_MASK) >> PTE_SHIFT;
 	if (pfn + ptes < pfn)
 		return -EINVAL;
@@ -4821,6 +4821,7 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 	pte_t pte;
 	vm_fault_t ret = 0;
 	int nr_pages;
+	int nr_ptes;
 	unsigned long page_idx;
 	unsigned long address;
 	pte_t *ptep;
@@ -4994,12 +4995,13 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 	}
 
 	nr_pages = 1;
+	nr_ptes = 1;
 	page_idx = 0;
 	address = vmf->address;
 	ptep = vmf->pte;
 	if (folio_test_large(folio) && folio_test_swapcache(folio)) {
 		int nr = folio_nr_pages(folio);
-		int nr_ptes = PAGES_TO_PTES(nr);
+		int folio_ptes = PAGES_TO_PTES(nr);
 		unsigned long idx = folio_page_idx(folio, page);
 		unsigned long folio_start = (address & PG_MASK) - idx * PG_SIZE;
 		unsigned long folio_end = folio_start + nr * PG_SIZE;
@@ -5015,13 +5017,14 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 		folio_ptep = vmf->pte - pte_idx;
 		folio_pte = ptep_get(folio_ptep);
 		if (!pte_same(folio_pte, pte_move_swp_offset(vmf->orig_pte, -pte_idx)) ||
-		    swap_pte_batch(folio_ptep, nr_ptes, folio_pte) != nr_ptes)
+		    swap_pte_batch(folio_ptep, folio_ptes, folio_pte) != folio_ptes)
 			goto check_folio;
 
 		page_idx = idx;
 		address = folio_start;
 		ptep = folio_ptep;
 		nr_pages = nr;
+		nr_ptes = folio_ptes;
 		entry = folio->swap;
 		page = &folio->page;
 	}
@@ -5068,7 +5071,7 @@ check_folio:
 		 */
 		exclusive = pte_swp_exclusive(vmf->orig_pte);
 		if (exclusive)
-			check_swap_exclusive(folio, entry, nr_pages);
+			check_swap_exclusive(folio, entry, nr_ptes);
 		if (folio != swapcache) {
 			/*
 			 * We have a fresh page that is not exposed to the
@@ -5106,8 +5109,8 @@ check_folio:
 	 */
 	arch_swap_restore(folio_swap(entry, folio), folio);
 
-	add_mm_counter(vma->vm_mm, MM_ANONPAGES, nr_pages);
-	add_mm_counter(vma->vm_mm, MM_SWAPENTS, -nr_pages);
+	add_mm_counter(vma->vm_mm, MM_ANONPAGES, nr_ptes);
+	add_mm_counter(vma->vm_mm, MM_SWAPENTS, -nr_ptes);
 	pte = mkpte(page, vmf->pteoff, vma->vm_page_prot);
 	if (pte_swp_soft_dirty(vmf->orig_pte))
 		pte = pte_mksoft_dirty(pte);
@@ -5132,8 +5135,8 @@ check_folio:
 		}
 		rmap_flags |= RMAP_EXCLUSIVE;
 	}
-	folio_ref_add(folio, nr_pages - 1);
-	flush_icache_pages(vma, page, nr_pages);
+	folio_ref_add(folio, nr_ptes - 1);
+	flush_icache_pages(vma, page, nr_ptes);
 	vmf->orig_pte = pte_advance_pfn(pte, page_idx);
 
 	/* ksm created a completely new copy */
@@ -5148,26 +5151,27 @@ check_folio:
 		 */
 		VM_WARN_ON_ONCE_FOLIO(folio_nr_pages(folio) != nr_pages, folio);
 		VM_WARN_ON_ONCE_FOLIO(folio_mapped(folio), folio);
-		folio_add_new_anon_rmap(folio, vma, address, rmap_flags);
+		folio_add_new_anon_rmap_ptes(folio, page, nr_ptes, vma,
+					     address, rmap_flags);
 		folio_put_swap(folio, NULL);
 	} else {
-		VM_WARN_ON_ONCE(nr_pages != 1 && nr_pages != folio_nr_pages(folio));
-		folio_add_anon_rmap_ptes(folio, page, nr_pages, vma, rmap_flags);
+		VM_WARN_ON_ONCE(nr_ptes != 1 && nr_ptes != folio_nr_ptes(folio));
+		folio_add_anon_rmap_ptes(folio, page, nr_ptes, vma, rmap_flags);
 		folio_put_swap(folio, nr_pages == 1 ? page : NULL);
 	}
 
 	VM_BUG_ON(!folio_test_anon(folio) ||
 			(pte_write(pte) && !PageAnonExclusive(page)));
-	set_ptes(vma->vm_mm, address, ptep, pte, nr_pages);
+	set_ptes(vma->vm_mm, address, ptep, pte, nr_ptes);
 	arch_do_swap_page_nr(vma->vm_mm, vma, address,
-			pte, pte, nr_pages);
+			pte, pte, nr_ptes);
 
 	/*
 	 * Remove the swap entry and conditionally try to free up the swapcache.
 	 * Do it after mapping, so raced page faults will likely see the folio
 	 * in swap cache and wait on the folio lock.
 	 */
-	if (should_try_to_free_swap(si, folio, vma, nr_pages, vmf->flags))
+	if (should_try_to_free_swap(si, folio, vma, nr_ptes, vmf->flags))
 		folio_free_swap(folio);
 
 	folio_unlock(folio);
@@ -5192,7 +5196,7 @@ check_folio:
 	}
 
 	/* No need to invalidate - it was non-present before */
-	update_mmu_cache_range(vmf, vma, address, ptep, nr_pages);
+	update_mmu_cache_range(vmf, vma, address, ptep, nr_ptes);
 unlock:
 	if (vmf->pte)
 		pte_unmap_unlock(vmf->pte, vmf->ptl);
@@ -5498,14 +5502,8 @@ static vm_fault_t do_anonymous_page(struct vm_fault *vmf)
 	folio_ref_add(folio, nr_ptes - 1);
 	add_mm_counter(vma->vm_mm, MM_ANONPAGES, nr_ptes);
 	count_mthp_stat(folio_order(folio), MTHP_STAT_ANON_FAULT_ALLOC);
-	folio_add_new_anon_rmap(folio, vma, addr, RMAP_EXCLUSIVE);
-	/*
-	 * folio_add_new_anon_rmap sets mapcount to 1 for non-large folios,
-	 * but we're mapping nr_ptes PTEs. Adjust mapcount to match so that
-	 * folio_remove_rmap_ptes(nr_ptes) during unmap doesn't go negative.
-	 */
-	if (nr_ptes > 1 && !folio_test_large(folio))
-		atomic_add(nr_ptes - 1, &folio->_mapcount);
+	folio_add_new_anon_rmap_ptes(folio, &folio->page, nr_ptes, vma, addr,
+				     RMAP_EXCLUSIVE);
 	folio_add_lru_vma(folio, vma);
 setpte:
 	if (vmf_orig_pte_uffd_wp(vmf))
@@ -5715,10 +5713,9 @@ void set_pte_range(struct vm_fault *vmf, struct folio *folio,
 		entry = pte_mkuffd_wp(entry);
 	/* copy-on-write page */
 	if (write && !(vma->vm_flags & VM_SHARED)) {
-		folio_add_new_anon_rmap(folio, vma, addr, RMAP_EXCLUSIVE);
+		folio_add_new_anon_rmap_ptes(folio, page, nr, vma, addr,
+					     RMAP_EXCLUSIVE);
 		folio_add_lru_vma(folio, vma);
-		if (nr > 1)
-			atomic_add(nr - 1, &folio->_mapcount);
 	} else {
 		folio_add_file_rmap_ptes(folio, page, nr, vma);
 	}
@@ -6311,7 +6308,7 @@ static void numa_rebuild_large_mapping(struct vm_fault *vmf, struct vm_area_stru
 {
 	int nr = pte_pfn(fault_pte) - folio_pfn(folio);
 	unsigned long start, end, addr = vmf->address;
-	unsigned long addr_start = addr - (nr << PG_SHIFT);
+	unsigned long addr_start = addr - (nr << PTE_SHIFT);
 	unsigned long pt_start = ALIGN_DOWN(addr, PMD_SIZE);
 	pte_t *start_ptep;
 
@@ -6319,7 +6316,7 @@ static void numa_rebuild_large_mapping(struct vm_fault *vmf, struct vm_area_stru
 	start = max3(addr_start, pt_start, vma->vm_start);
 	end = min3(addr_start + folio_size(folio), pt_start + PMD_SIZE,
 		   vma->vm_end);
-	start_ptep = vmf->pte - ((addr - start) >> PG_SHIFT);
+	start_ptep = vmf->pte - ((addr - start) >> PTE_SHIFT);
 
 	/* Restore all PTEs' mapping of the large folio */
 	for (addr = start; addr != end; start_ptep++, addr += PTE_SIZE) {
@@ -7031,7 +7028,7 @@ static inline void pfnmap_args_setup(struct follow_pfnmap_args *args,
 {
 	args->lock = lock;
 	args->ptep = ptep;
-	args->pfn = pfn_base + ((args->address & ~addr_mask) >> PG_SHIFT);
+	args->pfn = pfn_base + ((args->address & ~addr_mask) >> PTE_SHIFT);
 	args->addr_mask = addr_mask;
 	args->pgprot = pgprot;
 	args->writable = writable;

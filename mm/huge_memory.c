@@ -2969,7 +2969,7 @@ static void __split_huge_zero_page_pmd(struct vm_area_struct *vma,
 
 	pte = pte_offset_map(&_pmd, haddr);
 	VM_BUG_ON(!pte);
-	for (i = 0, addr = haddr; i < HPAGE_PMD_NR; i++, addr += PG_SIZE) {
+	for (i = 0, addr = haddr; i < PAGES_TO_PTES(HPAGE_PMD_NR); i++, addr += PTE_SIZE) {
 		pte_t entry;
 
 		entry = pfn_pte(my_zero_pfn(addr), vma->vm_page_prot);
@@ -3091,11 +3091,11 @@ static void __split_huge_pmd_locked(struct vm_area_struct *vma, pmd_t *pmd,
 		if (!freeze) {
 			rmap_t rmap_flags = RMAP_NONE;
 
-			folio_ref_add(folio, HPAGE_PMD_NR - 1);
+			folio_ref_add(folio, PAGES_TO_PTES(HPAGE_PMD_NR) - 1);
 			if (anon_exclusive)
 				rmap_flags |= RMAP_EXCLUSIVE;
 
-			folio_add_anon_rmap_ptes(folio, page, HPAGE_PMD_NR,
+			folio_add_anon_rmap_ptes(folio, page, PAGES_TO_PTES(HPAGE_PMD_NR),
 						 vma, rmap_flags);
 		}
 	} else {
@@ -3159,10 +3159,10 @@ static void __split_huge_pmd_locked(struct vm_area_struct *vma, pmd_t *pmd,
 		if (!freeze) {
 			rmap_t rmap_flags = RMAP_NONE;
 
-			folio_ref_add(folio, HPAGE_PMD_NR - 1);
+			folio_ref_add(folio, PAGES_TO_PTES(HPAGE_PMD_NR) - 1);
 			if (anon_exclusive)
 				rmap_flags |= RMAP_EXCLUSIVE;
-			folio_add_anon_rmap_ptes(folio, page, HPAGE_PMD_NR,
+			folio_add_anon_rmap_ptes(folio, page, PAGES_TO_PTES(HPAGE_PMD_NR),
 						 vma, rmap_flags);
 		}
 	}
@@ -3185,16 +3185,18 @@ static void __split_huge_pmd_locked(struct vm_area_struct *vma, pmd_t *pmd,
 		pte_t entry;
 		swp_entry_t swp_entry;
 
-		for (i = 0, addr = haddr; i < HPAGE_PMD_NR; i++, addr += PG_SIZE) {
+		for (i = 0, addr = haddr; i < PAGES_TO_PTES(HPAGE_PMD_NR); i++, addr += PTE_SIZE) {
+			struct page *pte_page = pfn_to_page(page_to_pfn(page) + i);
+
 			if (write)
 				swp_entry = make_writable_migration_entry(
-							page_to_pfn(page + i));
+							page_to_pfn(pte_page));
 			else if (anon_exclusive)
 				swp_entry = make_readable_exclusive_migration_entry(
-							page_to_pfn(page + i));
+							page_to_pfn(pte_page));
 			else
 				swp_entry = make_readable_migration_entry(
-							page_to_pfn(page + i));
+							page_to_pfn(pte_page));
 			if (young)
 				swp_entry = make_migration_entry_young(swp_entry);
 			if (dirty)
@@ -3211,7 +3213,9 @@ static void __split_huge_pmd_locked(struct vm_area_struct *vma, pmd_t *pmd,
 		pte_t entry;
 		swp_entry_t swp_entry;
 
-		for (i = 0, addr = haddr; i < HPAGE_PMD_NR; i++, addr += PG_SIZE) {
+		for (i = 0, addr = haddr; i < PAGES_TO_PTES(HPAGE_PMD_NR); i++, addr += PTE_SIZE) {
+			struct page *pte_page = pfn_to_page(page_to_pfn(page) + i);
+
 			/*
 			 * anon_exclusive was already propagated to the relevant
 			 * pages corresponding to the pte entries when freeze
@@ -3219,10 +3223,10 @@ static void __split_huge_pmd_locked(struct vm_area_struct *vma, pmd_t *pmd,
 			 */
 			if (write)
 				swp_entry = make_writable_device_private_entry(
-							page_to_pfn(page + i));
+							page_to_pfn(pte_page));
 			else
 				swp_entry = make_readable_device_private_entry(
-							page_to_pfn(page + i));
+							page_to_pfn(pte_page));
 			/*
 			 * Young and dirty bits are not progated via swp_entry
 			 */
@@ -3250,10 +3254,10 @@ static void __split_huge_pmd_locked(struct vm_area_struct *vma, pmd_t *pmd,
 		if (uffd_wp)
 			entry = pte_mkuffd_wp(entry);
 
-		for (i = 0; i < HPAGE_PMD_NR; i++)
+		for (i = 0; i < PAGES_TO_PTES(HPAGE_PMD_NR); i++)
 			VM_WARN_ON(!pte_none(ptep_get(pte + i)));
 
-		set_ptes(mm, haddr, pte, entry, HPAGE_PMD_NR);
+		set_ptes(mm, haddr, pte, entry, PAGES_TO_PTES(HPAGE_PMD_NR));
 	}
 	pte_unmap(pte);
 
@@ -4590,8 +4594,8 @@ static int split_huge_pages_pid(int pid, unsigned long vaddr_start,
 	unsigned long total = 0, split = 0;
 	unsigned long addr;
 
-	vaddr_start &= PG_MASK;
-	vaddr_end &= PG_MASK;
+	vaddr_start = PTE_ALIGN_DOWN(vaddr_start);
+	vaddr_end = PTE_ALIGN_DOWN(vaddr_end);
 
 	task = find_get_task_by_vpid(pid);
 	if (!task) {
@@ -4613,10 +4617,10 @@ static int split_huge_pages_pid(int pid, unsigned long vaddr_start,
 
 	mmap_read_lock(mm);
 	/*
-	 * always increase addr by PG_SIZE, since we could have a PTE page
+	 * always increase addr by PTE_SIZE, since we could have a PTE page
 	 * table filled with PTE-mapped THPs, each of which is distinct.
 	 */
-	for (addr = vaddr_start; addr < vaddr_end; addr += PG_SIZE) {
+	for (addr = vaddr_start; addr < vaddr_end; addr += PTE_SIZE) {
 		struct vm_area_struct *vma = vma_lookup(mm, addr);
 		struct folio_walk fw;
 		struct folio *folio;

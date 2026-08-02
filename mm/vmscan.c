@@ -3560,7 +3560,7 @@ restart:
 	walk_update_folio(walk, last, gen, dirty);
 	last = NULL;
 
-	if (i < PTRS_PER_PTE && get_next_vma(PMD_MASK, PG_SIZE, args, &start, &end))
+	if (i < PTRS_PER_PTE && get_next_vma(PMD_MASK, PTE_SIZE, args, &start, &end))
 		goto restart;
 
 	lazy_mmu_mode_disable();
@@ -4237,25 +4237,25 @@ bool lru_gen_look_around(struct page_vma_mapped_walk *pvmw)
 	start = max(addr & PMD_MASK, vma->vm_start);
 	end = min(addr | ~PMD_MASK, vma->vm_end - 1) + 1;
 
-	if (end - start == PG_SIZE)
+	if (end - start == PTE_SIZE)
 		return true;
 
-	if (end - start > MIN_LRU_BATCH * PG_SIZE) {
-		if (addr - start < MIN_LRU_BATCH * PG_SIZE / 2)
-			end = start + MIN_LRU_BATCH * PG_SIZE;
-		else if (end - addr < MIN_LRU_BATCH * PG_SIZE / 2)
-			start = end - MIN_LRU_BATCH * PG_SIZE;
-		else {
-			start = addr - MIN_LRU_BATCH * PG_SIZE / 2;
-			end = addr + MIN_LRU_BATCH * PG_SIZE / 2;
+	if (end - start > MIN_LRU_BATCH * PTE_SIZE) {
+		if (addr - start < MIN_LRU_BATCH * PTE_SIZE / 2) {
+			end = start + MIN_LRU_BATCH * PTE_SIZE;
+		} else if (end - addr < MIN_LRU_BATCH * PTE_SIZE / 2) {
+			start = end - MIN_LRU_BATCH * PTE_SIZE;
+		} else {
+			start = addr - MIN_LRU_BATCH * PTE_SIZE / 2;
+			end = addr + MIN_LRU_BATCH * PTE_SIZE / 2;
 		}
 	}
 
 	lazy_mmu_mode_enable();
 
-	pte -= (addr - start) / PG_SIZE;
+	pte -= (addr - start) / PTE_SIZE;
 
-	for (i = 0, addr = start; addr != end; i++, addr += PG_SIZE) {
+	for (i = 0, addr = start; addr != end; i++, addr += PTE_SIZE) {
 		unsigned long pfn;
 		pte_t ptent = ptep_get(pte + i);
 

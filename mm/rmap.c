@@ -1373,13 +1373,14 @@ static __always_inline void __folio_add_rmap(struct folio *folio,
 		}
 
 		do {
-			int pfn = page_to_pfn(page);
+			unsigned long pfn = page_to_pfn(page);
 			int ptes = min_t(int, nr_ptes, PTES_PER_PAGE - (pfn % PTES_PER_PAGE));
 
 			if (atomic_add_return(ptes, &page->_mapcount) < ptes)
 				first++;
 			nr_ptes -= ptes;
-		} while (page++, nr_ptes > 0);
+			page = pfn_to_page(pfn + ptes);
+		} while (nr_ptes > 0);
 
 		if (first &&
 		    atomic_add_return_relaxed(first, mapped) < ENTIRELY_MAPPED)
@@ -1528,7 +1529,7 @@ static __always_inline void __folio_add_anon_rmap(struct folio *folio,
 		switch (level) {
 		case PGTABLE_LEVEL_PTE:
 			for (i = 0; i < nr_ptes; i++)
-				SetPageAnonExclusive(page + i);
+				SetPageAnonExclusive(pfn_to_page(page_to_pfn(page) + i));
 			break;
 		case PGTABLE_LEVEL_PMD:
 			SetPageAnonExclusive(page);
@@ -1548,8 +1549,7 @@ static __always_inline void __folio_add_anon_rmap(struct folio *folio,
 	VM_WARN_ON_FOLIO(!folio_test_large(folio) && PageAnonExclusive(page) &&
 			 atomic_read(&folio->_mapcount) > 0, folio);
 	for (i = 0; i < nr_ptes; i++) {
-		/* FIXME */
-		struct page *cur_page = page + i;
+		struct page *cur_page = pfn_to_page(page_to_pfn(page) + i);
 
 		VM_WARN_ON_FOLIO(folio_test_large(folio) &&
 				 folio_entire_mapcount(folio) > 1 &&
@@ -1695,6 +1695,60 @@ void folio_add_new_anon_rmap(struct folio *folio, struct vm_area_struct *vma,
 	mod_mthp_stat(folio_order(folio), MTHP_STAT_NR_ANON, 1);
 }
 
+void folio_add_new_anon_rmap_ptes(struct folio *folio,
+				  struct page *page, int nr_ptes,
+				  struct vm_area_struct *vma,
+				  unsigned long address, rmap_t flags)
+{
+	const bool exclusive = flags & RMAP_EXCLUSIVE;
+	const int orig_nr_ptes = nr_ptes;
+	int first_pte, nr_mapped = 0;
+
+	if (likely(!folio_test_large(folio))) {
+		folio_add_new_anon_rmap(folio, vma, address, flags);
+		if (nr_ptes > 1)
+			atomic_add(nr_ptes - 1, &folio->_mapcount);
+		return;
+	}
+
+	VM_WARN_ON_FOLIO(folio_test_hugetlb(folio), folio);
+	VM_WARN_ON_FOLIO(!exclusive && !folio_test_locked(folio), folio);
+
+	if (!folio_test_swapbacked(folio) && !(vma->vm_flags & VM_DROPPABLE))
+		__folio_set_swapbacked(folio);
+	__folio_set_anon(folio, vma, address, exclusive);
+
+	first_pte = linear_pte_index(vma, address) - folio_pteoff(folio);
+	VM_WARN_ON_ONCE(first_pte < 0);
+	VM_WARN_ON_ONCE(first_pte + orig_nr_ptes > folio_nr_ptes(folio));
+
+	while (nr_ptes > 0) {
+		int page_idx = PTES_TO_PAGES(first_pte);
+		int pte_idx = first_pte % PTES_PER_PAGE;
+		int ptes = min_t(int, nr_ptes, PTES_PER_PAGE - pte_idx);
+		struct page *subpage = folio_page(folio, page_idx);
+
+		if (IS_ENABLED(CONFIG_PAGE_MAPCOUNT))
+			atomic_set(&subpage->_mapcount, ptes - 1);
+		if (exclusive)
+			SetPageAnonExclusive(subpage);
+
+		nr_mapped++;
+		first_pte += ptes;
+		nr_ptes -= ptes;
+	}
+
+	folio_set_large_mapcount(folio, orig_nr_ptes, vma);
+	if (IS_ENABLED(CONFIG_PAGE_MAPCOUNT))
+		atomic_set(&folio->_nr_pages_mapped, nr_mapped);
+
+	VM_WARN_ON_ONCE(address < vma->vm_start ||
+			address + (orig_nr_ptes * PTE_SIZE) > vma->vm_end);
+
+	__folio_mod_stat(folio, nr_mapped, 0);
+	mod_mthp_stat(folio_order(folio), MTHP_STAT_NR_ANON, 1);
+}
+
 static __always_inline void __folio_add_file_rmap(struct folio *folio,
 		struct page *page, int nr_ptes, struct vm_area_struct *vma,
 		enum pgtable_level level)
@@ -1806,12 +1860,13 @@ static __always_inline void __folio_remove_rmap(struct folio *folio,
 
 		folio_sub_large_mapcount(folio, nr_ptes, vma);
 		do {
-			int pfn = page_to_pfn(page);
+			unsigned long pfn = page_to_pfn(page);
 			int ptes = min_t(int, nr_ptes, PTES_PER_PAGE - (pfn % PTES_PER_PAGE));
 
 			last += atomic_add_negative(-ptes, &page->_mapcount);
 			nr_ptes -= ptes;
-		} while (page++, nr_ptes > 0);
+			page = pfn_to_page(pfn + ptes);
+		} while (nr_ptes > 0);
 
 		if (last &&
 		    atomic_sub_return_relaxed(last, mapped) < ENTIRELY_MAPPED)
@@ -1959,14 +2014,27 @@ static inline unsigned int folio_unmap_pte_batch(struct folio *folio,
 
 	if (flags & TTU_HWPOISON)
 		return 1;
-	if (!folio_test_large(folio))
+
+	/*
+	 * With PG_SIZE > PTE_SIZE, even an order-0 folio spans multiple
+	 * hardware PTEs. Reclaim must unmap all matching sibling PTEs as a
+	 * single batch, otherwise only one PTE mapcount/refcount is dropped
+	 * and the folio can later reach the free path with a non-zero
+	 * mapcount (Bad page: refcount:0 mapcount:PTES_PER_PAGE).
+	 */
+	if (folio_nr_ptes(folio) <= 1)
 		return 1;
 
 	/* We may only batch within a single VMA and a single page table. */
 	end_addr = pmd_addr_end(addr, vma->vm_end);
 	max_nr = (end_addr - addr) >> PTE_SHIFT;
 
-	/* We only support lazyfree or file folios batching for now ... */
+	/*
+	 * We only support lazyfree or file folios batching for now. Anonymous
+	 * swap-backed batching needs coordinated swap-entry allocation, but
+	 * lazyfree anonymous folios are discarded and must still be batched
+	 * when a single PG_SIZE folio is represented by multiple PTEs.
+	 */
 	if (folio_test_anon(folio) && folio_test_swapbacked(folio))
 		return 1;
 
@@ -2996,7 +3064,7 @@ static void rmap_walk_anon(struct folio *folio,
 			pgoff_start, pgoff_end) {
 		struct vm_area_struct *vma = avc->vma;
 		unsigned long address = vma_address(vma, pgoff_start,
-				folio_nr_pages(folio));
+				folio_nr_ptes(folio));
 
 		VM_BUG_ON_VMA(address == -EFAULT, vma);
 		cond_resched();
