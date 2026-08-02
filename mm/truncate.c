@@ -779,7 +779,7 @@ EXPORT_SYMBOL_GPL(invalidate_inode_pages2);
 void truncate_pagecache(struct inode *inode, loff_t newsize)
 {
 	struct address_space *mapping = inode->i_mapping;
-	loff_t holebegin = round_up(newsize, PG_SIZE);
+	loff_t holebegin = round_up(newsize, PTE_SIZE);
 
 	/*
 	 * unmap_mapping_range is called twice, first simply for

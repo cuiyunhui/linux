@@ -3517,13 +3517,13 @@ vm_fault_t filemap_fault(struct vm_fault *vmf)
 	struct file *fpin = NULL;
 	struct address_space *mapping = file->f_mapping;
 	struct inode *inode = mapping->host;
-	pgoff_t max_idx, index = PTES_TO_PAGES(vmf->pteoff);
+	pgoff_t max_pteoff, index = PTES_TO_PAGES(vmf->pteoff);
 	struct folio *folio;
 	vm_fault_t ret = 0;
 	bool mapping_locked = false;
 
-	max_idx = DIV_ROUND_UP(i_size_read(inode), PG_SIZE);
-	if (unlikely(index >= max_idx))
+	max_pteoff = DIV_ROUND_UP(i_size_read(inode), PTE_SIZE);
+	if (unlikely(vmf->pteoff >= max_pteoff))
 		return VM_FAULT_SIGBUS;
 
 	trace_mm_filemap_fault(mapping, index);
@@ -3626,8 +3626,8 @@ retry_find:
 	 * Found the page and have a reference on it.
 	 * We must recheck i_size under page lock.
 	 */
-	max_idx = DIV_ROUND_UP(i_size_read(inode), PG_SIZE);
-	if (unlikely(index >= max_idx)) {
+	max_pteoff = DIV_ROUND_UP(i_size_read(inode), PTE_SIZE);
+	if (unlikely(vmf->pteoff >= max_pteoff)) {
 		folio_unlock(folio);
 		folio_put(folio);
 		return VM_FAULT_SIGBUS;

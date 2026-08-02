@@ -4278,15 +4278,13 @@ static void unmap_mapping_range_vma(struct vm_area_struct *vma,
 	zap_page_range_single(vma, start_addr, end_addr - start_addr, details);
 }
 
-static inline void unmap_mapping_range_tree(struct rb_root_cached *root,
-					    pgoff_t first_index,
-					    pgoff_t last_index,
-					    struct zap_details *details)
+static inline void unmap_mapping_pte_range_tree(struct rb_root_cached *root,
+						unsigned long first_pte,
+						unsigned long last_pte,
+						struct zap_details *details)
 {
 	struct vm_area_struct *vma;
 	unsigned long vba, vea, zba, zea;
-	unsigned long first_pte = PAGES_TO_PTES(first_index);
-	unsigned long last_pte  = PAGES_TO_PTES(last_index + 1) - 1;
 
 	vma_interval_tree_foreach(vma, root, first_pte, last_pte) {
 		vba = vma->vm_pteoff;
@@ -4299,6 +4297,17 @@ static inline void unmap_mapping_range_tree(struct rb_root_cached *root,
 			((zea - vba + 1) << PTE_SHIFT) + vma->vm_start,
 				details);
 	}
+}
+
+static inline void unmap_mapping_range_tree(struct rb_root_cached *root,
+					    pgoff_t first_index,
+					    pgoff_t last_index,
+					    struct zap_details *details)
+{
+	unsigned long first_pte = PAGES_TO_PTES(first_index);
+	unsigned long last_pte = PAGES_TO_PTES(last_index + 1) - 1;
+
+	unmap_mapping_pte_range_tree(root, first_pte, last_pte, details);
 }
 
 /**
@@ -4373,12 +4382,12 @@ EXPORT_SYMBOL_GPL(unmap_mapping_pages);
  *
  * @mapping: the address space containing mmaps to be unmapped.
  * @holebegin: byte in first page to unmap, relative to the start of
- * the underlying file.  This will be rounded down to a PG_SIZE
+ * the underlying file.  This will be rounded down to a PTE_SIZE
  * boundary.  Note that this is different from truncate_pagecache(), which
  * must keep the partial page.  In contrast, we must get rid of
  * partial pages.
  * @holelen: size of prospective hole in bytes.  This will be rounded
- * up to a PG_SIZE boundary.  A holelen of zero truncates to the
+ * up to a PTE_SIZE boundary.  A holelen of zero truncates to the
  * end of the file.
  * @even_cows: 1 when truncating a file, unmap even private COWed pages;
  * but 0 when invalidating pagecache, don't throw away private data.
@@ -4386,18 +4395,32 @@ EXPORT_SYMBOL_GPL(unmap_mapping_pages);
 void unmap_mapping_range(struct address_space *mapping,
 		loff_t const holebegin, loff_t const holelen, int even_cows)
 {
-	pgoff_t hba = (pgoff_t)(holebegin) >> PG_SHIFT;
-	pgoff_t hlen = ((pgoff_t)(holelen) + PG_SIZE - 1) >> PG_SHIFT;
+	struct zap_details details = {
+		.even_cows = even_cows,
+	};
+	unsigned long first_pte = (pgoff_t)holebegin >> PTE_SHIFT;
+	unsigned long nr_ptes =
+		((pgoff_t)holelen + PTE_SIZE - 1) >> PTE_SHIFT;
+	unsigned long last_pte;
 
 	/* Check for overflow. */
-	if (sizeof(holelen) > sizeof(hlen)) {
+	if (sizeof(holelen) > sizeof(nr_ptes)) {
 		long long holeend =
-			(holebegin + holelen + PG_SIZE - 1) >> PG_SHIFT;
+			(holebegin + holelen + PTE_SIZE - 1) >> PTE_SHIFT;
 		if (holeend & ~(long long)ULONG_MAX)
-			hlen = ULONG_MAX - hba + 1;
+			nr_ptes = ULONG_MAX - first_pte + 1;
 	}
 
-	unmap_mapping_pages(mapping, hba, hlen, even_cows);
+	if (!nr_ptes || nr_ptes - 1 > ULONG_MAX - first_pte)
+		last_pte = ULONG_MAX;
+	else
+		last_pte = first_pte + nr_ptes - 1;
+
+	i_mmap_lock_read(mapping);
+	if (unlikely(!RB_EMPTY_ROOT(&mapping->i_mmap.rb_root)))
+		unmap_mapping_pte_range_tree(&mapping->i_mmap, first_pte,
+					     last_pte, &details);
+	i_mmap_unlock_read(mapping);
 }
 EXPORT_SYMBOL(unmap_mapping_range);
 
