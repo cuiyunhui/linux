@@ -973,6 +973,21 @@ static inline struct page *folio_file_page(struct folio *folio, pgoff_t index)
 }
 
 /**
+ * folio_file_pte_page - The base page containing a particular file PTE offset.
+ * @folio: The folio which contains this PTE offset.
+ * @pteoff: The PTE-sized offset within the file.
+ *
+ * On PG_SIZE > PTE_SIZE systems, the struct page/vmemmap is still indexed in
+ * PG_SIZE units (pfn_to_page() folds PTE PFNs with PTES_TO_PAGES()).  The
+ * hardware PTE slice is selected by mkpte()/folio_mkpte() from @pteoff, so the
+ * rmap/refcount page argument must remain the containing PG_SIZE base page.
+ */
+static inline struct page *folio_file_pte_page(struct folio *folio, pgoff_t pteoff)
+{
+	return folio_file_page(folio, PTES_TO_PAGES(pteoff));
+}
+
+/**
  * folio_contains - Does this folio contain this index?
  * @folio: The folio.
  * @index: The page index within the file.

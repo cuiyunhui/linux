@@ -1050,7 +1050,8 @@ unsigned long shmem_swap_usage(struct vm_area_struct *vma)
 
 	/* Here comes the more involved part */
 	return shmem_partial_swap_usage(mapping, vma->vm_pteoff / PTES_PER_PAGE,
-					vma->vm_pteoff / PTES_PER_PAGE + vma_pages(vma));
+					DIV_ROUND_UP(vma->vm_pteoff + vma_ptes(vma),
+						     PTES_PER_PAGE));
 }
 
 /*
@@ -2770,7 +2771,7 @@ static vm_fault_t shmem_fault(struct vm_fault *vmf)
 	if (err)
 		return vmf_error(err);
 	if (folio) {
-		vmf->page = folio_file_page(folio, vmf->pteoff / PTES_PER_PAGE);
+		vmf->page = folio_file_pte_page(folio, vmf->pteoff);
 		ret |= VM_FAULT_LOCKED;
 	}
 	return ret;

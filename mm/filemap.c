@@ -3380,7 +3380,8 @@ static struct file *do_sync_mmap_readahead(struct vm_fault *vmf)
 		 */
 		struct vm_area_struct *vma = vmf->vma;
 		unsigned long start = PTES_TO_PAGES(vma->vm_pteoff);
-		unsigned long end = start + vma_pages(vma);
+		unsigned long end = DIV_ROUND_UP(vma->vm_pteoff + vma_ptes(vma),
+							PTES_PER_PAGE);
 		unsigned long ra_end;
 
 		ra->order = exec_folio_order();
@@ -3632,7 +3633,7 @@ retry_find:
 		return VM_FAULT_SIGBUS;
 	}
 
-	vmf->page = folio_file_page(folio, index);
+	vmf->page = folio_file_pte_page(folio, vmf->pteoff);
 	return ret | VM_FAULT_LOCKED;
 
 page_not_uptodate:

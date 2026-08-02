@@ -100,7 +100,7 @@ retry:
 		flush_tlb_kernel_range(addr, addr + PG_SIZE);
 	}
 
-	vmf->page = folio_file_page(folio, vmf->pteoff);
+	vmf->page = folio_file_pte_page(folio, vmf->pteoff);
 	ret = VM_FAULT_LOCKED;
 
 out:
