@@ -307,10 +307,10 @@ void munlock_folio(struct folio *folio)
 static inline unsigned int folio_mlock_step(struct folio *folio,
 		pte_t *pte, unsigned long addr, unsigned long end)
 {
-	unsigned int count = (end - addr) >> PG_SHIFT;
+	unsigned int count = (end - addr) >> PTE_SHIFT;
 	pte_t ptent = ptep_get(pte);
 
-	if (!folio_test_large(folio))
+	if (folio_nr_ptes(folio) == 1)
 		return 1;
 
 	return folio_pte_batch(folio, pte, ptent, count);
@@ -341,7 +341,7 @@ static inline bool allow_mlock_munlock(struct folio *folio,
 		return false;
 
 	/* folio is not fully mapped, skip mlock */
-	if (step != folio_nr_pages(folio))
+	if (step != folio_nr_ptes(folio))
 		return false;
 
 	return true;
@@ -487,7 +487,7 @@ static int mlock_fixup(struct vma_iterator *vmi, struct vm_area_struct *vma,
 	/*
 	 * Keep track of amount of locked VM.
 	 */
-	nr_pages = (end - start) >> PG_SHIFT;
+	nr_pages = (end - start) >> PTE_SHIFT;
 	if (!(newflags & VM_LOCKED))
 		nr_pages = -nr_pages;
 	else if (oldflags & VM_LOCKED)
@@ -594,7 +594,7 @@ static unsigned long count_mm_mlocked_page_nr(struct mm_struct *mm,
 		}
 	}
 
-	return count >> PG_SHIFT;
+	return count >> PTE_SHIFT;
 }
 
 /*
@@ -621,11 +621,11 @@ static __must_check int do_mlock(unsigned long start, size_t len, vm_flags_t fla
 		return -EPERM;
 
 	len = PTE_ALIGN(len + offset_in_pte(start));
-	start &= PG_MASK;
+	start &= PTE_MASK;
 
 	lock_limit = rlimit(RLIMIT_MEMLOCK);
-	lock_limit >>= PG_SHIFT;
-	locked = len >> PG_SHIFT;
+	lock_limit >>= PTE_SHIFT;
+	locked = len >> PTE_SHIFT;
 
 	if (mmap_write_lock_killable(current->mm))
 		return -EINTR;
@@ -681,7 +681,7 @@ SYSCALL_DEFINE2(munlock, unsigned long, start, size_t, len)
 	start = untagged_addr(start);
 
 	len = PTE_ALIGN(len + offset_in_pte(start));
-	start &= PG_MASK;
+	start &= PTE_MASK;
 
 	if (mmap_write_lock_killable(current->mm))
 		return -EINTR;
@@ -755,7 +755,7 @@ SYSCALL_DEFINE1(mlockall, int, flags)
 		return -EPERM;
 
 	lock_limit = rlimit(RLIMIT_MEMLOCK);
-	lock_limit >>= PG_SHIFT;
+	lock_limit >>= PTE_SHIFT;
 
 	if (mmap_write_lock_killable(current->mm))
 		return -EINTR;
