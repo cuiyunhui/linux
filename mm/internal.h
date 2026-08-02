@@ -352,9 +352,20 @@ static inline unsigned int folio_pte_batch_flags(struct folio *folio,
 	 */
 	VM_WARN_ON(virt_addr_valid(ptentp) && PageTable(virt_to_page(ptentp)));
 
-	/* Limit max_nr to the actual remaining PFNs in the folio we could batch. */
+	/*
+	 * Limit max_nr to the actual remaining PFNs in both the folio and the
+	 * current allocator page.  When PG_SIZE > PTE_SIZE, pfn_to_page()
+	 * folds multiple PTE PFNs onto one struct page.  Rmap callers pass that
+	 * struct page together with the batch size, so a batch crossing a
+	 * PG_SIZE boundary would lose the starting subpage offset and charge
+	 * all PTEs to the first page's mapcount.
+	 */
 	max_nr = min_t(unsigned long, max_nr,
 		       folio_pfn(folio) + folio_nr_ptes(folio) - pte_pfn(pte));
+	if (PTES_PER_PAGE > 1)
+		max_nr = min_t(unsigned long, max_nr,
+			       PTES_PER_PAGE -
+			       (pte_pfn(pte) % PTES_PER_PAGE));
 
 	nr = pte_batch_hint(ptep, pte);
 	expected_pte = __pte_batch_clear_ignored(pte_advance_pfn(pte, nr), flags);
