@@ -625,7 +625,12 @@ static int break_ksm_pmd_entry(pmd_t *pmdp, unsigned long addr, unsigned long en
 	if (!start_ptep)
 		return 0;
 
-	for (ptep = start_ptep; addr < end; ptep++, addr += PG_SIZE) {
+	/*
+	 * KSM operates on allocator folios, but the page table remains in
+	 * PTE_SIZE units when PG_SIZE is larger.
+	 */
+	for (ptep = start_ptep; addr < end;
+	     ptep += PTES_PER_PAGE, addr += PG_SIZE) {
 		pte_t pte = ptep_get(ptep);
 		struct folio *folio = NULL;
 
@@ -2534,7 +2539,8 @@ static int ksm_next_page_pmd_entry(pmd_t *pmdp, unsigned long addr, unsigned lon
 	if (!start_ptep)
 		return 0;
 
-	for (ptep = start_ptep; addr < end; ptep++, addr += PG_SIZE) {
+	for (ptep = start_ptep; addr < end;
+	     ptep += PTES_PER_PAGE, addr += PG_SIZE) {
 		pte = ptep_get(ptep);
 
 		if (!pte_present(pte))
