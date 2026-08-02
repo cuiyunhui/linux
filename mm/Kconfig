@@ -572,6 +572,12 @@ config SPLIT_PTE_PTLOCKS
 	depends on !ARM || CPU_CACHE_VIPT
 	depends on !PARISC || PA20
 	depends on !SPARC32
+	# RISC-V can keep a 4K userspace ABI while using a larger
+	# allocator page represented by multiple PTEs.
+	# Per-page-table locks use pmd_page(*pmd)->ptl and are not safe
+	# for that layout: mmap-heavy exit_mmap can spin forever in
+	# pte_offset_map_lock(). Fall back to mm->page_table_lock.
+	depends on !RISCV || !RISCV_PG_SIZE_SPLIT
 
 config ARCH_ENABLE_SPLIT_PMD_PTLOCK
 	bool

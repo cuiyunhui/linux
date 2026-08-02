@@ -34,7 +34,7 @@ config RISCV
 	select ARCH_HAS_FORTIFY_SOURCE
 	select ARCH_HAS_GCOV_PROFILE_ALL
 	select ARCH_HAS_GIGANTIC_PAGE
-	select ARCH_HAS_HW_PTE_YOUNG
+	select ARCH_HAS_HW_PTE_YOUNG if !RISCV_PG_SIZE_SPLIT
 	select ARCH_HAS_KCOV
 	select ARCH_HAS_KERNEL_FPU_SUPPORT if 64BIT && FPU
 	select ARCH_HAS_MEMBARRIER_CALLBACKS
@@ -71,7 +71,7 @@ config RISCV
 	select ARCH_SUPPORTS_LTO_CLANG_THIN
 	select ARCH_SUPPORTS_MSEAL_SYSTEM_MAPPINGS if 64BIT && MMU
 	select ARCH_SUPPORTS_PAGE_TABLE_CHECK if MMU
-	select ARCH_SUPPORTS_PER_VMA_LOCK if MMU
+	select ARCH_SUPPORTS_PER_VMA_LOCK if MMU && !RISCV_PG_SIZE_SPLIT
 	select ARCH_SUPPORTS_RT
 	select ARCH_SUPPORTS_SHADOW_CALL_STACK if HAVE_SHADOW_CALL_STACK
 	select ARCH_SUPPORTS_SCHED_MC if SMP
@@ -274,6 +274,51 @@ config ARCH_MMAP_RND_BITS_MAX
 
 config ARCH_MMAP_RND_COMPAT_BITS_MAX
 	default 17
+
+config RISCV_PG_SIZE_SPLIT
+	bool
+
+choice
+	prompt "Base allocator page size" if EXPERT
+	default RISCV_PG_SIZE_4KB
+	depends on 64BIT && MMU
+	help
+	  Select the desired size of order-0 buddy allocation.
+
+	  If you are not absolutely sure what you are doing, leave this
+	  option alone. The default keeps the architecture behavior unchanged
+	  and is the only supported production configuration today.
+
+config RISCV_PG_SIZE_4KB
+	bool "4K page size"
+	select PG_SIZE_4KB
+	help
+	  Keep the order-0 buddy allocation size at 4 KiB. This is the
+	  traditional RISC-V configuration where PG_SIZE and PTE_SIZE are
+	  identical, and should remain the default for production kernels. It
+	  preserves the existing page-table and ABI assumptions.
+
+config RISCV_PG_SIZE_16KB
+	bool "16K page size"
+	select PG_SIZE_16KB
+	select RISCV_PG_SIZE_SPLIT
+	help
+	  Use 16 KiB order-0 buddy allocations while keeping the hardware PTE
+	  granularity unchanged. This option is intended for PG_SIZE versus
+	  PTE_SIZE split bring-up and experiments. It is useful for finding
+	  places that still conflate allocation and translation sizes.
+
+config RISCV_PG_SIZE_64KB
+	bool "64K page size"
+	select PG_SIZE_64KB
+	select RISCV_PG_SIZE_SPLIT
+	help
+	  Use 64 KiB order-0 buddy allocations while keeping the hardware PTE
+	  granularity unchanged. This option is intended for large-page core MM
+	  experiments and is not yet suitable for general use. It exercises the
+	  largest split currently mirrored from the x86 pte_size branch.
+
+endchoice
 
 # set if we run in machine mode, cleared if we run in supervisor mode
 config RISCV_M_MODE
