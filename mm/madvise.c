@@ -191,7 +191,7 @@ static int swapin_walk_pmd_entry(pmd_t *pmd, unsigned long start,
 	spinlock_t *ptl;
 	unsigned long addr;
 
-	for (addr = start; addr < end; addr += PG_SIZE) {
+	for (addr = start; addr < end; addr += PTE_SIZE) {
 		pte_t pte;
 		softleaf_t entry;
 		struct folio *folio;
@@ -343,7 +343,7 @@ static inline int madvise_folio_pte_batch(unsigned long addr, unsigned long end,
 					  struct folio *folio, pte_t *ptep,
 					  pte_t *ptentp)
 {
-	int max_nr = (end - addr) / PG_SIZE;
+	int max_nr = (end - addr) / PTE_SIZE;
 
 	return folio_pte_batch_flags(folio, NULL, ptep, ptentp, max_nr,
 				     FPB_MERGE_YOUNG_DIRTY);
@@ -445,7 +445,7 @@ huge_unlock:
 
 regular_folio:
 #endif
-	tlb_change_page_size(tlb, PG_SIZE);
+	tlb_change_page_size(tlb, PTE_SIZE);
 restart:
 	start_pte = pte = pte_offset_map_lock(vma->vm_mm, pmd, addr, &ptl);
 	if (!start_pte)
@@ -477,15 +477,15 @@ restart:
 			continue;
 
 		/*
-		 * If we encounter a large folio, only split it if it is not
+		 * If we encounter a multi-PTE folio, only split it if it is not
 		 * fully mapped within the range we are operating on. Otherwise
 		 * leave it as is so that it can be swapped out whole. If we
 		 * fail to split a folio, leave it in place and advance to the
 		 * next pte in the range.
 		 */
-		if (folio_test_large(folio)) {
+		if (folio_nr_ptes(folio) > 1) {
 			nr = madvise_folio_pte_batch(addr, end, folio, pte, &ptent);
-			if (nr < folio_nr_pages(folio)) {
+			if (nr < folio_nr_ptes(folio)) {
 				int err;
 
 				if (folio_maybe_mapped_shared(folio))
@@ -515,12 +515,12 @@ restart:
 
 		/*
 		 * Do not interfere with other mappings of this folio and
-		 * non-LRU folio. If we have a large folio at this point, we
+		 * non-LRU folio. If we have a multi-PTE folio at this point, we
 		 * know it is fully mapped so if its mapcount is the same as its
-		 * number of pages, it must be exclusive.
+		 * number of PTEs, it must be exclusive.
 		 */
 		if (!folio_test_lru(folio) ||
-		    folio_mapcount(folio) != folio_nr_pages(folio))
+		    folio_mapcount(folio) != folio_nr_ptes(folio))
 			continue;
 
 		if (pageout_anon_only_filter && !folio_test_anon(folio))
@@ -668,7 +668,7 @@ static int madvise_free_pte_range(pmd_t *pmd, unsigned long addr,
 		if (madvise_free_huge_pmd(tlb, vma, pmd, addr, next))
 			return 0;
 
-	tlb_change_page_size(tlb, PG_SIZE);
+	tlb_change_page_size(tlb, PTE_SIZE);
 	start_pte = pte = pte_offset_map_lock(mm, pmd, addr, &ptl);
 	if (!start_pte)
 		return 0;
@@ -706,15 +706,15 @@ static int madvise_free_pte_range(pmd_t *pmd, unsigned long addr,
 			continue;
 
 		/*
-		 * If we encounter a large folio, only split it if it is not
+		 * If we encounter a multi-PTE folio, only split it if it is not
 		 * fully mapped within the range we are operating on. Otherwise
 		 * leave it as is so that it can be marked as lazyfree. If we
 		 * fail to split a folio, leave it in place and advance to the
 		 * next pte in the range.
 		 */
-		if (folio_test_large(folio)) {
+		if (folio_nr_ptes(folio) > 1) {
 			nr = madvise_folio_pte_batch(addr, end, folio, pte, &ptent);
-			if (nr < folio_nr_pages(folio)) {
+			if (nr < folio_nr_ptes(folio)) {
 				int err;
 
 				if (folio_maybe_mapped_shared(folio))
@@ -744,11 +744,11 @@ static int madvise_free_pte_range(pmd_t *pmd, unsigned long addr,
 			if (!folio_trylock(folio))
 				continue;
 			/*
-			 * If we have a large folio at this point, we know it is
+			 * If we have a multi-PTE folio at this point, we know it is
 			 * fully mapped so if its mapcount is the same as its
-			 * number of pages, it must be exclusive.
+			 * number of PTEs, it must be exclusive.
 			 */
-			if (folio_mapcount(folio) != folio_nr_pages(folio)) {
+			if (folio_mapcount(folio) != folio_nr_ptes(folio)) {
 				folio_unlock(folio);
 				continue;
 			}
