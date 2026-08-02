@@ -2568,18 +2568,26 @@ EXPORT_SYMBOL(vm_insert_page);
 static int __vm_map_pages(struct vm_area_struct *vma, struct page **pages,
 				unsigned long num, unsigned long offset)
 {
-	unsigned long count = vma_pages(vma);
+	unsigned long count, page_offset;
 	unsigned long uaddr = vma->vm_start;
 
+	/* vm_map_pages() maps whole struct pages from @pages. */
+	if (!IS_ALIGNED(offset, PTES_PER_PAGE) || !PG_ALIGNED(vma->vm_start) ||
+	    !PG_ALIGNED(vma->vm_end))
+		return -EINVAL;
+
+	page_offset = PTES_TO_PAGES(offset);
+	count = (vma->vm_end - vma->vm_start) >> PG_SHIFT;
+
 	/* Fail if the user requested offset is beyond the end of the object */
-	if (offset >= num)
+	if (page_offset >= num)
 		return -ENXIO;
 
 	/* Fail if the user requested size exceeds available object size */
-	if (count > num - offset)
+	if (count > num - page_offset)
 		return -ENXIO;
 
-	return vm_insert_pages(vma, uaddr, pages + offset, &count);
+	return vm_insert_pages(vma, uaddr, pages + page_offset, &count);
 }
 
 /**
