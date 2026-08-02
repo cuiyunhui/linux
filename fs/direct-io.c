@@ -160,6 +160,11 @@ static inline unsigned dio_pages_present(struct dio_submit *sdio)
 	return sdio->tail - sdio->head;
 }
 
+static inline bool dio_iter_uses_pte_pages(struct dio *dio)
+{
+	return dio->is_pinned && PG_SIZE > PTE_SIZE;
+}
+
 /*
  * Go grab and pin some userspace pages.   Typically we'll get 64 at a time.
  */
@@ -189,10 +194,16 @@ static inline int dio_refill_pages(struct dio *dio, struct dio_submit *sdio)
 	}
 
 	if (ret >= 0) {
-		ret += sdio->from;
 		sdio->head = 0;
-		sdio->tail = (ret + PG_SIZE - 1) / PG_SIZE;
-		sdio->to = ((ret - 1) & (PG_SIZE - 1)) + 1;
+		if (dio_iter_uses_pte_pages(dio)) {
+			sdio->tail = DIV_ROUND_UP((sdio->from & (PTE_SIZE - 1)) + ret,
+						  PTE_SIZE);
+			sdio->to = ((sdio->from + ret - 1) & (PG_SIZE - 1)) + 1;
+		} else {
+			ret += sdio->from;
+			sdio->tail = (ret + PG_SIZE - 1) / PG_SIZE;
+			sdio->to = ((ret - 1) & (PG_SIZE - 1)) + 1;
+		}
 		return 0;
 	}
 	return ret;	
@@ -695,7 +706,10 @@ static inline int dio_bio_add_page(struct dio *dio, struct dio_submit *sdio)
 		/*
 		 * Decrement count only, if we are done with this page
 		 */
-		if ((sdio->cur_page_len + sdio->cur_page_offset) == PG_SIZE)
+		if (dio_iter_uses_pte_pages(dio) ?
+		    ((sdio->cur_page_len +
+		      (sdio->cur_page_offset & (PTE_SIZE - 1))) == PTE_SIZE) :
+		    ((sdio->cur_page_len + sdio->cur_page_offset) == PG_SIZE))
 			sdio->pages_in_io--;
 		dio_pin_page(dio, sdio->cur_page);
 		sdio->final_block_in_bio = sdio->cur_page_block +
@@ -911,14 +925,29 @@ static int do_direct_IO(struct dio *dio, struct dio_submit *sdio,
 	while (sdio->block_in_file < sdio->final_block_in_request) {
 		struct page *page;
 		size_t from, to;
+		unsigned int page_head;
 
 		page = dio_get_page(dio, sdio);
 		if (IS_ERR(page)) {
 			ret = PTR_ERR(page);
 			goto out;
 		}
-		from = sdio->head ? 0 : sdio->from;
-		to = (sdio->head == sdio->tail - 1) ? sdio->to : PG_SIZE;
+		page_head = sdio->head;
+		if (dio_iter_uses_pte_pages(dio)) {
+			from = page_head ?
+				(((sdio->from & ~(PTE_SIZE - 1)) +
+				  page_head * PTE_SIZE) & (PG_SIZE - 1)) :
+				sdio->from;
+			to = (page_head == sdio->tail - 1) ?
+				sdio->to :
+				(((sdio->from & ~(PTE_SIZE - 1)) +
+				  (page_head + 1) * PTE_SIZE) & (PG_SIZE - 1));
+			if (!to)
+				to = PG_SIZE;
+		} else {
+			from = page_head ? 0 : sdio->from;
+			to = (page_head == sdio->tail - 1) ? sdio->to : PG_SIZE;
+		}
 		sdio->head++;
 
 		while (from < to) {

@@ -3046,6 +3046,10 @@ int get_user_pages_fast(unsigned long start, int nr_pages,
 			unsigned int gup_flags, struct page **pages);
 int pin_user_pages_fast(unsigned long start, int nr_pages,
 			unsigned int gup_flags, struct page **pages);
+int get_user_pte_page(unsigned long start, unsigned int gup_flags,
+		      struct page **page, size_t *offset);
+int pin_user_pte_page(unsigned long start, unsigned int gup_flags,
+		      struct page **page, size_t *offset);
 void folio_add_pin(struct folio *folio);
 
 int account_locked_vm(struct mm_struct *mm, unsigned long pages, bool inc);

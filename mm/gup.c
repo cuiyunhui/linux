@@ -648,7 +648,8 @@ static inline bool can_follow_write_pud(pud_t pud, struct page *page,
 
 static struct page *follow_huge_pud(struct vm_area_struct *vma,
 				    unsigned long addr, pud_t *pudp,
-				    int flags, unsigned long *page_mask)
+				    int flags, unsigned long *page_mask,
+				    size_t *page_offset)
 {
 	struct mm_struct *mm = vma->vm_mm;
 	struct page *page;
@@ -665,7 +666,7 @@ static struct page *follow_huge_pud(struct vm_area_struct *vma,
 	    !can_follow_write_pud(pud, pfn_to_page(pfn), vma, flags))
 		return NULL;
 
-	pfn += (addr & ~PUD_MASK) >> PG_SHIFT;
+	pfn += (addr & ~PUD_MASK) >> PTE_SHIFT;
 	page = pfn_to_page(pfn);
 
 	if (!pud_write(pud) && gup_must_unshare(vma, flags, page))
@@ -676,6 +677,9 @@ static struct page *follow_huge_pud(struct vm_area_struct *vma,
 		page = ERR_PTR(ret);
 	else
 		*page_mask = HPAGE_PUD_NR - 1;
+	if (!ret && page_offset)
+		*page_offset = (pfn - page_to_pfn(page)) * PTE_SIZE +
+			       offset_in_pte(addr);
 
 	return page;
 }
@@ -701,16 +705,19 @@ static inline bool can_follow_write_pmd(pmd_t pmd, struct page *page,
 static struct page *follow_huge_pmd(struct vm_area_struct *vma,
 				    unsigned long addr, pmd_t *pmd,
 				    unsigned int flags,
-				    unsigned long *page_mask)
+				    unsigned long *page_mask,
+				    size_t *page_offset)
 {
 	struct mm_struct *mm = vma->vm_mm;
 	pmd_t pmdval = *pmd;
 	struct page *page;
+	unsigned long pfn;
 	int ret;
 
 	assert_spin_locked(pmd_lockptr(mm, pmd));
 
-	page = pmd_page(pmdval);
+	pfn = pmd_pfn(pmdval) + ((addr & ~HPAGE_PMD_MASK) >> PTE_SHIFT);
+	page = pfn_to_page(pfn);
 	if ((flags & FOLL_WRITE) &&
 	    !can_follow_write_pmd(pmdval, page, vma, flags))
 		return NULL;
@@ -737,8 +744,10 @@ static struct page *follow_huge_pmd(struct vm_area_struct *vma,
 		touch_pmd(vma, addr, pmd, flags & FOLL_WRITE);
 #endif	/* CONFIG_TRANSPARENT_HUGEPAGE */
 
-	page += (addr & ~HPAGE_PMD_MASK) >> PG_SHIFT;
 	*page_mask = HPAGE_PMD_NR - 1;
+	if (page_offset)
+		*page_offset = (pfn - page_to_pfn(page)) * PTE_SIZE +
+			       offset_in_pte(addr);
 
 	return page;
 }
@@ -746,7 +755,8 @@ static struct page *follow_huge_pmd(struct vm_area_struct *vma,
 #else  /* CONFIG_PGTABLE_HAS_HUGE_LEAVES */
 static struct page *follow_huge_pud(struct vm_area_struct *vma,
 				    unsigned long addr, pud_t *pudp,
-				    int flags, unsigned long *page_mask)
+				    int flags, unsigned long *page_mask,
+				    size_t *page_offset)
 {
 	return NULL;
 }
@@ -754,7 +764,8 @@ static struct page *follow_huge_pud(struct vm_area_struct *vma,
 static struct page *follow_huge_pmd(struct vm_area_struct *vma,
 				    unsigned long addr, pmd_t *pmd,
 				    unsigned int flags,
-				    unsigned long *page_mask)
+				    unsigned long *page_mask,
+				    size_t *page_offset)
 {
 	return NULL;
 }
@@ -799,8 +810,22 @@ static inline bool can_follow_write_pte(pte_t pte, struct page *page,
 	return !userfaultfd_pte_wp(vma, pte);
 }
 
+static size_t gup_pte_page_offset(pte_t pte, unsigned long address,
+				  struct page *page)
+{
+	unsigned long leaf_size = pte_leaf_size(pte);
+	unsigned long pfn = pte_pfn(pte);
+
+	if (leaf_size > PTE_SIZE)
+		pfn += (address & (leaf_size - 1)) >> PTE_SHIFT;
+
+	return (pfn - page_to_pfn(page)) * PTE_SIZE +
+	       offset_in_pte(address);
+}
+
 static struct page *follow_page_pte(struct vm_area_struct *vma,
-		unsigned long address, pmd_t *pmd, unsigned int flags)
+		unsigned long address, pmd_t *pmd, unsigned int flags,
+		size_t *page_offset)
 {
 	struct mm_struct *mm = vma->vm_mm;
 	struct folio *folio;
@@ -885,6 +910,8 @@ static struct page *follow_page_pte(struct vm_area_struct *vma,
 		 */
 		folio_mark_accessed(folio);
 	}
+	if (page_offset)
+		*page_offset = gup_pte_page_offset(pte, address, page);
 out:
 	pte_unmap_unlock(ptep, ptl);
 	return page;
@@ -898,7 +925,8 @@ no_page:
 static struct page *follow_pmd_mask(struct vm_area_struct *vma,
 				    unsigned long address, pud_t *pudp,
 				    unsigned int flags,
-				    unsigned long *page_mask)
+				    unsigned long *page_mask,
+				    size_t *page_offset)
 {
 	pmd_t *pmd, pmdval;
 	spinlock_t *ptl;
@@ -912,7 +940,8 @@ static struct page *follow_pmd_mask(struct vm_area_struct *vma,
 	if (!pmd_present(pmdval))
 		return no_page_table(vma, flags, address);
 	if (likely(!pmd_leaf(pmdval)))
-		return follow_page_pte(vma, address, pmd, flags);
+		return follow_page_pte(vma, address, pmd, flags,
+				       page_offset);
 
 	if (pmd_protnone(pmdval) && !gup_can_follow_protnone(vma, flags))
 		return no_page_table(vma, flags, address);
@@ -925,16 +954,18 @@ static struct page *follow_pmd_mask(struct vm_area_struct *vma,
 	}
 	if (unlikely(!pmd_leaf(pmdval))) {
 		spin_unlock(ptl);
-		return follow_page_pte(vma, address, pmd, flags);
+		return follow_page_pte(vma, address, pmd, flags,
+				       page_offset);
 	}
 	if (pmd_trans_huge(pmdval) && (flags & FOLL_SPLIT_PMD)) {
 		spin_unlock(ptl);
 		split_huge_pmd(vma, pmd, address);
 		/* If pmd was left empty, stuff a page table in there quickly */
 		return pte_alloc(mm, pmd) ? ERR_PTR(-ENOMEM) :
-			follow_page_pte(vma, address, pmd, flags);
+			follow_page_pte(vma, address, pmd, flags, page_offset);
 	}
-	page = follow_huge_pmd(vma, address, pmd, flags, page_mask);
+	page = follow_huge_pmd(vma, address, pmd, flags, page_mask,
+			       page_offset);
 	spin_unlock(ptl);
 	return page;
 }
@@ -942,7 +973,8 @@ static struct page *follow_pmd_mask(struct vm_area_struct *vma,
 static struct page *follow_pud_mask(struct vm_area_struct *vma,
 				    unsigned long address, p4d_t *p4dp,
 				    unsigned int flags,
-				    unsigned long *page_mask)
+				    unsigned long *page_mask,
+				    size_t *page_offset)
 {
 	pud_t *pudp, pud;
 	spinlock_t *ptl;
@@ -955,7 +987,8 @@ static struct page *follow_pud_mask(struct vm_area_struct *vma,
 		return no_page_table(vma, flags, address);
 	if (pud_leaf(pud)) {
 		ptl = pud_lock(mm, pudp);
-		page = follow_huge_pud(vma, address, pudp, flags, page_mask);
+		page = follow_huge_pud(vma, address, pudp, flags, page_mask,
+				       page_offset);
 		spin_unlock(ptl);
 		if (page)
 			return page;
@@ -964,13 +997,15 @@ static struct page *follow_pud_mask(struct vm_area_struct *vma,
 	if (unlikely(pud_bad(pud)))
 		return no_page_table(vma, flags, address);
 
-	return follow_pmd_mask(vma, address, pudp, flags, page_mask);
+	return follow_pmd_mask(vma, address, pudp, flags, page_mask,
+			       page_offset);
 }
 
 static struct page *follow_p4d_mask(struct vm_area_struct *vma,
 				    unsigned long address, pgd_t *pgdp,
 				    unsigned int flags,
-				    unsigned long *page_mask)
+				    unsigned long *page_mask,
+				    size_t *page_offset)
 {
 	p4d_t *p4dp, p4d;
 
@@ -981,7 +1016,8 @@ static struct page *follow_p4d_mask(struct vm_area_struct *vma,
 	if (!p4d_present(p4d) || p4d_bad(p4d))
 		return no_page_table(vma, flags, address);
 
-	return follow_pud_mask(vma, address, p4dp, flags, page_mask);
+	return follow_pud_mask(vma, address, p4dp, flags, page_mask,
+			       page_offset);
 }
 
 /**
@@ -1006,7 +1042,8 @@ static struct page *follow_p4d_mask(struct vm_area_struct *vma,
  */
 static struct page *follow_page_mask(struct vm_area_struct *vma,
 			      unsigned long address, unsigned int flags,
-			      unsigned long *page_mask)
+			      unsigned long *page_mask,
+			      size_t *page_offset)
 {
 	pgd_t *pgd;
 	struct mm_struct *mm = vma->vm_mm;
@@ -1020,7 +1057,8 @@ static struct page *follow_page_mask(struct vm_area_struct *vma,
 	if (pgd_none(*pgd) || unlikely(pgd_bad(*pgd)))
 		page = no_page_table(vma, flags, address);
 	else
-		page = follow_p4d_mask(vma, address, pgd, flags, page_mask);
+		page = follow_p4d_mask(vma, address, pgd, flags, page_mask,
+				       page_offset);
 
 	vma_pgtable_walk_end(vma);
 
@@ -1029,7 +1067,7 @@ static struct page *follow_page_mask(struct vm_area_struct *vma,
 
 static int get_gate_page(struct mm_struct *mm, unsigned long address,
 		unsigned int gup_flags, struct vm_area_struct **vma,
-		struct page **page)
+		struct page **page, size_t *page_offset)
 {
 	pgd_t *pgd;
 	p4d_t *p4d;
@@ -1072,6 +1110,8 @@ static int get_gate_page(struct mm_struct *mm, unsigned long address,
 	ret = try_grab_folio(page_folio(*page), 1, gup_flags);
 	if (unlikely(ret))
 		goto unmap;
+	if (page_offset)
+		*page_offset = gup_pte_page_offset(entry, address, *page);
 out:
 	ret = 0;
 unmap:
@@ -1397,7 +1437,8 @@ static long __get_user_pages(struct mm_struct *mm,
 			if (!vma && in_gate_area(mm, start)) {
 				ret = get_gate_page(mm, start & PG_MASK,
 						    gup_flags, &vma,
-						    pages ? &page : NULL);
+						    pages ? &page : NULL,
+						    NULL);
 				if (ret)
 					goto out;
 				page_mask = 0;
@@ -1423,7 +1464,8 @@ retry:
 		}
 		cond_resched();
 
-		page = follow_page_mask(vma, start, gup_flags, &page_mask);
+		page = follow_page_mask(vma, start, gup_flags, &page_mask,
+					NULL);
 		if (!page || PTR_ERR(page) == -EMLINK) {
 			ret = faultin_page(vma, start, gup_flags,
 					   PTR_ERR(page) == -EMLINK, locked);
@@ -2692,6 +2734,105 @@ long get_user_pages_unlocked(unsigned long start, unsigned long nr_pages,
 				       &locked, gup_flags);
 }
 EXPORT_SYMBOL(get_user_pages_unlocked);
+
+static int __get_user_pte_page(unsigned long start, unsigned int gup_flags,
+			       struct page **page, size_t *offset,
+			       unsigned int to_set)
+{
+	struct mm_struct *mm = current->mm;
+	struct vm_area_struct *vma;
+	struct page *p;
+	unsigned long page_mask = 0;
+	int locked = 1, ret;
+
+	if (!offset)
+		return -EINVAL;
+	if (!is_valid_gup_args(page, NULL, &gup_flags, to_set))
+		return -EINVAL;
+
+	gup_flags |= FOLL_TOUCH;
+	if (gup_flags & FOLL_PIN)
+		mm_set_has_pinned_flag(mm);
+
+	ret = mmap_read_lock_killable(mm);
+	if (ret)
+		return ret;
+
+	start = untagged_addr(start);
+retry:
+	vma = gup_vma_lookup(mm, start);
+	if (!vma && in_gate_area(mm, start)) {
+		ret = get_gate_page(mm, start, gup_flags, &vma, page, offset);
+		goto out;
+	}
+	if (!vma) {
+		ret = -EFAULT;
+		goto out;
+	}
+
+	ret = check_vma_flags(vma, gup_flags);
+	if (ret)
+		goto out;
+
+	if (fatal_signal_pending(current)) {
+		ret = -EINTR;
+		goto out;
+	}
+	cond_resched();
+
+	p = follow_page_mask(vma, start, gup_flags, &page_mask, offset);
+	if (!p || PTR_ERR(p) == -EMLINK) {
+		ret = faultin_page(vma, start, gup_flags,
+				   PTR_ERR(p) == -EMLINK, &locked);
+		switch (ret) {
+		case 0:
+			goto retry;
+		case -EFAULT:
+		case -ENOMEM:
+		case -EHWPOISON:
+			goto out;
+		}
+		goto out;
+	} else if (PTR_ERR(p) == -EEXIST) {
+		ret = PTR_ERR(p);
+		goto out;
+	} else if (IS_ERR(p)) {
+		ret = PTR_ERR(p);
+		goto out;
+	}
+
+	*page = p;
+	ret = 1;
+out:
+	mmap_read_unlock(mm);
+	return ret;
+}
+
+/**
+ * get_user_pte_page - Get the allocator page and offset for one user PTE.
+ * @start: User address to look up.
+ * @gup_flags: Flags modifying lookup behaviour.
+ * @page: Returns the PG_SIZE-sized page containing the mapping.
+ * @offset: Returns the byte offset of @start within @page.
+ */
+int get_user_pte_page(unsigned long start, unsigned int gup_flags,
+		      struct page **page, size_t *offset)
+{
+	return __get_user_pte_page(start, gup_flags, page, offset, FOLL_GET);
+}
+
+/**
+ * pin_user_pte_page - Pin the allocator page and offset for one user PTE.
+ * @start: User address to pin.
+ * @gup_flags: Flags modifying lookup behaviour.
+ * @page: Returns the PG_SIZE-sized page containing the mapping.
+ * @offset: Returns the byte offset of @start within @page.
+ */
+int pin_user_pte_page(unsigned long start, unsigned int gup_flags,
+		      struct page **page, size_t *offset)
+{
+	return __get_user_pte_page(start, gup_flags, page, offset, FOLL_PIN);
+}
 
 /*
  * GUP-fast

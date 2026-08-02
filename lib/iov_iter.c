@@ -910,6 +910,22 @@ static int want_pages_array(struct page ***res, size_t size,
 	return count;
 }
 
+static int want_pte_pages_array(struct page ***res, size_t size,
+				size_t start, unsigned int maxpages)
+{
+	unsigned int count = DIV_ROUND_UP(size + start, PTE_SIZE);
+
+	if (count > maxpages)
+		count = maxpages;
+	WARN_ON(!count);
+	if (!*res) {
+		*res = kvmalloc_objs(struct page *, count);
+		if (!*res)
+			return 0;
+	}
+	return count;
+}
+
 static ssize_t iter_folioq_get_pages(struct iov_iter *iter,
 				     struct page ***ppages, size_t maxsize,
 				     unsigned maxpages, size_t *_start_offset)
@@ -1076,6 +1092,7 @@ static ssize_t __iov_iter_get_pages_alloc(struct iov_iter *i,
 	if (likely(user_backed_iter(i))) {
 		unsigned long addr;
 		int res;
+		size_t pte_offset;
 
 		if (iov_iter_rw(i) != WRITE)
 			gup_flags |= FOLL_WRITE;
@@ -1083,15 +1100,15 @@ static ssize_t __iov_iter_get_pages_alloc(struct iov_iter *i,
 			gup_flags |= FOLL_NOFAULT;
 
 		addr = first_iovec_segment(i, &maxsize);
-		*start = addr % PG_SIZE;
-		addr &= PG_MASK;
-		n = want_pages_array(pages, maxsize, *start, maxpages);
+		pte_offset = offset_in_pte(addr);
+		maxsize = min_t(size_t, maxsize, PTE_SIZE - pte_offset);
+		n = want_pte_pages_array(pages, maxsize, pte_offset,
+					 maxpages);
 		if (!n)
 			return -ENOMEM;
-		res = get_user_pages_fast(addr, n, gup_flags, *pages);
+		res = get_user_pte_page(addr, gup_flags, *pages, start);
 		if (unlikely(res <= 0))
 			return res;
-		maxsize = min_t(size_t, maxsize, res * PG_SIZE - *start);
 		iov_iter_advance(i, maxsize);
 		return maxsize;
 	}
@@ -1161,12 +1178,13 @@ static int iov_npages(const struct iov_iter *i, int maxpages)
 	int npages = 0;
 
 	for (p = iter_iov(i); size; skip = 0, p++) {
-		unsigned offs = offset_in_pg(p->iov_base + skip);
+		unsigned int offs = (unsigned long)(p->iov_base + skip) &
+				    (PTE_SIZE - 1);
 		size_t len = min(p->iov_len - skip, size);
 
 		if (len) {
 			size -= len;
-			npages += DIV_ROUND_UP(offs + len, PG_SIZE);
+			npages += DIV_ROUND_UP(offs + len, PTE_SIZE);
 			if (unlikely(npages > maxpages))
 				return maxpages;
 		}
@@ -1197,13 +1215,32 @@ int iov_iter_npages(const struct iov_iter *i, int maxpages)
 	if (unlikely(!i->count))
 		return 0;
 	if (likely(iter_is_ubuf(i))) {
-		unsigned offs = offset_in_pg(i->ubuf + i->iov_offset);
-		int npages = DIV_ROUND_UP(offs + i->count, PG_SIZE);
+		unsigned int offs = (unsigned long)(i->ubuf + i->iov_offset) &
+				    (PTE_SIZE - 1);
+		int npages = DIV_ROUND_UP(offs + i->count, PTE_SIZE);
 		return min(npages, maxpages);
 	}
-	/* iovec and kvec have identical layouts */
-	if (likely(iter_is_iovec(i) || iov_iter_is_kvec(i)))
+	if (likely(iter_is_iovec(i)))
 		return iov_npages(i, maxpages);
+	if (iov_iter_is_kvec(i)) {
+		/* iovec and kvec have identical layouts */
+		size_t skip = i->iov_offset, size = i->count;
+		const struct iovec *p;
+		int npages = 0;
+
+		for (p = iter_iov(i); size; skip = 0, p++) {
+			unsigned int offs = offset_in_pg(p->iov_base + skip);
+			size_t len = min(p->iov_len - skip, size);
+
+			if (len) {
+				size -= len;
+				npages += DIV_ROUND_UP(offs + len, PG_SIZE);
+				if (unlikely(npages > maxpages))
+					return maxpages;
+			}
+		}
+		return npages;
+	}
 	if (iov_iter_is_bvec(i))
 		return bvec_npages(i, maxpages);
 	if (iov_iter_is_folioq(i)) {
@@ -1744,7 +1781,7 @@ static ssize_t iov_iter_extract_user_pages(struct iov_iter *i,
 {
 	unsigned long addr;
 	unsigned int gup_flags = 0;
-	size_t offset;
+	size_t pte_offset;
 	int res;
 
 	if (i->data_source == ITER_DEST)
@@ -1755,15 +1792,15 @@ static ssize_t iov_iter_extract_user_pages(struct iov_iter *i,
 		gup_flags |= FOLL_NOFAULT;
 
 	addr = first_iovec_segment(i, &maxsize);
-	*offset0 = offset = addr % PG_SIZE;
-	addr &= PG_MASK;
-	maxpages = want_pages_array(pages, maxsize, offset, maxpages);
+	pte_offset = offset_in_pte(addr);
+	maxsize = min_t(size_t, maxsize, PTE_SIZE - pte_offset);
+	maxpages = want_pte_pages_array(pages, maxsize, pte_offset,
+					maxpages);
 	if (!maxpages)
 		return -ENOMEM;
-	res = pin_user_pages_fast(addr, maxpages, gup_flags, *pages);
+	res = pin_user_pte_page(addr, gup_flags, *pages, offset0);
 	if (unlikely(res <= 0))
 		return res;
-	maxsize = min_t(size_t, maxsize, res * PG_SIZE - offset);
 	iov_iter_advance(i, maxsize);
 	return maxsize;
 }
@@ -1854,6 +1891,12 @@ static unsigned int get_contig_folio_len(struct page **pages,
 	unsigned int max_pages, i;
 	size_t folio_offset, len;
 
+	if (PG_SIZE > PTE_SIZE) {
+		*num_pages = 1;
+		return min_t(size_t, PTE_SIZE - (offset & (PTE_SIZE - 1)),
+			     left);
+	}
+
 	folio_offset = PG_SIZE * folio_page_idx(folio, pages[0]) + offset;
 	len = min(folio_size(folio) - folio_offset, left);
 
@@ -1919,7 +1962,11 @@ ssize_t iov_iter_extract_bvecs(struct iov_iter *iter, struct bio_vec *bv,
 	if (unlikely(size <= 0))
 		return size ? size : -EFAULT;
 
-	nr_pages = DIV_ROUND_UP(offset + size, PG_SIZE);
+	if (iov_iter_extract_will_pin(iter) && PG_SIZE > PTE_SIZE)
+		nr_pages = DIV_ROUND_UP((offset & (PTE_SIZE - 1)) + size,
+					PTE_SIZE);
+	else
+		nr_pages = DIV_ROUND_UP(offset + size, PG_SIZE);
 	for (left = size; left > 0; left -= len) {
 		unsigned int nr_to_add;
 
@@ -1932,7 +1979,7 @@ ssize_t iov_iter_extract_bvecs(struct iov_iter *iter, struct bio_vec *bv,
 		bvec_set_page(&bv[*nr_vecs], pages[i], len, offset);
 		i += nr_to_add;
 		(*nr_vecs)++;
-		offset = 0;
+		offset = (offset + len) & (PG_SIZE - 1);
 	}
 
 	iov_iter_revert(iter, left);
