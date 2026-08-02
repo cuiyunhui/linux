@@ -165,7 +165,7 @@ static void __init cma_activate_area(struct cma *cma)
 		}
 
 		for (pfn = early_pfn[r]; pfn < cmr->base_pfn + cmr->count;
-		     pfn += pageblock_nr_pages)
+		     pfn += pageblock_nr_ptes)
 			init_cma_reserved_pageblock(pfn_to_page(pfn));
 	}
 

@@ -367,8 +367,9 @@ static void __reset_isolation_suitable(struct zone *zone)
 	 * is found, both PageBuddy and PageLRU are checked as the pageblock
 	 * is suitable as both source and target.
 	 */
-	for (; migrate_pfn < free_pfn; migrate_pfn += pageblock_nr_pages,
-					free_pfn -= pageblock_nr_pages) {
+	for (; migrate_pfn < free_pfn;
+	     migrate_pfn += pageblock_nr_ptes,
+	     free_pfn -= pageblock_nr_ptes) {
 		cond_resched();
 
 		/* Update the migrate PFN */
@@ -709,7 +710,7 @@ isolate_freepages_range(struct compact_control *cc,
 
 	for (; pfn < end_pfn; pfn += isolated,
 				block_start_pfn = block_end_pfn,
-				block_end_pfn += pageblock_nr_pages) {
+				block_end_pfn += pageblock_nr_ptes) {
 		/* Protect pfn from changing by isolate_freepages_block */
 		unsigned long isolate_start_pfn = pfn;
 
@@ -989,7 +990,8 @@ isolate_migratepages_block(struct compact_control *cc, unsigned long low_pfn,
 				 * Hugepage was successfully isolated and placed
 				 * on the cc->migratepages list.
 				 */
-				low_pfn += folio_nr_pages(folio) - folio_page_idx(folio, page) - 1;
+				low_pfn += PAGES_TO_PTES(folio_nr_pages(folio) -
+						folio_page_idx(folio, page)) - 1;
 				goto isolate_success_no_list;
 			}
 
@@ -1185,7 +1187,7 @@ isolate_migratepages_block(struct compact_control *cc, unsigned long low_pfn,
 			if (unlikely(skip_isolation_on_order(folio_order(folio),
 							     cc->order) &&
 				     !cc->alloc_contig)) {
-				low_pfn += folio_nr_pages(folio) - 1;
+				low_pfn += PAGES_TO_PTES(folio_nr_pages(folio)) - 1;
 				nr_scanned += folio_nr_pages(folio) - 1;
 				folio_set_lru(folio);
 				goto isolate_fail_put;
@@ -1194,7 +1196,7 @@ isolate_migratepages_block(struct compact_control *cc, unsigned long low_pfn,
 
 		/* The folio is taken off the LRU */
 		if (folio_test_large(folio))
-			low_pfn += folio_nr_pages(folio) - 1;
+			low_pfn += PAGES_TO_PTES(folio_nr_pages(folio)) - 1;
 
 		/* Successfully isolated */
 		lruvec_del_folio(lruvec, folio);
@@ -1332,7 +1334,7 @@ isolate_migratepages_range(struct compact_control *cc, unsigned long start_pfn,
 
 	for (; pfn < end_pfn; pfn = block_end_pfn,
 				block_start_pfn = block_end_pfn,
-				block_end_pfn += pageblock_nr_pages) {
+				block_end_pfn += pageblock_nr_ptes) {
 
 		block_end_pfn = min(block_end_pfn, end_pfn);
 
@@ -1417,8 +1419,8 @@ freelist_scan_limit(struct compact_control *cc)
  */
 static inline bool compact_scanners_met(struct compact_control *cc)
 {
-	return (cc->free_pfn >> pageblock_order)
-		<= (cc->migrate_pfn >> pageblock_order);
+	return (cc->free_pfn / pageblock_nr_ptes)
+		<= (cc->migrate_pfn / pageblock_nr_ptes);
 }
 
 /*
@@ -1658,7 +1660,7 @@ static void fast_isolate_freepages(struct compact_control *cc)
 	}
 
 	if (highest && highest >= cc->zone->compact_cached_free_pfn) {
-		highest -= pageblock_nr_pages;
+		highest -= pageblock_nr_ptes;
 		cc->zone->compact_cached_free_pfn = highest;
 	}
 
@@ -1694,7 +1696,7 @@ static void isolate_freepages(struct compact_control *cc)
 	 * successfully isolated from, zone-cached value, or the end of the
 	 * zone when isolating for the first time. For looping we also need
 	 * this pfn aligned down to the pageblock boundary, because we do
-	 * block_start_pfn -= pageblock_nr_pages in the for loop.
+	 * block_start_pfn -= pageblock_nr_ptes in the for loop.
 	 * For ending point, take care when isolating in last pageblock of a
 	 * zone which ends in the middle of a pageblock.
 	 * The low boundary is the end of the pageblock the migration scanner
@@ -1702,8 +1704,8 @@ static void isolate_freepages(struct compact_control *cc)
 	 */
 	isolate_start_pfn = cc->free_pfn;
 	block_start_pfn = pageblock_start_pfn(isolate_start_pfn);
-	block_end_pfn = min(block_start_pfn + pageblock_nr_pages,
-						zone_end_pfn(zone));
+	block_end_pfn = min(block_start_pfn + pageblock_nr_ptes,
+			    zone_end_pfn(zone));
 	low_pfn = pageblock_end_pfn(cc->migrate_pfn);
 	stride = cc->mode == MIGRATE_ASYNC ? COMPACT_CLUSTER_MAX : 1;
 
@@ -1714,7 +1716,7 @@ static void isolate_freepages(struct compact_control *cc)
 	 */
 	for (; block_start_pfn >= low_pfn;
 				block_end_pfn = block_start_pfn,
-				block_start_pfn -= pageblock_nr_pages,
+				block_start_pfn -= pageblock_nr_ptes,
 				isolate_start_pfn = block_start_pfn) {
 		unsigned long nr_isolated;
 
@@ -1722,7 +1724,7 @@ static void isolate_freepages(struct compact_control *cc)
 		 * This can iterate a massively long zone without finding any
 		 * suitable migration targets, so periodically check resched.
 		 */
-		if (!(block_start_pfn % (COMPACT_CLUSTER_MAX * pageblock_nr_pages)))
+		if (!(block_start_pfn % (COMPACT_CLUSTER_MAX * pageblock_nr_ptes)))
 			cond_resched();
 
 		page = pageblock_pfn_to_page(block_start_pfn, block_end_pfn,
@@ -1752,7 +1754,7 @@ static void isolate_freepages(struct compact_control *cc)
 		/* Update the skip hint if the full pageblock was scanned */
 		if (isolate_start_pfn == block_end_pfn)
 			update_pageblock_skip(cc, page, block_start_pfn -
-					      pageblock_nr_pages);
+					      pageblock_nr_ptes);
 
 		/* Are enough freepages isolated? */
 		if (cc->nr_freepages >= cc->nr_migratepages) {
@@ -1762,7 +1764,7 @@ static void isolate_freepages(struct compact_control *cc)
 				 * freepages can be isolated next time.
 				 */
 				isolate_start_pfn =
-					block_start_pfn - pageblock_nr_pages;
+					block_start_pfn - pageblock_nr_ptes;
 			}
 			break;
 		} else if (isolate_start_pfn < block_end_pfn) {
@@ -2081,14 +2083,14 @@ static isolate_migrate_t isolate_migratepages(struct compact_control *cc)
 			fast_find_block = false,
 			cc->migrate_pfn = low_pfn = block_end_pfn,
 			block_start_pfn = block_end_pfn,
-			block_end_pfn += pageblock_nr_pages) {
+			block_end_pfn += pageblock_nr_ptes) {
 
 		/*
 		 * This can potentially iterate a massively long zone with
 		 * many pageblocks unsuitable, so periodically check if we
 		 * need to schedule.
 		 */
-		if (!(low_pfn % (COMPACT_CLUSTER_MAX * pageblock_nr_pages)))
+		if (!(low_pfn % (COMPACT_CLUSTER_MAX * pageblock_nr_ptes)))
 			cond_resched();
 
 		page = pageblock_pfn_to_page(block_start_pfn,

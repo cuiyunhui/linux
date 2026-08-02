@@ -1487,9 +1487,10 @@ static unsigned long __init usemap_size(unsigned long zone_start_pfn, unsigned l
 {
 	unsigned long usemapsize;
 
-	zonesize += zone_start_pfn & (pageblock_nr_pages-1);
-	usemapsize = round_up(zonesize, pageblock_nr_pages);
-	usemapsize = usemapsize >> pageblock_order;
+	zonesize = PAGES_TO_PTES(zonesize);
+	zonesize += zone_start_pfn & (pageblock_nr_ptes - 1);
+	usemapsize = round_up(zonesize, pageblock_nr_ptes);
+	usemapsize = usemapsize / pageblock_nr_ptes;
 	usemapsize *= NR_PAGEBLOCK_BITS;
 	usemapsize = round_up(usemapsize, BITS_PER_LONG);
 
@@ -2294,7 +2295,7 @@ void set_zone_contiguous(struct zone *zone)
 	block_end_pfn = pageblock_end_pfn(block_start_pfn);
 	for (; block_start_pfn < zone_end_pfn(zone);
 			block_start_pfn = block_end_pfn,
-			 block_end_pfn += pageblock_nr_pages) {
+			 block_end_pfn += pageblock_nr_ptes) {
 
 		block_end_pfn = min(block_end_pfn, zone_end_pfn(zone));
 

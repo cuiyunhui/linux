@@ -327,6 +327,7 @@ static int isolate_single_pageblock(unsigned long boundary_pfn,
 {
 	unsigned long start_pfn;
 	unsigned long isolate_pageblock;
+	unsigned long max_order_ptes;
 	unsigned long pfn;
 	struct zone *zone;
 	int ret;
@@ -334,7 +335,7 @@ static int isolate_single_pageblock(unsigned long boundary_pfn,
 	VM_BUG_ON(!pageblock_aligned(boundary_pfn));
 
 	if (isolate_before)
-		isolate_pageblock = boundary_pfn - pageblock_nr_pages;
+		isolate_pageblock = boundary_pfn - pageblock_nr_ptes;
 	else
 		isolate_pageblock = boundary_pfn;
 
@@ -345,15 +346,16 @@ static int isolate_single_pageblock(unsigned long boundary_pfn,
 	 * are within the same zone.
 	 */
 	zone  = page_zone(pfn_to_page(isolate_pageblock));
-	start_pfn  = max(ALIGN_DOWN(isolate_pageblock, MAX_ORDER_NR_PAGES),
-				      zone->zone_start_pfn);
+	max_order_ptes = PAGES_TO_PTES(MAX_ORDER_NR_PAGES);
+	start_pfn = max(ALIGN_DOWN(isolate_pageblock, max_order_ptes),
+			zone->zone_start_pfn);
 
 	if (skip_isolation) {
 		VM_BUG_ON(!get_pageblock_isolate(pfn_to_page(isolate_pageblock)));
 	} else {
 		ret = set_migratetype_isolate(pfn_to_page(isolate_pageblock),
 				mode, isolate_pageblock,
-				isolate_pageblock + pageblock_nr_pages);
+				isolate_pageblock + pageblock_nr_ptes);
 
 		if (ret)
 			return ret;
@@ -386,7 +388,7 @@ static int isolate_single_pageblock(unsigned long boundary_pfn,
 		pfn = page_to_pfn(page);
 
 		if (PageUnaccepted(page)) {
-			pfn += MAX_ORDER_NR_PAGES;
+			pfn += PAGES_TO_PTES(MAX_ORDER_NR_PAGES);
 			continue;
 		}
 
@@ -394,9 +396,9 @@ static int isolate_single_pageblock(unsigned long boundary_pfn,
 			int order = buddy_order(page);
 
 			/* pageblock_isolate_and_move_free_pages() handled this */
-			VM_WARN_ON_ONCE(pfn + (1 << order) > boundary_pfn);
+			VM_WARN_ON_ONCE(pfn + PAGES_TO_PTES(1UL << order) > boundary_pfn);
 
-			pfn += 1UL << order;
+			pfn += PAGES_TO_PTES(1UL << order);
 			continue;
 		}
 
@@ -416,11 +418,11 @@ static int isolate_single_pageblock(unsigned long boundary_pfn,
 		if (PageCompound(page)) {
 			struct page *head = compound_head(page);
 			unsigned long head_pfn = page_to_pfn(head);
-			unsigned long nr_pages = compound_nr(head);
+			unsigned long nr_ptes = PAGES_TO_PTES(compound_nr(head));
 
-			if (head_pfn + nr_pages <= boundary_pfn ||
+			if (head_pfn + nr_ptes <= boundary_pfn ||
 			    PageHuge(page)) {
-				pfn = head_pfn + nr_pages;
+				pfn = head_pfn + nr_ptes;
 				continue;
 			}
 
@@ -494,13 +496,13 @@ int start_isolate_page_range(unsigned long start_pfn, unsigned long end_pfn,
 	int ret;
 	bool skip_isolation = false;
 
-	/* isolate [isolate_start, isolate_start + pageblock_nr_pages) pageblock */
+	/* isolate [isolate_start, isolate_start + pageblock_nr_ptes) pageblock */
 	ret = isolate_single_pageblock(isolate_start, mode, false,
 			skip_isolation);
 	if (ret)
 		return ret;
 
-	if (isolate_start == isolate_end - pageblock_nr_pages)
+	if (isolate_start == isolate_end - pageblock_nr_ptes)
 		skip_isolation = true;
 
 	/* isolate [isolate_end - pageblock_nr_pages, isolate_end) pageblock */
@@ -511,15 +513,15 @@ int start_isolate_page_range(unsigned long start_pfn, unsigned long end_pfn,
 	}
 
 	/* skip isolated pageblocks at the beginning and end */
-	for (pfn = isolate_start + pageblock_nr_pages;
-	     pfn < isolate_end - pageblock_nr_pages;
-	     pfn += pageblock_nr_pages) {
-		page = __first_valid_page(pfn, pageblock_nr_pages);
+	for (pfn = isolate_start + pageblock_nr_ptes;
+	     pfn < isolate_end - pageblock_nr_ptes;
+	     pfn += pageblock_nr_ptes) {
+		page = __first_valid_page(pfn, pageblock_nr_ptes);
 		if (page && set_migratetype_isolate(page, mode, start_pfn,
 					end_pfn)) {
 			undo_isolate_page_range(isolate_start, pfn);
 			unset_migratetype_isolate(
-				pfn_to_page(isolate_end - pageblock_nr_pages));
+				pfn_to_page(isolate_end - pageblock_nr_ptes));
 			return -EBUSY;
 		}
 	}
@@ -542,8 +544,8 @@ void undo_isolate_page_range(unsigned long start_pfn, unsigned long end_pfn)
 
 	for (pfn = isolate_start;
 	     pfn < isolate_end;
-	     pfn += pageblock_nr_pages) {
-		page = __first_valid_page(pfn, pageblock_nr_pages);
+	     pfn += pageblock_nr_ptes) {
+		page = __first_valid_page(pfn, pageblock_nr_ptes);
 		if (!page || !is_migrate_isolate_page(page))
 			continue;
 		unset_migratetype_isolate(page);
@@ -570,7 +572,7 @@ __test_page_isolated_in_pageblock(unsigned long pfn, unsigned long end_pfn,
 			 * the correct MIGRATE_ISOLATE freelist. There is no
 			 * simple way to verify that as VM_BUG_ON(), though.
 			 */
-			pfn += 1 << buddy_order(page);
+			pfn += PAGES_TO_PTES(1UL << buddy_order(page));
 		else if ((mode == PB_ISOLATE_MODE_MEM_OFFLINE) &&
 			 PageHWPoison(page))
 			/* A HWPoisoned page cannot be also PageBuddy */
@@ -628,8 +630,8 @@ int test_pages_isolated(unsigned long start_pfn, unsigned long end_pfn,
 	 * pages are not aligned to pageblock_nr_pages.
 	 * Then we just check migratetype first.
 	 */
-	for (pfn = start_pfn; pfn < end_pfn; pfn += pageblock_nr_pages) {
-		page = __first_valid_page(pfn, pageblock_nr_pages);
+	for (pfn = start_pfn; pfn < end_pfn; pfn += pageblock_nr_ptes) {
+		page = __first_valid_page(pfn, pageblock_nr_ptes);
 		if (page && !is_migrate_isolate_page(page))
 			break;
 	}

@@ -1977,13 +1977,13 @@ static int __move_freepages_block(struct zone *zone, unsigned long start_pfn,
 	unsigned int order;
 	int pages_moved = 0;
 
-	VM_WARN_ON(start_pfn & (pageblock_nr_pages - 1));
+	VM_WARN_ON(start_pfn & (pageblock_nr_ptes - 1));
 	end_pfn = pageblock_end_pfn(start_pfn);
 
 	for (pfn = start_pfn; pfn < end_pfn;) {
 		page = pfn_to_page(pfn);
 		if (!PageBuddy(page)) {
-			pfn++;
+			pfn = page_to_pfn(page) + PTES_PER_PAGE;
 			continue;
 		}
 
@@ -1995,7 +1995,7 @@ static int __move_freepages_block(struct zone *zone, unsigned long start_pfn,
 
 		move_to_free_list(page, zone, order, old_mt, new_mt);
 
-		pfn += 1 << order;
+		pfn += PAGES_TO_PTES(1UL << order);
 		pages_moved += 1 << order;
 	}
 
@@ -2035,7 +2035,7 @@ static bool prep_move_freepages_block(struct zone *zone, struct page *page,
 				int nr = 1 << buddy_order(page);
 
 				*num_free += nr;
-				pfn += nr;
+				pfn += PAGES_TO_PTES(nr);
 				continue;
 			}
 			/*
@@ -2045,7 +2045,7 @@ static bool prep_move_freepages_block(struct zone *zone, struct page *page,
 			 */
 			if (PageLRU(page) || page_has_movable_ops(page))
 				(*num_movable)++;
-			pfn++;
+			pfn = page_to_pfn(page) + PTES_PER_PAGE;
 		}
 	}
 
@@ -2078,7 +2078,7 @@ static unsigned long find_large_buddy(unsigned long start_pfn)
 	 * the order with __ffs(start_pfn). If start_pfn is order-0 PageBuddy,
 	 * the starting order does not matter.
 	 */
-	int order = start_pfn ? __ffs(start_pfn) : MAX_PAGE_ORDER;
+	int order = start_pfn ? __ffs(PTES_TO_PAGES(start_pfn)) : MAX_PAGE_ORDER;
 	struct page *page;
 	unsigned long pfn = start_pfn;
 
@@ -2086,13 +2086,13 @@ static unsigned long find_large_buddy(unsigned long start_pfn)
 		/* Nothing found */
 		if (++order > MAX_PAGE_ORDER)
 			return start_pfn;
-		pfn &= ~0UL << order;
+		pfn = PAGES_TO_PTES(PTES_TO_PAGES(pfn) & (~0UL << order));
 	}
 
 	/*
 	 * Found a preceding buddy, but does it straddle?
 	 */
-	if (pfn + (1 << buddy_order(page)) > start_pfn)
+	if (pfn + PAGES_TO_PTES(1UL << buddy_order(page)) > start_pfn)
 		return pfn;
 
 	/* Nothing found */
