@@ -298,7 +298,7 @@ bool isolate_folio_to_list(struct folio *folio, struct list_head *list)
 static bool try_to_map_unused_to_zeropage(struct page_vma_mapped_walk *pvmw,
 		struct folio *folio, pte_t old_pte, unsigned long idx)
 {
-	struct page *page = folio_page(folio, idx);
+	struct page *page = folio_page(folio, PTES_TO_PAGES(idx));
 	pte_t newpte;
 
 	if (PageCompound(page) || PageHWPoison(page))
@@ -357,14 +357,14 @@ static bool remove_migration_pte(struct folio *folio,
 		struct page *new;
 		unsigned long idx = 0;
 
-		/* pgoff is invalid for ksm pages, but they are never large */
-		if (folio_test_large(folio) && !folio_test_hugetlb(folio))
-			idx = linear_pte_index(vma, pvmw.address) - pvmw.pteoff;
-		new = folio_page(folio, idx);
-
 #ifdef CONFIG_ARCH_ENABLE_THP_MIGRATION
 		/* PMD-mapped THP migration entry */
 		if (!pvmw.pte) {
+			if (folio_test_large(folio) &&
+			    !folio_test_hugetlb(folio))
+				idx = linear_pte_index(vma, pvmw.address) -
+				      pvmw.pteoff;
+			new = folio_page(folio, PTES_TO_PAGES(idx));
 			VM_BUG_ON_FOLIO(folio_test_hugetlb(folio) ||
 					!folio_test_pmd_mappable(folio), folio);
 			remove_migration_pmd(&pvmw, new);
@@ -372,14 +372,22 @@ static bool remove_migration_pte(struct folio *folio,
 		}
 #endif
 		old_pte = ptep_get(pvmw.pte);
+		entry = softleaf_from_pte(old_pte);
+		/*
+		 * Migration entries preserve the exact PTE PFN.  Convert its
+		 * folio-relative PTE index only when selecting a struct page.
+		 */
+		if (!folio_test_hugetlb(folio))
+			idx = softleaf_to_pfn(entry) - pvmw.pfn;
+		new = folio_page(folio, PTES_TO_PAGES(idx));
+
 		if (rmap_walk_arg->map_unused_to_zeropage &&
 		    try_to_map_unused_to_zeropage(&pvmw, folio, old_pte, idx))
 			continue;
 
 		folio_get(folio);
-		pte = mkpte(new, 0, READ_ONCE(vma->vm_page_prot));
+		pte = mkpte(new, idx, READ_ONCE(vma->vm_page_prot));
 
-		entry = softleaf_from_pte(old_pte);
 		if (!softleaf_is_migration_young(entry))
 			pte = pte_mkold(pte);
 		if (folio_test_dirty(folio) && softleaf_is_migration_dirty(entry))
@@ -400,10 +408,10 @@ static bool remove_migration_pte(struct folio *folio,
 		if (unlikely(is_device_private_page(new))) {
 			if (pte_write(pte))
 				entry = make_writable_device_private_entry(
-							page_to_pfn(new));
+							pte_pfn(pte));
 			else
 				entry = make_readable_device_private_entry(
-							page_to_pfn(new));
+							pte_pfn(pte));
 			pte = softleaf_to_pte(entry);
 			if (pte_swp_soft_dirty(old_pte))
 				pte = pte_swp_mksoft_dirty(pte);
