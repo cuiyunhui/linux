@@ -1002,6 +1002,23 @@ static inline bool pud_user_accessible_page(pud_t pud, unsigned long addr)
 #endif
 
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
+/*
+ * Generic THP code still assumes that one base page is represented by one
+ * PTE. Keep huge mappings disabled until split PG/PTE granularity is fully
+ * supported by the fault, collapse, rmap and accounting paths.
+ */
+#define has_transparent_hugepage has_transparent_hugepage
+static inline int has_transparent_hugepage(void)
+{
+	return PG_SIZE == PTE_SIZE;
+}
+
+#define has_transparent_pud_hugepage has_transparent_pud_hugepage
+static inline int has_transparent_pud_hugepage(void)
+{
+	return PG_SIZE == PTE_SIZE;
+}
+
 static inline int pmd_trans_huge(pmd_t pmd)
 {
 	return pmd_leaf(pmd);
