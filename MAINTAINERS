@@ -21242,6 +21242,12 @@ S:	Maintained
 F:	Documentation/hwmon/pt5161l.rst
 F:	drivers/hwmon/pt5161l.c
 
+PTE SIZE TEST SUITE
+M:	Yunhui Cui <cuiyunhui@bytedance.com>
+L:	linux-mm@kvack.org
+S:	Maintained
+F:	tools/testing/pte_size/
+
 PTP HARDWARE CLOCK SUPPORT
 M:	Richard Cochran <richardcochran@gmail.com>
 L:	netdev@vger.kernel.org
