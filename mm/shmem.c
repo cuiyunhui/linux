@@ -1355,7 +1355,7 @@ static int shmem_setattr(struct mnt_idmap *idmap,
 			update_ctime = false;
 		}
 		if (newsize <= oldsize) {
-			loff_t holebegin = round_up(newsize, PG_SIZE);
+			loff_t holebegin = round_up(newsize, PTE_SIZE);
 			if (oldsize > holebegin)
 				unmap_mapping_range(inode->i_mapping,
 							holebegin, 0, 1);
