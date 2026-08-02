@@ -33,7 +33,7 @@
 #define SENTINEL_VMA_GATE	-2
 
 #define SEQ_PUT_DEC(str, val) \
-		seq_put_decimal_ull_width(m, str, (val) << (PG_SHIFT-10), 8)
+		seq_put_decimal_ull_width(m, str, (val) << (PTE_SHIFT - 10), 8)
 void task_mem(struct seq_file *m, struct mm_struct *mm)
 {
 	unsigned long text, lib, swap, anon, file, shmem;

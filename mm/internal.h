@@ -627,6 +627,7 @@ pmd_t *mm_find_pmd(struct mm_struct *mm, unsigned long address);
  * in mm/page_alloc.c
  */
 #define K(x) ((x) << (PG_SHIFT-10))
+#define PTE_K(x) ((x) << (PTE_SHIFT - 10))
 
 extern char * const zone_names[MAX_NR_ZONES];
 

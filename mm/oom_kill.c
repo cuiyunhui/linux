@@ -228,7 +228,9 @@ long oom_badness(struct task_struct *p, unsigned long totalpages)
 	 * The baseline for the badness score is the proportion of RAM that each
 	 * task's rss, pagetable and swap space use.
 	 */
-	points = get_mm_rss_sum(p->mm) + get_mm_counter_sum(p->mm, MM_SWAPENTS) +
+	points = DIV_ROUND_UP(get_mm_rss_sum(p->mm) +
+			      get_mm_counter_sum(p->mm, MM_SWAPENTS),
+			      PTES_PER_PAGE) +
 		mm_pgtables_bytes(p->mm) / PG_SIZE;
 	task_unlock(p);
 
@@ -604,9 +606,9 @@ static bool oom_reap_task_mm(struct task_struct *tsk, struct mm_struct *mm)
 
 	pr_info("oom_reaper: reaped process %d (%s), now anon-rss:%lukB, file-rss:%lukB, shmem-rss:%lukB\n",
 			task_pid_nr(tsk), tsk->comm,
-			K(get_mm_counter_sum(mm, MM_ANONPAGES)),
-			K(get_mm_counter_sum(mm, MM_FILEPAGES)),
-			K(get_mm_counter_sum(mm, MM_SHMEMPAGES)));
+			PTE_K(get_mm_counter_sum(mm, MM_ANONPAGES)),
+			PTE_K(get_mm_counter_sum(mm, MM_FILEPAGES)),
+			PTE_K(get_mm_counter_sum(mm, MM_SHMEMPAGES)));
 out_finish:
 	trace_finish_task_reaping(tsk->pid);
 out_unlock:
@@ -959,10 +961,10 @@ static void __oom_kill_process(struct task_struct *victim, const char *message)
 	do_send_sig_info(SIGKILL, SEND_SIG_PRIV, victim, PIDTYPE_TGID);
 	mark_oom_victim(victim);
 	pr_err("%s: Killed process %d (%s) total-vm:%lukB, anon-rss:%lukB, file-rss:%lukB, shmem-rss:%lukB, UID:%u pgtables:%lukB oom_score_adj:%d\n",
-		message, task_pid_nr(victim), victim->comm, K(mm->total_vm),
-		K(get_mm_counter_sum(mm, MM_ANONPAGES)),
-		K(get_mm_counter_sum(mm, MM_FILEPAGES)),
-		K(get_mm_counter_sum(mm, MM_SHMEMPAGES)),
+		message, task_pid_nr(victim), victim->comm, PTE_K(mm->total_vm),
+		PTE_K(get_mm_counter_sum(mm, MM_ANONPAGES)),
+		PTE_K(get_mm_counter_sum(mm, MM_FILEPAGES)),
+		PTE_K(get_mm_counter_sum(mm, MM_SHMEMPAGES)),
 		from_kuid(&init_user_ns, task_uid(victim)),
 		mm_pgtables_bytes(mm) >> 10, victim->signal->oom_score_adj);
 	task_unlock(victim);
