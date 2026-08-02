@@ -549,10 +549,12 @@ int get_futex_key(u32 __user *uaddr, unsigned int flags, union futex_key *key,
 		  enum futex_access rw)
 {
 	unsigned long address = (unsigned long)uaddr;
+	unsigned long pte_address = PTE_ALIGN_DOWN(address);
 	struct mm_struct *mm = current->mm;
 	struct page *page;
 	struct folio *folio;
 	struct address_space *mapping;
+	size_t page_offset;
 	int node, err, size, ro = 0;
 	bool node_updated = false;
 	bool fshared;
@@ -564,6 +566,10 @@ int get_futex_key(u32 __user *uaddr, unsigned int flags, union futex_key *key,
 
 	/*
 	 * The futex address must be "naturally" aligned.
+	 */
+	/*
+	 * Keep the key in allocator-page units, but use the actual PTE for
+	 * mapping lookups when an allocator page spans multiple PTEs.
 	 */
 	key->both.offset = address % PG_SIZE;
 	if (unlikely((address % size) != 0))
@@ -590,7 +596,7 @@ int get_futex_key(u32 __user *uaddr, unsigned int flags, union futex_key *key,
 	}
 
 	if (node == FUTEX_NO_NODE && (flags & FLAGS_MPOL)) {
-		node = futex_mpol(mm, address);
+		node = futex_mpol(mm, pte_address);
 		node_updated = true;
 	}
 
@@ -635,13 +641,13 @@ again:
 	if (unlikely(should_fail_futex(true)))
 		return -EFAULT;
 
-	err = get_user_pages_fast(address, 1, FOLL_WRITE, &page);
+	err = get_user_pte_page(pte_address, FOLL_WRITE, &page, &page_offset);
 	/*
 	 * If write access is not required (eg. FUTEX_WAIT), try
 	 * and get read-only access.
 	 */
 	if (err == -EFAULT && rw == FUTEX_READ) {
-		err = get_user_pages_fast(address, 1, 0, &page);
+		err = get_user_pte_page(pte_address, 0, &page, &page_offset);
 		ro = 1;
 	}
 	if (err < 0)
