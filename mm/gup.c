@@ -3045,7 +3045,7 @@ static int gup_fast_pte_range(pmd_t pmd, pmd_t *pmdp, unsigned long addr,
 		folio_set_referenced(folio);
 		pages[*nr] = page;
 		(*nr)++;
-	} while (ptep++, addr += PG_SIZE, addr != end);
+	} while (ptep += PTES_PER_PAGE, addr += PG_SIZE, addr != end);
 
 	ret = 1;
 
