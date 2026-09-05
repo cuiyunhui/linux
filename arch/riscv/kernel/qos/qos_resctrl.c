@@ -19,6 +19,7 @@
 extern int max_name_width;
 
 static struct cbqri_controller *controllers;
+static int num_controllers;
 static struct cbqri_resctrl_res cbqri_resctrl_resources[RDT_NUM_RESOURCES];
 
 static bool exposed_alloc_capable;
@@ -26,6 +27,27 @@ static bool exposed_mon_capable;
 /* CDP (code data prioritization) on x86 is AT (access type) on RISC-V */
 static bool exposed_cdp_l2_capable;
 static bool exposed_cdp_l3_capable;
+
+static bool cbqri_all_bw_controllers_support_inactive(void)
+{
+	struct cbqri_controller *ctrl;
+	bool found = false;
+	int i;
+
+	for (i = 0; i < num_controllers; i++) {
+		ctrl = &controllers[i];
+		if (ctrl->ctrl_info->type != CBQRI_CONTROLLER_TYPE_BANDWIDTH ||
+		    !ctrl->alloc_capable)
+			continue;
+
+		found = true;
+		if (!ctrl->bc.supports_inactive_entry)
+			return false;
+	}
+
+	return found;
+}
+
 static bool is_cdp_l2_enabled;
 static bool is_cdp_l3_enabled;
 
@@ -459,9 +481,23 @@ void resctrl_arch_reset_rmid_all(struct rdt_resource *r,
 	/* not implemented for the RISC-V resctrl implementation */
 }
 
+/*
+ * The default RCID remains active. All other RCIDs are made inactive before
+ * resctrl discards its allocation state.
+ */
 void resctrl_arch_reset_all_ctrls(struct rdt_resource *r)
 {
-	/* not implemented for the RISC-V resctrl implementation */
+	u32 closid;
+	int err;
+
+	if (r->rid != RDT_RESOURCE_MBA)
+		return;
+
+	for (closid = 1; closid < resctrl_arch_get_num_closid(r); closid++) {
+		err = resctrl_arch_release_ctrl(closid);
+		if (err)
+			pr_err("failed to release RCID %u: %d\n", closid, err);
+	}
 }
 
 /* Set capacity block mask (cc_block_mask) */
@@ -802,6 +838,105 @@ static int cbqri_bc_alloc_op(struct cbqri_controller *ctrl, int operation,
 	return 0;
 }
 
+static int cbqri_bc_inactivate(struct cbqri_controller *ctrl, u32 rcid,
+			       int at)
+{
+	u64 config_mask, reg;
+	int err;
+
+	config_mask = (u64)CBQRI_CONTROL_REGISTERS_RBWB_MASK <<
+		      CBQRI_CONTROL_REGISTERS_RBWB_SHIFT;
+	config_mask |= (u64)CBQRI_BC_BW_ALLOC_MWEIGHT_MASK <<
+		       CBQRI_BC_BW_ALLOC_MWEIGHT_SHIFT;
+	config_mask |= (u64)CBQRI_BC_BW_ALLOC_USESHARED_MASK <<
+		       CBQRI_BC_BW_ALLOC_USESHARED_SHIFT;
+
+	reg = cbqri_readq(ctrl, CBQRI_BC_BW_ALLOC_OFF);
+	reg &= ~config_mask;
+	cbqri_writeq(ctrl, CBQRI_BC_BW_ALLOC_OFF, reg);
+
+	err = cbqri_bc_alloc_op(ctrl, CBQRI_BC_ALLOC_CTL_OP_CONFIG_LIMIT,
+				rcid, at);
+	if (err)
+		return err;
+
+	err = cbqri_bc_alloc_op(ctrl, CBQRI_BC_ALLOC_CTL_OP_READ_LIMIT,
+				rcid, at);
+	if (err)
+		return err;
+
+	reg = cbqri_readq(ctrl, CBQRI_BC_BW_ALLOC_OFF);
+	if (reg & config_mask) {
+		pr_err("RCID %u AT %d inactive readback failed: 0x%llx\n",
+		       rcid, at, (unsigned long long)(reg & config_mask));
+		return -EIO;
+	}
+
+	return 0;
+}
+
+static void cbqri_reset_cached_bw_config(u32 closid)
+{
+	static const enum resctrl_res_level rids[] = {
+		RDT_RESOURCE_MBA,
+		RDT_RESOURCE_MB_WEIGHT,
+	};
+	struct cbqri_resctrl_dom *hw_dom;
+	struct rdt_ctrl_domain *domain;
+	struct cbqri_resctrl_res *hw_res;
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(rids); i++) {
+		hw_res = &cbqri_resctrl_resources[rids[i]];
+		if (closid >= hw_res->max_rcid)
+			continue;
+
+		list_for_each_entry(domain, &hw_res->resctrl_res.ctrl_domains,
+				    hdr.list) {
+			hw_dom = container_of(domain, struct cbqri_resctrl_dom,
+					      resctrl_ctrl_dom);
+			hw_dom->ctrl_val[closid] = 0;
+		}
+	}
+}
+
+int resctrl_arch_release_ctrl(u32 closid)
+{
+	struct cbqri_controller *ctrl;
+	int at, err, i;
+
+	/*
+	 * Inactive entries are exposed only when every allocation-capable
+	 * bandwidth controller supports them. Otherwise retain CBQRI 1.0
+	 * lifecycle behavior.
+	 */
+	if (!cbqri_all_bw_controllers_support_inactive())
+		return 0;
+
+	for (i = 0; i < num_controllers; i++) {
+		ctrl = &controllers[i];
+		if (ctrl->ctrl_info->type != CBQRI_CONTROLLER_TYPE_BANDWIDTH ||
+		    !ctrl->alloc_capable)
+			continue;
+
+		for (at = CBQRI_CONTROL_REGISTERS_AT_DATA;
+		     at <= CBQRI_CONTROL_REGISTERS_AT_CODE; at++) {
+			if (at == CBQRI_CONTROL_REGISTERS_AT_DATA &&
+			    !ctrl->bc.supports_alloc_at_data)
+				continue;
+			if (at == CBQRI_CONTROL_REGISTERS_AT_CODE &&
+			    !ctrl->bc.supports_alloc_at_code)
+				continue;
+			err = cbqri_bc_inactivate(ctrl, closid, at);
+			if (err)
+				return err;
+		}
+	}
+
+	cbqri_reset_cached_bw_config(closid);
+	return 0;
+}
+
 static int cbqri_apply_bw_config(struct cbqri_resctrl_dom *hw_dom, u32 closid,
 				 enum resctrl_conf_type type, struct cbqri_config *cfg)
 {
@@ -818,7 +953,10 @@ static int cbqri_apply_bw_config(struct cbqri_resctrl_dom *hw_dom, u32 closid,
 	if (ret < 0)
 		return ret;
 
+	/* Set reserved bandwidth blocks */
 	cbqri_set_rbwb(ctrl, cfg->rbwb);
+
+	/* Bandwidth config limit operation */
 	ret = cbqri_bc_alloc_op(ctrl, CBQRI_BC_ALLOC_CTL_OP_CONFIG_LIMIT,
 				closid, CBQRI_CONTROL_REGISTERS_AT_DATA);
 	if (ret < 0) {
@@ -826,7 +964,10 @@ static int cbqri_apply_bw_config(struct cbqri_resctrl_dom *hw_dom, u32 closid,
 		return ret;
 	}
 
+	/* Clear rbwb before read limit to verify op works*/
 	cbqri_set_rbwb(ctrl, 0);
+
+	/* Bandwidth allocation read limit operation to verify */
 	ret = cbqri_bc_alloc_op(ctrl, CBQRI_BC_ALLOC_CTL_OP_READ_LIMIT,
 				closid, CBQRI_CONTROL_REGISTERS_AT_DATA);
 	if (ret < 0) {
@@ -834,6 +975,7 @@ static int cbqri_apply_bw_config(struct cbqri_resctrl_dom *hw_dom, u32 closid,
 		return ret;
 	}
 
+	/* Read bandwidth allocation to verify it matches the requested config */
 	reg = cbqri_get_rbwb(ctrl);
 	if (reg != cfg->rbwb) {
 		pr_warn("%s(): failed to verify allocation (reg=0x%llx rbwb=%llu)\n",
@@ -1196,12 +1338,17 @@ static int cbqri_probe_capacity_features(struct cbqri_controller *ctrl)
 
 static int bc_read_caps(struct cbqri_controller *ctrl)
 {
-	u64 reg = cbqri_readq(ctrl, CBQRI_BC_CAPABILITIES_OFF);
+	u64 reg;
+	u8 version;
 
+	reg = cbqri_readq(ctrl, CBQRI_BC_CAPABILITIES_OFF);
 	if (reg == 0)
 		return -ENODEV;
+	version = reg & GENMASK(7, 0);
 	ctrl->ver_minor = reg & CBQRI_BC_CAPABILITIES_VER_MINOR_MASK;
 	ctrl->ver_major = (reg & CBQRI_BC_CAPABILITIES_VER_MAJOR_MASK) >> 4;
+	ctrl->bc.supports_inactive_entry =
+		version == CBQRI_BC_INACTIVE_ENTRY_VERSION;
 	ctrl->bc.nbwblks = (reg >> CBQRI_BC_CAPABILITIES_NBWBLKS_SHIFT) &
 				CBQRI_BC_CAPABILITIES_NBWBLKS_MASK;
 	ctrl->bc.mrbwb = (reg >> CBQRI_BC_CAPABILITIES_MRBWB_SHIFT) &
@@ -1210,9 +1357,10 @@ static int bc_read_caps(struct cbqri_controller *ctrl)
 		pr_warn("%s(): invalid nbwblks=0\n", __func__);
 		return -EINVAL;
 	}
-	pr_debug("version=%d.%d nbwblks=%d mrbwb=%d\n",
+	pr_debug("version=%d.%d nbwblks=%d mrbwb=%d inactive=%d\n",
 		 ctrl->ver_major, ctrl->ver_minor,
-		ctrl->bc.nbwblks, ctrl->bc.mrbwb);
+		ctrl->bc.nbwblks, ctrl->bc.mrbwb,
+		ctrl->bc.supports_inactive_entry);
 	return 0;
 }
 
@@ -1416,6 +1564,18 @@ static int qos_init_domain_ctrlval(struct rdt_resource *r, struct rdt_ctrl_domai
 	}
 
 	for (i = 0; i < hw_res->max_rcid; i++) {
+		/*
+		 * Keep the root group at the maximum and initialize all other
+		 * inactive-capable bandwidth entries to the minimum.
+		 */
+		if (i == RESCTRL_RESERVED_CLOSID &&
+		    r->schema_fmt == RESCTRL_SCHEMA_RANGE &&
+		    r->membw.default_to_min)
+			def_ctrl = r->membw.max_bw;
+		else
+			def_ctrl = resctrl_get_default_ctrl(r);
+
+		hw_dom->ctrl_val[i] = U64_MAX;
 		err = resctrl_arch_update_one(r, d, i, 0, def_ctrl);
 		if (err) {
 			kfree(hw_dom->ctrl_val);
@@ -1493,6 +1653,8 @@ static void qos_populate_res_fields(struct cbqri_controller *ctrl,
 static void qos_populate_mba_fields(struct cbqri_controller *ctrl,
 				    struct rdt_resource *res)
 {
+	bool inactive = cbqri_all_bw_controllers_support_inactive();
+
 	res->mon.num_rmid = ctrl->ctrl_info->mcid_count;
 	res->rid = RDT_RESOURCE_MBA;
 	res->name = (char *)"MB";
@@ -1503,8 +1665,9 @@ static void qos_populate_mba_fields(struct cbqri_controller *ctrl,
 	res->membw.delay_linear = true;
 	res->membw.arch_needs_linear = true;
 	res->membw.throttle_mode = THREAD_THROTTLE_UNDEFINED;
-	res->membw.min_bw = 1;
+	res->membw.min_bw = inactive ? 0 : 1;
 	res->membw.max_bw = 80;
+	res->membw.default_to_min = inactive;
 	res->membw.bw_gran = 1;
 }
 
@@ -1577,6 +1740,8 @@ static int qos_add_mb_weight_resource(struct cbqri_controller *ctrl, int id)
 	res_pri->alloc_capable = ctrl->alloc_capable;
 	res_pri->membw.min_bw = 0;
 	res_pri->membw.max_bw = 255;
+	res_pri->membw.default_to_min =
+		cbqri_all_bw_controllers_support_inactive();
 	res_pri->membw.bw_gran = 1;
 
 	/* Create and initialize the control domain for MB weight. */
@@ -1866,7 +2031,6 @@ static void qos_free_all_domains(void)
 int qos_resctrl_setup(void)
 {
 	int err = 0;
-	int num_controllers;
 	int cache_ctrl = 0;
 	int bw_ctrl = 0;
 	struct cbqri_controller_info *ctrl_info;
@@ -1911,6 +2075,7 @@ err_unmap_controllers:
 	qos_unmap_controllers(num_controllers);
 	kfree(controllers);
 	controllers = NULL;
+	num_controllers = 0;
 
 	return err;
 }

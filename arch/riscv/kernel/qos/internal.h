@@ -28,6 +28,8 @@
 #define CBQRI_BC_CAPABILITIES_VER_MINOR_MASK  GENMASK(3, 0)
 #define CBQRI_BC_CAPABILITIES_VER_MAJOR_MASK  GENMASK(7, 4)
 
+#define CBQRI_BC_INACTIVE_ENTRY_VERSION 0x11
+
 #define CBQRI_BC_CAPABILITIES_NBWBLKS_SHIFT 8
 #define CBQRI_BC_CAPABILITIES_NBWBLKS_MASK  0xFFFF
 #define CBQRI_BC_CAPABILITIES_MRBWB_SHIFT   32
@@ -122,6 +124,7 @@ struct riscv_cbqri_bandwidth_caps {
 
 	bool supports_alloc_op_config_limit;
 	bool supports_alloc_op_read_limit;
+	bool supports_inactive_entry;
 
 	bool supports_mon_at_data;
 	bool supports_mon_at_code;
