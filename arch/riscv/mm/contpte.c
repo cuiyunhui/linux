@@ -24,6 +24,20 @@ static inline bool mm_is_user(struct mm_struct *mm)
 	return mm != &init_mm;
 }
 
+static inline bool napotpte_order_supported(unsigned int order)
+{
+	switch (order) {
+	case NAPOT_CONT16KB_ORDER:
+		return riscv_has_extension_unlikely(RISCV_ISA_EXT_SVNAPOT16K);
+	case NAPOT_CONT32KB_ORDER:
+		return riscv_has_extension_unlikely(RISCV_ISA_EXT_SVNAPOT32K);
+	case NAPOT_CONT64KB_ORDER:
+		return napot_hw_supported();
+	default:
+		return false;
+	}
+}
+
 static inline unsigned int napotpte_order(void)
 {
 	return NAPOT_CONT64KB_ORDER;
@@ -298,7 +312,7 @@ void modify_prot_commit_ptes(struct vm_area_struct *vma, unsigned long addr,
 
 static inline pte_t
 napotpte_normalize_batch_pte(pte_t *ptep, pte_t orig_pte, fpb_t flags,
-				     unsigned int order)
+			     unsigned int order)
 {
 	unsigned long pfn;
 	pgprot_t prot;
@@ -333,8 +347,8 @@ static bool napotpte_all_subptes_same(pte_t *ptep, pte_t expected_pte,
 }
 
 static bool napotpte_try_fold_order(struct mm_struct *mm, unsigned long addr,
-					   pte_t *ptep, pte_t pte,
-					   unsigned int order)
+				    pte_t *ptep, pte_t pte,
+				    unsigned int order)
 {
 	struct page *page;
 	struct folio *folio;
@@ -396,7 +410,11 @@ void __napotpte_try_fold(struct mm_struct *mm, unsigned long addr,
 	if (!pte_present(pte) || pte_napot(pte) || pte_special(pte))
 		return;
 
-	for_each_napot_order_rev(order) {
+	for (order = NAPOT_CONT64KB_ORDER;
+	     order >= NAPOT_CONT16KB_ORDER; order--) {
+		if (!napotpte_order_supported(order))
+			continue;
+
 		if (napotpte_try_fold_order(mm, addr, ptep, pte, order))
 			return;
 	}
@@ -678,7 +696,11 @@ void napotpte_set_ptes(struct mm_struct *mm, unsigned long addr,
 
 	do {
 		folded = false;
-		for_each_napot_order_rev(order) {
+		for (order = NAPOT_CONT64KB_ORDER;
+		     order >= NAPOT_CONT16KB_ORDER; order--) {
+			if (!napotpte_order_supported(order))
+				continue;
+
 			size = napotpte_size_order(order);
 			chunk = napotpte_pte_num_order(order);
 
@@ -889,7 +911,7 @@ int napotpte_ptep_clear_flush_young(struct vm_area_struct *vma,
 
 	start_addr = napot_align_addr_order(address, order);
 	flush_tlb_range(vma, start_addr,
-				start_addr + napotpte_size_order(order));
+			start_addr + napotpte_size_order(order));
 
 	return young;
 }
