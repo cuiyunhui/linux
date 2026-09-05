@@ -321,6 +321,16 @@ properties:
             Manual, Volume II Privileged Architecture, Document Version
             20211203.
 
+        - const: svnapot16k
+          description:
+            The Svnapot16k extension for 16 KiB NAPOT page mappings. This
+            extension depends on Svnapot.
+
+        - const: svnapot32k
+          description:
+            The Svnapot32k extension for 32 KiB NAPOT page mappings. This
+            extension depends on Svnapot.
+
         - const: svpbmt
           description:
             The standard Svpbmt supervisor-level extensions for page-based
