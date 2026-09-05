@@ -34,6 +34,10 @@ static u32 max_rmid;
 
 LIST_HEAD(cbqri_controllers);
 
+void resctrl_arch_pre_mount(void)
+{
+}
+
 /*
  * Some platforms cannot perform 64-bit wide MMIO accesses.
  * Enable 32-bit IO mode via boot param: cbqri_32bit_io=1|true|on.
@@ -239,14 +243,16 @@ void resctrl_arch_reset_resources(void)
 	/* not implemented for the RISC-V resctrl implementation */
 }
 
-void resctrl_arch_config_cntr(struct rdt_resource *r, struct rdt_mon_domain *d,
+void resctrl_arch_config_cntr(struct rdt_resource *r,
+			      struct rdt_l3_mon_domain *d,
 			      enum resctrl_event_id evtid, u32 rmid, u32 closid,
 			      u32 cntr_id, bool assign)
 {
 	/* not implemented for the RISC-V resctrl implementation */
 }
 
-int resctrl_arch_cntr_read(struct rdt_resource *r, struct rdt_mon_domain *d,
+int resctrl_arch_cntr_read(struct rdt_resource *r,
+			   struct rdt_l3_mon_domain *d,
 			   u32 unused, u32 rmid, int cntr_id,
 			   enum resctrl_event_id eventid, u64 *val)
 {
@@ -268,7 +274,8 @@ int resctrl_arch_mbm_cntr_assign_set(struct rdt_resource *r, bool enable)
 	return 0;
 }
 
-void resctrl_arch_reset_cntr(struct rdt_resource *r, struct rdt_mon_domain *d,
+void resctrl_arch_reset_cntr(struct rdt_resource *r,
+			     struct rdt_l3_mon_domain *d,
 			     u32 unused, u32 rmid, int cntr_id,
 			     enum resctrl_event_id eventid)
 {
@@ -380,20 +387,22 @@ bool resctrl_arch_match_rmid(struct task_struct *tsk, u32 closid, u32 rmid)
 	return tsk_rmid == rmid;
 }
 
-int resctrl_arch_rmid_read(struct rdt_resource *r, struct rdt_mon_domain *d,
+int resctrl_arch_rmid_read(struct rdt_resource *r, struct rdt_domain_hdr *hdr,
 			   u32 closid, u32 rmid, enum resctrl_event_id eventid,
-			   u64 *val, void *arch_mon_ctx)
+			   void *arch_priv, u64 *val, void *arch_mon_ctx)
 {
 	struct cbqri_resctrl_dom *hw_dom;
+	struct rdt_l3_mon_domain *d;
 	struct cbqri_controller *ctrl;
 	bool is_capacity;
 	bool valid = false;
 	u64 ctr = 0;
 	int err;
 
-	if (!r || !d || !val)
+	if (!r || !hdr || !val)
 		return -EINVAL;
 
+	d = container_of(hdr, struct rdt_l3_mon_domain, hdr);
 	hw_dom = container_of(d, struct cbqri_resctrl_dom, resctrl_mon_dom);
 	ctrl = hw_dom->hw_ctrl;
 	if (!ctrl || !ctrl->mon_capable || !ctrl->base) {
@@ -427,7 +436,8 @@ int resctrl_arch_rmid_read(struct rdt_resource *r, struct rdt_mon_domain *d,
 	return 0;
 }
 
-void resctrl_arch_reset_rmid(struct rdt_resource *r, struct rdt_mon_domain *d,
+void resctrl_arch_reset_rmid(struct rdt_resource *r,
+			     struct rdt_l3_mon_domain *d,
 			     u32 closid, u32 rmid, enum resctrl_event_id eventid)
 {
 	/* not implemented for the RISC-V resctrl interface */
@@ -443,7 +453,8 @@ void resctrl_arch_mon_event_config_write(void *info)
 	/* not implemented for the RISC-V resctrl interface */
 }
 
-void resctrl_arch_reset_rmid_all(struct rdt_resource *r, struct rdt_mon_domain *d)
+void resctrl_arch_reset_rmid_all(struct rdt_resource *r,
+				 struct rdt_l3_mon_domain *d)
 {
 	/* not implemented for the RISC-V resctrl implementation */
 }
@@ -1579,7 +1590,7 @@ static int qos_resctrl_add_mon_domain(struct cbqri_controller *ctrl,
 				      struct rdt_resource *res, int id)
 {
 	struct cbqri_resctrl_dom *hw_dom;
-	struct rdt_mon_domain *mon_domain;
+	struct rdt_l3_mon_domain *mon_domain;
 	int err;
 
 	/* No-op unless monitoring is exposed for this resource. */
@@ -1593,6 +1604,7 @@ static int qos_resctrl_add_mon_domain(struct cbqri_controller *ctrl,
 	INIT_LIST_HEAD(&mon_domain->hdr.list);
 	mon_domain->hdr.id = id;
 	mon_domain->hdr.type = RESCTRL_MON_DOMAIN;
+	mon_domain->hdr.rid = res->rid;
 
 	if (!cpumask_empty(&ctrl->ctrl_info->cache.cpu_mask))
 		cpumask_copy(&mon_domain->hdr.cpu_mask,
@@ -1623,7 +1635,7 @@ static int qos_resctrl_add_mon_domain(struct cbqri_controller *ctrl,
 					 0, NULL);
 	}
 
-	err = resctrl_online_mon_domain(res, mon_domain);
+	err = resctrl_online_mon_domain(res, &mon_domain->hdr);
 	if (err)
 		return err;
 
@@ -1807,15 +1819,15 @@ static void qos_free_all_domains(void)
 {
 	int i;
 	struct cbqri_resctrl_res *res;
-	struct rdt_mon_domain *mon_dom, *mon_dom_tmp;
+	struct rdt_domain_hdr *mon_hdr, *mon_hdr_tmp;
 	struct rdt_ctrl_domain *domain, *domain_temp;
 
 	for (i = 0; i < RDT_NUM_RESOURCES; i++) {
 		res = &cbqri_resctrl_resources[i];
-		list_for_each_entry_safe(mon_dom, mon_dom_tmp,
-					 &res->resctrl_res.mon_domains, hdr.list) {
-			resctrl_offline_mon_domain(&res->resctrl_res, mon_dom);
-			list_del(&mon_dom->hdr.list);
+		list_for_each_entry_safe(mon_hdr, mon_hdr_tmp,
+					 &res->resctrl_res.mon_domains, list) {
+			resctrl_offline_mon_domain(&res->resctrl_res, mon_hdr);
+			list_del(&mon_hdr->list);
 		}
 
 		list_for_each_entry_safe(domain, domain_temp,
