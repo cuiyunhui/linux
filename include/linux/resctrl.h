@@ -54,6 +54,8 @@ enum resctrl_res_level {
 	RDT_RESOURCE_MBA,
 	RDT_RESOURCE_SMBA,
 	RDT_RESOURCE_PERF_PKG,
+	/* CBQRI: Memory Bandwidth weight control */
+	RDT_RESOURCE_MB_WEIGHT,
 
 	/* Must be the last */
 	RDT_NUM_RESOURCES,
@@ -483,6 +485,9 @@ static inline u32 resctrl_get_config_index(u32 closid,
 
 bool resctrl_arch_get_cdp_enabled(enum resctrl_res_level l);
 int resctrl_arch_set_cdp_enabled(enum resctrl_res_level l, bool enable);
+
+bool resctrl_arch_get_io_alloc_enabled(struct rdt_resource *r);
+int resctrl_arch_io_alloc_enable(struct rdt_resource *r, bool enable);
 
 /**
  * resctrl_arch_mbm_cntr_assign_enabled() - Check if MBM counter assignment

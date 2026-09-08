@@ -45,8 +45,20 @@
 #define CBQRI_CONTROL_REGISTERS_AT_CODE      1
 #define CBQRI_CONTROL_REGISTERS_RCID_SHIFT   8
 #define CBQRI_CONTROL_REGISTERS_RCID_MASK    0xFFF
+/* MON_CTL specific fields per spec: OP[4:0], AT[7:5], MCID[19:8], EVT_ID[27:20], ATV[28] */
+#define CBQRI_CONTROL_REGISTERS_EVT_ID_SHIFT 20
+#define CBQRI_CONTROL_REGISTERS_EVT_ID_MASK  0xFF
+#define CBQRI_CONTROL_REGISTERS_ATV_SHIFT    28
+#define CBQRI_CONTROL_REGISTERS_ATV_MASK     0x1
 #define CBQRI_CONTROL_REGISTERS_RBWB_SHIFT   0
 #define CBQRI_CONTROL_REGISTERS_RBWB_MASK    0xFFFF
+/* bc_bw_alloc fields beyond Rbwb */
+#define CBQRI_BC_BW_ALLOC_MWEIGHT_SHIFT      20
+#define CBQRI_BC_BW_ALLOC_MWEIGHT_MASK       0xFF
+#define CBQRI_BC_BW_ALLOC_SHAREDAT_SHIFT     28
+#define CBQRI_BC_BW_ALLOC_SHAREDAT_MASK      0x7
+#define CBQRI_BC_BW_ALLOC_USESHARED_SHIFT    31
+#define CBQRI_BC_BW_ALLOC_USESHARED_MASK     0x1
 
 #define CBQRI_CC_MON_CTL_OP_CONFIG_EVENT 1
 #define CBQRI_CC_MON_CTL_OP_READ_COUNTER 2
@@ -60,6 +72,13 @@
 #define CBQRI_BC_MON_CTL_OP_CONFIG_EVENT 1
 #define CBQRI_BC_MON_CTL_OP_READ_COUNTER 2
 #define CBQRI_BC_MON_CTL_STATUS_SUCCESS  1
+
+/* MON_CTR_VAL layout for capacity and bandwidth controllers */
+/* Capacity: CTR[62:0], INV[63] */
+#define CBQRI_CC_MON_CTR_INV_BIT 63
+/* Bandwidth: CTR[61:0], INV[62], OVF[63] */
+#define CBQRI_BC_MON_CTR_INV_BIT 62
+#define CBQRI_BC_MON_CTR_OVF_BIT 63
 
 #define CBQRI_BC_ALLOC_CTL_OP_CONFIG_LIMIT 1
 #define CBQRI_BC_ALLOC_CTL_OP_READ_LIMIT   2
@@ -132,17 +151,13 @@ struct cbqri_controller {
 
 struct cbqri_resctrl_res {
 	struct rdt_resource     resctrl_res;
-	struct cbqri_controller controller;
 	u32 max_rcid;
 	u32 max_mcid;
 };
 
 struct cbqri_resctrl_dom {
-	struct rdt_domain_hdr       resctrl_dom_hdr;
 	struct rdt_ctrl_domain  resctrl_ctrl_dom;
-	struct rdt_mon_domain   resctrl_mon_dom;
-	u64 cbm;
-	u64 rbwb;
+	struct rdt_l3_mon_domain resctrl_mon_dom;
 	u64 *ctrl_val;
 	struct cbqri_controller *hw_ctrl;
 };
@@ -150,6 +165,7 @@ struct cbqri_resctrl_dom {
 struct cbqri_config {
 	u64 cbm; /* capacity block mask */
 	u64 rbwb; /* reserved bandwidth blocks */
+	u64 mweight; /* memory bandwidth weight (if supported by HW) */
 };
 
 #endif /* _ASM_RISCV_QOS_INTERNAL_H */

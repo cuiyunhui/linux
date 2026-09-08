@@ -13,13 +13,26 @@
 
 /* cached value of srmcfg csr for each cpu */
 DECLARE_PER_CPU(u32, cpu_srmcfg);
+/* default value of srmcfg csr for each cpu */
+DECLARE_PER_CPU(u32, cpu_srmcfg_default);
+
+static inline u32 srmcfg_task_value(struct task_struct *next)
+{
+	u32 srmcfg;
+
+	srmcfg = READ_ONCE(next->thread.srmcfg);
+	if (!srmcfg)
+		srmcfg = READ_ONCE(*this_cpu_ptr(&cpu_srmcfg_default));
+
+	return srmcfg;
+}
 
 static inline void __switch_to_srmcfg(struct task_struct *next)
 {
 	u32 *cpu_srmcfg_ptr = this_cpu_ptr(&cpu_srmcfg);
 	u32 thread_srmcfg;
 
-	thread_srmcfg = READ_ONCE(next->thread.srmcfg);
+	thread_srmcfg = srmcfg_task_value(next);
 
 	if (thread_srmcfg != *cpu_srmcfg_ptr) {
 		*cpu_srmcfg_ptr = thread_srmcfg;
