@@ -8,6 +8,7 @@ RISC-V architecture
     acpi
     boot
     boot-image-header
+    cbqri-inactive-entry-poc
     vm-layout
     hwprobe
     patch-acceptance
