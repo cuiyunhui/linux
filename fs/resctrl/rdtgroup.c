@@ -2717,7 +2717,8 @@ static int schemata_list_add(struct rdt_resource *r, enum resctrl_conf_type type
 
 	s->res = r;
 	s->num_closid = resctrl_arch_get_num_closid(r);
-	if (resctrl_arch_get_cdp_enabled(r->rid))
+	if (resctrl_arch_get_cdp_enabled(r->rid) &&
+	    resctrl_arch_cdp_consumes_closids())
 		s->num_closid /= 2;
 
 	s->conf_type = type;
@@ -3693,7 +3694,8 @@ static int rdtgroup_init_alloc(struct rdtgroup *rdtgrp)
 				goto out;
 		}
 
-		ret = resctrl_arch_update_domains(r, rdtgrp->closid);
+		ret = resctrl_arch_update_domains(r, rdtgrp->closid,
+						  RESCTRL_UPDATE_GROUP_INIT, NULL, NULL);
 		if (ret < 0) {
 			rdt_last_cmd_puts("Failed to initialize allocations\n");
 			goto out;

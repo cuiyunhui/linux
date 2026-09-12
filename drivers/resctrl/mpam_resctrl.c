@@ -1245,7 +1245,9 @@ int resctrl_arch_update_one(struct rdt_resource *r, struct rdt_ctrl_domain *d,
 	return mpam_apply_config(dom->ctrl_comp, partid, &cfg);
 }
 
-int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid)
+int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid,
+				enum resctrl_update_reason reason,
+				int *err_rid, int *err_domain)
 {
 	int err;
 	struct rdt_ctrl_domain *d;

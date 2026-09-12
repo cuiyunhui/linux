@@ -15,6 +15,7 @@
 #define CBQRI_BC_MON_CTR_VAL_OFF 16
 #define CBQRI_BC_ALLOC_CTL_OFF   24
 #define CBQRI_BC_BW_ALLOC_OFF    32
+#define CBQRI_BC_RCID_MAP_CTL_OFF 40
 
 #define CBQRI_CC_CAPABILITIES_VER_MINOR_MASK  GENMASK(3, 0)
 #define CBQRI_CC_CAPABILITIES_VER_MAJOR_MASK  GENMASK(7, 4)
@@ -24,6 +25,8 @@
 
 #define CBQRI_CC_CAPABILITIES_NCBLKS_SHIFT 8
 #define CBQRI_CC_CAPABILITIES_NCBLKS_MASK  0xFFFF
+#define CBQRI_CC_CAPABILITIES_RCID_MAP_SHIFT 62
+#define CBQRI_CC_CAPABILITIES_MCID_MAP_SHIFT 63
 
 #define CBQRI_BC_CAPABILITIES_VER_MINOR_MASK  GENMASK(3, 0)
 #define CBQRI_BC_CAPABILITIES_VER_MAJOR_MASK  GENMASK(7, 4)
@@ -34,6 +37,11 @@
 #define CBQRI_BC_CAPABILITIES_NBWBLKS_MASK  0xFFFF
 #define CBQRI_BC_CAPABILITIES_MRBWB_SHIFT   32
 #define CBQRI_BC_CAPABILITIES_MRBWB_MASK    0xFFFF
+#define CBQRI_BC_CAPABILITIES_RCID_MAP_SHIFT 62
+#define CBQRI_BC_CAPABILITIES_MCID_MAP_SHIFT 63
+
+#define CBQRI_ID_MAP_VERSION 0x12
+#define CBQRI_LOGICAL_ID_COUNT 4096
 
 #define CBQRI_CONTROL_REGISTERS_BUSY_SHIFT   39
 #define CBQRI_CONTROL_REGISTERS_BUSY_MASK    0x01
@@ -74,6 +82,7 @@
 #define CBQRI_BC_MON_CTL_OP_CONFIG_EVENT 1
 #define CBQRI_BC_MON_CTL_OP_READ_COUNTER 2
 #define CBQRI_BC_MON_CTL_STATUS_SUCCESS  1
+#define CBQRI_MON_CTL_STATUS_NO_COUNTER  6
 
 /* MON_CTR_VAL layout for capacity and bandwidth controllers */
 /* Capacity: CTR[62:0], INV[63] */
@@ -85,6 +94,10 @@
 #define CBQRI_BC_ALLOC_CTL_OP_CONFIG_LIMIT 1
 #define CBQRI_BC_ALLOC_CTL_OP_READ_LIMIT   2
 #define CBQRI_BC_ALLOC_CTL_STATUS_SUCCESS  1
+
+#define CBQRI_RCID_MAP_OP_CONFIG 1
+#define CBQRI_RCID_MAP_OP_READ   2
+#define CBQRI_RCID_MAP_STATUS_SUCCESS 1
 
 int qos_resctrl_setup(void);
 void qos_resctrl_exit(void);
@@ -112,6 +125,8 @@ struct riscv_cbqri_capacity_caps {
 
 	bool supports_mon_evt_id_none;
 	bool supports_mon_evt_id_occupancy;
+	bool supports_rcid_map;
+	bool supports_mcid_map;
 };
 
 /* Bandwidth Controller hardware capabilities */
@@ -136,6 +151,8 @@ struct riscv_cbqri_bandwidth_caps {
 	bool supports_mon_evt_id_rdwr_count;
 	bool supports_mon_evt_id_rdonly_count;
 	bool supports_mon_evt_id_wronly_count;
+	bool supports_rcid_map;
+	bool supports_mcid_map;
 };
 
 struct cbqri_controller {
@@ -150,6 +167,8 @@ struct cbqri_controller {
 
 	bool alloc_capable;
 	bool mon_capable;
+	u16 *req_to_int;
+	unsigned long *int_rcid_busy;
 };
 
 struct cbqri_resctrl_res {

@@ -378,6 +378,12 @@ struct resctrl_cpu_defaults {
 	u32 rmid;
 };
 
+enum resctrl_update_reason {
+	RESCTRL_UPDATE_GROUP_INIT,
+	RESCTRL_UPDATE_USER,
+	RESCTRL_UPDATE_INTERNAL,
+};
+
 struct resctrl_mon_config_info {
 	struct rdt_resource		*r;
 	struct rdt_l3_mon_domain	*d;
@@ -422,7 +428,9 @@ static inline u32 resctrl_get_default_ctrl(struct rdt_resource *r)
 /* The number of closid supported by this resource regardless of CDP */
 u32 resctrl_arch_get_num_closid(struct rdt_resource *r);
 u32 resctrl_arch_system_num_rmid_idx(void);
-int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid);
+int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid,
+				enum resctrl_update_reason reason,
+				int *err_rid, int *err_domain);
 
 bool resctrl_enable_mon_event(enum resctrl_event_id eventid, bool any_cpu,
 			      unsigned int binary_bits, void *arch_priv);

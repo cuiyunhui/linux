@@ -117,6 +117,7 @@ static void limbo_release_entry(struct rmid_entry *entry)
 {
 	lockdep_assert_held(&rdtgroup_mutex);
 
+	resctrl_arch_release_rmid(entry->rmid);
 	rmid_limbo_count--;
 	list_add_tail(&entry->list, &rmid_free_lru);
 
@@ -345,10 +346,12 @@ void free_rmid(u32 closid, u32 rmid)
 
 	entry = __rmid_entry(idx);
 
-	if (resctrl_is_mon_event_enabled(QOS_L3_OCCUP_EVENT_ID))
+	if (resctrl_is_mon_event_enabled(QOS_L3_OCCUP_EVENT_ID)) {
 		add_rmid_to_limbo(entry);
-	else
+	} else {
+		resctrl_arch_release_rmid(rmid);
 		list_add_tail(&entry->list, &rmid_free_lru);
+	}
 }
 
 static struct mbm_state *get_mbm_state(struct rdt_l3_mon_domain *d, u32 closid,

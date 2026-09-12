@@ -41,7 +41,9 @@ int resctrl_arch_update_one(struct rdt_resource *r, struct rdt_ctrl_domain *d,
 	return 0;
 }
 
-int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid)
+int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid,
+				enum resctrl_update_reason reason,
+				int *err_rid, int *err_domain)
 {
 	struct resctrl_staged_config *cfg;
 	struct rdt_hw_ctrl_domain *hw_dom;

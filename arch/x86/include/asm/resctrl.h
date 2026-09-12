@@ -11,6 +11,11 @@
 
 #include <asm/msr.h>
 
+static inline bool resctrl_arch_cdp_consumes_closids(void)
+{
+	return true;
+}
+
 /*
  * This value can never be a valid CLOSID, and is used when mapping a
  * (closid, rmid) pair to an index and back. On x86 only the RMID is
@@ -164,6 +169,10 @@ static inline bool resctrl_arch_match_rmid(struct task_struct *tsk, u32 ignored,
 static inline int resctrl_arch_release_ctrl(u32 closid)
 {
 	return 0;
+}
+
+static inline void resctrl_arch_release_rmid(u32 rmid)
+{
 }
 
 static inline void resctrl_arch_sched_in(struct task_struct *tsk)

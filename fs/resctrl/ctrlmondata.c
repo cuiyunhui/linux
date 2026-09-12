@@ -309,7 +309,9 @@ ssize_t rdtgroup_schemata_write(struct kernfs_open_file *of,
 	struct resctrl_schema *s;
 	struct rdtgroup *rdtgrp;
 	struct rdt_resource *r;
+	struct rdt_resource *err_res = NULL;
 	char *tok, *resname;
+	int err_rid, err_domain;
 	int ret = 0;
 
 	/* Valid input requires a trailing newline */
@@ -363,7 +365,22 @@ ssize_t rdtgroup_schemata_write(struct kernfs_open_file *of,
 		if (is_mba_sc(r))
 			continue;
 
-		ret = resctrl_arch_update_domains(r, rdtgrp->closid);
+		err_rid = -1;
+		err_domain = -1;
+		ret = resctrl_arch_update_domains(r, rdtgrp->closid,
+						  RESCTRL_UPDATE_USER, &err_rid,
+					  &err_domain);
+		if (ret == -ENOSPC && err_domain >= 0)
+			err_res = resctrl_arch_get_resource(err_rid);
+		if (ret == -ENOSPC && err_domain >= 0 && err_res)
+			rdt_last_cmd_printf("No free hardware control ID for %s domain %d; "
+					    "CLOSID %u remains on the default allocation\n",
+					    err_res->name, err_domain,
+					    rdtgrp->closid);
+		else if (ret == -ENOSPC)
+			rdt_last_cmd_printf("No free hardware control ID for %s; "
+					    "CLOSID %u remains on the default allocation\n",
+					    r->name, rdtgrp->closid);
 		if (ret)
 			goto out;
 	}
@@ -823,7 +840,8 @@ static int resctrl_io_alloc_init_cbm(struct resctrl_schema *s, u32 closid)
 			       sizeof(d->staged_config[0]));
 	}
 
-	ret = resctrl_arch_update_domains(r, closid);
+	ret = resctrl_arch_update_domains(r, closid, RESCTRL_UPDATE_INTERNAL,
+					  NULL, NULL);
 out:
 	rdt_staged_configs_clear();
 	return ret;
@@ -1046,7 +1064,8 @@ ssize_t resctrl_io_alloc_cbm_write(struct kernfs_open_file *of, char *buf,
 	if (ret)
 		goto out_clear_configs;
 
-	ret = resctrl_arch_update_domains(r, io_alloc_closid);
+	ret = resctrl_arch_update_domains(r, io_alloc_closid,
+					  RESCTRL_UPDATE_INTERNAL, NULL, NULL);
 
 out_clear_configs:
 	rdt_staged_configs_clear();
