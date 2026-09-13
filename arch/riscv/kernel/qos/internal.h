@@ -88,6 +88,7 @@ int qos_resctrl_setup(void);
 void qos_resctrl_exit(void);
 int qos_resctrl_online_cpu(unsigned int cpu);
 int qos_resctrl_offline_cpu(unsigned int cpu);
+void qos_write_supervisor_assoc_local(void);
 
 /* Capacity Controller hardware capabilities */
 struct riscv_cbqri_capacity_caps {

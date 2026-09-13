@@ -57,6 +57,9 @@ void resctrl_arch_rmid_idx_decode(u32 idx, u32 *closid, u32 *rmid);
 void resctrl_arch_set_cpu_default_closid_rmid(int cpu, u32 closid, u32 pmg);
 void resctrl_arch_sched_in(struct task_struct *tsk);
 void resctrl_arch_set_closid_rmid(struct task_struct *tsk, u32 closid, u32 rmid);
+unsigned long resctrl_arch_get_kernel_modes(void);
+int resctrl_arch_set_kernel_mode(enum resctrl_kernel_mode mode,
+				 u32 closid, u32 rmid);
 bool resctrl_arch_match_closid(struct task_struct *tsk, u32 closid);
 bool resctrl_arch_match_rmid(struct task_struct *tsk, u32 closid, u32 rmid);
 void resctrl_arch_reset_resources(void);

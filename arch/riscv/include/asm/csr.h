@@ -91,6 +91,13 @@
 #define SRMCFG_MASK		((SRMCFG_MCID_MASK << SRMCFG_MCID_SHIFT) | \
 				  SRMCFG_RCID_MASK)
 
+/* Experimental supervisor-mode QoS association fields */
+#define SRMCFG_ASSOC_RCID_EN	BIT(12)
+#define SRMCFG_ASSOC_MCID_EN	BIT(28)
+#define SRMCFG_ASSOC_EN		BIT(31)
+#define SRMCFG_ASSOC_MASK	(SRMCFG_MASK | SRMCFG_ASSOC_RCID_EN | \
+				 SRMCFG_ASSOC_MCID_EN | SRMCFG_ASSOC_EN)
+
 /* Exception cause high bit - is an interrupt if set */
 #define CAUSE_IRQ_FLAG		(_AC(1, UL) << (__riscv_xlen - 1))
 
@@ -336,6 +343,7 @@
 #define CSR_SIP			0x144
 #define CSR_SATP		0x180
 #define CSR_SRMCFG		0x181
+#define CSR_SRMCFG_ASSOC	0x182
 
 #define CSR_STIMECMP		0x14D
 #define CSR_STIMECMPH		0x15D

@@ -1893,6 +1893,8 @@ err_unmap_controllers:
 
 int qos_resctrl_online_cpu(unsigned int cpu)
 {
+	if (riscv_isa_extension_available(NULL, SSQOSASSOC))
+		qos_write_supervisor_assoc_local();
 	resctrl_online_cpu(cpu);
 	return 0;
 }
