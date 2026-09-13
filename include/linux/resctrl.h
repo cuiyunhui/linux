@@ -12,6 +12,19 @@
 #include <asm/resctrl.h>
 #endif
 
+#ifndef RESCTRL_ARCH_HAS_KERNEL_MODE
+static inline unsigned long resctrl_arch_get_kernel_modes(void)
+{
+	return BIT(RESCTRL_KERNEL_MODE_INHERIT);
+}
+
+static inline int resctrl_arch_set_kernel_mode(enum resctrl_kernel_mode mode,
+				       u32 closid, u32 rmid)
+{
+	return mode == RESCTRL_KERNEL_MODE_INHERIT ? 0 : -EOPNOTSUPP;
+}
+#endif
+
 /* CLOSID, RMID value used by the default control group */
 #define RESCTRL_RESERVED_CLOSID		0
 #define RESCTRL_RESERVED_RMID		0

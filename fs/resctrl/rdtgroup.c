@@ -37,6 +37,12 @@ static struct kernfs_root *rdt_root;
 
 struct rdtgroup rdtgroup_default;
 
+static struct {
+	unsigned long supported;
+	enum resctrl_kernel_mode mode;
+	struct rdtgroup *rdtgrp;
+} resctrl_kernel_mode_cfg;
+
 LIST_HEAD(rdt_all_groups);
 
 /* list of entries for the schemata file */
@@ -989,6 +995,235 @@ static int rdt_last_cmd_status_show(struct kernfs_open_file *of,
 	return 0;
 }
 
+static const char * const resctrl_kernel_mode_names[] = {
+	[RESCTRL_KERNEL_MODE_INHERIT] = "inherit_ctrl_and_mon",
+	[RESCTRL_KERNEL_MODE_GLOBAL_CTRL] =
+		"global_assign_ctrl_inherit_mon",
+	[RESCTRL_KERNEL_MODE_GLOBAL_CTRL_MON] =
+		"global_assign_ctrl_assign_mon",
+};
+
+static struct rdtgroup *kernel_mode_ctrl_group(struct rdtgroup *rdtgrp)
+{
+	if (rdtgrp->type == RDTMON_GROUP)
+		return rdtgrp->mon.parent;
+
+	return rdtgrp;
+}
+
+static int resctrl_program_kernel_mode(void)
+{
+	struct rdtgroup *rdtgrp = resctrl_kernel_mode_cfg.rdtgrp;
+	struct rdtgroup *ctrl_grp;
+	u32 rmid;
+
+	if (resctrl_kernel_mode_cfg.mode == RESCTRL_KERNEL_MODE_INHERIT ||
+	    !rdtgrp)
+		return resctrl_arch_set_kernel_mode(RESCTRL_KERNEL_MODE_INHERIT,
+						    0, 0);
+
+	ctrl_grp = kernel_mode_ctrl_group(rdtgrp);
+	rmid = rdtgrp->type == RDTMON_GROUP ? rdtgrp->mon.rmid :
+					       ctrl_grp->mon.rmid;
+
+	return resctrl_arch_set_kernel_mode(resctrl_kernel_mode_cfg.mode,
+					ctrl_grp->closid, rmid);
+}
+
+static void resctrl_kernel_mode_remove_group(struct rdtgroup *rdtgrp)
+{
+	struct rdtgroup *assigned = resctrl_kernel_mode_cfg.rdtgrp;
+
+	if (!assigned)
+		return;
+	if (rdtgrp->type == RDTMON_GROUP) {
+		if (assigned != rdtgrp)
+			return;
+	} else if (kernel_mode_ctrl_group(assigned) != rdtgrp) {
+		return;
+	}
+
+	resctrl_kernel_mode_cfg.rdtgrp = NULL;
+	resctrl_program_kernel_mode();
+}
+
+static int resctrl_kernel_mode_show(struct kernfs_open_file *of,
+				    struct seq_file *seq, void *v)
+{
+	int i;
+
+	mutex_lock(&rdtgroup_mutex);
+	for (i = 0; i < RESCTRL_KERNEL_MODE_NUM; i++) {
+		if (!(resctrl_kernel_mode_cfg.supported & BIT(i)))
+			continue;
+
+		seq_printf(seq, i == resctrl_kernel_mode_cfg.mode ?
+			   "[%s]\n" : "%s\n",
+			   resctrl_kernel_mode_names[i]);
+	}
+	mutex_unlock(&rdtgroup_mutex);
+
+	return 0;
+}
+
+static ssize_t resctrl_kernel_mode_write(struct kernfs_open_file *of,
+					 char *buf, size_t nbytes, loff_t off)
+{
+	enum resctrl_kernel_mode old_mode;
+	int i, ret = -EINVAL;
+
+	if (nbytes == 0 || buf[nbytes - 1] != '\n')
+		return -EINVAL;
+	buf[nbytes - 1] = '\0';
+
+	buf = strim(buf);
+	if (!*buf)
+		return -EINVAL;
+	cpus_read_lock();
+	mutex_lock(&rdtgroup_mutex);
+	rdt_last_cmd_clear();
+
+	for (i = 0; i < RESCTRL_KERNEL_MODE_NUM; i++) {
+		if (strcmp(buf, resctrl_kernel_mode_names[i]))
+			continue;
+		if (!(resctrl_kernel_mode_cfg.supported & BIT(i))) {
+			rdt_last_cmd_puts("Kernel mode is not supported\n");
+			goto out;
+		}
+
+		old_mode = resctrl_kernel_mode_cfg.mode;
+		resctrl_kernel_mode_cfg.mode = i;
+		ret = resctrl_program_kernel_mode();
+		if (ret)
+			resctrl_kernel_mode_cfg.mode = old_mode;
+		else
+			ret = nbytes;
+		goto out;
+	}
+
+	rdt_last_cmd_puts("Unknown kernel mode\n");
+out:
+	mutex_unlock(&rdtgroup_mutex);
+	cpus_read_unlock();
+	return ret;
+}
+
+static int resctrl_kernel_mode_assignment_show(struct kernfs_open_file *of,
+					       struct seq_file *seq, void *v)
+{
+	struct rdtgroup *rdtgrp;
+
+	mutex_lock(&rdtgroup_mutex);
+	rdtgrp = resctrl_kernel_mode_cfg.rdtgrp;
+	if (!rdtgrp) {
+		seq_puts(seq, "none\n");
+	} else if (rdtgrp->type == RDTMON_GROUP) {
+		if (rdtgrp->mon.parent == &rdtgroup_default)
+			seq_printf(seq, "/%s/\n", rdt_kn_name(rdtgrp->kn));
+		else
+			seq_printf(seq, "%s/%s/\n",
+				   rdt_kn_name(rdtgrp->mon.parent->kn),
+				   rdt_kn_name(rdtgrp->kn));
+	} else {
+		seq_printf(seq, rdtgrp == &rdtgroup_default ? "//\n" :
+			   "%s//\n", rdt_kn_name(rdtgrp->kn));
+	}
+	mutex_unlock(&rdtgroup_mutex);
+
+	return 0;
+}
+
+static struct rdtgroup *
+resctrl_find_kernel_mode_group(char *ctrl_name, char *mon_name)
+{
+	struct rdtgroup *rdtgrp, *mon_grp;
+
+	if (!*ctrl_name) {
+		rdtgrp = &rdtgroup_default;
+	} else {
+		rdtgrp = NULL;
+		list_for_each_entry(mon_grp, &rdt_all_groups, rdtgroup_list) {
+			if (mon_grp->type == RDTCTRL_GROUP &&
+			    !strcmp(ctrl_name, rdt_kn_name(mon_grp->kn))) {
+				rdtgrp = mon_grp;
+				break;
+			}
+		}
+	}
+
+	if (!rdtgrp || !*mon_name)
+		return rdtgrp;
+
+	list_for_each_entry(mon_grp, &rdtgrp->mon.crdtgrp_list,
+			    mon.crdtgrp_list)
+		if (!strcmp(mon_name, rdt_kn_name(mon_grp->kn)))
+			return mon_grp;
+
+	return NULL;
+}
+
+static ssize_t
+resctrl_kernel_mode_assignment_write(struct kernfs_open_file *of, char *buf,
+				     size_t nbytes, loff_t off)
+{
+	struct rdtgroup *rdtgrp, *old_rdtgrp;
+	char *ctrl_name, *mon_name, *tail;
+	int ret;
+
+	if (nbytes == 0 || buf[nbytes - 1] != '\n')
+		return -EINVAL;
+	buf[nbytes - 1] = '\0';
+
+	buf = strim(buf);
+	cpus_read_lock();
+	mutex_lock(&rdtgroup_mutex);
+	rdt_last_cmd_clear();
+
+	if (!*buf || !strcmp(buf, "none")) {
+		old_rdtgrp = resctrl_kernel_mode_cfg.rdtgrp;
+		resctrl_kernel_mode_cfg.rdtgrp = NULL;
+		ret = resctrl_program_kernel_mode();
+		if (ret)
+			resctrl_kernel_mode_cfg.rdtgrp = old_rdtgrp;
+		else
+			ret = nbytes;
+		goto out;
+	}
+	if (resctrl_kernel_mode_cfg.mode == RESCTRL_KERNEL_MODE_INHERIT) {
+		rdt_last_cmd_puts("Select a global kernel mode first\n");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	ctrl_name = strsep(&buf, "/");
+	mon_name = strsep(&buf, "/");
+	tail = strsep(&buf, "/");
+	if (!ctrl_name || !mon_name || !tail || *tail || buf) {
+		rdt_last_cmd_puts("Expected CTRL_MON/MON/\n");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	rdtgrp = resctrl_find_kernel_mode_group(ctrl_name, mon_name);
+	if (!rdtgrp || rdtgrp->mode == RDT_MODE_PSEUDO_LOCKED) {
+		rdt_last_cmd_puts("Invalid kernel mode group\n");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	old_rdtgrp = resctrl_kernel_mode_cfg.rdtgrp;
+	resctrl_kernel_mode_cfg.rdtgrp = rdtgrp;
+	ret = resctrl_program_kernel_mode();
+	if (ret)
+		resctrl_kernel_mode_cfg.rdtgrp = old_rdtgrp;
+	else
+		ret = nbytes;
+out:
+	mutex_unlock(&rdtgroup_mutex);
+	cpus_read_unlock();
+	return ret;
+}
+
 void *rdt_kn_parent_priv(struct kernfs_node *kn)
 {
 	/*
@@ -1893,6 +2128,22 @@ static struct rftype res_common_files[] = {
 		.kf_ops		= &rdtgroup_kf_single_ops,
 		.seq_show	= rdt_last_cmd_status_show,
 		.fflags		= RFTYPE_TOP_INFO,
+	},
+	{
+		.name		= "kernel_mode",
+		.mode		= 0644,
+		.kf_ops		= &rdtgroup_kf_single_ops,
+		.seq_show	= resctrl_kernel_mode_show,
+		.write		= resctrl_kernel_mode_write,
+		.fflags		= 0,
+	},
+	{
+		.name		= "kernel_mode_assignment",
+		.mode		= 0644,
+		.kf_ops		= &rdtgroup_kf_single_ops,
+		.seq_show	= resctrl_kernel_mode_assignment_show,
+		.write		= resctrl_kernel_mode_assignment_write,
+		.fflags		= 0,
 	},
 	{
 		.name		= "mbm_assign_on_mkdir",
@@ -3191,6 +3442,10 @@ static void resctrl_fs_teardown(void)
 	if (!rdtgroup_default.kn)
 		return;
 
+	resctrl_kernel_mode_cfg.rdtgrp = NULL;
+	resctrl_kernel_mode_cfg.mode = RESCTRL_KERNEL_MODE_INHERIT;
+	resctrl_program_kernel_mode();
+
 	rmdir_all_sub();
 	rdtgroup_unassign_cntrs(&rdtgroup_default);
 	mon_put_kn_priv();
@@ -3995,6 +4250,8 @@ static int rdtgroup_rmdir_mon(struct rdtgroup *rdtgrp, cpumask_var_t tmpmask)
 	u32 closid, rmid;
 	int cpu;
 
+	resctrl_kernel_mode_remove_group(rdtgrp);
+
 	/* Give any tasks back to the parent group */
 	rdt_move_group_tasks(rdtgrp, prdtgrp, tmpmask);
 
@@ -4033,6 +4290,7 @@ static int rdtgroup_rmdir_mon(struct rdtgroup *rdtgrp, cpumask_var_t tmpmask)
 
 static int rdtgroup_ctrl_remove(struct rdtgroup *rdtgrp)
 {
+	resctrl_kernel_mode_remove_group(rdtgrp);
 	rdtgrp->flags = RDT_DELETED;
 	list_del(&rdtgrp->rdtgroup_list);
 
@@ -4593,6 +4851,15 @@ int resctrl_init(void)
 		     sizeof(last_cmd_status_buf));
 
 	rdtgroup_setup_default();
+	resctrl_kernel_mode_cfg.supported = resctrl_arch_get_kernel_modes();
+	resctrl_kernel_mode_cfg.mode = RESCTRL_KERNEL_MODE_INHERIT;
+	resctrl_kernel_mode_cfg.rdtgrp = NULL;
+	if (resctrl_kernel_mode_cfg.supported &
+	    ~BIT(RESCTRL_KERNEL_MODE_INHERIT)) {
+		resctrl_file_fflags_init("kernel_mode", RFTYPE_TOP_INFO);
+		resctrl_file_fflags_init("kernel_mode_assignment",
+				   RFTYPE_TOP_INFO);
+	}
 
 	thread_throttle_mode_init();
 
