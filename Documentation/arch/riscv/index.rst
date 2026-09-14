@@ -18,3 +18,4 @@ RISC-V architecture
     zicfiss
 
     features
+   ssqosassoc-poc
