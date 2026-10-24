@@ -19,6 +19,10 @@ The ``sharedAT`` field has no effect when ``useShared`` is zero.  The PoC
 therefore neither requires nor verifies a particular ``sharedAT`` value for
 an inactive entry.
 
+A unique entry with ``Rbwb=0`` and ``Mweight>0`` remains active.  It reserves
+no bandwidth and competes only for non-reserved or unused bandwidth according
+to ``Mweight``; no minimum bandwidth is guaranteed.
+
 The PoC validates the controller and operating-system control plane.  It does
 not validate bandwidth performance and does not define an arbitration
 algorithm.  The discovery value ``bc_capabilities.VER=0x11`` is provisional
@@ -102,7 +106,7 @@ The tests cover:
 * discovery of the provisional inactive-entry version;
 * active-to-inactive and inactive-to-active transitions;
 * release and reallocation of the controller-wide reserved budget;
-* rejection of ``Rbwb=0, Mweight>0``;
+* acceptance and readback of an active ``Rbwb=0, Mweight>0`` entry;
 * an inactive entry with a non-zero ignored ``sharedAT`` field;
 * independent DATA and CODE entries; and
 * a controller supporting CODE but not DATA.
