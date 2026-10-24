@@ -35,7 +35,7 @@ The recorded validation used these immutable revisions:
 
 * Linux implementation: ``e1475c3393857fb8b14be827bacad2ba64deb2bf``
 * QEMU implementation and tests:
-  ``6fda7b6269e39f53d2d0f60b925bf1a8c1ad7189``
+  ``37a1e8d97d31433cf4a454f4756d256f3b1755e1``
 * QEMU upstream base:
   ``1df256f5968e9f7c3c4533a1383b071c044a36d6``
 * Proposal:
@@ -243,9 +243,9 @@ The following checks passed:
 
 Artifact hashes from the recorded run::
 
-  1c218650f4b545e30360fe62728b878850e16b2f0083d24be0d7335491cbcb70  qemu-system-riscv64
-  e15f5c4861005e90087fd716bbbdb04a027482e89ef01b379bc205a06379e638  Linux Image
-  894e2aef99590fc07ec6c60ab00282b8bc5d5d5bb2a1d0c6ada0c52df24274c0  OpenSBI firmware
+  6839fab88bc65b9d4ca84c6937783866cec2f2da4f540cbbc0f220a2f4d584fd  qemu-system-riscv64
+  4273908374a5a8e492b9895a44bb6ed888bb55344fb38d7070345a481b2c075a  Linux Image
+  49bdf7b939bda11321132d1042bf99d7324fb190f1feef423171fed3573f8705  OpenSBI firmware
   ba4f670d3fb251a247b664199ebf35ae55c1e80de7f2e3db15a44a93a5c221fa  initramfs
   c3b779f86671c0cadf9cbdb274917a20210aeceb6f58b42d68406cdddfa48869  EDK2 firmware
 
