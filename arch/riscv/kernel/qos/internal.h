@@ -19,6 +19,7 @@
 #define CBQRI_BC_MON_CTR_VAL_OFF	0x10
 #define CBQRI_BC_ALLOC_CTL_OFF		0x18
 #define CBQRI_BC_BW_ALLOC_OFF		0x20
+#define CBQRI_BC_RCID_MAP_CTL_OFF	0x28
 
 #define CBQRI_CAPABILITIES_VER_MINOR_MASK	GENMASK(3, 0)
 #define CBQRI_CAPABILITIES_VER_MAJOR_MASK	GENMASK(7, 4)
@@ -33,6 +34,11 @@
 #define CBQRI_BC_CAPABILITIES_MRBWB_SHIFT	32
 #define CBQRI_BC_CAPABILITIES_MRBWB_MASK		GENMASK(15, 0)
 
+#define CBQRI_CAPABILITIES_RCID_MAP_SHIFT	62
+#define CBQRI_CAPABILITIES_MCID_MAP_SHIFT	63
+#define CBQRI_ID_MAP_VERSION			0x12
+#define CBQRI_LOGICAL_ID_COUNT			4096
+
 #define CBQRI_CTL_OP_SHIFT		0
 #define CBQRI_CTL_OP_MASK		GENMASK(4, 0)
 #define CBQRI_CTL_AT_SHIFT		5
@@ -43,6 +49,10 @@
 #define CBQRI_CTL_STATUS_MASK		GENMASK(6, 0)
 #define CBQRI_CTL_BUSY_SHIFT		39
 #define CBQRI_CTL_BUSY_MASK		BIT(0)
+
+#define CBQRI_RCID_MAP_INT_RCID_SHIFT	20
+#define CBQRI_RCID_MAP_INT_RCID_MASK	GENMASK(11, 0)
+#define CBQRI_RCID_MAP_VALID_SHIFT	40
 
 #define CBQRI_MON_CTL_EVT_ID_SHIFT	20
 #define CBQRI_MON_CTL_EVT_ID_MASK	GENMASK(7, 0)
@@ -72,6 +82,17 @@
 #define CBQRI_BC_ALLOC_CTL_OP_READ_LIMIT	2
 #define CBQRI_BC_ALLOC_CTL_STATUS_SUCCESS	1
 
+#define CBQRI_RCID_MAP_OP_CONFIG		1
+#define CBQRI_RCID_MAP_OP_READ			2
+#define CBQRI_RCID_MAP_OP_READ_ENTRY		3
+
+#define CBQRI_RCID_MAP_STATUS_SUCCESS		1
+#define CBQRI_RCID_MAP_STATUS_INVALID_OP		2
+#define CBQRI_RCID_MAP_STATUS_INVALID_REQ_RCID	3
+#define CBQRI_RCID_MAP_STATUS_INVALID_INT_RCID	4
+#define CBQRI_RCID_MAP_STATUS_INT_RCID_BUSY	5
+#define CBQRI_RCID_MAP_STATUS_CONSTRAINT		6
+
 #define CBQRI_BC_BW_ALLOC_RBWB_SHIFT	0
 #define CBQRI_BC_BW_ALLOC_RBWB_MASK	GENMASK(15, 0)
 #define CBQRI_BC_BW_ALLOC_MWEIGHT_SHIFT	20
@@ -100,6 +121,8 @@ struct riscv_cbqri_capacity_caps {
 	bool supports_mon_op_read_counter;
 	bool supports_mon_evt_id_none;
 	bool supports_mon_evt_id_occupancy;
+	bool supports_rcid_map;
+	bool supports_mcid_map;
 };
 
 struct riscv_cbqri_bandwidth_caps {
@@ -119,6 +142,8 @@ struct riscv_cbqri_bandwidth_caps {
 	bool supports_mon_evt_id_rdwr_count;
 	bool supports_mon_evt_id_rdonly_count;
 	bool supports_mon_evt_id_wronly_count;
+	bool supports_rcid_map;
+	bool supports_mcid_map;
 };
 
 struct cbqri_controller {
@@ -132,6 +157,10 @@ struct cbqri_controller {
 		struct riscv_cbqri_capacity_caps	cc;
 		struct riscv_cbqri_bandwidth_caps	bc;
 	};
+
+	u16				*req_to_int;
+	unsigned long			*int_rcid_busy;
+	unsigned long			*int_rcid_quarantined;
 };
 
 enum cbqri_ctrl_kind {

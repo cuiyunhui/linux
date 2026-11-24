@@ -2,6 +2,7 @@
 
 #define pr_fmt(fmt) "riscv-cbqri: " fmt
 
+#include <linux/bitmap.h>
 #include <linux/bitfield.h>
 #include <linux/io.h>
 #include <linux/ioport.h>
@@ -39,15 +40,181 @@ static int cbqri_wait_busy(struct cbqri_controller *ctrl, u32 offset)
 				 1, 1000, false, ctrl, offset);
 }
 
+static bool cbqri_has_rcid_map(struct cbqri_controller *ctrl)
+{
+	if (ctrl->info->type == CBQRI_CONTROLLER_TYPE_CAPACITY)
+		return ctrl->cc.supports_rcid_map;
+
+	return ctrl->bc.supports_rcid_map;
+}
+
+static u32 cbqri_rcid_map_offset(struct cbqri_controller *ctrl)
+{
+	u32 slots;
+
+	if (ctrl->info->type == CBQRI_CONTROLLER_TYPE_BANDWIDTH)
+		return CBQRI_BC_RCID_MAP_CTL_OFF;
+
+	slots = DIV_ROUND_UP(ctrl->cc.ncblks, 64);
+	return CBQRI_CC_BLOCK_MASK_OFF + (slots + 1) * sizeof(u64);
+}
+
+static int cbqri_rcid_map_status(u32 status)
+{
+	switch (status) {
+	case CBQRI_RCID_MAP_STATUS_SUCCESS:
+		return 0;
+	case CBQRI_RCID_MAP_STATUS_INVALID_OP:
+		return -EOPNOTSUPP;
+	case CBQRI_RCID_MAP_STATUS_INVALID_REQ_RCID:
+	case CBQRI_RCID_MAP_STATUS_INVALID_INT_RCID:
+		return -ERANGE;
+	case CBQRI_RCID_MAP_STATUS_INT_RCID_BUSY:
+		return -EBUSY;
+	case CBQRI_RCID_MAP_STATUS_CONSTRAINT:
+		return -ENOSPC;
+	default:
+		return -EIO;
+	}
+}
+
+static int cbqri_rcid_map_op(struct cbqri_controller *ctrl, u32 op,
+			     u32 *req_rcid, u32 *int_rcid, bool *valid)
+{
+	u32 offset = cbqri_rcid_map_offset(ctrl);
+	u64 value;
+	u32 status;
+	int ret;
+
+	if (ctrl->info->size < sizeof(value) ||
+	    offset > ctrl->info->size - sizeof(value))
+		return -ERANGE;
+
+	value = op << CBQRI_CTL_OP_SHIFT;
+	value |= (u64)*req_rcid << CBQRI_CTL_RCID_SHIFT;
+	value |= (u64)*int_rcid << CBQRI_RCID_MAP_INT_RCID_SHIFT;
+	cbqri_writeq(ctrl, offset, value);
+	if (cbqri_wait_busy(ctrl, offset))
+		return -ETIMEDOUT;
+
+	value = cbqri_readq(ctrl, offset);
+	status = (value >> CBQRI_CTL_STATUS_SHIFT) & CBQRI_CTL_STATUS_MASK;
+	ret = cbqri_rcid_map_status(status);
+	if (ret)
+		return ret;
+
+	*req_rcid = (value >> CBQRI_CTL_RCID_SHIFT) & CBQRI_CTL_RCID_MASK;
+	*int_rcid = (value >> CBQRI_RCID_MAP_INT_RCID_SHIFT) &
+		    CBQRI_RCID_MAP_INT_RCID_MASK;
+	if (valid)
+		*valid = value & BIT_ULL(CBQRI_RCID_MAP_VALID_SHIFT);
+
+	return 0;
+}
+
+static void cbqri_free_identifier_map(struct cbqri_controller *ctrl)
+{
+	bitmap_free(ctrl->int_rcid_quarantined);
+	bitmap_free(ctrl->int_rcid_busy);
+	kfree(ctrl->req_to_int);
+	ctrl->int_rcid_quarantined = NULL;
+	ctrl->int_rcid_busy = NULL;
+	ctrl->req_to_int = NULL;
+}
+
+static void cbqri_quarantine_int_rcid(struct cbqri_controller *ctrl,
+				      u32 int_rcid)
+{
+	__set_bit(int_rcid, ctrl->int_rcid_busy);
+	__set_bit(int_rcid, ctrl->int_rcid_quarantined);
+}
+
+static int cbqri_init_identifier_map(struct cbqri_controller *ctrl)
+{
+	u32 req_rcid, int_rcid, map_int_rcid;
+	bool valid;
+	int ret;
+
+	if (!cbqri_has_rcid_map(ctrl))
+		return 0;
+	if (!ctrl->info->rcid_count ||
+	    ctrl->info->rcid_count > CBQRI_LOGICAL_ID_COUNT)
+		return -EINVAL;
+
+	ctrl->req_to_int = kcalloc(CBQRI_LOGICAL_ID_COUNT,
+				   sizeof(*ctrl->req_to_int), GFP_KERNEL);
+	ctrl->int_rcid_busy = bitmap_zalloc(ctrl->info->rcid_count,
+					    GFP_KERNEL);
+	ctrl->int_rcid_quarantined = bitmap_zalloc(ctrl->info->rcid_count,
+						   GFP_KERNEL);
+	if (!ctrl->req_to_int || !ctrl->int_rcid_busy ||
+	    !ctrl->int_rcid_quarantined) {
+		cbqri_free_identifier_map(ctrl);
+		return -ENOMEM;
+	}
+
+	__set_bit(0, ctrl->int_rcid_busy);
+	for (int_rcid = 1; int_rcid < ctrl->info->rcid_count; int_rcid++) {
+		req_rcid = 0;
+		map_int_rcid = int_rcid;
+		valid = false;
+		ret = cbqri_rcid_map_op(ctrl, CBQRI_RCID_MAP_OP_READ_ENTRY,
+					&req_rcid, &map_int_rcid, &valid);
+		if (ret) {
+			cbqri_quarantine_int_rcid(ctrl, int_rcid);
+			pr_warn("failed to recover internal RCID %u: %d\n",
+				int_rcid, ret);
+			continue;
+		}
+		if (map_int_rcid != int_rcid) {
+			cbqri_quarantine_int_rcid(ctrl, int_rcid);
+			continue;
+		}
+		if (!valid)
+			continue;
+
+		__set_bit(int_rcid, ctrl->int_rcid_busy);
+		if (!req_rcid || req_rcid >= CBQRI_LOGICAL_ID_COUNT ||
+		    ctrl->req_to_int[req_rcid]) {
+			__set_bit(int_rcid, ctrl->int_rcid_quarantined);
+			continue;
+		}
+
+		ctrl->req_to_int[req_rcid] = int_rcid;
+		map_int_rcid = 0;
+		ret = cbqri_rcid_map_op(ctrl, CBQRI_RCID_MAP_OP_CONFIG,
+					&req_rcid, &map_int_rcid, NULL);
+		if (ret) {
+			__set_bit(int_rcid, ctrl->int_rcid_quarantined);
+			pr_warn("failed to release recovered RCID %u mapping: %d\n",
+				req_rcid, ret);
+			continue;
+		}
+
+		ctrl->req_to_int[req_rcid] = 0;
+		__clear_bit(int_rcid, ctrl->int_rcid_busy);
+	}
+
+	return 0;
+}
+
 static int cbqri_read_capacity_caps(struct cbqri_controller *ctrl)
 {
 	u64 value = cbqri_readq(ctrl, CBQRI_CC_CAPABILITIES_OFF);
+	u32 version;
 
 	if (!value)
 		return -ENODEV;
 
+	version = value & GENMASK(7, 0);
 	ctrl->version_minor = value & CBQRI_CAPABILITIES_VER_MINOR_MASK;
 	ctrl->version_major = (value & CBQRI_CAPABILITIES_VER_MAJOR_MASK) >> 4;
+	if (version >= CBQRI_ID_MAP_VERSION) {
+		ctrl->cc.supports_rcid_map =
+			(value >> CBQRI_CAPABILITIES_RCID_MAP_SHIFT) & 1;
+		ctrl->cc.supports_mcid_map =
+			(value >> CBQRI_CAPABILITIES_MCID_MAP_SHIFT) & 1;
+	}
 	ctrl->cc.ncblks = (value >> CBQRI_CC_CAPABILITIES_NCBLKS_SHIFT) &
 			   CBQRI_CC_CAPABILITIES_NCBLKS_MASK;
 	ctrl->cc.supports_alloc_op_flush_rcid =
@@ -60,12 +227,20 @@ static int cbqri_read_capacity_caps(struct cbqri_controller *ctrl)
 static int cbqri_read_bandwidth_caps(struct cbqri_controller *ctrl)
 {
 	u64 value = cbqri_readq(ctrl, CBQRI_BC_CAPABILITIES_OFF);
+	u32 version;
 
 	if (!value)
 		return -ENODEV;
 
+	version = value & GENMASK(7, 0);
 	ctrl->version_minor = value & CBQRI_CAPABILITIES_VER_MINOR_MASK;
 	ctrl->version_major = (value & CBQRI_CAPABILITIES_VER_MAJOR_MASK) >> 4;
+	if (version >= CBQRI_ID_MAP_VERSION) {
+		ctrl->bc.supports_rcid_map =
+			(value >> CBQRI_CAPABILITIES_RCID_MAP_SHIFT) & 1;
+		ctrl->bc.supports_mcid_map =
+			(value >> CBQRI_CAPABILITIES_MCID_MAP_SHIFT) & 1;
+	}
 	ctrl->bc.nbwblks = (value >> CBQRI_BC_CAPABILITIES_NBWBLKS_SHIFT) &
 			    CBQRI_BC_CAPABILITIES_NBWBLKS_MASK;
 	ctrl->bc.mrbwb = (value >> CBQRI_BC_CAPABILITIES_MRBWB_SHIFT) &
@@ -119,6 +294,7 @@ void cbqri_remove_controllers(void)
 
 	list_for_each_entry_safe(ctrl, tmp, &cbqri_hw_controllers, list) {
 		list_del(&ctrl->list);
+		cbqri_free_identifier_map(ctrl);
 		iounmap(ctrl->base);
 		release_mem_region(ctrl->info->addr, ctrl->info->size);
 		kfree(ctrl);
@@ -140,6 +316,15 @@ int cbqri_probe_controllers(void)
 
 		ret = cbqri_map_controller(ctrl, info);
 		if (ret) {
+			kfree(ctrl);
+			goto out_remove;
+		}
+
+		ret = cbqri_init_identifier_map(ctrl);
+		if (ret) {
+			cbqri_free_identifier_map(ctrl);
+			iounmap(ctrl->base);
+			release_mem_region(ctrl->info->addr, ctrl->info->size);
 			kfree(ctrl);
 			goto out_remove;
 		}
