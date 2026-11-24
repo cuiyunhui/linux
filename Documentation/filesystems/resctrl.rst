@@ -487,6 +487,8 @@ The following properties that are exposed with individual files:
 "unit":
 	When "type" == "scalar":
 		The base unit of the quantity measured by the control value.
+		The unit "weight" denotes a dimensionless proportional weight
+		used to distribute a resource among competing groups.
 
 		The special unit "all" denotes a proportional schema.  In this
 		case, the resource is a finite, physical thing such as a cache

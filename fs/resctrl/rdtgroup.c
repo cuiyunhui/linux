@@ -91,6 +91,7 @@ static const char * const resctrl_ctrl_name[] = {
 	[RESCTRL_CTRL_NAME_DEF]		= "",
 	[RESCTRL_CTRL_NAME_MIN]		= "MIN",
 	[RESCTRL_CTRL_NAME_MAX]		= "MAX",
+	[RESCTRL_CTRL_NAME_WEIGHT]	= "WEIGHT",
 	[RESCTRL_CTRL_NAME_REGION0_MIN]		= "REGION0_MIN",
 	[RESCTRL_CTRL_NAME_REGION0_MAX]		= "REGION0_MAX",
 };
@@ -2632,6 +2633,9 @@ static int resctrl_ctrl_unit_show(struct kernfs_open_file *of,
 		return 0;
 	case RESCTRL_CTRL_UNIT_GBPS:
 		seq_puts(seq, "GBps\n");
+		return 0;
+	case RESCTRL_CTRL_UNIT_WEIGHT:
+		seq_puts(seq, "weight\n");
 		return 0;
 	}
 	WARN_ON_ONCE(1);

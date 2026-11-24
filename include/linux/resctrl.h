@@ -286,10 +286,12 @@ enum membw_throttle_mode {
  *				and the control value indicates what proportion
  *				of it is allocated.
  * @RESCTRL_CTRL_UNIT_GBPS:	GBps base unit of an absolute schema.
+ * @RESCTRL_CTRL_UNIT_WEIGHT:	Dimensionless proportional weight.
  */
 enum resctrl_ctrl_unit {
 	RESCTRL_CTRL_UNIT_ALL,
 	RESCTRL_CTRL_UNIT_GBPS,
+	RESCTRL_CTRL_UNIT_WEIGHT,
 };
 
 /**
@@ -402,6 +404,7 @@ struct resctrl_mon {
  *				resource name only.
  * @RESCTRL_CTRL_NAME_MIN:	"MIN"
  * @RESCTRL_CTRL_NAME_MAX:	"MAX"
+ * @RESCTRL_CTRL_NAME_WEIGHT:	"WEIGHT"
  * @RESCTRL_CTRL_NAME_REGION0_MIN:	"REGION0_MIN"
  * @RESCTRL_CTRL_NAME_REGION0_MAX:	"REGION0_MAX"
  */
@@ -409,6 +412,7 @@ enum resctrl_ctrl_name {
 	RESCTRL_CTRL_NAME_DEF,
 	RESCTRL_CTRL_NAME_MIN,
 	RESCTRL_CTRL_NAME_MAX,
+	RESCTRL_CTRL_NAME_WEIGHT,
 	RESCTRL_CTRL_NAME_REGION0_MIN,
 	RESCTRL_CTRL_NAME_REGION0_MAX,
 	RESCTRL_CTRL_NAME_LAST = RESCTRL_CTRL_NAME_REGION0_MAX
