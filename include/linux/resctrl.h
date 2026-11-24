@@ -632,10 +632,28 @@ static inline u32 resctrl_get_default_ctrlval(struct resctrl_ctrl *ctrl)
 	return WARN_ON_ONCE(1);
 }
 
+/**
+ * enum resctrl_update_reason - Reason for a control update
+ * @RESCTRL_UPDATE_GROUP_INIT: Initialize a newly created control group
+ * @RESCTRL_UPDATE_USER: Apply values explicitly requested by user space
+ * @RESCTRL_UPDATE_INTERNAL: Apply an update initiated by resctrl
+ *
+ * Architectures that decouple logical IDs from physical control entries may
+ * need to defer allocation of a physical entry until user space requests a
+ * distinct configuration. Indicate whether an update is initialization, an
+ * explicit user request, or internal resctrl maintenance.
+ */
+enum resctrl_update_reason {
+	RESCTRL_UPDATE_GROUP_INIT,
+	RESCTRL_UPDATE_USER,
+	RESCTRL_UPDATE_INTERNAL,
+};
+
 /* The number of closid supported by this resource regardless of CDP */
 u32 resctrl_arch_get_num_closid(struct rdt_resource *r);
 u32 resctrl_arch_system_num_rmid_idx(void);
-int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid);
+int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid,
+				enum resctrl_update_reason reason);
 
 bool resctrl_enable_mon_event(enum resctrl_event_id eventid, bool any_cpu,
 			      unsigned int binary_bits, void *arch_priv);
