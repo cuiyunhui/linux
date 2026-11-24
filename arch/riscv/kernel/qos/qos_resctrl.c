@@ -2,11 +2,17 @@
 
 #define pr_fmt(fmt) "riscv-cbqri: " fmt
 
+#include <linux/bitfield.h>
 #include <linux/io.h>
 #include <linux/ioport.h>
 #include <linux/iopoll.h>
-#include <linux/topology.h>
+#include <linux/percpu.h>
+#include <linux/sched.h>
 #include <linux/slab.h>
+#include <linux/smp.h>
+#include <linux/topology.h>
+
+#include <asm/qos.h>
 
 #include "internal.h"
 
@@ -795,6 +801,202 @@ bool resctrl_arch_alloc_capable(void)
 	return false;
 }
 
+void resctrl_arch_enable_alloc(void)
+{
+}
+
+void resctrl_arch_disable_alloc(void)
+{
+}
+
+bool resctrl_arch_mon_capable(void)
+{
+	return false;
+}
+
+void resctrl_arch_enable_mon(void)
+{
+}
+
+void resctrl_arch_disable_mon(void)
+{
+}
+
+unsigned int resctrl_arch_round_mon_val(unsigned int value)
+{
+	return value;
+}
+
+void resctrl_arch_set_cpu_default_closid_rmid(int cpu, u32 closid, u32 rmid)
+{
+	u32 srmcfg;
+
+	WARN_ON_ONCE(closid > FIELD_MAX(SRMCFG_RCID_MASK));
+	WARN_ON_ONCE(rmid > FIELD_MAX(SRMCFG_MCID_MASK));
+
+	srmcfg = FIELD_PREP(SRMCFG_RCID_MASK, closid) |
+		 FIELD_PREP(SRMCFG_MCID_MASK, rmid);
+	WRITE_ONCE(per_cpu(cpu_srmcfg_default, cpu), srmcfg);
+}
+
+void resctrl_arch_set_closid_rmid(struct task_struct *task, u32 closid,
+				  u32 rmid)
+{
+	u32 srmcfg;
+
+	WARN_ON_ONCE(closid > FIELD_MAX(SRMCFG_RCID_MASK));
+	WARN_ON_ONCE(rmid > FIELD_MAX(SRMCFG_MCID_MASK));
+
+	srmcfg = FIELD_PREP(SRMCFG_RCID_MASK, closid) |
+		 FIELD_PREP(SRMCFG_MCID_MASK, rmid);
+	WRITE_ONCE(task->thread.srmcfg, srmcfg);
+}
+
+bool resctrl_arch_match_closid(struct task_struct *task, u32 closid)
+{
+	return FIELD_GET(SRMCFG_RCID_MASK,
+			 READ_ONCE(task->thread.srmcfg)) == closid;
+}
+
+bool resctrl_arch_match_rmid(struct task_struct *task, u32 closid, u32 rmid)
+{
+	return FIELD_GET(SRMCFG_MCID_MASK,
+			 READ_ONCE(task->thread.srmcfg)) == rmid;
+}
+
+void resctrl_arch_sched_in(struct task_struct *task)
+{
+	lockdep_assert_preemption_disabled();
+	__switch_to_srmcfg(task);
+}
+
+void resctrl_arch_sync_cpu_closid_rmid(void *info)
+{
+	struct resctrl_cpu_defaults *defaults = info;
+
+	lockdep_assert_preemption_disabled();
+	if (defaults)
+		resctrl_arch_set_cpu_default_closid_rmid(smp_processor_id(),
+							 defaults->closid,
+							 defaults->rmid);
+
+	resctrl_arch_sched_in(current);
+}
+
+u32 resctrl_arch_system_num_rmid_idx(void)
+{
+	return 1;
+}
+
+u32 resctrl_arch_rmid_idx_encode(u32 closid, u32 rmid)
+{
+	return rmid;
+}
+
+void resctrl_arch_rmid_idx_decode(u32 idx, u32 *closid, u32 *rmid)
+{
+	*closid = U32_MAX;
+	*rmid = idx;
+}
+
+void resctrl_arch_pre_mount(void)
+{
+}
+
+bool resctrl_arch_get_cdp_enabled(struct rdt_resource *r)
+{
+	return false;
+}
+
+int resctrl_arch_set_cdp_enabled(struct rdt_resource *r,
+				 struct resctrl_ctrl *ctrl, bool enable)
+{
+	return enable ? -EOPNOTSUPP : 0;
+}
+
+int resctrl_arch_control_mode_set(struct rdt_resource *r,
+				  enum resctrl_ctrl_mode newmode)
+{
+	return 0;
+}
+
+bool resctrl_arch_get_io_alloc_enabled(struct rdt_resource *r)
+{
+	return false;
+}
+
+int resctrl_arch_io_alloc_enable(struct rdt_resource *r,
+				 struct resctrl_ctrl *ctrl, bool enable)
+{
+	return enable ? -EOPNOTSUPP : 0;
+}
+
+bool resctrl_arch_is_evt_configurable(enum resctrl_event_id eventid)
+{
+	return false;
+}
+
+void resctrl_arch_mon_event_config_read(void *info)
+{
+}
+
+void resctrl_arch_mon_event_config_write(void *info)
+{
+}
+
+bool resctrl_arch_mbm_cntr_assign_enabled(struct rdt_resource *r)
+{
+	return false;
+}
+
+int resctrl_arch_mbm_cntr_assign_set(struct rdt_resource *r, bool enable)
+{
+	return enable ? -EOPNOTSUPP : 0;
+}
+
+int resctrl_arch_rmid_read(struct rdt_resource *r, struct rdt_domain_hdr *hdr,
+			   u32 closid, u32 rmid,
+			   enum resctrl_event_id eventid, void *arch_priv,
+			   u64 *value, void *arch_mon_ctx)
+{
+	*value = 0;
+	return -EOPNOTSUPP;
+}
+
+void resctrl_arch_reset_rmid(struct rdt_resource *r,
+			     struct rdt_l3_mon_domain *domain, u32 closid,
+			     u32 rmid, enum resctrl_event_id eventid)
+{
+}
+
+void resctrl_arch_reset_rmid_all(struct rdt_resource *r,
+				 struct rdt_l3_mon_domain *domain)
+{
+}
+
+void resctrl_arch_config_cntr(struct rdt_resource *r,
+			      struct rdt_l3_mon_domain *domain,
+			      enum resctrl_event_id eventid, u32 rmid,
+			      u32 closid, u32 counter_id, bool assign)
+{
+}
+
+int resctrl_arch_cntr_read(struct rdt_resource *r,
+			   struct rdt_l3_mon_domain *domain, u32 closid,
+			   u32 rmid, int counter_id,
+			   enum resctrl_event_id eventid, u64 *value)
+{
+	*value = 0;
+	return -EOPNOTSUPP;
+}
+
+void resctrl_arch_reset_cntr(struct rdt_resource *r,
+			     struct rdt_l3_mon_domain *domain, u32 closid,
+			     u32 rmid, int counter_id,
+			     enum resctrl_event_id eventid)
+{
+}
+
 int resctrl_arch_update_one(struct rdt_resource *r, struct resctrl_ctrl *ctrl,
 			    struct rdt_ctrl_domain *d, u32 closid,
 			    enum resctrl_conf_type type, u32 value)
@@ -818,6 +1020,32 @@ int resctrl_arch_update_one(struct rdt_resource *r, struct resctrl_ctrl *ctrl,
 	}
 
 	return -EINVAL;
+}
+
+void resctrl_arch_reset_all_ctrls(struct rdt_resource *r)
+{
+	struct rdt_ctrl_domain *domain;
+	struct resctrl_ctrl *ctrl;
+	u32 closid;
+	int ret;
+
+	lockdep_assert_cpus_held();
+
+	for_each_resource_ctrl(ctrl, r) {
+		list_for_each_entry(domain, &ctrl->domains, hdr.list) {
+			for (closid = 0;
+			     closid < resctrl_arch_get_num_closid(r); closid++) {
+				ret = resctrl_arch_update_one(r, ctrl, domain,
+							      closid, CDP_NONE,
+							      resctrl_get_default_ctrlval(ctrl));
+				if (ret) {
+					pr_warn("failed to reset control type %u ID %u in domain %d: %d\n",
+						ctrl->name, closid, domain->hdr.id, ret);
+					return;
+				}
+			}
+		}
+	}
 }
 
 static int cbqri_update_control(struct rdt_resource *r,
@@ -917,4 +1145,71 @@ u32 resctrl_arch_preconvert_bw(const struct rdt_resource *r,
 			       struct resctrl_ctrl *ctrl, u32 value)
 {
 	return value;
+}
+
+static void cbqri_init_resources(void)
+{
+	int rid;
+
+	for (rid = 0; rid < RDT_NUM_RESOURCES; rid++) {
+		cbqri_resources[rid].res.rid = rid;
+		INIT_LIST_HEAD(&cbqri_resources[rid].res.controls);
+		INIT_LIST_HEAD(&cbqri_resources[rid].res.mon_domains);
+	}
+}
+
+int qos_resctrl_setup(void)
+{
+	int ret;
+
+	cbqri_init_resources();
+
+	ret = cbqri_probe_controllers();
+	if (ret)
+		return ret;
+
+	cpus_read_lock();
+	ret = cbqri_init_capacity_controls();
+	if (ret)
+		goto out_unlock;
+	ret = cbqri_init_bandwidth_controls();
+	if (ret)
+		goto out_remove_capacity;
+	ret = resctrl_init();
+	if (ret)
+		goto out_remove_bandwidth;
+	cpus_read_unlock();
+
+	return 0;
+
+out_remove_bandwidth:
+	cbqri_remove_bandwidth_controls();
+out_remove_capacity:
+	cbqri_remove_capacity_controls();
+out_unlock:
+	cpus_read_unlock();
+	cbqri_remove_controllers();
+	return ret;
+}
+
+void qos_resctrl_exit(void)
+{
+	cpus_read_lock();
+	resctrl_exit();
+	cbqri_remove_bandwidth_controls();
+	cbqri_remove_capacity_controls();
+	cpus_read_unlock();
+	cbqri_remove_controllers();
+}
+
+int qos_resctrl_online_cpu(unsigned int cpu)
+{
+	resctrl_online_cpu(cpu);
+	return 0;
+}
+
+int qos_resctrl_offline_cpu(unsigned int cpu)
+{
+	resctrl_offline_cpu(cpu);
+	return 0;
 }

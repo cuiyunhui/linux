@@ -4,6 +4,7 @@
 #include <linux/cpuhotplug.h>
 #include <linux/notifier.h>
 #include <linux/percpu-defs.h>
+#include <linux/riscv_qos.h>
 #include <linux/types.h>
 
 #include <asm/cpufeature-macros.h>
@@ -99,3 +100,27 @@ static int __init riscv_srmcfg_init(void)
 	return 0;
 }
 arch_initcall(riscv_srmcfg_init);
+
+#ifdef CONFIG_RESCTRL_FS
+static int __init riscv_resctrl_init(void)
+{
+	int ret;
+
+	if (!riscv_has_extension_unlikely(RISCV_ISA_EXT_SSQOSID))
+		return 0;
+
+	ret = qos_resctrl_setup();
+	if (ret)
+		return ret;
+
+	ret = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "riscv/qos:online",
+				qos_resctrl_online_cpu, qos_resctrl_offline_cpu);
+	if (ret < 0) {
+		qos_resctrl_exit();
+		return ret;
+	}
+
+	return 0;
+}
+late_initcall(riscv_resctrl_init);
+#endif

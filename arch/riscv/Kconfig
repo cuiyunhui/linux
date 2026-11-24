@@ -585,6 +585,7 @@ config RISCV_ISA_SVNAPOT
 config RISCV_ISA_SSQOSID
 	bool "Ssqosid extension support for supervisor mode Quality of Service ID"
 	depends on 64BIT
+	select ARCH_HAS_CPU_RESCTRL
 	default n
 	help
 	  Adds support for the Ssqosid ISA extension (Supervisor-mode

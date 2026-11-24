@@ -74,7 +74,9 @@ struct cbqri_controller_info {
 
 extern struct list_head cbqri_controllers;
 
-bool resctrl_arch_alloc_capable(void);
-int resctrl_arch_release_ctrl(u32 closid);
+int qos_resctrl_setup(void);
+void qos_resctrl_exit(void);
+int qos_resctrl_online_cpu(unsigned int cpu);
+int qos_resctrl_offline_cpu(unsigned int cpu);
 
 #endif /* __LINUX_RISCV_QOS_H */
