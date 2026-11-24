@@ -71,6 +71,8 @@ void acpi_get_cbo_block_size(struct acpi_table_header *table, u32 *cbom_size,
 			     u32 *cboz_size, u32 *cbop_size);
 acpi_handle acpi_get_riscv_gsi_handle(u32 gsi);
 
+int acpi_parse_rqsc(struct acpi_table_header *table);
+
 /*
  * RISC-V Functional Fixed Hardware Specification Version v1.0.1,
  * Chapter 3.1.2, Table 4: Arch. Context Lost Flags
