@@ -27,9 +27,7 @@ u32 resctrl_arch_rmid_idx_encode(u32 closid, u32 rmid);
 
 int resctrl_arch_release_ctrl(u32 closid);
 
-static inline void resctrl_arch_release_rmid(u32 closid, u32 rmid)
-{
-}
+void resctrl_arch_release_rmid(u32 closid, u32 rmid);
 
 static inline void *resctrl_arch_mon_ctx_alloc(struct rdt_resource *r,
 					       enum resctrl_event_id eventid)

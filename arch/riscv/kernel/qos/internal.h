@@ -59,11 +59,20 @@
 #define CBQRI_MON_CTL_ATV_SHIFT		28
 #define CBQRI_MON_CTL_ATV_MASK		BIT(0)
 
+#define CBQRI_MON_EVT_NONE		0
+#define CBQRI_CC_MON_EVT_OCCUPANCY	1
+#define CBQRI_BC_MON_EVT_RDWR_COUNT	1
+
 #define CBQRI_AT_DATA			0
 #define CBQRI_AT_CODE			1
 
 #define CBQRI_RESOURCE_ID_PROCESSOR_CACHE	0
 #define CBQRI_RESOURCE_ID_MEMORY_RANGE		1
+
+#define CBQRI_MON_CTL_OP_CONFIG_EVENT		1
+#define CBQRI_MON_CTL_OP_READ_COUNTER		2
+#define CBQRI_MON_CTL_STATUS_SUCCESS		1
+#define CBQRI_MON_CTL_STATUS_NO_COUNTER		6
 
 #define CBQRI_CC_MON_CTL_OP_CONFIG_EVENT	1
 #define CBQRI_CC_MON_CTL_OP_READ_COUNTER	2
@@ -165,6 +174,7 @@ struct cbqri_controller {
 	u16				pending_int_rcid;
 	u16				pending_old_int_rcid;
 	bool				pending_valid;
+	bool				mon_capable;
 };
 
 enum cbqri_ctrl_kind {
