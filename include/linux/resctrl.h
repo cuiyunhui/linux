@@ -655,6 +655,42 @@ u32 resctrl_arch_system_num_rmid_idx(void);
 int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid,
 				enum resctrl_update_reason reason);
 
+/**
+ * resctrl_arch_prepare_ctrl_update() - Prepare an update transaction
+ * @closid: Logical control group ID being updated
+ * @reason: Reason for the update
+ *
+ * Reserve any architecture resources needed to update all staged controls.
+ * No request-visible mapping may be changed by this operation.
+ *
+ * Return: 0 on success, or a negative error code on failure.
+ */
+int resctrl_arch_prepare_ctrl_update(u32 closid,
+				     enum resctrl_update_reason reason);
+
+/**
+ * resctrl_arch_commit_ctrl_update() - Publish a prepared update transaction
+ * @closid: Logical control group ID being updated
+ * @reason: Reason for the update
+ *
+ * Publish architecture state prepared for @closid after all staged control
+ * values have been programmed.
+ *
+ * Return: 0 on success, or a negative error code on failure.
+ */
+int resctrl_arch_commit_ctrl_update(u32 closid,
+				    enum resctrl_update_reason reason);
+
+/**
+ * resctrl_arch_abort_ctrl_update() - Abort a prepared update transaction
+ * @closid: Logical control group ID being updated
+ * @reason: Reason for the update
+ *
+ * Release architecture resources reserved for an update that did not commit.
+ */
+void resctrl_arch_abort_ctrl_update(u32 closid,
+				    enum resctrl_update_reason reason);
+
 bool resctrl_enable_mon_event(enum resctrl_event_id eventid, bool any_cpu,
 			      unsigned int binary_bits, void *arch_priv);
 

@@ -1604,6 +1604,23 @@ int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid,
 	return 0;
 }
 
+int resctrl_arch_prepare_ctrl_update(u32 closid,
+				     enum resctrl_update_reason reason)
+{
+	return 0;
+}
+
+int resctrl_arch_commit_ctrl_update(u32 closid,
+				    enum resctrl_update_reason reason)
+{
+	return 0;
+}
+
+void resctrl_arch_abort_ctrl_update(u32 closid,
+				    enum resctrl_update_reason reason)
+{
+}
+
 void resctrl_arch_reset_all_ctrls(struct rdt_resource *r)
 {
 	struct mpam_resctrl_res *res;

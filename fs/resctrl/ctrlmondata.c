@@ -435,6 +435,7 @@ ssize_t rdtgroup_schemata_write(struct kernfs_open_file *of,
 	struct rdtgroup *rdtgrp;
 	struct rdt_resource *r;
 	char *tok, *ctrlname;
+	bool update_prepared = false;
 	int ret = 0;
 
 	rdtgrp = rdtgroup_kn_lock_live(of->kn);
@@ -481,14 +482,33 @@ ssize_t rdtgroup_schemata_write(struct kernfs_open_file *of,
 			goto out_clear_staged;
 	}
 
+	ret = resctrl_arch_prepare_ctrl_update(rdtgrp->closid,
+					       RESCTRL_UPDATE_USER);
+	if (ret) {
+		rdt_last_cmd_printf("Failed to prepare control update: %d\n", ret);
+		goto out_clear_staged;
+	}
+	update_prepared = true;
+
 	list_for_each_entry(f, &rdt_resource_final_all, list) {
 		r = f->res;
 
 		ret = resctrl_arch_update_domains(r, rdtgrp->closid,
 						  RESCTRL_UPDATE_USER);
-		if (ret)
+		if (ret) {
+			rdt_last_cmd_printf("Failed to update resource %s: %d\n",
+					    r->name, ret);
 			goto out_clear_staged;
+		}
 	}
+
+	ret = resctrl_arch_commit_ctrl_update(rdtgrp->closid,
+					      RESCTRL_UPDATE_USER);
+	if (ret) {
+		rdt_last_cmd_printf("Failed to commit control update: %d\n", ret);
+		goto out_clear_staged;
+	}
+	update_prepared = false;
 
 	if (rdtgrp->mode == RDT_MODE_PSEUDO_LOCKSETUP) {
 		/*
@@ -501,6 +521,9 @@ ssize_t rdtgroup_schemata_write(struct kernfs_open_file *of,
 	}
 
 out_clear_staged:
+	if (update_prepared)
+		resctrl_arch_abort_ctrl_update(rdtgrp->closid,
+					       RESCTRL_UPDATE_USER);
 	rdt_staged_configs_clear();
 out_unlock:
 	rdtgroup_kn_unlock(of->kn);
