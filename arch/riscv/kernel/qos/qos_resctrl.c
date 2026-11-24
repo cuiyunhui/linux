@@ -767,3 +767,154 @@ void cbqri_remove_bandwidth_controls(void)
 		kfree(component);
 	}
 }
+
+struct rdt_resource *resctrl_arch_get_resource(enum resctrl_res_level rid)
+{
+	if (rid < 0 || rid >= RDT_NUM_RESOURCES)
+		return NULL;
+	return &cbqri_resources[rid].res;
+}
+
+u32 resctrl_arch_get_num_closid(struct rdt_resource *r)
+{
+	struct cbqri_resctrl_resource *resource;
+
+	resource = container_of(r, struct cbqri_resctrl_resource, res);
+	return resource->num_closid;
+}
+
+bool resctrl_arch_alloc_capable(void)
+{
+	int rid;
+
+	for (rid = 0; rid < RDT_NUM_RESOURCES; rid++) {
+		if (cbqri_resources[rid].res.alloc_capable)
+			return true;
+	}
+
+	return false;
+}
+
+int resctrl_arch_update_one(struct rdt_resource *r, struct resctrl_ctrl *ctrl,
+			    struct rdt_ctrl_domain *d, u32 closid,
+			    enum resctrl_conf_type type, u32 value)
+{
+	struct cbqri_resctrl_resource *resource;
+	struct cbqri_resctrl_ctrl *control;
+	struct cbqri_ctrl_domain *domain;
+
+	resource = container_of(r, struct cbqri_resctrl_resource, res);
+	control = container_of(ctrl, struct cbqri_resctrl_ctrl, r_ctrl);
+	domain = container_of(d, struct cbqri_ctrl_domain, domain);
+	if (closid >= resource->num_closid)
+		return -EINVAL;
+
+	switch (control->kind) {
+	case CBQRI_CTRL_CAPACITY:
+		return cbqri_capacity_set(domain, closid, type, value);
+	case CBQRI_CTRL_BANDWIDTH_RESERVED:
+	case CBQRI_CTRL_BANDWIDTH_WEIGHT:
+		return cbqri_bandwidth_set(domain, control, closid, value);
+	}
+
+	return -EINVAL;
+}
+
+static int cbqri_update_control(struct rdt_resource *r,
+				struct resctrl_ctrl *ctrl, u32 closid)
+{
+	struct rdt_ctrl_domain *domain;
+	enum resctrl_conf_type type;
+	int ret;
+
+	list_for_each_entry(domain, &ctrl->domains, hdr.list) {
+		for (type = 0; type < CDP_NUM_TYPES; type++) {
+			struct resctrl_staged_config *cfg;
+
+			cfg = &domain->staged_config[type];
+			if (!cfg->have_new_ctrl)
+				continue;
+			ret = resctrl_arch_update_one(r, ctrl, domain, closid,
+						      type, cfg->new_ctrl);
+			if (ret)
+				return ret;
+		}
+	}
+
+	return 0;
+}
+
+int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid,
+				enum resctrl_update_reason reason)
+{
+	struct resctrl_ctrl *ctrl;
+	int ret;
+
+	for_each_enabled_ctrl(ctrl, r) {
+		ret = cbqri_update_control(r, ctrl, closid);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
+u32 resctrl_arch_get_config(struct rdt_resource *r, struct resctrl_ctrl *ctrl,
+			    struct rdt_ctrl_domain *d, u32 closid,
+			    enum resctrl_conf_type type)
+{
+	struct cbqri_resctrl_resource *resource;
+	struct cbqri_resctrl_ctrl *control;
+	struct cbqri_ctrl_domain *domain;
+	u32 value;
+	int ret;
+
+	resource = container_of(r, struct cbqri_resctrl_resource, res);
+	control = container_of(ctrl, struct cbqri_resctrl_ctrl, r_ctrl);
+	domain = container_of(d, struct cbqri_ctrl_domain, domain);
+	if (closid >= resource->num_closid)
+		return resctrl_get_default_ctrlval(ctrl);
+
+	switch (control->kind) {
+	case CBQRI_CTRL_CAPACITY:
+		ret = cbqri_capacity_get(domain, closid, type, &value);
+		break;
+	case CBQRI_CTRL_BANDWIDTH_RESERVED:
+	case CBQRI_CTRL_BANDWIDTH_WEIGHT:
+		ret = cbqri_bandwidth_get(domain, control, closid, &value);
+		break;
+	default:
+		ret = -EINVAL;
+		break;
+	}
+
+	return ret ? domain->ctrl_val[closid] : value;
+}
+
+int resctrl_arch_prepare_ctrl_update(u32 closid,
+				     enum resctrl_update_reason reason)
+{
+	return 0;
+}
+
+int resctrl_arch_commit_ctrl_update(u32 closid,
+				    enum resctrl_update_reason reason)
+{
+	return 0;
+}
+
+void resctrl_arch_abort_ctrl_update(u32 closid,
+				    enum resctrl_update_reason reason)
+{
+}
+
+int resctrl_arch_release_ctrl(u32 closid)
+{
+	return 0;
+}
+
+u32 resctrl_arch_preconvert_bw(const struct rdt_resource *r,
+			       struct resctrl_ctrl *ctrl, u32 value)
+{
+	return value;
+}
