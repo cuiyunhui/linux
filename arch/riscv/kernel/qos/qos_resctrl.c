@@ -5,6 +5,7 @@
 #include <linux/io.h>
 #include <linux/ioport.h>
 #include <linux/iopoll.h>
+#include <linux/topology.h>
 #include <linux/slab.h>
 
 #include "internal.h"
@@ -273,6 +274,7 @@ static int cbqri_setup_capacity_domain(struct cbqri_resctrl_resource *resource,
 	}
 
 	domain->component = component;
+	domain->ctrl = &resource->capacity_ctrl;
 	domain->domain.hdr.id = component->id;
 	domain->domain.hdr.rid = resource->res.rid;
 	domain->domain.hdr.type = RESCTRL_CTRL_DOMAIN;
@@ -456,5 +458,312 @@ void cbqri_remove_capacity_controls(void)
 			list_del(&component->list);
 			kfree(component);
 		}
+	}
+}
+
+static void cbqri_init_bandwidth_resource(struct cbqri_resctrl_resource *resource)
+{
+	struct resctrl_ctrl *reserved = &resource->reserved_ctrl.r_ctrl;
+	struct resctrl_ctrl *weight = &resource->weight_ctrl.r_ctrl;
+	struct rdt_resource *r = &resource->res;
+
+	r->rid = RDT_RESOURCE_MBA;
+	r->name = "MB";
+	r->alloc_scope = RESCTRL_L3_NODE;
+	r->bw_throttle_mode = THREAD_THROTTLE_UNDEFINED;
+	INIT_LIST_HEAD(&r->controls);
+	INIT_LIST_HEAD(&r->mon_domains);
+	INIT_LIST_HEAD(&resource->components);
+	resource->num_closid = U32_MAX;
+
+	reserved->scope = RESCTRL_L3_NODE;
+	reserved->type = RESCTRL_CTRL_SCALAR;
+	reserved->name = RESCTRL_CTRL_NAME_DEF;
+	INIT_LIST_HEAD(&reserved->domains);
+	INIT_LIST_HEAD(&reserved->emulated_by);
+	reserved->scalar.min = 0;
+	reserved->scalar.max = MAX_MBA_BW;
+	reserved->scalar.gran = 1;
+	reserved->scalar.resolution = MAX_MBA_BW;
+	reserved->scalar.scale = 1;
+	reserved->scalar.unit = RESCTRL_CTRL_UNIT_ALL;
+	reserved->scalar.reset_val = 0;
+	__set_bit(RESCTRL_SCALAR_FLAG_LINEAR, reserved->scalar.flags);
+	resource->reserved_ctrl.kind = CBQRI_CTRL_BANDWIDTH_RESERVED;
+
+	weight->scope = RESCTRL_L3_NODE;
+	weight->type = RESCTRL_CTRL_SCALAR;
+	weight->name = RESCTRL_CTRL_NAME_WEIGHT;
+	INIT_LIST_HEAD(&weight->domains);
+	INIT_LIST_HEAD(&weight->emulated_by);
+	weight->scalar.min = 0;
+	weight->scalar.max = U8_MAX;
+	weight->scalar.gran = 1;
+	weight->scalar.resolution = 1;
+	weight->scalar.scale = 1;
+	weight->scalar.unit = RESCTRL_CTRL_UNIT_WEIGHT;
+	weight->scalar.reset_val = 0;
+	__set_bit(RESCTRL_SCALAR_FLAG_LINEAR, weight->scalar.flags);
+	resource->weight_ctrl.kind = CBQRI_CTRL_BANDWIDTH_WEIGHT;
+}
+
+static int cbqri_add_memory_component(struct cbqri_controller *ctrl,
+				      struct cbqri_resource_info *info)
+{
+	struct cbqri_resctrl_resource *resource;
+	struct cbqri_component *component;
+
+	resource = &cbqri_resources[RDT_RESOURCE_MBA];
+	component = cbqri_find_component(resource, info->mem.prox_dom);
+	if (!component) {
+		component = kzalloc_obj(*component, GFP_KERNEL);
+		if (!component)
+			return -ENOMEM;
+
+		component->id = info->mem.prox_dom;
+		cpumask_copy(&component->cpu_mask,
+			     cpumask_of_node(info->mem.prox_dom));
+		INIT_LIST_HEAD(&component->controllers);
+		list_add_tail(&component->list, &resource->components);
+	}
+
+	resource->num_closid = min(resource->num_closid, ctrl->info->rcid_count);
+	return cbqri_add_component_controller(component, ctrl);
+}
+
+static int cbqri_setup_bandwidth_domain(struct cbqri_resctrl_resource *resource,
+					struct cbqri_component *component,
+					struct cbqri_resctrl_ctrl *owner)
+{
+	struct cbqri_ctrl_domain *domain;
+	u32 default_value = owner->r_ctrl.scalar.reset_val;
+	int ret;
+	u32 i;
+
+	domain = kzalloc_obj(*domain, GFP_KERNEL);
+	if (!domain)
+		return -ENOMEM;
+
+	domain->ctrl_val = kcalloc(resource->num_closid,
+				   sizeof(*domain->ctrl_val), GFP_KERNEL);
+	if (!domain->ctrl_val) {
+		kfree(domain);
+		return -ENOMEM;
+	}
+
+	domain->component = component;
+	domain->ctrl = owner;
+	domain->domain.hdr.id = component->id;
+	domain->domain.hdr.rid = RDT_RESOURCE_MBA;
+	domain->domain.hdr.type = RESCTRL_CTRL_DOMAIN;
+	cpumask_copy(&domain->domain.hdr.cpu_mask, &component->cpu_mask);
+	for (i = 0; i < resource->num_closid; i++)
+		domain->ctrl_val[i] = default_value;
+
+	ret = resctrl_online_ctrl_domain(&resource->res, &owner->r_ctrl,
+					 &domain->domain);
+	if (ret) {
+		kfree(domain->ctrl_val);
+		kfree(domain);
+		return ret;
+	}
+
+	list_add_tail_rcu(&domain->domain.hdr.list, &owner->r_ctrl.domains);
+	return 0;
+}
+
+int cbqri_init_bandwidth_controls(void)
+{
+	struct cbqri_resctrl_resource *resource;
+	struct cbqri_resource_info *info;
+	struct cbqri_component *component;
+	struct cbqri_controller *ctrl;
+	int ret;
+
+	resource = &cbqri_resources[RDT_RESOURCE_MBA];
+	cbqri_init_bandwidth_resource(resource);
+
+	list_for_each_entry(ctrl, &cbqri_hw_controllers, list) {
+		if (ctrl->info->type != CBQRI_CONTROLLER_TYPE_BANDWIDTH ||
+		    !ctrl->info->rcid_count)
+			continue;
+
+		list_for_each_entry(info, &ctrl->info->resources, list) {
+			if (info->id_type != CBQRI_RESOURCE_ID_MEMORY_RANGE)
+				continue;
+			ret = cbqri_add_memory_component(ctrl, info);
+			if (ret)
+				goto out_remove;
+		}
+	}
+
+	if (list_empty(&resource->components))
+		return 0;
+	if (!resource->num_closid || resource->num_closid == U32_MAX) {
+		ret = -EINVAL;
+		goto out_remove;
+	}
+
+	list_add_tail(&resource->reserved_ctrl.r_ctrl.entry,
+		      &resource->res.controls);
+	list_add_tail(&resource->weight_ctrl.r_ctrl.entry,
+		      &resource->res.controls);
+	resource->res.alloc_capable = true;
+
+	list_for_each_entry(component, &resource->components, list) {
+		ret = cbqri_setup_bandwidth_domain(resource, component,
+						   &resource->reserved_ctrl);
+		if (ret)
+			goto out_remove;
+		ret = cbqri_setup_bandwidth_domain(resource, component,
+						   &resource->weight_ctrl);
+		if (ret)
+			goto out_remove;
+	}
+
+	return 0;
+
+out_remove:
+	cbqri_remove_bandwidth_controls();
+	return ret;
+}
+
+static int cbqri_bandwidth_op(struct cbqri_controller *ctrl, u32 op, u32 rcid)
+{
+	u64 value;
+	u32 status;
+
+	value = op | ((u64)rcid << CBQRI_CTL_RCID_SHIFT);
+	cbqri_writeq(ctrl, CBQRI_BC_ALLOC_CTL_OFF, value);
+	if (cbqri_wait_busy(ctrl, CBQRI_BC_ALLOC_CTL_OFF))
+		return -ETIMEDOUT;
+
+	value = cbqri_readq(ctrl, CBQRI_BC_ALLOC_CTL_OFF);
+	status = (value >> CBQRI_CTL_STATUS_SHIFT) & CBQRI_CTL_STATUS_MASK;
+	return status == CBQRI_BC_ALLOC_CTL_STATUS_SUCCESS ? 0 : -EIO;
+}
+
+static u64 cbqri_bandwidth_value(struct cbqri_controller *ctrl,
+				 struct cbqri_resctrl_ctrl *control, u32 value)
+{
+	u64 reg = cbqri_readq(ctrl, CBQRI_BC_BW_ALLOC_OFF);
+	u64 mask;
+	u64 raw;
+
+	if (control->kind == CBQRI_CTRL_BANDWIDTH_RESERVED) {
+		raw = DIV_ROUND_UP((u64)value * ctrl->bc.nbwblks, MAX_MBA_BW);
+		mask = (u64)CBQRI_BC_BW_ALLOC_RBWB_MASK <<
+			CBQRI_BC_BW_ALLOC_RBWB_SHIFT;
+		reg &= ~mask;
+		reg |= raw << CBQRI_BC_BW_ALLOC_RBWB_SHIFT;
+	} else {
+		mask = (u64)CBQRI_BC_BW_ALLOC_MWEIGHT_MASK <<
+			CBQRI_BC_BW_ALLOC_MWEIGHT_SHIFT;
+		reg &= ~mask;
+		reg |= (u64)value << CBQRI_BC_BW_ALLOC_MWEIGHT_SHIFT;
+	}
+
+	return reg;
+}
+
+int cbqri_bandwidth_set(struct cbqri_ctrl_domain *domain,
+			struct cbqri_resctrl_ctrl *control, u32 closid, u32 value)
+{
+	struct cbqri_component_ctrl *entry;
+	u32 op = CBQRI_BC_ALLOC_CTL_OP_CONFIG_LIMIT;
+	int ret;
+
+	list_for_each_entry(entry, &domain->component->controllers, list) {
+		cbqri_writeq(entry->ctrl, CBQRI_BC_BW_ALLOC_OFF,
+			     cbqri_bandwidth_value(entry->ctrl, control, value));
+		ret = cbqri_bandwidth_op(entry->ctrl, op, closid);
+		if (ret)
+			return ret;
+	}
+
+	domain->ctrl_val[closid] = value;
+	return 0;
+}
+
+static u32 cbqri_decode_bandwidth_value(struct cbqri_controller *ctrl,
+					struct cbqri_resctrl_ctrl *control)
+{
+	u64 reg = cbqri_readq(ctrl, CBQRI_BC_BW_ALLOC_OFF);
+	u32 raw;
+
+	if (control->kind == CBQRI_CTRL_BANDWIDTH_RESERVED) {
+		raw = (reg >> CBQRI_BC_BW_ALLOC_RBWB_SHIFT) &
+		      CBQRI_BC_BW_ALLOC_RBWB_MASK;
+		return DIV_ROUND_UP((u64)raw * MAX_MBA_BW, ctrl->bc.nbwblks);
+	}
+
+	return (reg >> CBQRI_BC_BW_ALLOC_MWEIGHT_SHIFT) &
+	       CBQRI_BC_BW_ALLOC_MWEIGHT_MASK;
+}
+
+int cbqri_bandwidth_get(struct cbqri_ctrl_domain *domain,
+			struct cbqri_resctrl_ctrl *control, u32 closid, u32 *value)
+{
+	struct cbqri_component_ctrl *entry;
+	u32 op = CBQRI_BC_ALLOC_CTL_OP_READ_LIMIT;
+	u32 first = 0;
+	u32 current_value;
+	bool have_value = false;
+	int ret;
+
+	list_for_each_entry(entry, &domain->component->controllers, list) {
+		ret = cbqri_bandwidth_op(entry->ctrl, op, closid);
+		if (ret)
+			return ret;
+		current_value = cbqri_decode_bandwidth_value(entry->ctrl, control);
+		if (have_value && current_value != first)
+			return -EUCLEAN;
+		first = current_value;
+		have_value = true;
+	}
+
+	if (!have_value)
+		return -ENODEV;
+
+	domain->ctrl_val[closid] = first;
+	*value = first;
+	return 0;
+}
+
+void cbqri_remove_bandwidth_controls(void)
+{
+	struct cbqri_resctrl_resource *resource;
+	struct cbqri_component_ctrl *entry, *entry_tmp;
+	struct cbqri_component *component, *component_tmp;
+	struct cbqri_ctrl_domain *domain, *domain_tmp;
+	struct cbqri_resctrl_ctrl *controls[2];
+	struct resctrl_ctrl *ctrl;
+	int i;
+
+	resource = &cbqri_resources[RDT_RESOURCE_MBA];
+	controls[0] = &resource->reserved_ctrl;
+	controls[1] = &resource->weight_ctrl;
+
+	for (i = 0; i < ARRAY_SIZE(controls); i++) {
+		ctrl = &controls[i]->r_ctrl;
+		list_for_each_entry_safe(domain, domain_tmp, &ctrl->domains,
+					 domain.hdr.list) {
+			list_del(&domain->domain.hdr.list);
+			resctrl_offline_ctrl_domain(&resource->res, ctrl,
+						    &domain->domain);
+			kfree(domain->ctrl_val);
+			kfree(domain);
+		}
+	}
+
+	list_for_each_entry_safe(component, component_tmp,
+				 &resource->components, list) {
+		list_for_each_entry_safe(entry, entry_tmp,
+					 &component->controllers, list) {
+			list_del(&entry->list);
+			kfree(entry);
+		}
+		list_del(&component->list);
+		kfree(component);
 	}
 }

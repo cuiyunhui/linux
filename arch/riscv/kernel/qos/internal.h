@@ -53,6 +53,7 @@
 #define CBQRI_AT_CODE			1
 
 #define CBQRI_RESOURCE_ID_PROCESSOR_CACHE	0
+#define CBQRI_RESOURCE_ID_MEMORY_RANGE		1
 
 #define CBQRI_CC_MON_CTL_OP_CONFIG_EVENT	1
 #define CBQRI_CC_MON_CTL_OP_READ_COUNTER	2
@@ -160,6 +161,8 @@ struct cbqri_resctrl_ctrl {
 struct cbqri_resctrl_resource {
 	struct rdt_resource		res;
 	struct cbqri_resctrl_ctrl	capacity_ctrl;
+	struct cbqri_resctrl_ctrl	reserved_ctrl;
+	struct cbqri_resctrl_ctrl	weight_ctrl;
 	struct list_head		components;
 	u32				num_closid;
 };
@@ -167,6 +170,7 @@ struct cbqri_resctrl_resource {
 struct cbqri_ctrl_domain {
 	struct rdt_ctrl_domain	domain;
 	struct cbqri_component	*component;
+	struct cbqri_resctrl_ctrl *ctrl;
 	u32			*ctrl_val;
 };
 
@@ -180,5 +184,11 @@ int cbqri_capacity_set(struct cbqri_ctrl_domain *domain, u32 closid,
 		       enum resctrl_conf_type type, u32 value);
 int cbqri_capacity_get(struct cbqri_ctrl_domain *domain, u32 closid,
 		       enum resctrl_conf_type type, u32 *value);
+int cbqri_init_bandwidth_controls(void);
+void cbqri_remove_bandwidth_controls(void);
+int cbqri_bandwidth_set(struct cbqri_ctrl_domain *domain,
+			struct cbqri_resctrl_ctrl *ctrl, u32 closid, u32 value);
+int cbqri_bandwidth_get(struct cbqri_ctrl_domain *domain,
+			struct cbqri_resctrl_ctrl *ctrl, u32 closid, u32 *value);
 
 #endif /* _RISCV_QOS_INTERNAL_H */
