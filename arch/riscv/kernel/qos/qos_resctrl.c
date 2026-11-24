@@ -48,6 +48,64 @@ static bool cbqri_has_rcid_map(struct cbqri_controller *ctrl)
 	return ctrl->bc.supports_rcid_map;
 }
 
+static u32 cbqri_logical_rcid_count(struct cbqri_controller *ctrl)
+{
+	return cbqri_has_rcid_map(ctrl) ? CBQRI_LOGICAL_ID_COUNT :
+		ctrl->info->rcid_count;
+}
+
+static int cbqri_effective_int_rcid(struct cbqri_controller *ctrl,
+				    u32 req_rcid, u32 *int_rcid)
+{
+	if (req_rcid >= cbqri_logical_rcid_count(ctrl))
+		return -ERANGE;
+
+	if (!cbqri_has_rcid_map(ctrl)) {
+		*int_rcid = req_rcid;
+		return 0;
+	}
+
+	*int_rcid = ctrl->req_to_int[req_rcid];
+	return 0;
+}
+
+static int cbqri_update_int_rcid(struct cbqri_controller *ctrl, u32 req_rcid,
+				 enum resctrl_update_reason reason,
+				 u32 *int_rcid)
+{
+	if (req_rcid >= cbqri_logical_rcid_count(ctrl))
+		return -ERANGE;
+
+	if (!cbqri_has_rcid_map(ctrl)) {
+		*int_rcid = req_rcid;
+		return 0;
+	}
+	if (!req_rcid) {
+		*int_rcid = 0;
+		return 0;
+	}
+	if (reason == RESCTRL_UPDATE_USER) {
+		if (!ctrl->pending_valid || ctrl->pending_req_rcid != req_rcid)
+			return -EINVAL;
+		*int_rcid = ctrl->pending_int_rcid;
+		return 0;
+	}
+	if (reason == RESCTRL_UPDATE_GROUP_INIT)
+		return -ENOENT;
+
+	*int_rcid = ctrl->req_to_int[req_rcid];
+	return *int_rcid ? 0 : -ENOENT;
+}
+
+static bool cbqri_component_maps_rcid(struct cbqri_component *component)
+{
+	struct cbqri_component_ctrl *entry;
+
+	entry = list_first_entry_or_null(&component->controllers,
+					 struct cbqri_component_ctrl, list);
+	return entry && cbqri_has_rcid_map(entry->ctrl);
+}
+
 static u32 cbqri_rcid_map_offset(struct cbqri_controller *ctrl)
 {
 	u32 slots;
@@ -369,11 +427,17 @@ static int cbqri_add_component_controller(struct cbqri_component *component,
 					  struct cbqri_controller *ctrl)
 {
 	struct cbqri_component_ctrl *entry;
+	struct cbqri_component_ctrl *first;
 
 	list_for_each_entry(entry, &component->controllers, list) {
 		if (entry->ctrl == ctrl)
 			return 0;
 	}
+	first = list_first_entry_or_null(&component->controllers,
+					 struct cbqri_component_ctrl, list);
+	if (first && cbqri_has_rcid_map(first->ctrl) !=
+		     cbqri_has_rcid_map(ctrl))
+		return -EOPNOTSUPP;
 
 	entry = kzalloc_obj(*entry, GFP_KERNEL);
 	if (!entry)
@@ -410,7 +474,8 @@ static int cbqri_add_cache_component(struct cbqri_controller *ctrl,
 		list_add_tail(&component->list, &resource->components);
 	}
 
-	resource->num_closid = min(resource->num_closid, ctrl->info->rcid_count);
+	resource->num_closid = min(resource->num_closid,
+				   cbqri_logical_rcid_count(ctrl));
 	resource->capacity_ctrl.r_ctrl.bitmap.cbm_len =
 		min(resource->capacity_ctrl.r_ctrl.bitmap.cbm_len,
 		    (unsigned int)ctrl->cc.ncblks);
@@ -571,20 +636,31 @@ static int cbqri_capacity_op(struct cbqri_controller *ctrl, u32 op,
 }
 
 int cbqri_capacity_set(struct cbqri_ctrl_domain *domain, u32 closid,
-		       enum resctrl_conf_type type, u32 value)
+		       enum resctrl_conf_type type, u32 value,
+		       enum resctrl_update_reason reason)
 {
 	struct cbqri_component_ctrl *entry;
-	u32 op = CBQRI_CC_ALLOC_CTL_OP_CONFIG_LIMIT;
+	u32 int_rcid;
 	int ret;
 
 	list_for_each_entry(entry, &domain->component->controllers, list) {
+		ret = cbqri_update_int_rcid(entry->ctrl, closid, reason,
+					    &int_rcid);
+		if (ret == -ENOENT)
+			continue;
+		if (ret)
+			return ret;
 		cbqri_writeq(entry->ctrl, CBQRI_CC_BLOCK_MASK_OFF, value);
-		ret = cbqri_capacity_op(entry->ctrl, op, closid, type);
+		ret = cbqri_capacity_op(entry->ctrl,
+					CBQRI_CC_ALLOC_CTL_OP_CONFIG_LIMIT,
+					int_rcid, type);
 		if (ret)
 			return ret;
 	}
 
-	domain->ctrl_val[closid] = value;
+	if (reason != RESCTRL_UPDATE_USER ||
+	    !cbqri_component_maps_rcid(domain->component))
+		domain->ctrl_val[closid] = value;
 	return 0;
 }
 
@@ -594,12 +670,16 @@ int cbqri_capacity_get(struct cbqri_ctrl_domain *domain, u32 closid,
 	struct cbqri_component_ctrl *entry;
 	u32 op = CBQRI_CC_ALLOC_CTL_OP_READ_LIMIT;
 	u32 first = 0;
-	u32 current_value;
+	u32 current_value, int_rcid;
 	bool have_value = false;
 	int ret;
 
 	list_for_each_entry(entry, &domain->component->controllers, list) {
-		ret = cbqri_capacity_op(entry->ctrl, op, closid, type);
+		ret = cbqri_effective_int_rcid(entry->ctrl, closid,
+					       &int_rcid);
+		if (ret)
+			return ret;
+		ret = cbqri_capacity_op(entry->ctrl, op, int_rcid, type);
 		if (ret)
 			return ret;
 		current_value = cbqri_readq(entry->ctrl, CBQRI_CC_BLOCK_MASK_OFF);
@@ -718,7 +798,8 @@ static int cbqri_add_memory_component(struct cbqri_controller *ctrl,
 		list_add_tail(&component->list, &resource->components);
 	}
 
-	resource->num_closid = min(resource->num_closid, ctrl->info->rcid_count);
+	resource->num_closid = min(resource->num_closid,
+				   cbqri_logical_rcid_count(ctrl));
 	return cbqri_add_component_controller(component, ctrl);
 }
 
@@ -858,21 +939,37 @@ static u64 cbqri_bandwidth_value(struct cbqri_controller *ctrl,
 }
 
 int cbqri_bandwidth_set(struct cbqri_ctrl_domain *domain,
-			struct cbqri_resctrl_ctrl *control, u32 closid, u32 value)
+			struct cbqri_resctrl_ctrl *control, u32 closid, u32 value,
+			enum resctrl_update_reason reason)
 {
 	struct cbqri_component_ctrl *entry;
-	u32 op = CBQRI_BC_ALLOC_CTL_OP_CONFIG_LIMIT;
+	u32 int_rcid;
 	int ret;
 
 	list_for_each_entry(entry, &domain->component->controllers, list) {
+		ret = cbqri_update_int_rcid(entry->ctrl, closid, reason,
+					    &int_rcid);
+		if (ret == -ENOENT)
+			continue;
+		if (ret)
+			return ret;
+		ret = cbqri_bandwidth_op(entry->ctrl,
+					 CBQRI_BC_ALLOC_CTL_OP_READ_LIMIT,
+					 int_rcid);
+		if (ret)
+			return ret;
 		cbqri_writeq(entry->ctrl, CBQRI_BC_BW_ALLOC_OFF,
 			     cbqri_bandwidth_value(entry->ctrl, control, value));
-		ret = cbqri_bandwidth_op(entry->ctrl, op, closid);
+		ret = cbqri_bandwidth_op(entry->ctrl,
+					 CBQRI_BC_ALLOC_CTL_OP_CONFIG_LIMIT,
+					 int_rcid);
 		if (ret)
 			return ret;
 	}
 
-	domain->ctrl_val[closid] = value;
+	if (reason != RESCTRL_UPDATE_USER ||
+	    !cbqri_component_maps_rcid(domain->component))
+		domain->ctrl_val[closid] = value;
 	return 0;
 }
 
@@ -898,12 +995,16 @@ int cbqri_bandwidth_get(struct cbqri_ctrl_domain *domain,
 	struct cbqri_component_ctrl *entry;
 	u32 op = CBQRI_BC_ALLOC_CTL_OP_READ_LIMIT;
 	u32 first = 0;
-	u32 current_value;
+	u32 current_value, int_rcid;
 	bool have_value = false;
 	int ret;
 
 	list_for_each_entry(entry, &domain->component->controllers, list) {
-		ret = cbqri_bandwidth_op(entry->ctrl, op, closid);
+		ret = cbqri_effective_int_rcid(entry->ctrl, closid,
+					       &int_rcid);
+		if (ret)
+			return ret;
+		ret = cbqri_bandwidth_op(entry->ctrl, op, int_rcid);
 		if (ret)
 			return ret;
 		current_value = cbqri_decode_bandwidth_value(entry->ctrl, control);
@@ -1182,9 +1283,10 @@ void resctrl_arch_reset_cntr(struct rdt_resource *r,
 {
 }
 
-int resctrl_arch_update_one(struct rdt_resource *r, struct resctrl_ctrl *ctrl,
+static int cbqri_update_one(struct rdt_resource *r, struct resctrl_ctrl *ctrl,
 			    struct rdt_ctrl_domain *d, u32 closid,
-			    enum resctrl_conf_type type, u32 value)
+			    enum resctrl_conf_type type, u32 value,
+			    enum resctrl_update_reason reason)
 {
 	struct cbqri_resctrl_resource *resource;
 	struct cbqri_resctrl_ctrl *control;
@@ -1198,13 +1300,22 @@ int resctrl_arch_update_one(struct rdt_resource *r, struct resctrl_ctrl *ctrl,
 
 	switch (control->kind) {
 	case CBQRI_CTRL_CAPACITY:
-		return cbqri_capacity_set(domain, closid, type, value);
+		return cbqri_capacity_set(domain, closid, type, value, reason);
 	case CBQRI_CTRL_BANDWIDTH_RESERVED:
 	case CBQRI_CTRL_BANDWIDTH_WEIGHT:
-		return cbqri_bandwidth_set(domain, control, closid, value);
+		return cbqri_bandwidth_set(domain, control, closid, value,
+					   reason);
 	}
 
 	return -EINVAL;
+}
+
+int resctrl_arch_update_one(struct rdt_resource *r, struct resctrl_ctrl *ctrl,
+			    struct rdt_ctrl_domain *d, u32 closid,
+			    enum resctrl_conf_type type, u32 value)
+{
+	return cbqri_update_one(r, ctrl, d, closid, type, value,
+				RESCTRL_UPDATE_INTERNAL);
 }
 
 void resctrl_arch_reset_all_ctrls(struct rdt_resource *r)
@@ -1234,21 +1345,29 @@ void resctrl_arch_reset_all_ctrls(struct rdt_resource *r)
 }
 
 static int cbqri_update_control(struct rdt_resource *r,
-				struct resctrl_ctrl *ctrl, u32 closid)
+				struct resctrl_ctrl *ctrl, u32 closid,
+				enum resctrl_update_reason reason)
 {
 	struct rdt_ctrl_domain *domain;
 	enum resctrl_conf_type type;
 	int ret;
 
 	list_for_each_entry(domain, &ctrl->domains, hdr.list) {
+		struct cbqri_ctrl_domain *cbqri_domain;
+
 		for (type = 0; type < CDP_NUM_TYPES; type++) {
 			struct resctrl_staged_config *cfg;
 
 			cfg = &domain->staged_config[type];
 			if (!cfg->have_new_ctrl)
 				continue;
-			ret = resctrl_arch_update_one(r, ctrl, domain, closid,
-						      type, cfg->new_ctrl);
+			cbqri_domain = container_of(domain,
+						    struct cbqri_ctrl_domain, domain);
+			if (reason == RESCTRL_UPDATE_USER &&
+			    cbqri_domain->ctrl_val[closid] == cfg->new_ctrl)
+				continue;
+			ret = cbqri_update_one(r, ctrl, domain, closid, type,
+					       cfg->new_ctrl, reason);
 			if (ret)
 				return ret;
 		}
@@ -1264,7 +1383,7 @@ int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid,
 	int ret;
 
 	for_each_enabled_ctrl(ctrl, r) {
-		ret = cbqri_update_control(r, ctrl, closid);
+		ret = cbqri_update_control(r, ctrl, closid, reason);
 		if (ret)
 			return ret;
 	}
@@ -1304,25 +1423,368 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct resctrl_ctrl *ctrl,
 	return ret ? domain->ctrl_val[closid] : value;
 }
 
+static bool cbqri_component_has_controller(struct cbqri_component *component,
+					   struct cbqri_controller *ctrl)
+{
+	struct cbqri_component_ctrl *entry;
+
+	list_for_each_entry(entry, &component->controllers, list) {
+		if (entry->ctrl == ctrl)
+			return true;
+	}
+
+	return false;
+}
+
+static bool cbqri_controller_needs_update(struct cbqri_controller *ctrl,
+					  u32 closid)
+{
+	struct cbqri_resctrl_resource *resource;
+	struct cbqri_ctrl_domain *domain;
+	struct rdt_ctrl_domain *rdt_domain;
+	struct resctrl_ctrl *control;
+	enum resctrl_conf_type type;
+	int rid;
+
+	for (rid = 0; rid < RDT_NUM_RESOURCES; rid++) {
+		resource = &cbqri_resources[rid];
+		if (!resource->res.alloc_capable ||
+		    closid >= resource->num_closid)
+			continue;
+
+		for_each_enabled_ctrl(control, &resource->res) {
+			list_for_each_entry(rdt_domain, &control->domains,
+					    hdr.list) {
+				domain = container_of(rdt_domain,
+						      struct cbqri_ctrl_domain,
+						      domain);
+				if (!cbqri_component_has_controller(domain->component,
+								    ctrl))
+					continue;
+
+				for (type = 0; type < CDP_NUM_TYPES; type++) {
+					struct resctrl_staged_config *cfg;
+
+					cfg = &rdt_domain->staged_config[type];
+					if (cfg->have_new_ctrl &&
+					    cfg->new_ctrl != domain->ctrl_val[closid])
+						return true;
+				}
+			}
+		}
+	}
+
+	return false;
+}
+
+static int cbqri_materialize_capacity_entry(struct cbqri_controller *ctrl,
+					    u32 from, u32 to)
+{
+	u64 value;
+	int ret;
+
+	ret = cbqri_capacity_op(ctrl, CBQRI_CC_ALLOC_CTL_OP_READ_LIMIT,
+				from, CDP_NONE);
+	if (ret)
+		return ret;
+	value = cbqri_readq(ctrl, CBQRI_CC_BLOCK_MASK_OFF);
+	cbqri_writeq(ctrl, CBQRI_CC_BLOCK_MASK_OFF, value);
+	ret = cbqri_capacity_op(ctrl, CBQRI_CC_ALLOC_CTL_OP_CONFIG_LIMIT,
+				to, CDP_NONE);
+	if (ret)
+		return ret;
+	ret = cbqri_capacity_op(ctrl, CBQRI_CC_ALLOC_CTL_OP_READ_LIMIT,
+				to, CDP_NONE);
+	if (ret)
+		return ret;
+
+	return cbqri_readq(ctrl, CBQRI_CC_BLOCK_MASK_OFF) == value ? 0 : -EIO;
+}
+
+static int cbqri_materialize_bandwidth_entry(struct cbqri_controller *ctrl,
+					     u32 from, u32 to)
+{
+	u64 value, readback;
+	int ret;
+
+	ret = cbqri_bandwidth_op(ctrl, CBQRI_BC_ALLOC_CTL_OP_READ_LIMIT, from);
+	if (ret)
+		return ret;
+	value = cbqri_readq(ctrl, CBQRI_BC_BW_ALLOC_OFF);
+	cbqri_writeq(ctrl, CBQRI_BC_BW_ALLOC_OFF, value);
+	ret = cbqri_bandwidth_op(ctrl, CBQRI_BC_ALLOC_CTL_OP_CONFIG_LIMIT, to);
+	if (ret)
+		return ret;
+	ret = cbqri_bandwidth_op(ctrl, CBQRI_BC_ALLOC_CTL_OP_READ_LIMIT, to);
+	if (ret)
+		return ret;
+	readback = cbqri_readq(ctrl, CBQRI_BC_BW_ALLOC_OFF);
+
+	return readback == value ? 0 : -EIO;
+}
+
+static int cbqri_materialize_entry(struct cbqri_controller *ctrl, u32 from,
+				   u32 to)
+{
+	if (ctrl->info->type == CBQRI_CONTROLLER_TYPE_CAPACITY)
+		return cbqri_materialize_capacity_entry(ctrl, from, to);
+
+	return cbqri_materialize_bandwidth_entry(ctrl, from, to);
+}
+
+static void cbqri_clear_pending(struct cbqri_controller *ctrl,
+				bool release_new)
+{
+	if (release_new)
+		__clear_bit(ctrl->pending_int_rcid, ctrl->int_rcid_busy);
+	ctrl->pending_req_rcid = 0;
+	ctrl->pending_int_rcid = 0;
+	ctrl->pending_old_int_rcid = 0;
+	ctrl->pending_valid = false;
+}
+
+static void cbqri_discard_pending(u32 closid)
+{
+	struct cbqri_controller *ctrl;
+
+	list_for_each_entry(ctrl, &cbqri_hw_controllers, list) {
+		if (!ctrl->pending_valid || ctrl->pending_req_rcid != closid)
+			continue;
+		cbqri_clear_pending(ctrl, true);
+	}
+}
+
 int resctrl_arch_prepare_ctrl_update(u32 closid,
 				     enum resctrl_update_reason reason)
 {
+	struct cbqri_controller *ctrl;
+	u32 int_rcid;
+	int ret;
+
+	if (reason != RESCTRL_UPDATE_USER || !closid)
+		return 0;
+
+	list_for_each_entry(ctrl, &cbqri_hw_controllers, list) {
+		if (!cbqri_has_rcid_map(ctrl) ||
+		    !cbqri_controller_needs_update(ctrl, closid))
+			continue;
+		if (ctrl->pending_valid)
+			return -EBUSY;
+		int_rcid = find_next_zero_bit(ctrl->int_rcid_busy,
+					      ctrl->info->rcid_count, 1);
+		if (int_rcid >= ctrl->info->rcid_count)
+			return -ENOSPC;
+	}
+
+	list_for_each_entry(ctrl, &cbqri_hw_controllers, list) {
+		if (!cbqri_has_rcid_map(ctrl) ||
+		    !cbqri_controller_needs_update(ctrl, closid))
+			continue;
+
+		int_rcid = find_next_zero_bit(ctrl->int_rcid_busy,
+					      ctrl->info->rcid_count, 1);
+		__set_bit(int_rcid, ctrl->int_rcid_busy);
+		ctrl->pending_req_rcid = closid;
+		ctrl->pending_int_rcid = int_rcid;
+		ctrl->pending_old_int_rcid = ctrl->req_to_int[closid];
+		ctrl->pending_valid = true;
+	}
+
+	list_for_each_entry(ctrl, &cbqri_hw_controllers, list) {
+		if (!ctrl->pending_valid || ctrl->pending_req_rcid != closid)
+			continue;
+		ret = cbqri_materialize_entry(ctrl, ctrl->pending_old_int_rcid,
+					      ctrl->pending_int_rcid);
+		if (ret) {
+			cbqri_discard_pending(closid);
+			return ret;
+		}
+	}
+
 	return 0;
+}
+
+static bool cbqri_component_is_unbound(struct cbqri_component *component,
+				       u32 closid)
+{
+	struct cbqri_component_ctrl *entry;
+
+	list_for_each_entry(entry, &component->controllers, list) {
+		if (!cbqri_has_rcid_map(entry->ctrl) ||
+		    entry->ctrl->req_to_int[closid])
+			return false;
+	}
+
+	return true;
+}
+
+static void
+cbqri_commit_cached_value(struct cbqri_resctrl_resource *resource,
+			  struct cbqri_ctrl_domain *domain, u32 closid,
+			  u32 value)
+{
+	u32 id;
+
+	domain->ctrl_val[closid] = value;
+	if (closid)
+		return;
+
+	for (id = 1; id < resource->num_closid; id++) {
+		if (cbqri_component_is_unbound(domain->component, id))
+			domain->ctrl_val[id] = value;
+	}
+}
+
+static void
+cbqri_commit_staged_domain(struct cbqri_resctrl_resource *resource,
+			   struct rdt_ctrl_domain *rdt_domain, u32 closid)
+{
+	struct cbqri_ctrl_domain *domain;
+	enum resctrl_conf_type type;
+
+	domain = container_of(rdt_domain, struct cbqri_ctrl_domain, domain);
+	for (type = 0; type < CDP_NUM_TYPES; type++) {
+		struct resctrl_staged_config *cfg;
+
+		cfg = &rdt_domain->staged_config[type];
+		if (!cfg->have_new_ctrl)
+			continue;
+		cbqri_commit_cached_value(resource, domain, closid,
+					  cfg->new_ctrl);
+	}
+}
+
+static void cbqri_commit_cached_values(u32 closid)
+{
+	struct cbqri_resctrl_resource *resource;
+	struct rdt_ctrl_domain *rdt_domain;
+	struct resctrl_ctrl *control;
+	int rid;
+
+	for (rid = 0; rid < RDT_NUM_RESOURCES; rid++) {
+		resource = &cbqri_resources[rid];
+		if (!resource->res.alloc_capable ||
+		    closid >= resource->num_closid)
+			continue;
+
+		for_each_enabled_ctrl(control, &resource->res) {
+			list_for_each_entry(rdt_domain, &control->domains,
+					    hdr.list) {
+				cbqri_commit_staged_domain(resource, rdt_domain,
+							   closid);
+			}
+		}
+	}
+}
+
+static void cbqri_recover_failed_rollback(struct cbqri_controller *ctrl,
+					  u32 closid)
+{
+	u32 req_rcid = closid;
+	u32 int_rcid = 0;
+	int ret;
+
+	cbqri_quarantine_int_rcid(ctrl, ctrl->pending_int_rcid);
+	if (ctrl->pending_old_int_rcid)
+		cbqri_quarantine_int_rcid(ctrl, ctrl->pending_old_int_rcid);
+	ret = cbqri_rcid_map_op(ctrl, CBQRI_RCID_MAP_OP_READ, &req_rcid,
+				&int_rcid, NULL);
+	if (!ret) {
+		ctrl->req_to_int[closid] = int_rcid;
+		if (int_rcid)
+			cbqri_quarantine_int_rcid(ctrl, int_rcid);
+	}
 }
 
 int resctrl_arch_commit_ctrl_update(u32 closid,
 				    enum resctrl_update_reason reason)
 {
+	struct cbqri_controller *ctrl;
+	u32 req_rcid, int_rcid;
+	int rollback_ret;
+	int ret;
+
+	if (reason != RESCTRL_UPDATE_USER)
+		return 0;
+
+	list_for_each_entry(ctrl, &cbqri_hw_controllers, list) {
+		if (!ctrl->pending_valid || ctrl->pending_req_rcid != closid)
+			continue;
+		req_rcid = closid;
+		int_rcid = ctrl->pending_int_rcid;
+		ret = cbqri_rcid_map_op(ctrl, CBQRI_RCID_MAP_OP_CONFIG,
+					&req_rcid, &int_rcid, NULL);
+		if (ret)
+			goto rollback;
+	}
+
+	list_for_each_entry(ctrl, &cbqri_hw_controllers, list) {
+		if (!ctrl->pending_valid || ctrl->pending_req_rcid != closid)
+			continue;
+		ctrl->req_to_int[closid] = ctrl->pending_int_rcid;
+		if (ctrl->pending_old_int_rcid)
+			__clear_bit(ctrl->pending_old_int_rcid,
+				    ctrl->int_rcid_busy);
+		cbqri_clear_pending(ctrl, false);
+	}
+	cbqri_commit_cached_values(closid);
+
 	return 0;
+
+rollback:
+	list_for_each_entry(ctrl, &cbqri_hw_controllers, list) {
+		if (!ctrl->pending_valid || ctrl->pending_req_rcid != closid)
+			continue;
+		req_rcid = closid;
+		int_rcid = ctrl->pending_old_int_rcid;
+		rollback_ret = cbqri_rcid_map_op(ctrl,
+						 CBQRI_RCID_MAP_OP_CONFIG,
+						 &req_rcid, &int_rcid, NULL);
+		if (rollback_ret)
+			cbqri_recover_failed_rollback(ctrl, closid);
+		else
+			__clear_bit(ctrl->pending_int_rcid,
+				    ctrl->int_rcid_busy);
+		cbqri_clear_pending(ctrl, false);
+	}
+
+	return ret;
 }
 
 void resctrl_arch_abort_ctrl_update(u32 closid,
 				    enum resctrl_update_reason reason)
 {
+	if (reason == RESCTRL_UPDATE_USER)
+		cbqri_discard_pending(closid);
 }
 
 int resctrl_arch_release_ctrl(u32 closid)
 {
+	struct cbqri_controller *ctrl;
+	u32 req_rcid, int_rcid;
+	int ret;
+
+	if (!closid || closid >= CBQRI_LOGICAL_ID_COUNT)
+		return closid ? -ERANGE : 0;
+
+	list_for_each_entry(ctrl, &cbqri_hw_controllers, list) {
+		if (!cbqri_has_rcid_map(ctrl))
+			continue;
+		int_rcid = ctrl->req_to_int[closid];
+		if (!int_rcid)
+			continue;
+		req_rcid = closid;
+		int_rcid = 0;
+		ret = cbqri_rcid_map_op(ctrl, CBQRI_RCID_MAP_OP_CONFIG,
+					&req_rcid, &int_rcid, NULL);
+		if (ret)
+			return ret;
+		int_rcid = ctrl->req_to_int[closid];
+		ctrl->req_to_int[closid] = 0;
+		__clear_bit(int_rcid, ctrl->int_rcid_busy);
+		__clear_bit(int_rcid, ctrl->int_rcid_quarantined);
+	}
+
 	return 0;
 }
 

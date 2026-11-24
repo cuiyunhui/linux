@@ -161,6 +161,10 @@ struct cbqri_controller {
 	u16				*req_to_int;
 	unsigned long			*int_rcid_busy;
 	unsigned long			*int_rcid_quarantined;
+	u16				pending_req_rcid;
+	u16				pending_int_rcid;
+	u16				pending_old_int_rcid;
+	bool				pending_valid;
 };
 
 enum cbqri_ctrl_kind {
@@ -210,13 +214,15 @@ void cbqri_remove_controllers(void);
 int cbqri_init_capacity_controls(void);
 void cbqri_remove_capacity_controls(void);
 int cbqri_capacity_set(struct cbqri_ctrl_domain *domain, u32 closid,
-		       enum resctrl_conf_type type, u32 value);
+		       enum resctrl_conf_type type, u32 value,
+		       enum resctrl_update_reason reason);
 int cbqri_capacity_get(struct cbqri_ctrl_domain *domain, u32 closid,
 		       enum resctrl_conf_type type, u32 *value);
 int cbqri_init_bandwidth_controls(void);
 void cbqri_remove_bandwidth_controls(void);
 int cbqri_bandwidth_set(struct cbqri_ctrl_domain *domain,
-			struct cbqri_resctrl_ctrl *ctrl, u32 closid, u32 value);
+			struct cbqri_resctrl_ctrl *ctrl, u32 closid, u32 value,
+			enum resctrl_update_reason reason);
 int cbqri_bandwidth_get(struct cbqri_ctrl_domain *domain,
 			struct cbqri_resctrl_ctrl *ctrl, u32 closid, u32 *value);
 
