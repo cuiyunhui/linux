@@ -101,10 +101,15 @@ static int cbqri_update_int_rcid(struct cbqri_controller *ctrl, u32 req_rcid,
 		return 0;
 	}
 	if (reason == RESCTRL_UPDATE_USER) {
-		if (!ctrl->pending_valid || ctrl->pending_req_rcid != req_rcid)
-			return -EINVAL;
-		*int_rcid = ctrl->pending_int_rcid;
-		return 0;
+		if (ctrl->pending_valid) {
+			if (ctrl->pending_req_rcid != req_rcid)
+				return -EINVAL;
+			*int_rcid = ctrl->pending_int_rcid;
+			return 0;
+		}
+
+		*int_rcid = ctrl->req_to_int[req_rcid];
+		return *int_rcid ? 0 : -EINVAL;
 	}
 	if (reason == RESCTRL_UPDATE_GROUP_INIT)
 		return -ENOENT;
@@ -1978,6 +1983,8 @@ int resctrl_arch_prepare_ctrl_update(u32 closid,
 			continue;
 		if (ctrl->pending_valid)
 			return -EBUSY;
+		if (ctrl->req_to_int[closid])
+			continue;
 		int_rcid = find_next_zero_bit(ctrl->int_rcid_busy,
 					      ctrl->info->rcid_count, 1);
 		if (int_rcid >= ctrl->info->rcid_count)
@@ -1986,7 +1993,8 @@ int resctrl_arch_prepare_ctrl_update(u32 closid,
 
 	list_for_each_entry(ctrl, &cbqri_hw_controllers, list) {
 		if (!cbqri_has_rcid_map(ctrl) ||
-		    !cbqri_controller_needs_update(ctrl, closid))
+		    !cbqri_controller_needs_update(ctrl, closid) ||
+		    ctrl->req_to_int[closid])
 			continue;
 
 		int_rcid = find_next_zero_bit(ctrl->int_rcid_busy,
