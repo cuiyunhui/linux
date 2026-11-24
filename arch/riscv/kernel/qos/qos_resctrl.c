@@ -18,8 +18,10 @@
 #include "internal.h"
 
 LIST_HEAD(cbqri_hw_controllers);
+static LIST_HEAD(cbqri_mon_domains);
 
 static struct cbqri_resctrl_resource cbqri_resources[RDT_NUM_RESOURCES];
+static u32 cbqri_num_rmid = 1;
 
 static u64 cbqri_readq(struct cbqri_controller *ctrl, u32 offset)
 {
@@ -60,6 +62,12 @@ static u32 cbqri_logical_rcid_count(struct cbqri_controller *ctrl)
 {
 	return cbqri_has_rcid_map(ctrl) ? CBQRI_LOGICAL_ID_COUNT :
 		ctrl->info->rcid_count;
+}
+
+static u32 cbqri_logical_mcid_count(struct cbqri_controller *ctrl)
+{
+	return cbqri_has_mcid_map(ctrl) ? CBQRI_LOGICAL_ID_COUNT :
+		ctrl->info->mcid_count;
 }
 
 static int cbqri_effective_int_rcid(struct cbqri_controller *ctrl,
@@ -302,6 +310,68 @@ static int cbqri_config_event(struct cbqri_controller *ctrl, u32 mcid,
 		return -ENOSPC;
 
 	return status == CBQRI_MON_CTL_STATUS_SUCCESS ? 0 : -EIO;
+}
+
+static int cbqri_event_id(struct cbqri_controller *ctrl,
+			  enum resctrl_event_id event_id)
+{
+	if (ctrl->info->type == CBQRI_CONTROLLER_TYPE_CAPACITY &&
+	    event_id == QOS_L3_OCCUP_EVENT_ID)
+		return CBQRI_CC_MON_EVT_OCCUPANCY;
+	if (ctrl->info->type == CBQRI_CONTROLLER_TYPE_BANDWIDTH &&
+	    event_id == QOS_L3_MBM_TOTAL_EVENT_ID)
+		return CBQRI_BC_MON_EVT_RDWR_COUNT;
+
+	return -EOPNOTSUPP;
+}
+
+static int cbqri_read_counter(struct cbqri_controller *ctrl, u32 mcid,
+			      enum resctrl_event_id event_id, u64 *value)
+{
+	u32 offset, status;
+	u64 counter;
+	int hw_event;
+	int ret;
+
+	if (mcid >= cbqri_logical_mcid_count(ctrl))
+		return -ERANGE;
+	hw_event = cbqri_event_id(ctrl, event_id);
+	if (hw_event < 0)
+		return hw_event;
+
+	ret = cbqri_mon_op(ctrl, CBQRI_MON_CTL_OP_READ_COUNTER, mcid,
+			   CBQRI_MON_EVT_NONE, &status);
+	if (ret)
+		return ret;
+	if (status == CBQRI_MON_CTL_STATUS_NO_COUNTER) {
+		ret = cbqri_config_event(ctrl, mcid, hw_event);
+		if (ret)
+			return ret;
+		ret = cbqri_mon_op(ctrl, CBQRI_MON_CTL_OP_READ_COUNTER, mcid,
+				   CBQRI_MON_EVT_NONE, &status);
+		if (ret)
+			return ret;
+	}
+	if (status == CBQRI_MON_CTL_STATUS_NO_COUNTER)
+		return -ENOSPC;
+	if (status != CBQRI_MON_CTL_STATUS_SUCCESS)
+		return -EIO;
+
+	if (ctrl->info->type == CBQRI_CONTROLLER_TYPE_CAPACITY) {
+		offset = CBQRI_CC_MON_CTR_VAL_OFF;
+		counter = cbqri_readq(ctrl, offset);
+		if (counter & BIT_ULL(CBQRI_CC_MON_CTR_INV_BIT))
+			return -EAGAIN;
+		*value = counter & GENMASK_ULL(62, 0);
+	} else {
+		offset = CBQRI_BC_MON_CTR_VAL_OFF;
+		counter = cbqri_readq(ctrl, offset);
+		if (counter & BIT_ULL(CBQRI_BC_MON_CTR_INV_BIT))
+			return -EAGAIN;
+		*value = counter & GENMASK_ULL(61, 0);
+	}
+
+	return 0;
 }
 
 static int cbqri_probe_monitor(struct cbqri_controller *ctrl)
@@ -1148,6 +1218,227 @@ void cbqri_remove_bandwidth_controls(void)
 	}
 }
 
+static struct cbqri_mon_domain *cbqri_find_mon_domain(u32 id)
+{
+	struct cbqri_mon_domain *domain;
+
+	list_for_each_entry(domain, &cbqri_mon_domains, list) {
+		if (domain->domain.hdr.id == id)
+			return domain;
+	}
+
+	return NULL;
+}
+
+static struct cbqri_mon_domain *
+cbqri_find_mon_domain_by_mask(const struct cpumask *mask)
+{
+	struct cbqri_mon_domain *domain;
+
+	list_for_each_entry(domain, &cbqri_mon_domains, list) {
+		if (cpumask_equal(&domain->domain.hdr.cpu_mask, mask))
+			return domain;
+	}
+
+	return NULL;
+}
+
+static struct cbqri_mon_domain *
+cbqri_new_mon_domain(struct cbqri_component *component)
+{
+	struct cbqri_mon_domain *domain;
+
+	domain = kzalloc_obj(*domain, GFP_KERNEL);
+	if (!domain)
+		return NULL;
+
+	domain->domain.hdr.id = component->id;
+	domain->domain.hdr.rid = RDT_RESOURCE_L3;
+	domain->domain.hdr.type = RESCTRL_MON_DOMAIN;
+	cpumask_copy(&domain->domain.hdr.cpu_mask, &component->cpu_mask);
+	INIT_LIST_HEAD(&domain->domain.hdr.list);
+	INIT_LIST_HEAD(&domain->controllers);
+	INIT_LIST_HEAD(&domain->list);
+	list_add_tail(&domain->list, &cbqri_mon_domains);
+
+	return domain;
+}
+
+static int cbqri_add_mon_controller(struct cbqri_mon_domain *domain,
+				    struct cbqri_controller *ctrl)
+{
+	struct cbqri_mon_ctrl *entry;
+
+	list_for_each_entry(entry, &domain->controllers, list) {
+		if (entry->ctrl == ctrl)
+			return 0;
+	}
+
+	entry = kzalloc_obj(*entry, GFP_KERNEL);
+	if (!entry)
+		return -ENOMEM;
+	entry->ctrl = ctrl;
+	list_add_tail(&entry->list, &domain->controllers);
+
+	if (ctrl->info->type == CBQRI_CONTROLLER_TYPE_CAPACITY)
+		domain->has_occupancy = true;
+	else
+		domain->has_mbm_total = true;
+	cbqri_num_rmid = min(cbqri_num_rmid,
+			     cbqri_logical_mcid_count(ctrl));
+
+	return 0;
+}
+
+static int cbqri_add_capacity_mon_domains(void)
+{
+	struct cbqri_resctrl_resource *resource;
+	struct cbqri_component_ctrl *entry;
+	struct cbqri_component *component;
+	struct cbqri_mon_domain *domain;
+	int ret;
+
+	resource = &cbqri_resources[RDT_RESOURCE_L3];
+	list_for_each_entry(component, &resource->components, list) {
+		domain = NULL;
+		list_for_each_entry(entry, &component->controllers, list) {
+			if (!entry->ctrl->mon_capable)
+				continue;
+			if (!domain) {
+				domain = cbqri_find_mon_domain(component->id);
+				if (!domain)
+					domain = cbqri_new_mon_domain(component);
+				if (!domain)
+					return -ENOMEM;
+			}
+			ret = cbqri_add_mon_controller(domain, entry->ctrl);
+			if (ret)
+				return ret;
+		}
+	}
+
+	return 0;
+}
+
+static int cbqri_add_bandwidth_mon_controllers(void)
+{
+	struct cbqri_resctrl_resource *resource;
+	struct cbqri_component_ctrl *entry;
+	struct cbqri_component *component;
+	struct cbqri_mon_domain *domain;
+	int ret;
+
+	resource = &cbqri_resources[RDT_RESOURCE_MBA];
+	list_for_each_entry(component, &resource->components, list) {
+		domain = cbqri_find_mon_domain_by_mask(&component->cpu_mask);
+
+		list_for_each_entry(entry, &component->controllers, list) {
+			if (!entry->ctrl->mon_capable)
+				continue;
+			if (!domain) {
+				domain = cbqri_new_mon_domain(component);
+				if (!domain)
+					return -ENOMEM;
+			}
+			ret = cbqri_add_mon_controller(domain, entry->ctrl);
+			if (ret)
+				return ret;
+		}
+	}
+
+	return 0;
+}
+
+int cbqri_init_monitoring(void)
+{
+	struct cbqri_resctrl_resource *resource;
+	struct cbqri_mon_domain *domain;
+	bool has_mbm_total = false;
+	bool has_occupancy = false;
+	int ret;
+
+	cbqri_num_rmid = U32_MAX;
+	ret = cbqri_add_capacity_mon_domains();
+	if (ret)
+		goto out_remove;
+	ret = cbqri_add_bandwidth_mon_controllers();
+	if (ret)
+		goto out_remove;
+	if (list_empty(&cbqri_mon_domains)) {
+		cbqri_num_rmid = 1;
+		return 0;
+	}
+
+	list_for_each_entry(domain, &cbqri_mon_domains, list) {
+		has_occupancy |= domain->has_occupancy;
+		has_mbm_total |= domain->has_mbm_total;
+	}
+	if (has_occupancy &&
+	    !resctrl_enable_mon_event(QOS_L3_OCCUP_EVENT_ID, false, 0, NULL)) {
+		ret = -EINVAL;
+		goto out_remove;
+	}
+	if (has_mbm_total &&
+	    !resctrl_enable_mon_event(QOS_L3_MBM_TOTAL_EVENT_ID, false, 0,
+				      NULL)) {
+		ret = -EINVAL;
+		goto out_remove;
+	}
+
+	resource = &cbqri_resources[RDT_RESOURCE_L3];
+	resource->res.mon_capable = true;
+	resource->res.mon_scope = RESCTRL_L3_CACHE;
+	resource->res.mon.num_rmid = cbqri_num_rmid;
+	list_for_each_entry(domain, &cbqri_mon_domains, list) {
+		ret = resctrl_online_mon_domain(&resource->res,
+						&domain->domain.hdr);
+		if (ret)
+			goto out_remove;
+		list_add_tail_rcu(&domain->domain.hdr.list,
+				  &resource->res.mon_domains);
+		domain->online = true;
+	}
+
+	return 0;
+
+out_remove:
+	cbqri_remove_monitoring();
+	return ret;
+}
+
+void cbqri_remove_monitoring(void)
+{
+	struct cbqri_resctrl_resource *resource;
+	struct cbqri_mon_ctrl *entry, *entry_tmp;
+	struct cbqri_mon_domain *domain, *domain_tmp;
+	bool synchronize = false;
+
+	resource = &cbqri_resources[RDT_RESOURCE_L3];
+	list_for_each_entry(domain, &cbqri_mon_domains, list) {
+		if (!domain->online)
+			continue;
+		list_del_rcu(&domain->domain.hdr.list);
+		synchronize = true;
+	}
+	if (synchronize)
+		synchronize_rcu();
+
+	list_for_each_entry_safe(domain, domain_tmp, &cbqri_mon_domains, list) {
+		if (domain->online)
+			resctrl_offline_mon_domain(&resource->res,
+						   &domain->domain.hdr);
+		list_for_each_entry_safe(entry, entry_tmp, &domain->controllers,
+					 list) {
+			list_del(&entry->list);
+			kfree(entry);
+		}
+		list_del(&domain->list);
+		kfree(domain);
+	}
+	resource->res.mon_capable = false;
+	cbqri_num_rmid = 1;
+}
+
 struct rdt_resource *resctrl_arch_get_resource(enum resctrl_res_level rid)
 {
 	if (rid < 0 || rid >= RDT_NUM_RESOURCES)
@@ -1185,7 +1476,7 @@ void resctrl_arch_disable_alloc(void)
 
 bool resctrl_arch_mon_capable(void)
 {
-	return false;
+	return cbqri_resources[RDT_RESOURCE_L3].res.mon_capable;
 }
 
 void resctrl_arch_enable_mon(void)
@@ -1259,7 +1550,7 @@ void resctrl_arch_sync_cpu_closid_rmid(void *info)
 
 u32 resctrl_arch_system_num_rmid_idx(void)
 {
-	return 1;
+	return cbqri_num_rmid;
 }
 
 u32 resctrl_arch_rmid_idx_encode(u32 closid, u32 rmid)
@@ -1333,8 +1624,37 @@ int resctrl_arch_rmid_read(struct rdt_resource *r, struct rdt_domain_hdr *hdr,
 			   enum resctrl_event_id eventid, void *arch_priv,
 			   u64 *value, void *arch_mon_ctx)
 {
+	struct rdt_l3_mon_domain *rdt_domain;
+	struct cbqri_mon_domain *domain;
+	struct cbqri_mon_ctrl *entry;
+	bool found = false;
+	u64 counter_value;
+	int ret;
+
+	if (r != &cbqri_resources[RDT_RESOURCE_L3].res || !hdr || !value)
+		return -EINVAL;
+	if (hdr->type != RESCTRL_MON_DOMAIN || hdr->rid != RDT_RESOURCE_L3)
+		return -EINVAL;
+
+	rdt_domain = container_of(hdr, struct rdt_l3_mon_domain, hdr);
+	domain = container_of(rdt_domain, struct cbqri_mon_domain, domain);
 	*value = 0;
-	return -EOPNOTSUPP;
+	list_for_each_entry(entry, &domain->controllers, list) {
+		ret = cbqri_read_counter(entry->ctrl, rmid, eventid,
+					 &counter_value);
+		if (ret == -EOPNOTSUPP)
+			continue;
+		if (ret == -ENOSPC)
+			return -ENOENT;
+		if (ret)
+			return ret;
+		if (U64_MAX - *value < counter_value)
+			return -EOVERFLOW;
+		*value += counter_value;
+		found = true;
+	}
+
+	return found ? 0 : -EOPNOTSUPP;
 }
 
 void resctrl_arch_reset_rmid(struct rdt_resource *r,
@@ -1925,13 +2245,18 @@ int qos_resctrl_setup(void)
 	ret = cbqri_init_bandwidth_controls();
 	if (ret)
 		goto out_remove_capacity;
-	ret = resctrl_init();
+	ret = cbqri_init_monitoring();
 	if (ret)
 		goto out_remove_bandwidth;
+	ret = resctrl_init();
+	if (ret)
+		goto out_remove_monitoring;
 	cpus_read_unlock();
 
 	return 0;
 
+out_remove_monitoring:
+	cbqri_remove_monitoring();
 out_remove_bandwidth:
 	cbqri_remove_bandwidth_controls();
 out_remove_capacity:
@@ -1946,6 +2271,7 @@ void qos_resctrl_exit(void)
 {
 	cpus_read_lock();
 	resctrl_exit();
+	cbqri_remove_monitoring();
 	cbqri_remove_bandwidth_controls();
 	cbqri_remove_capacity_controls();
 	cpus_read_unlock();

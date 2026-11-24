@@ -217,6 +217,20 @@ struct cbqri_ctrl_domain {
 	u32			*ctrl_val;
 };
 
+struct cbqri_mon_ctrl {
+	struct list_head	list;
+	struct cbqri_controller	*ctrl;
+};
+
+struct cbqri_mon_domain {
+	struct rdt_l3_mon_domain	domain;
+	struct list_head		controllers;
+	struct list_head		list;
+	bool				online;
+	bool				has_occupancy;
+	bool				has_mbm_total;
+};
+
 extern struct list_head cbqri_hw_controllers;
 
 int cbqri_probe_controllers(void);
@@ -235,5 +249,7 @@ int cbqri_bandwidth_set(struct cbqri_ctrl_domain *domain,
 			enum resctrl_update_reason reason);
 int cbqri_bandwidth_get(struct cbqri_ctrl_domain *domain,
 			struct cbqri_resctrl_ctrl *ctrl, u32 closid, u32 *value);
+int cbqri_init_monitoring(void);
+void cbqri_remove_monitoring(void);
 
 #endif /* _RISCV_QOS_INTERNAL_H */
