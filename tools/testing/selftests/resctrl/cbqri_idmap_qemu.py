@@ -13,7 +13,7 @@ import subprocess
 import sys
 import time
 
-PASS_MARKER = "IDMAP_V3_E2E_PASS:logical_ids_multicontroller_sum_release_reuse"
+PASS_MARKER = "IDMAP_V3_E2E_PASS:logical_ids_full_table_update_sum_release_reuse"
 
 GUEST_TEST = r"""
 fail() { echo IDMAP_E2E_FAIL:$1; poweroff -f; }
@@ -39,6 +39,13 @@ check_ctrl() {
     [ "$int_rcid" != "0" ] || fail map_${1}_${2}
     /sbin/devmem $(($1 + 0x18)) 64 $((2 | (int_rcid << 8))) >/dev/null
     [ "$(/sbin/devmem $(($1 + 0x20)) 64)" = "0x0000000000700004" ] || \
+        fail config_${1}_${2}
+}
+check_ctrl_value() {
+    int_rcid=$(map_int $1 $2)
+    [ "$int_rcid" != "0" ] || fail map_${1}_${2}
+    /sbin/devmem $(($1 + 0x18)) 64 $((2 | (int_rcid << 8))) >/dev/null
+    [ "$(/sbin/devmem $(($1 + 0x20)) 64)" = "$3" ] || \
         fail config_${1}_${2}
 }
 for base in 0x04828000 0x04829000; do
@@ -76,6 +83,17 @@ for base in 0x04828000 0x04829000; do
     done
     [ "$(map_int $base 4)" = "0" ] || fail map_g4_$base
 done
+g1_map_0=$(map_int 0x04828000 1)
+g1_map_1=$(map_int 0x04829000 1)
+write_schema /sys/fs/resctrl/g1 20 9 || fail update_mapped_g1
+grep -q 'MB:0=25$' /sys/fs/resctrl/g1/schemata || fail updated_g1_mb
+grep -q 'MB_NODE_WEIGHT:0=9$' /sys/fs/resctrl/g1/schemata || \
+    fail updated_g1_weight
+[ "$(map_int 0x04828000 1)" = "$g1_map_0" ] || fail remap_g1_0
+[ "$(map_int 0x04829000 1)" = "$g1_map_1" ] || fail remap_g1_1
+for base in 0x04828000 0x04829000; do
+    check_ctrl_value $base 1 0x0000000000900004
+done
 [ "$(cat /sys/fs/resctrl/g2/mon_data/mon_L3_00/mbm_total_bytes)" = \
   "Unassigned" ] || fail g2_should_unassigned
 rmdir /sys/fs/resctrl/g1 || fail rmdir_g1
@@ -91,7 +109,7 @@ for base in 0x04828000 0x04829000; do
 done
 [ "$(cat /sys/fs/resctrl/g4/mon_data/mon_L3_00/mbm_total_bytes)" = "36" ] || \
     fail reuse_mcid_g4
-echo IDMAP_V3_E2E_PASS:logical_ids_multicontroller_sum_release_reuse
+echo IDMAP_V3_E2E_PASS:logical_ids_full_table_update_sum_release_reuse
 poweroff -f
 """
 
