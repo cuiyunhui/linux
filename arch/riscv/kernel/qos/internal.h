@@ -4,6 +4,7 @@
 
 #include <linux/bits.h>
 #include <linux/list.h>
+#include <linux/resctrl.h>
 #include <linux/riscv_qos.h>
 #include <linux/types.h>
 
@@ -50,6 +51,8 @@
 
 #define CBQRI_AT_DATA			0
 #define CBQRI_AT_CODE			1
+
+#define CBQRI_RESOURCE_ID_PROCESSOR_CACHE	0
 
 #define CBQRI_CC_MON_CTL_OP_CONFIG_EVENT	1
 #define CBQRI_CC_MON_CTL_OP_READ_COUNTER	2
@@ -130,9 +133,52 @@ struct cbqri_controller {
 	};
 };
 
+enum cbqri_ctrl_kind {
+	CBQRI_CTRL_CAPACITY,
+	CBQRI_CTRL_BANDWIDTH_RESERVED,
+	CBQRI_CTRL_BANDWIDTH_WEIGHT,
+};
+
+struct cbqri_component_ctrl {
+	struct list_head		list;
+	struct cbqri_controller	*ctrl;
+};
+
+struct cbqri_component {
+	struct list_head	controllers;
+	struct list_head	list;
+	cpumask_t		cpu_mask;
+	u32			id;
+	u32			level;
+};
+
+struct cbqri_resctrl_ctrl {
+	struct resctrl_ctrl	r_ctrl;
+	enum cbqri_ctrl_kind	kind;
+};
+
+struct cbqri_resctrl_resource {
+	struct rdt_resource		res;
+	struct cbqri_resctrl_ctrl	capacity_ctrl;
+	struct list_head		components;
+	u32				num_closid;
+};
+
+struct cbqri_ctrl_domain {
+	struct rdt_ctrl_domain	domain;
+	struct cbqri_component	*component;
+	u32			*ctrl_val;
+};
+
 extern struct list_head cbqri_hw_controllers;
 
 int cbqri_probe_controllers(void);
 void cbqri_remove_controllers(void);
+int cbqri_init_capacity_controls(void);
+void cbqri_remove_capacity_controls(void);
+int cbqri_capacity_set(struct cbqri_ctrl_domain *domain, u32 closid,
+		       enum resctrl_conf_type type, u32 value);
+int cbqri_capacity_get(struct cbqri_ctrl_domain *domain, u32 closid,
+		       enum resctrl_conf_type type, u32 *value);
 
 #endif /* _RISCV_QOS_INTERNAL_H */
