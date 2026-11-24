@@ -3,6 +3,8 @@
 #define _RISCV_QOS_INTERNAL_H
 
 #include <linux/bits.h>
+#include <linux/list.h>
+#include <linux/riscv_qos.h>
 #include <linux/types.h>
 
 #define CBQRI_CC_CAPABILITIES_OFF	0x00
@@ -114,5 +116,23 @@ struct riscv_cbqri_bandwidth_caps {
 	bool supports_mon_evt_id_rdonly_count;
 	bool supports_mon_evt_id_wronly_count;
 };
+
+struct cbqri_controller {
+	struct list_head			list;
+	struct cbqri_controller_info	*info;
+	void __iomem			*base;
+	u8				version_major;
+	u8				version_minor;
+
+	union {
+		struct riscv_cbqri_capacity_caps	cc;
+		struct riscv_cbqri_bandwidth_caps	bc;
+	};
+};
+
+extern struct list_head cbqri_hw_controllers;
+
+int cbqri_probe_controllers(void);
+void cbqri_remove_controllers(void);
 
 #endif /* _RISCV_QOS_INTERNAL_H */
