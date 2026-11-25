@@ -217,6 +217,8 @@ int resctrl_arch_set_cdp_enabled(struct rdt_resource *r, struct resctrl_ctrl *ct
 		pr_warn("CDP not supported\n");
 		return -EOPNOTSUPP;
 	}
+	if (enable && mpam_has_partid_narrowing())
+		return -EOPNOTSUPP;
 
 	if (enable)
 		pr_warn("CDP is an expert feature and may cause MPAM to malfunction.\n");
@@ -273,6 +275,14 @@ int resctrl_arch_set_cdp_enabled(struct rdt_resource *r, struct resctrl_ctrl *ct
 static bool mpam_resctrl_hide_cdp(struct rdt_resource *r)
 {
 	return cdp_enabled && !resctrl_arch_get_cdp_enabled(r);
+}
+
+enum resctrl_id_mode resctrl_arch_id_mode(enum resctrl_id_type type)
+{
+	if (type == RESCTRL_CTRL_ID && mpam_has_partid_narrowing())
+		return RESCTRL_LOCAL_MAP;
+
+	return RESCTRL_IDENTITY;
 }
 
 /*
@@ -1449,6 +1459,10 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct resctrl_ctrl *ctrl,
 		type = CDP_DATA;
 
 	partid = resctrl_get_config_index(closid, type);
+	if (mpam_component_uses_partid_narrowing(dom->ctrl_comp) &&
+	    !mpam_partid_is_mapped(dom->ctrl_comp, partid))
+		partid = resctrl_get_config_index(RESCTRL_RESERVED_CLOSID,
+						  type);
 	cfg = &dom->ctrl_comp->cfg[partid];
 
 	switch (r->rid) {
@@ -1485,7 +1499,7 @@ int resctrl_arch_update_one(struct rdt_resource *r, struct resctrl_ctrl *ctrl,
 			    enum resctrl_conf_type t, u32 cfg_val)
 {
 	int err;
-	u32 partid;
+	u32 partid, root_partid;
 	struct mpam_config cfg;
 	struct mpam_props *cprops;
 	struct mpam_resctrl_res *res;
@@ -1509,6 +1523,7 @@ int resctrl_arch_update_one(struct rdt_resource *r, struct resctrl_ctrl *ctrl,
 		t = CDP_DATA;
 
 	partid = resctrl_get_config_index(closid, t);
+	root_partid = resctrl_get_config_index(RESCTRL_RESERVED_CLOSID, t);
 	if (!r->alloc_capable || partid >= resctrl_arch_get_num_closid(r)) {
 		pr_debug("Not alloc capable or computed PARTID out of range\n");
 		return -EINVAL;
@@ -1518,7 +1533,11 @@ int resctrl_arch_update_one(struct rdt_resource *r, struct resctrl_ctrl *ctrl,
 	 * Copy the current config to avoid clearing other resources when the
 	 * same component is exposed multiple times through resctrl.
 	 */
-	cfg = dom->ctrl_comp->cfg[partid];
+	if (mpam_component_uses_partid_narrowing(dom->ctrl_comp) &&
+	    !mpam_partid_is_mapped(dom->ctrl_comp, partid))
+		cfg = dom->ctrl_comp->cfg[root_partid];
+	else
+		cfg = dom->ctrl_comp->cfg[partid];
 
 	switch (r->rid) {
 	case RDT_RESOURCE_L2:
@@ -1555,7 +1574,8 @@ int resctrl_arch_update_one(struct rdt_resource *r, struct resctrl_ctrl *ctrl,
 }
 
 static int _resctrl_arch_update_domains(struct rdt_resource *r, struct resctrl_ctrl *ctrl,
-					u32 closid)
+					u32 closid,
+					enum resctrl_update_reason reason)
 {
 	int err;
 	struct rdt_ctrl_domain *d;
@@ -1566,8 +1586,14 @@ static int _resctrl_arch_update_domains(struct rdt_resource *r, struct resctrl_c
 	list_for_each_entry_rcu(d, &ctrl->domains, hdr.list) {
 		for (enum resctrl_conf_type t = 0; t < CDP_NUM_TYPES; t++) {
 			struct resctrl_staged_config *cfg = &d->staged_config[t];
+			struct mpam_resctrl_ctrl_dom *dom;
 
 			if (!cfg->have_new_ctrl)
+				continue;
+			dom = container_of(d, struct mpam_resctrl_ctrl_dom,
+					   resctrl_ctrl_dom);
+			if (reason == RESCTRL_UPDATE_GROUP_INIT && closid &&
+			    mpam_component_uses_partid_narrowing(dom->ctrl_comp))
 				continue;
 
 			err = resctrl_arch_update_one(r, ctrl, d, closid, t,
@@ -1596,9 +1622,165 @@ int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid,
 	 * controls? How to communicate to user space?
 	 */
 	for_each_resource_ctrl(ctrl, r) {
-		err = _resctrl_arch_update_domains(r, ctrl, closid);
+		err = _resctrl_arch_update_domains(r, ctrl, closid, reason);
 		if (err)
 			return err;
+	}
+
+	return 0;
+}
+
+static bool mpam_domain_has_staged_config(struct rdt_ctrl_domain *d)
+{
+	enum resctrl_conf_type type;
+
+	for (type = 0; type < CDP_NUM_TYPES; type++) {
+		if (d->staged_config[type].have_new_ctrl)
+			return true;
+	}
+
+	return false;
+}
+
+static int mpam_prepare_ctrl_partids(struct rdt_resource *r,
+				     struct resctrl_ctrl *ctrl, u32 closid)
+{
+	struct rdt_ctrl_domain *d;
+
+	list_for_each_entry_rcu(d, &ctrl->domains, hdr.list) {
+		struct mpam_resctrl_ctrl_dom *dom;
+		u16 partids[CDP_NUM_TYPES];
+		u16 root_partids[CDP_NUM_TYPES];
+		size_t i, nr_partids = 0;
+		enum resctrl_conf_type type;
+		int ret;
+
+		if (!mpam_domain_has_staged_config(d))
+			continue;
+		dom = container_of(d, struct mpam_resctrl_ctrl_dom,
+				   resctrl_ctrl_dom);
+		if (!mpam_component_uses_partid_narrowing(dom->ctrl_comp))
+			continue;
+
+		if (mpam_resctrl_hide_cdp(r)) {
+			partids[nr_partids] =
+				resctrl_get_config_index(closid, CDP_CODE);
+			root_partids[nr_partids++] =
+				resctrl_get_config_index(RESCTRL_RESERVED_CLOSID,
+							 CDP_CODE);
+			partids[nr_partids] =
+				resctrl_get_config_index(closid, CDP_DATA);
+			root_partids[nr_partids++] =
+				resctrl_get_config_index(RESCTRL_RESERVED_CLOSID,
+							 CDP_DATA);
+		} else {
+			for (type = 0; type < CDP_NUM_TYPES; type++) {
+				if (!d->staged_config[type].have_new_ctrl)
+					continue;
+				partids[nr_partids] =
+					resctrl_get_config_index(closid, type);
+				root_partids[nr_partids++] =
+					resctrl_get_config_index(RESCTRL_RESERVED_CLOSID,
+								 type);
+			}
+		}
+
+		if (!mpam_partids_can_map(dom->ctrl_comp, partids,
+					  nr_partids))
+			return -ENOSPC;
+		for (i = 0; i < nr_partids; i++) {
+			ret = mpam_prepare_partid(dom->ctrl_comp, partids[i]);
+			if (ret)
+				return ret;
+			ret = mpam_configure_pending_partid(dom->ctrl_comp,
+							    partids[i],
+							    root_partids[i]);
+			if (ret)
+				return ret;
+		}
+	}
+
+	return 0;
+}
+
+enum mpam_partid_op {
+	MPAM_PARTID_COMMIT,
+	MPAM_PARTID_FINISH,
+	MPAM_PARTID_ABORT,
+	MPAM_PARTID_RELEASE,
+};
+
+static int mpam_component_partid_op(struct mpam_component *comp, u32 closid,
+				    enum mpam_partid_op op)
+{
+	u16 partids[CDP_NUM_TYPES];
+	u16 root_partids[CDP_NUM_TYPES];
+	size_t i, nr_partids = 0;
+
+	if (!mpam_component_uses_partid_narrowing(comp))
+		return 0;
+
+	if (cdp_enabled) {
+		partids[nr_partids++] =
+			resctrl_get_config_index(closid, CDP_CODE);
+		root_partids[0] =
+			resctrl_get_config_index(RESCTRL_RESERVED_CLOSID,
+						 CDP_CODE);
+		partids[nr_partids++] =
+			resctrl_get_config_index(closid, CDP_DATA);
+		root_partids[1] =
+			resctrl_get_config_index(RESCTRL_RESERVED_CLOSID,
+						 CDP_DATA);
+	} else {
+		partids[nr_partids++] = closid;
+		root_partids[0] = RESCTRL_RESERVED_CLOSID;
+	}
+
+	for (i = 0; i < nr_partids; i++) {
+		int ret;
+
+		switch (op) {
+		case MPAM_PARTID_COMMIT:
+			ret = mpam_commit_partid(comp, partids[i]);
+			break;
+		case MPAM_PARTID_FINISH:
+			mpam_finish_partid(comp, partids[i]);
+			ret = 0;
+			break;
+		case MPAM_PARTID_ABORT:
+			ret = mpam_abort_partid(comp, partids[i],
+						root_partids[i]);
+			break;
+		case MPAM_PARTID_RELEASE:
+			ret = mpam_release_partid(comp, partids[i],
+						  root_partids[i]);
+			break;
+		default:
+			return -EINVAL;
+		}
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
+static int mpam_all_components_partid_op(u32 closid, enum mpam_partid_op op)
+{
+	struct mpam_resctrl_res *res;
+	enum resctrl_res_level rid;
+
+	for_each_mpam_resctrl_control(res, rid) {
+		struct mpam_component *comp;
+		int ret;
+
+		if (!res->class || !res->resctrl_res.alloc_capable)
+			continue;
+		list_for_each_entry(comp, &res->class->components, class_list) {
+			ret = mpam_component_partid_op(comp, closid, op);
+			if (ret)
+				return ret;
+		}
 	}
 
 	return 0;
@@ -1607,18 +1789,67 @@ int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid,
 int resctrl_arch_prepare_ctrl_update(u32 closid,
 				     enum resctrl_update_reason reason)
 {
+	struct mpam_resctrl_res *res;
+	enum resctrl_res_level rid;
+	int ret;
+
+	if (reason != RESCTRL_UPDATE_USER || !closid)
+		return 0;
+
+	for_each_mpam_resctrl_control(res, rid) {
+		struct rdt_resource *r = &res->resctrl_res;
+		struct resctrl_ctrl *ctrl;
+
+		if (!r->alloc_capable)
+			continue;
+		for_each_resource_ctrl(ctrl, r) {
+			ret = mpam_prepare_ctrl_partids(r, ctrl, closid);
+			if (ret)
+				goto abort;
+		}
+	}
+
 	return 0;
+
+abort:
+	if (mpam_all_components_partid_op(closid, MPAM_PARTID_ABORT))
+		pr_warn("Failed to abort partially prepared CLOSID %u\n",
+			closid);
+	return ret;
 }
 
 int resctrl_arch_commit_ctrl_update(u32 closid,
 				    enum resctrl_update_reason reason)
 {
-	return 0;
+	int ret;
+
+	if (reason != RESCTRL_UPDATE_USER)
+		return 0;
+
+	ret = mpam_all_components_partid_op(closid, MPAM_PARTID_COMMIT);
+	if (ret)
+		return ret;
+
+	return mpam_all_components_partid_op(closid, MPAM_PARTID_FINISH);
 }
 
 void resctrl_arch_abort_ctrl_update(u32 closid,
 				    enum resctrl_update_reason reason)
 {
+	int ret;
+
+	if (reason != RESCTRL_UPDATE_USER)
+		return;
+
+	ret = mpam_all_components_partid_op(closid, MPAM_PARTID_ABORT);
+	if (ret)
+		pr_warn("Failed to abort CLOSID %u mapping: %d\n", closid,
+			ret);
+}
+
+int resctrl_arch_release_ctrl(u32 closid)
+{
+	return mpam_all_components_partid_op(closid, MPAM_PARTID_RELEASE);
 }
 
 void resctrl_arch_reset_all_ctrls(struct rdt_resource *r)

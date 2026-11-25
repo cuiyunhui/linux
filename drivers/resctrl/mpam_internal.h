@@ -526,12 +526,16 @@ int mpam_reset_class_locked(struct mpam_class *class);
 int mpam_apply_config(struct mpam_component *comp, u16 partid,
 		      struct mpam_config *cfg);
 bool mpam_component_uses_partid_narrowing(struct mpam_component *comp);
+bool mpam_has_partid_narrowing(void);
 bool mpam_partid_is_mapped(struct mpam_component *comp, u16 partid);
 bool mpam_partid_can_map(struct mpam_component *comp, u16 partid);
 bool mpam_partids_can_map(struct mpam_component *comp, const u16 *partids,
 			  size_t nr_partids);
 int mpam_prepare_partid(struct mpam_component *comp, u16 partid);
+int mpam_configure_pending_partid(struct mpam_component *comp, u16 partid,
+				  u16 root_partid);
 int mpam_commit_partid(struct mpam_component *comp, u16 partid);
+void mpam_finish_partid(struct mpam_component *comp, u16 partid);
 int mpam_abort_partid(struct mpam_component *comp, u16 partid,
 		      u16 root_partid);
 int mpam_release_partid(struct mpam_component *comp, u16 partid,
