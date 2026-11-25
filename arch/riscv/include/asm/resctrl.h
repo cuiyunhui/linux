@@ -8,6 +8,7 @@
 struct rdt_resource;
 struct task_struct;
 
+enum resctrl_id_mode resctrl_arch_id_mode(enum resctrl_id_type type);
 bool resctrl_arch_alloc_capable(void);
 void resctrl_arch_enable_alloc(void);
 void resctrl_arch_disable_alloc(void);

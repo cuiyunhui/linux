@@ -58,6 +58,21 @@ static bool cbqri_has_mcid_map(struct cbqri_controller *ctrl)
 	return ctrl->bc.supports_mcid_map;
 }
 
+enum resctrl_id_mode resctrl_arch_id_mode(enum resctrl_id_type type)
+{
+	struct cbqri_controller *ctrl;
+
+	list_for_each_entry(ctrl, &cbqri_hw_controllers, list) {
+		if (type == RESCTRL_CTRL_ID && cbqri_has_rcid_map(ctrl))
+			return RESCTRL_LOCAL_MAP;
+
+		if (type == RESCTRL_MON_ID && cbqri_has_mcid_map(ctrl))
+			return RESCTRL_LOCAL_MAP;
+	}
+
+	return RESCTRL_IDENTITY;
+}
+
 static u32 cbqri_logical_rcid_count(struct cbqri_controller *ctrl)
 {
 	return cbqri_has_rcid_map(ctrl) ? CBQRI_LOGICAL_ID_COUNT :

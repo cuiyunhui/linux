@@ -10,6 +10,33 @@
 #define MAX_MBA_BW			100u
 #define MBM_OVERFLOW_INTERVAL		1000
 
+/**
+ * enum resctrl_id_type - Type of resctrl identifier
+ * @RESCTRL_CTRL_ID: Control group identifier (CLOSID/PARTID/RCID)
+ * @RESCTRL_MON_ID: Monitoring group identifier (RMID/PMG/MCID)
+ */
+enum resctrl_id_type {
+	RESCTRL_CTRL_ID,
+	RESCTRL_MON_ID,
+};
+
+/**
+ * enum resctrl_id_mode - Architecture realization of a logical identifier
+ * @RESCTRL_IDENTITY: Logical and physical identifiers are equal
+ * @RESCTRL_GLOBAL_MAP: Logical identifiers map to one global physical ID
+ * @RESCTRL_LOCAL_MAP: Controllers map logical identifiers independently
+ *
+ * Identity architectures program the same identifier in every controller.
+ * Global mapping changes the request identifier, but every controller still
+ * observes the same value. Local mapping preserves the logical request
+ * identifier and lets each controller select a different physical entry.
+ */
+enum resctrl_id_mode {
+	RESCTRL_IDENTITY,
+	RESCTRL_GLOBAL_MAP,
+	RESCTRL_LOCAL_MAP,
+};
+
 /* Reads to Local DRAM Memory */
 #define READS_TO_LOCAL_MEM		BIT(0)
 

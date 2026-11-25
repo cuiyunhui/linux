@@ -653,6 +653,17 @@ enum resctrl_update_reason {
 	RESCTRL_UPDATE_INTERNAL,
 };
 
+/**
+ * resctrl_arch_id_mode() - Get an architecture's ID realization mode
+ * @type: Type of identifier being queried
+ *
+ * Return how the architecture realizes logical control or monitoring IDs.
+ * Architectures can use different modes for control and monitoring IDs.
+ *
+ * Return: The architecture's realization mode for @type.
+ */
+enum resctrl_id_mode resctrl_arch_id_mode(enum resctrl_id_type type);
+
 /* The number of closid supported by this resource regardless of CDP */
 u32 resctrl_arch_get_num_closid(struct rdt_resource *r);
 u32 resctrl_arch_system_num_rmid_idx(void);
