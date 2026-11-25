@@ -4899,7 +4899,9 @@ static int rdtgroup_rmdir_ctrl(struct rdtgroup *rdtgrp, cpumask_var_t tmpmask)
 	cpumask_or(tmpmask, tmpmask, &rdtgrp->cpu_mask);
 	update_closid_rmid(tmpmask, NULL);
 
-	ret = resctrl_arch_release_ctrl(rdtgrp->closid);
+	ret = 0;
+	if (resctrl_arch_has_id_mapping(RESCTRL_CTRL_ID))
+		ret = resctrl_arch_release_ctrl(rdtgrp->closid);
 	cpumask_clear(&rdtgrp->cpu_mask);
 	if (ret) {
 		rdt_last_cmd_printf("Failed to release control ID %u: %d\n",

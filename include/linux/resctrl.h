@@ -664,6 +664,11 @@ enum resctrl_update_reason {
  */
 enum resctrl_id_mode resctrl_arch_id_mode(enum resctrl_id_type type);
 
+static inline bool resctrl_arch_has_id_mapping(enum resctrl_id_type type)
+{
+	return resctrl_arch_id_mode(type) != RESCTRL_IDENTITY;
+}
+
 /* The number of closid supported by this resource regardless of CDP */
 u32 resctrl_arch_get_num_closid(struct rdt_resource *r);
 u32 resctrl_arch_system_num_rmid_idx(void);

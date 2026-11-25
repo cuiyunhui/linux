@@ -436,6 +436,7 @@ ssize_t rdtgroup_schemata_write(struct kernfs_open_file *of,
 	struct rdt_resource *r;
 	char *tok, *ctrlname;
 	bool update_prepared = false;
+	bool map_ids;
 	int ret = 0;
 
 	rdtgrp = rdtgroup_kn_lock_live(of->kn);
@@ -443,6 +444,8 @@ ssize_t rdtgroup_schemata_write(struct kernfs_open_file *of,
 		rdtgroup_kn_unlock(of->kn);
 		return -ENOENT;
 	}
+
+	map_ids = resctrl_arch_has_id_mapping(RESCTRL_CTRL_ID);
 
 	/* Valid input requires a trailing newline */
 	if (nbytes == 0 || buf[nbytes - 1] != '\n') {
@@ -482,13 +485,15 @@ ssize_t rdtgroup_schemata_write(struct kernfs_open_file *of,
 			goto out_clear_staged;
 	}
 
-	ret = resctrl_arch_prepare_ctrl_update(rdtgrp->closid,
-					       RESCTRL_UPDATE_USER);
-	if (ret) {
-		rdt_last_cmd_printf("Failed to prepare control update: %d\n", ret);
-		goto out_clear_staged;
+	if (map_ids) {
+		ret = resctrl_arch_prepare_ctrl_update(rdtgrp->closid,
+						       RESCTRL_UPDATE_USER);
+		if (ret) {
+			rdt_last_cmd_printf("Failed to prepare control update: %d\n", ret);
+			goto out_clear_staged;
+		}
+		update_prepared = true;
 	}
-	update_prepared = true;
 
 	list_for_each_entry(f, &rdt_resource_final_all, list) {
 		r = f->res;
@@ -502,13 +507,15 @@ ssize_t rdtgroup_schemata_write(struct kernfs_open_file *of,
 		}
 	}
 
-	ret = resctrl_arch_commit_ctrl_update(rdtgrp->closid,
-					      RESCTRL_UPDATE_USER);
-	if (ret) {
-		rdt_last_cmd_printf("Failed to commit control update: %d\n", ret);
-		goto out_clear_staged;
+	if (map_ids) {
+		ret = resctrl_arch_commit_ctrl_update(rdtgrp->closid,
+						      RESCTRL_UPDATE_USER);
+		if (ret) {
+			rdt_last_cmd_printf("Failed to commit control update: %d\n", ret);
+			goto out_clear_staged;
+		}
+		update_prepared = false;
 	}
-	update_prepared = false;
 
 	if (rdtgrp->mode == RDT_MODE_PSEUDO_LOCKSETUP) {
 		/*
