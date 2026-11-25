@@ -370,6 +370,7 @@ struct mpam_config {
 
 struct mpam_component {
 	u32			comp_id;
+	bool			partid_narrowing;
 
 	/* mpam_vmsc in this component */
 	struct list_head	vmsc;
@@ -414,6 +415,7 @@ struct mpam_msc_ris {
 	u64			idr;
 	struct mpam_props	props;
 	bool			in_reset_state;
+	u16			intpartid_max;
 
 	cpumask_t		affinity;
 
@@ -519,6 +521,7 @@ int mpam_reset_class_locked(struct mpam_class *class);
 
 int mpam_apply_config(struct mpam_component *comp, u16 partid,
 		      struct mpam_config *cfg);
+bool mpam_component_uses_partid_narrowing(struct mpam_component *comp);
 
 int mpam_msmon_read(struct mpam_component *comp, struct mon_cfg *ctx,
 		    enum mpam_device_features, u64 *val);

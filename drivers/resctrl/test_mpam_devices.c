@@ -382,9 +382,34 @@ static void test_mpam_reset_msc_bitmap(struct kunit *test)
 	mutex_unlock(&fake_msc.part_sel_lock);
 }
 
+static void test_mpam_component_partid_narrowing(struct kunit *test)
+{
+	reset_fake_hierarchy();
+	fake_comp1.class = &fake_class;
+	list_add(&fake_comp1.class_list, &fake_class.components);
+	fake_vmsc1.comp = &fake_comp1;
+	list_add(&fake_vmsc1.comp_list, &fake_comp1.vmsc);
+	fake_ris1.vmsc = &fake_vmsc1;
+	fake_ris2.vmsc = &fake_vmsc1;
+	list_add(&fake_ris1.vmsc_list, &fake_vmsc1.ris);
+	list_add(&fake_ris2.vmsc_list, &fake_vmsc1.ris);
+
+	mpam_set_feature(mpam_feat_partid_nrw, &fake_ris1.props);
+	mpam_set_feature(mpam_feat_partid_nrw, &fake_ris2.props);
+	KUNIT_EXPECT_TRUE(test, mpam_component_all_ris_narrow(&fake_comp1));
+
+	mpam_clear_feature(mpam_feat_partid_nrw, &fake_ris2.props);
+	KUNIT_EXPECT_FALSE(test, mpam_component_all_ris_narrow(&fake_comp1));
+
+	fake_class.type = MPAM_CLASS_UNKNOWN;
+	mpam_set_feature(mpam_feat_partid_nrw, &fake_ris2.props);
+	KUNIT_EXPECT_FALSE(test, mpam_component_all_ris_narrow(&fake_comp1));
+}
+
 static struct kunit_case mpam_devices_test_cases[] = {
 	KUNIT_CASE(test_mpam_reset_msc_bitmap),
 	KUNIT_CASE(test_mpam_enable_merge_features),
+	KUNIT_CASE(test_mpam_component_partid_narrowing),
 	KUNIT_CASE(test__props_mismatch),
 	{}
 };
