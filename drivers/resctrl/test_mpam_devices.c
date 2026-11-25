@@ -406,10 +406,58 @@ static void test_mpam_component_partid_narrowing(struct kunit *test)
 	KUNIT_EXPECT_FALSE(test, mpam_component_all_ris_narrow(&fake_comp1));
 }
 
+static void test_mpam_logical_partid_allocator(struct kunit *test)
+{
+	unsigned long private1[BITS_TO_LONGS(8)] = {};
+	unsigned long private2[BITS_TO_LONGS(8)] = {};
+	unsigned long busy1[BITS_TO_LONGS(4)] = {};
+	unsigned long busy2[BITS_TO_LONGS(4)] = {};
+	u16 map1[8] = {};
+	u16 map2[8] = {};
+	u16 pair[] = { 1, 2 };
+
+	reset_fake_hierarchy();
+	fake_comp1.class = &fake_class;
+	fake_comp1.partid_narrowing = true;
+	list_add(&fake_comp1.class_list, &fake_class.components);
+	fake_vmsc1.comp = &fake_comp1;
+	list_add(&fake_vmsc1.comp_list, &fake_comp1.vmsc);
+	fake_ris1.vmsc = &fake_vmsc1;
+	fake_ris2.vmsc = &fake_vmsc1;
+	list_add(&fake_ris1.vmsc_list, &fake_vmsc1.ris);
+	list_add(&fake_ris2.vmsc_list, &fake_vmsc1.ris);
+
+	fake_ris1.intpartid_max = 3;
+	fake_ris1.partid_to_intpartid = map1;
+	fake_ris1.intpartid_busy = busy1;
+	fake_ris1.partid_private = private1;
+	fake_ris2.intpartid_max = 3;
+	fake_ris2.partid_to_intpartid = map2;
+	fake_ris2.intpartid_busy = busy2;
+	fake_ris2.partid_private = private2;
+	__set_bit(0, busy1);
+	__set_bit(0, busy2);
+	__set_bit(0, private1);
+	__set_bit(0, private2);
+
+	KUNIT_EXPECT_TRUE(test, mpam_partids_can_map(&fake_comp1, pair,
+						     ARRAY_SIZE(pair)));
+	KUNIT_ASSERT_EQ(test, mpam_prepare_partid(&fake_comp1, 1), 0);
+	KUNIT_EXPECT_EQ(test, map1[1], 1);
+	KUNIT_EXPECT_EQ(test, map2[1], 1);
+	KUNIT_EXPECT_TRUE(test, mpam_partid_is_mapped(&fake_comp1, 1));
+
+	KUNIT_ASSERT_EQ(test, mpam_prepare_partid(&fake_comp1, 2), 0);
+	KUNIT_ASSERT_EQ(test, mpam_prepare_partid(&fake_comp1, 3), 0);
+	KUNIT_EXPECT_FALSE(test, mpam_partid_can_map(&fake_comp1, 4));
+	KUNIT_EXPECT_EQ(test, mpam_prepare_partid(&fake_comp1, 4), -ENOSPC);
+}
+
 static struct kunit_case mpam_devices_test_cases[] = {
 	KUNIT_CASE(test_mpam_reset_msc_bitmap),
 	KUNIT_CASE(test_mpam_enable_merge_features),
 	KUNIT_CASE(test_mpam_component_partid_narrowing),
+	KUNIT_CASE(test_mpam_logical_partid_allocator),
 	KUNIT_CASE(test__props_mismatch),
 	{}
 };
