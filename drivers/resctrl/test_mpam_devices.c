@@ -410,6 +410,8 @@ static void test_mpam_logical_partid_allocator(struct kunit *test)
 {
 	unsigned long private1[BITS_TO_LONGS(8)] = {};
 	unsigned long private2[BITS_TO_LONGS(8)] = {};
+	unsigned long pending1[BITS_TO_LONGS(8)] = {};
+	unsigned long pending2[BITS_TO_LONGS(8)] = {};
 	unsigned long busy1[BITS_TO_LONGS(4)] = {};
 	unsigned long busy2[BITS_TO_LONGS(4)] = {};
 	u16 map1[8] = {};
@@ -431,10 +433,12 @@ static void test_mpam_logical_partid_allocator(struct kunit *test)
 	fake_ris1.partid_to_intpartid = map1;
 	fake_ris1.intpartid_busy = busy1;
 	fake_ris1.partid_private = private1;
+	fake_ris1.partid_pending = pending1;
 	fake_ris2.intpartid_max = 3;
 	fake_ris2.partid_to_intpartid = map2;
 	fake_ris2.intpartid_busy = busy2;
 	fake_ris2.partid_private = private2;
+	fake_ris2.partid_pending = pending2;
 	__set_bit(0, busy1);
 	__set_bit(0, busy2);
 	__set_bit(0, private1);
@@ -446,6 +450,8 @@ static void test_mpam_logical_partid_allocator(struct kunit *test)
 	KUNIT_EXPECT_EQ(test, map1[1], 1);
 	KUNIT_EXPECT_EQ(test, map2[1], 1);
 	KUNIT_EXPECT_TRUE(test, mpam_partid_is_mapped(&fake_comp1, 1));
+	KUNIT_EXPECT_TRUE(test, test_bit(1, pending1));
+	KUNIT_EXPECT_TRUE(test, test_bit(1, pending2));
 
 	KUNIT_ASSERT_EQ(test, mpam_prepare_partid(&fake_comp1, 2), 0);
 	KUNIT_ASSERT_EQ(test, mpam_prepare_partid(&fake_comp1, 3), 0);
