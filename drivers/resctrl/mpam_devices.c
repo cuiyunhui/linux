@@ -1133,26 +1133,18 @@ static int mpam_ris_hw_probe(struct mpam_msc_ris *ris)
 		}
 	}
 
-	/*
-	 * RIS with PARTID narrowing don't have enough storage for one
-	 * configuration per PARTID. If these are in a class we could use,
-	 * reduce the supported partid_max to match the number of intpartid.
-	 * If the class is unknown, just ignore it.
-	 */
+	/* Record the controller-local internal PARTID range. */
 	if (FIELD_GET(MPAMF_IDR_HAS_PARTID_NRW, ris->idr) &&
 	    class->type != MPAM_CLASS_UNKNOWN) {
-		u16 partid_max;
 		u32 nrwidr;
 
 		err = mpam_read_partsel_reg(msc, PARTID_NRW_IDR, &nrwidr);
 		if (err)
 			return err;
 
-		partid_max = FIELD_GET(MPAMF_PARTID_NRW_IDR_INTPARTID_MAX, nrwidr);
-
 		mpam_set_feature(mpam_feat_partid_nrw, props);
-		ris->intpartid_max = partid_max;
-		msc->partid_max = min(msc->partid_max, partid_max);
+		ris->intpartid_max = FIELD_GET(MPAMF_PARTID_NRW_IDR_INTPARTID_MAX,
+					       nrwidr);
 	}
 
 	return 0;
@@ -2934,6 +2926,28 @@ static bool mpam_component_all_ris_narrow(struct mpam_component *comp)
 	return found;
 }
 
+static u16 mpam_component_safe_partid_max(struct mpam_component *comp,
+					  u16 partid_max)
+{
+	struct mpam_vmsc *vmsc;
+
+	if (comp->partid_narrowing)
+		return partid_max;
+
+	list_for_each_entry(vmsc, &comp->vmsc, comp_list) {
+		struct mpam_msc_ris *ris;
+
+		list_for_each_entry(ris, &vmsc->ris, vmsc_list) {
+			if (mpam_has_feature(mpam_feat_partid_nrw,
+					     &ris->props))
+				partid_max = min(partid_max,
+						 ris->intpartid_max);
+		}
+	}
+
+	return partid_max;
+}
+
 bool mpam_component_uses_partid_narrowing(struct mpam_component *comp)
 {
 	return comp->partid_narrowing;
@@ -3271,17 +3285,24 @@ static void mpam_enable_set_partid_narrowing(struct list_head *classes)
 {
 	struct mpam_component *comp;
 	struct mpam_class *class;
+	u16 partid_max;
 
 	lockdep_assert_held(&mpam_list_lock);
 	partid_narrowing_enabled = false;
+	guard(spinlock)(&partid_max_lock);
+	partid_max = mpam_partid_max;
 
 	list_for_each_entry(class, classes, classes_list) {
 		list_for_each_entry(comp, &class->components, class_list) {
 			comp->partid_narrowing =
 				mpam_component_all_ris_narrow(comp);
 			partid_narrowing_enabled |= comp->partid_narrowing;
+			partid_max = mpam_component_safe_partid_max(comp,
+								    partid_max);
 		}
 	}
+
+	mpam_partid_max = min(mpam_partid_max, partid_max);
 }
 
 static int mpam_init_vmsc_partid_mappings(struct mpam_vmsc *vmsc)
@@ -3723,14 +3744,6 @@ static void mpam_enable_once(void)
 	int err;
 
 	/*
-	 * Once the cpuhp callbacks have been changed, mpam_partid_max can no
-	 * longer change.
-	 */
-	spin_lock(&partid_max_lock);
-	partid_max_published = true;
-	spin_unlock(&partid_max_lock);
-
-	/*
 	 * If all the MSC have been probed, enabling the IRQs happens next.
 	 * That involves cross-calling to a CPU that can reach the MSC, and
 	 * the locks must be taken in this order:
@@ -3740,6 +3753,11 @@ static void mpam_enable_once(void)
 	do {
 		mpam_enable_merge_features(&mpam_classes);
 		mpam_enable_set_partid_narrowing(&mpam_classes);
+
+		/* All request and internal PARTID limits are now known. */
+		scoped_guard(spinlock, &partid_max_lock) {
+			partid_max_published = true;
+		}
 
 		err = mpam_register_irqs();
 		if (err) {

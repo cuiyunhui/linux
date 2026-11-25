@@ -406,6 +406,37 @@ static void test_mpam_component_partid_narrowing(struct kunit *test)
 	KUNIT_EXPECT_FALSE(test, mpam_component_all_ris_narrow(&fake_comp1));
 }
 
+static void test_mpam_component_safe_partid_max(struct kunit *test)
+{
+	reset_fake_hierarchy();
+	fake_comp1.class = &fake_class;
+	list_add(&fake_comp1.class_list, &fake_class.components);
+	fake_vmsc1.comp = &fake_comp1;
+	list_add(&fake_vmsc1.comp_list, &fake_comp1.vmsc);
+	fake_ris1.vmsc = &fake_vmsc1;
+	fake_ris2.vmsc = &fake_vmsc1;
+	list_add(&fake_ris1.vmsc_list, &fake_vmsc1.ris);
+	list_add(&fake_ris2.vmsc_list, &fake_vmsc1.ris);
+
+	mpam_set_feature(mpam_feat_partid_nrw, &fake_ris1.props);
+	mpam_set_feature(mpam_feat_partid_nrw, &fake_ris2.props);
+	fake_ris1.intpartid_max = 3;
+	fake_ris2.intpartid_max = 7;
+
+	fake_comp1.partid_narrowing = true;
+	KUNIT_EXPECT_EQ(test, mpam_component_safe_partid_max(&fake_comp1, 255),
+			255);
+
+	fake_comp1.partid_narrowing = false;
+	KUNIT_EXPECT_EQ(test, mpam_component_safe_partid_max(&fake_comp1, 255),
+			3);
+
+	mpam_clear_feature(mpam_feat_partid_nrw, &fake_ris1.props);
+	mpam_clear_feature(mpam_feat_partid_nrw, &fake_ris2.props);
+	KUNIT_EXPECT_EQ(test, mpam_component_safe_partid_max(&fake_comp1, 255),
+			255);
+}
+
 static void test_mpam_logical_partid_allocator(struct kunit *test)
 {
 	unsigned long private1[BITS_TO_LONGS(8)] = {};
@@ -463,6 +494,7 @@ static struct kunit_case mpam_devices_test_cases[] = {
 	KUNIT_CASE(test_mpam_reset_msc_bitmap),
 	KUNIT_CASE(test_mpam_enable_merge_features),
 	KUNIT_CASE(test_mpam_component_partid_narrowing),
+	KUNIT_CASE(test_mpam_component_safe_partid_max),
 	KUNIT_CASE(test_mpam_logical_partid_allocator),
 	KUNIT_CASE(test__props_mismatch),
 	{}
