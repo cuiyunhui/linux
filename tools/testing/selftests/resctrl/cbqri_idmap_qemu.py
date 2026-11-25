@@ -14,6 +14,7 @@ import sys
 import time
 
 PASS_MARKER = "IDMAP_V3_E2E_PASS:logical_ids_full_table_update_sum_release_reuse"
+SHELL_PROMPTS = ("[@orca ~]#", "~ #", "/ #")
 
 GUEST_TEST = r"""
 fail() { echo IDMAP_E2E_FAIL:$1; poweroff -f; }
@@ -225,7 +226,8 @@ def main():
             if not sent_enter and "Please press Enter to activate this console." in current:
                 write_all(master, b"\n")
                 sent_enter = True
-            if sent_enter and not sent_test and "[@orca ~]#" in current:
+            if (sent_enter and not sent_test and
+                    any(prompt in current for prompt in SHELL_PROMPTS)):
                 send_guest_test(master)
                 sent_test = True
             if PASS_MARKER in current or "IDMAP_E2E_FAIL:" in current:
