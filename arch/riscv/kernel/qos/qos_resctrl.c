@@ -118,6 +118,10 @@ static int cbqri_update_int_rcid(struct cbqri_controller *ctrl, u32 req_rcid,
 		return -ERANGE;
 
 	if (!cbqri_has_rcid_map(ctrl)) {
+		if (cbqri_supports_rcid_map(ctrl) && req_rcid &&
+		    ctrl->req_to_int[req_rcid] != req_rcid &&
+		    test_bit(req_rcid, ctrl->int_rcid_busy))
+			return -EBUSY;
 		*int_rcid = req_rcid;
 		return 0;
 	}
@@ -193,6 +197,9 @@ static int cbqri_rcid_map_op(struct cbqri_controller *ctrl, u32 op,
 	if (ctrl->info->size < sizeof(value) ||
 	    offset > ctrl->info->size - sizeof(value))
 		return -ERANGE;
+
+	if (cbqri_wait_busy(ctrl, offset))
+		return -ETIMEDOUT;
 
 	value = op << CBQRI_CTL_OP_SHIFT;
 	value |= (u64)*req_rcid << CBQRI_CTL_RCID_SHIFT;
@@ -315,6 +322,9 @@ static int cbqri_mon_op(struct cbqri_controller *ctrl, u32 op, u32 mcid,
 {
 	u32 offset = cbqri_mon_ctl_offset(ctrl);
 	u64 value;
+
+	if (cbqri_wait_busy(ctrl, offset))
+		return -ETIMEDOUT;
 
 	value = op << CBQRI_CTL_OP_SHIFT;
 	value |= (u64)mcid << CBQRI_CTL_RCID_SHIFT;
@@ -816,6 +826,9 @@ static int cbqri_capacity_op(struct cbqri_controller *ctrl, u32 op,
 	if (type == CDP_CODE)
 		value |= (u64)CBQRI_AT_CODE << CBQRI_CTL_AT_SHIFT;
 
+	if (cbqri_wait_busy(ctrl, CBQRI_CC_ALLOC_CTL_OFF))
+		return -ETIMEDOUT;
+
 	cbqri_writeq(ctrl, CBQRI_CC_ALLOC_CTL_OFF, value);
 	if (cbqri_wait_busy(ctrl, CBQRI_CC_ALLOC_CTL_OFF))
 		return -ETIMEDOUT;
@@ -840,6 +853,8 @@ int cbqri_capacity_set(struct cbqri_ctrl_domain *domain, u32 closid,
 			continue;
 		if (ret)
 			return ret;
+		if (cbqri_wait_busy(entry->ctrl, CBQRI_CC_ALLOC_CTL_OFF))
+			return -ETIMEDOUT;
 		cbqri_writeq(entry->ctrl, CBQRI_CC_BLOCK_MASK_OFF, value);
 		ret = cbqri_capacity_op(entry->ctrl,
 					CBQRI_CC_ALLOC_CTL_OP_CONFIG_LIMIT,
@@ -1096,6 +1111,9 @@ static int cbqri_bandwidth_op(struct cbqri_controller *ctrl, u32 op, u32 rcid)
 	u32 status;
 
 	value = op | ((u64)rcid << CBQRI_CTL_RCID_SHIFT);
+	if (cbqri_wait_busy(ctrl, CBQRI_BC_ALLOC_CTL_OFF))
+		return -ETIMEDOUT;
+
 	cbqri_writeq(ctrl, CBQRI_BC_ALLOC_CTL_OFF, value);
 	if (cbqri_wait_busy(ctrl, CBQRI_BC_ALLOC_CTL_OFF))
 		return -ETIMEDOUT;
@@ -1803,9 +1821,6 @@ static int cbqri_update_control(struct rdt_resource *r,
 				continue;
 			cbqri_domain = container_of(domain,
 						    struct cbqri_ctrl_domain, domain);
-			if (reason == RESCTRL_UPDATE_USER &&
-			    cbqri_domain->ctrl_val[closid] == cfg->new_ctrl)
-				continue;
 			ret = cbqri_update_one(r, ctrl, domain, closid, type,
 					       cfg->new_ctrl, reason);
 			if (ret)
@@ -1816,11 +1831,60 @@ static int cbqri_update_control(struct rdt_resource *r,
 	return 0;
 }
 
+static int cbqri_group_binding(struct cbqri_resctrl_resource *resource,
+			       u32 closid, bool initialize)
+{
+	struct cbqri_component *component;
+
+	if (!closid)
+		return 0;
+	list_for_each_entry(component, &resource->components, list) {
+		struct cbqri_component_ctrl *entry;
+
+		list_for_each_entry(entry, &component->controllers, list) {
+			struct cbqri_controller *ctrl = entry->ctrl;
+			u32 req_rcid = closid, old_rcid, int_rcid;
+			int ret;
+
+			if (!cbqri_supports_rcid_map(ctrl))
+				continue;
+			if (!initialize && cbqri_has_rcid_map(ctrl))
+				continue;
+			old_rcid = ctrl->req_to_int[closid];
+			if (initialize && !old_rcid)
+				continue;
+			int_rcid = initialize ? 0 : closid;
+			if (!initialize && old_rcid == int_rcid)
+				continue;
+			ret = cbqri_rcid_map_op(ctrl, CBQRI_RCID_MAP_OP_CONFIG,
+						&req_rcid, &int_rcid, NULL);
+			if (ret)
+				return ret;
+			ctrl->req_to_int[closid] = int_rcid;
+			if (old_rcid && old_rcid != int_rcid) {
+				__clear_bit(old_rcid, ctrl->int_rcid_busy);
+				__clear_bit(old_rcid, ctrl->int_rcid_quarantined);
+			}
+			if (int_rcid)
+				__set_bit(int_rcid, ctrl->int_rcid_busy);
+		}
+	}
+	return 0;
+}
+
 int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid,
 				enum resctrl_update_reason reason)
 {
+	struct cbqri_resctrl_resource *resource;
 	struct resctrl_ctrl *ctrl;
 	int ret;
+
+	resource = container_of(r, struct cbqri_resctrl_resource, res);
+	if (reason == RESCTRL_UPDATE_GROUP_INIT) {
+		ret = cbqri_group_binding(resource, closid, true);
+		if (ret)
+			return ret;
+	}
 
 	for_each_enabled_ctrl(ctrl, r) {
 		ret = cbqri_update_control(r, ctrl, closid, reason);
@@ -1828,6 +1892,8 @@ int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid,
 			return ret;
 	}
 
+	if (reason == RESCTRL_UPDATE_GROUP_INIT)
+		return cbqri_group_binding(resource, closid, false);
 	return 0;
 }
 
@@ -1906,8 +1972,7 @@ static bool cbqri_controller_needs_update(struct cbqri_controller *ctrl,
 					struct resctrl_staged_config *cfg;
 
 					cfg = &rdt_domain->staged_config[type];
-					if (cfg->have_new_ctrl &&
-					    cfg->new_ctrl != domain->ctrl_val[closid])
+					if (cfg->have_new_ctrl)
 						return true;
 				}
 			}
@@ -2263,6 +2328,32 @@ static void cbqri_init_resources(void)
 	}
 }
 
+static int cbqri_init_default_policies(void)
+{
+	struct rdt_ctrl_domain *domain;
+	struct resctrl_ctrl *ctrl;
+	struct rdt_resource *r;
+	int rid, ret;
+
+	for (rid = 0; rid < RDT_NUM_RESOURCES; rid++) {
+		r = &cbqri_resources[rid].res;
+		if (!r->alloc_capable)
+			continue;
+		for_each_enabled_ctrl(ctrl, r) {
+			list_for_each_entry(domain, &ctrl->domains, hdr.list) {
+				ret = resctrl_arch_update_one(r, ctrl, domain,
+							      RESCTRL_RESERVED_CLOSID,
+							      CDP_NONE,
+							      resctrl_get_default_ctrlval(ctrl));
+				if (ret)
+					return ret;
+			}
+		}
+	}
+
+	return 0;
+}
+
 int qos_resctrl_setup(void)
 {
 	int ret;
@@ -2280,6 +2371,9 @@ int qos_resctrl_setup(void)
 	ret = cbqri_init_bandwidth_controls();
 	if (ret)
 		goto out_remove_capacity;
+	ret = cbqri_init_default_policies();
+	if (ret)
+		goto out_remove_bandwidth;
 	ret = cbqri_init_monitoring();
 	if (ret)
 		goto out_remove_bandwidth;
