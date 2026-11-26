@@ -484,7 +484,8 @@ ssize_t rdtgroup_schemata_write(struct kernfs_open_file *of,
 	list_for_each_entry(f, &rdt_resource_final_all, list) {
 		r = f->res;
 
-		ret = resctrl_arch_update_domains(r, rdtgrp->closid);
+		ret = resctrl_arch_update_domains(r, rdtgrp->closid,
+						  RESCTRL_UPDATE_USER);
 		if (ret)
 			goto out_clear_staged;
 	}
@@ -971,7 +972,8 @@ static int resctrl_io_alloc_init_cbm(struct rdt_resource_final *f,
 			       sizeof(d->staged_config[0]));
 	}
 
-	ret = resctrl_arch_update_domains(r, closid);
+	ret = resctrl_arch_update_domains(r, closid,
+					  RESCTRL_UPDATE_PHYSICAL);
 out:
 	rdt_staged_configs_clear();
 	return ret;
@@ -1226,7 +1228,8 @@ ssize_t resctrl_io_alloc_cbm_write(struct kernfs_open_file *of, char *buf,
 	if (ret)
 		goto out_clear_configs;
 
-	ret = resctrl_arch_update_domains(r, io_alloc_closid);
+	ret = resctrl_arch_update_domains(r, io_alloc_closid,
+					  RESCTRL_UPDATE_PHYSICAL);
 
 out_clear_configs:
 	rdt_staged_configs_clear();

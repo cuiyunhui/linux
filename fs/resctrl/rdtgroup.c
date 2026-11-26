@@ -4525,7 +4525,8 @@ static int rdtgroup_init_alloc(struct rdtgroup *rdtgrp)
 			}
 		}
 
-		ret = resctrl_arch_update_domains(r, rdtgrp->closid);
+		ret = resctrl_arch_update_domains(r, rdtgrp->closid,
+						  RESCTRL_UPDATE_GROUP_INIT);
 		if (ret < 0) {
 			rdt_last_cmd_puts("Failed to initialize allocations\n");
 			goto out;
