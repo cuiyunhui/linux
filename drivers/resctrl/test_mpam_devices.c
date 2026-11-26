@@ -382,9 +382,295 @@ static void test_mpam_reset_msc_bitmap(struct kunit *test)
 	mutex_unlock(&fake_msc.part_sel_lock);
 }
 
+static void test_mpam_component_partid_narrowing(struct kunit *test)
+{
+	reset_fake_hierarchy();
+	fake_comp1.class = &fake_class;
+	list_add(&fake_comp1.class_list, &fake_class.components);
+	fake_vmsc1.comp = &fake_comp1;
+	list_add(&fake_vmsc1.comp_list, &fake_comp1.vmsc);
+	fake_ris1.vmsc = &fake_vmsc1;
+	fake_ris2.vmsc = &fake_vmsc1;
+	list_add(&fake_ris1.vmsc_list, &fake_vmsc1.ris);
+	list_add(&fake_ris2.vmsc_list, &fake_vmsc1.ris);
+
+	mpam_set_feature(mpam_feat_partid_nrw, &fake_ris1.props);
+	mpam_set_feature(mpam_feat_partid_nrw, &fake_ris2.props);
+	KUNIT_EXPECT_TRUE(test, mpam_component_all_ris_narrow(&fake_comp1));
+
+	mpam_clear_feature(mpam_feat_partid_nrw, &fake_ris2.props);
+	KUNIT_EXPECT_FALSE(test, mpam_component_all_ris_narrow(&fake_comp1));
+
+	fake_class.type = MPAM_CLASS_UNKNOWN;
+	mpam_set_feature(mpam_feat_partid_nrw, &fake_ris2.props);
+	KUNIT_EXPECT_FALSE(test, mpam_component_all_ris_narrow(&fake_comp1));
+}
+
+static void test_mpam_component_safe_partid_max(struct kunit *test)
+{
+	reset_fake_hierarchy();
+	fake_comp1.class = &fake_class;
+	list_add(&fake_comp1.class_list, &fake_class.components);
+	fake_vmsc1.comp = &fake_comp1;
+	list_add(&fake_vmsc1.comp_list, &fake_comp1.vmsc);
+	fake_ris1.vmsc = &fake_vmsc1;
+	fake_ris2.vmsc = &fake_vmsc1;
+	list_add(&fake_ris1.vmsc_list, &fake_vmsc1.ris);
+	list_add(&fake_ris2.vmsc_list, &fake_vmsc1.ris);
+
+	mpam_set_feature(mpam_feat_partid_nrw, &fake_ris1.props);
+	mpam_set_feature(mpam_feat_partid_nrw, &fake_ris2.props);
+	fake_ris1.intpartid_max = 3;
+	fake_ris2.intpartid_max = 7;
+
+	fake_comp1.partid_narrowing = true;
+	KUNIT_EXPECT_EQ(test, mpam_component_safe_partid_max(&fake_comp1, 255),
+			255);
+
+	fake_comp1.partid_narrowing = false;
+	KUNIT_EXPECT_EQ(test, mpam_component_safe_partid_max(&fake_comp1, 255),
+			3);
+
+	mpam_clear_feature(mpam_feat_partid_nrw, &fake_ris1.props);
+	mpam_clear_feature(mpam_feat_partid_nrw, &fake_ris2.props);
+	KUNIT_EXPECT_EQ(test, mpam_component_safe_partid_max(&fake_comp1, 255),
+			255);
+}
+
+static void test_mpam_logical_partid_allocator(struct kunit *test)
+{
+	unsigned long private1[BITS_TO_LONGS(8)] = {};
+	unsigned long private2[BITS_TO_LONGS(8)] = {};
+	unsigned long pending1[BITS_TO_LONGS(8)] = {};
+	unsigned long pending2[BITS_TO_LONGS(8)] = {};
+	unsigned long busy1[BITS_TO_LONGS(4)] = {};
+	unsigned long busy2[BITS_TO_LONGS(4)] = {};
+	u16 map1[8] = {};
+	u16 map2[8] = {};
+	u16 pair[] = { 1, 2 };
+
+	reset_fake_hierarchy();
+	fake_comp1.class = &fake_class;
+	fake_comp1.partid_narrowing = true;
+	list_add(&fake_comp1.class_list, &fake_class.components);
+	fake_vmsc1.comp = &fake_comp1;
+	list_add(&fake_vmsc1.comp_list, &fake_comp1.vmsc);
+	fake_ris1.vmsc = &fake_vmsc1;
+	fake_ris2.vmsc = &fake_vmsc1;
+	list_add(&fake_ris1.vmsc_list, &fake_vmsc1.ris);
+	list_add(&fake_ris2.vmsc_list, &fake_vmsc1.ris);
+
+	fake_ris1.intpartid_max = 3;
+	fake_ris1.partid_to_intpartid = map1;
+	fake_ris1.intpartid_busy = busy1;
+	fake_ris1.partid_private = private1;
+	fake_ris1.partid_pending = pending1;
+	fake_ris2.intpartid_max = 3;
+	fake_ris2.partid_to_intpartid = map2;
+	fake_ris2.intpartid_busy = busy2;
+	fake_ris2.partid_private = private2;
+	fake_ris2.partid_pending = pending2;
+	__set_bit(0, busy1);
+	__set_bit(0, busy2);
+	__set_bit(0, private1);
+	__set_bit(0, private2);
+
+	KUNIT_EXPECT_TRUE(test, mpam_partids_can_map(&fake_comp1, pair,
+						     ARRAY_SIZE(pair)));
+	KUNIT_ASSERT_EQ(test, mpam_prepare_partid(&fake_comp1, 1), 0);
+	KUNIT_EXPECT_EQ(test, map1[1], 1);
+	KUNIT_EXPECT_EQ(test, map2[1], 1);
+	KUNIT_EXPECT_TRUE(test, mpam_partid_is_mapped(&fake_comp1, 1));
+	KUNIT_EXPECT_TRUE(test, test_bit(1, pending1));
+	KUNIT_EXPECT_TRUE(test, test_bit(1, pending2));
+
+	KUNIT_ASSERT_EQ(test, mpam_prepare_partid(&fake_comp1, 2), 0);
+	KUNIT_ASSERT_EQ(test, mpam_prepare_partid(&fake_comp1, 3), 0);
+	KUNIT_EXPECT_FALSE(test, mpam_partid_can_map(&fake_comp1, 4));
+	KUNIT_EXPECT_EQ(test, mpam_prepare_partid(&fake_comp1, 4), -ENOSPC);
+}
+
+struct test_partid_maps {
+	DECLARE_BITMAP(private1, 8);
+	DECLARE_BITMAP(private2, 8);
+	DECLARE_BITMAP(pending1, 8);
+	DECLARE_BITMAP(pending2, 8);
+	DECLARE_BITMAP(busy1, 4);
+	DECLARE_BITMAP(busy2, 4);
+	u16 map1[8];
+	u16 map2[8];
+};
+
+static struct test_partid_maps *setup_test_partid_maps(struct kunit *test)
+{
+	struct test_partid_maps *maps;
+
+	maps = kunit_kzalloc(test, sizeof(*maps), GFP_KERNEL);
+	if (!maps)
+		return NULL;
+
+	reset_fake_hierarchy();
+	fake_comp1.class = &fake_class;
+	fake_comp1.partid_narrowing = true;
+	list_add(&fake_comp1.class_list, &fake_class.components);
+	fake_vmsc1.comp = &fake_comp1;
+	fake_vmsc2.comp = &fake_comp1;
+	fake_vmsc1.msc = &fake_msc1;
+	fake_vmsc2.msc = &fake_msc2;
+	list_add(&fake_vmsc1.comp_list, &fake_comp1.vmsc);
+	list_add(&fake_vmsc2.comp_list, &fake_comp1.vmsc);
+	fake_ris1.vmsc = &fake_vmsc1;
+	fake_ris2.vmsc = &fake_vmsc2;
+	list_add(&fake_ris1.vmsc_list, &fake_vmsc1.ris);
+	list_add(&fake_ris2.vmsc_list, &fake_vmsc2.ris);
+	fake_ris1.intpartid_max = 3;
+	fake_ris2.intpartid_max = 3;
+	fake_ris1.partid_to_intpartid = maps->map1;
+	fake_ris2.partid_to_intpartid = maps->map2;
+	fake_ris1.partid_private = maps->private1;
+	fake_ris2.partid_private = maps->private2;
+	fake_ris1.partid_pending = maps->pending1;
+	fake_ris2.partid_pending = maps->pending2;
+	fake_ris1.intpartid_busy = maps->busy1;
+	fake_ris2.intpartid_busy = maps->busy2;
+	mutex_init(&fake_msc1.cfg_lock);
+	mutex_init(&fake_msc2.cfg_lock);
+	mutex_init(&fake_msc1.part_sel_lock);
+	mutex_init(&fake_msc2.part_sel_lock);
+	fake_msc1.partid_max = 7;
+	fake_msc2.partid_max = 7;
+	fake_msc1.iface = MPAM_IFACE_MMIO;
+	fake_msc2.iface = MPAM_IFACE_MMIO;
+	for (unsigned int root = 0; root < 2; root++) {
+		__set_bit(root, maps->busy1);
+		__set_bit(root, maps->busy2);
+		__set_bit(root, maps->private1);
+		__set_bit(root, maps->private2);
+		maps->map1[root] = root;
+		maps->map2[root] = root;
+	}
+	return maps;
+}
+
+static void test_mpam_partid_pair_preflight(struct kunit *test)
+{
+	struct test_partid_maps *maps = setup_test_partid_maps(test);
+	u16 pair[] = { 6, 7 };
+	u16 repeated[] = { 6, 6 };
+
+	KUNIT_ASSERT_NOT_NULL(test, maps);
+	__set_bit(2, maps->busy2);
+	KUNIT_EXPECT_FALSE(test, mpam_partids_can_map(&fake_comp1, pair,
+						      ARRAY_SIZE(pair)));
+	KUNIT_EXPECT_EQ(test, bitmap_weight(maps->busy1, 4), 2);
+	KUNIT_EXPECT_EQ(test, bitmap_weight(maps->busy2, 4), 3);
+	KUNIT_EXPECT_TRUE(test, mpam_partids_can_map(&fake_comp1, repeated,
+						     ARRAY_SIZE(repeated)));
+	KUNIT_EXPECT_FALSE(test, test_bit(6, maps->private1));
+	KUNIT_EXPECT_FALSE(test, test_bit(6, maps->private2));
+}
+
+static void test_mpam_partid_pair_allocation(struct kunit *test)
+{
+	struct test_partid_maps *maps = setup_test_partid_maps(test);
+	u16 pair[] = { 6, 7 };
+
+	KUNIT_ASSERT_NOT_NULL(test, maps);
+	KUNIT_ASSERT_TRUE(test, mpam_partids_can_map(&fake_comp1, pair,
+						     ARRAY_SIZE(pair)));
+	KUNIT_ASSERT_EQ(test, mpam_prepare_partid(&fake_comp1, 6), 0);
+	KUNIT_ASSERT_EQ(test, mpam_prepare_partid(&fake_comp1, 7), 0);
+	KUNIT_EXPECT_EQ(test, maps->map1[6], 2);
+	KUNIT_EXPECT_EQ(test, maps->map2[6], 2);
+	KUNIT_EXPECT_EQ(test, maps->map1[7], 3);
+	KUNIT_EXPECT_EQ(test, maps->map2[7], 3);
+	KUNIT_EXPECT_EQ(test, mpam_prepare_partid(&fake_comp1, 6), 0);
+	KUNIT_EXPECT_EQ(test, bitmap_weight(maps->busy1, 4), 4);
+	KUNIT_EXPECT_EQ(test, bitmap_weight(maps->busy2, 4), 4);
+	KUNIT_EXPECT_EQ(test, mpam_prepare_partid(&fake_comp1, 4), -ENOSPC);
+}
+
+static void test_mpam_default_partid_selection(struct kunit *test)
+{
+	for (u16 partid = 0; partid < 8; partid++) {
+		KUNIT_EXPECT_EQ(test, mpam_default_partid(partid, false), 0);
+		KUNIT_EXPECT_EQ(test, mpam_default_partid(partid, true),
+				partid & 1);
+	}
+}
+
+static void test_mpam_cleanup_srcu(void *arg)
+{
+	struct srcu_struct *srcu = arg;
+
+	cleanup_srcu_struct(srcu);
+	memset(srcu, 0, sizeof(*srcu));
+}
+
+static void test_mpam_partid_release_retry(struct kunit *test)
+{
+	struct test_partid_maps *maps = setup_test_partid_maps(test);
+	void *regs1, *regs2;
+	int ret;
+
+	if (!IS_ENABLED(CONFIG_SMP)) {
+		kunit_skip(test, "Requires an unavailable CPU target");
+		return;
+	}
+	KUNIT_ASSERT_NOT_NULL(test, maps);
+	/* The driver skips SRCU setup when the virtual CPU has no MPAM. */
+	if (!mpam_srcu.sda) {
+		KUNIT_ASSERT_EQ(test, init_srcu_struct(&mpam_srcu), 0);
+		ret = kunit_add_action_or_reset(test, test_mpam_cleanup_srcu,
+						&mpam_srcu);
+		KUNIT_ASSERT_EQ(test, ret, 0);
+	}
+	regs1 = kunit_kzalloc(test, SZ_64K, GFP_KERNEL);
+	regs2 = kunit_kzalloc(test, SZ_64K, GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, regs1);
+	KUNIT_ASSERT_NOT_NULL(test, regs2);
+	fake_msc1.mapped_hwpage = (void __iomem *)regs1;
+	fake_msc2.mapped_hwpage = (void __iomem *)regs2;
+	fake_msc1.mapped_hwpage_sz = SZ_64K;
+	fake_msc2.mapped_hwpage_sz = SZ_64K;
+	KUNIT_ASSERT_EQ(test, mpam_prepare_partid(&fake_comp1, 6), 0);
+	cpus_read_lock();
+	cpumask_set_cpu(raw_smp_processor_id(), &fake_msc1.accessibility);
+	cpumask_clear(&fake_msc2.accessibility);
+	ret = mpam_release_partid(&fake_comp1, 6, 0);
+	cpus_read_unlock();
+	KUNIT_EXPECT_LT(test, ret, 0);
+	KUNIT_EXPECT_TRUE(test, test_bit(2, maps->busy1));
+	KUNIT_EXPECT_TRUE(test, test_bit(2, maps->busy2));
+	KUNIT_EXPECT_TRUE(test, test_bit(6, maps->private1));
+	KUNIT_EXPECT_TRUE(test, test_bit(6, maps->private2));
+
+	cpus_read_lock();
+	cpumask_set_cpu(raw_smp_processor_id(), &fake_msc2.accessibility);
+	ret = mpam_release_partid(&fake_comp1, 6, 0);
+	cpus_read_unlock();
+	KUNIT_ASSERT_EQ(test, ret, 0);
+	KUNIT_EXPECT_FALSE(test, test_bit(2, maps->busy1));
+	KUNIT_EXPECT_FALSE(test, test_bit(2, maps->busy2));
+	KUNIT_EXPECT_FALSE(test, test_bit(6, maps->private1));
+	KUNIT_EXPECT_FALSE(test, test_bit(6, maps->private2));
+	KUNIT_EXPECT_EQ(test, maps->map1[6], 0);
+	KUNIT_EXPECT_EQ(test, maps->map2[6], 0);
+	KUNIT_ASSERT_EQ(test, mpam_prepare_partid(&fake_comp1, 4), 0);
+	KUNIT_EXPECT_EQ(test, maps->map1[4], 2);
+	KUNIT_EXPECT_EQ(test, maps->map2[4], 2);
+}
+
 static struct kunit_case mpam_devices_test_cases[] = {
 	KUNIT_CASE(test_mpam_reset_msc_bitmap),
 	KUNIT_CASE(test_mpam_enable_merge_features),
+	KUNIT_CASE(test_mpam_component_partid_narrowing),
+	KUNIT_CASE(test_mpam_component_safe_partid_max),
+	KUNIT_CASE(test_mpam_logical_partid_allocator),
+	KUNIT_CASE(test_mpam_partid_pair_preflight),
+	KUNIT_CASE(test_mpam_partid_pair_allocation),
+	KUNIT_CASE(test_mpam_default_partid_selection),
+	KUNIT_CASE(test_mpam_partid_release_retry),
 	KUNIT_CASE(test__props_mismatch),
 	{}
 };
