@@ -225,6 +225,8 @@ static int cbqri_rcid_map_op(struct cbqri_controller *ctrl, u32 op,
 
 static void cbqri_free_identifier_map(struct cbqri_controller *ctrl)
 {
+	bitmap_free(ctrl->mcid_assigned);
+	ctrl->mcid_assigned = NULL;
 	bitmap_free(ctrl->int_rcid_quarantined);
 	bitmap_free(ctrl->int_rcid_busy);
 	kfree(ctrl->req_to_int);
@@ -346,12 +348,24 @@ static int cbqri_config_event(struct cbqri_controller *ctrl, u32 mcid,
 
 	ret = cbqri_mon_op(ctrl, CBQRI_MON_CTL_OP_CONFIG_EVENT, mcid,
 			   event_id, &status);
-	if (ret)
+	if (ret) {
+		if (event_id != CBQRI_MON_EVT_NONE &&
+		    ctrl->mcid_assigned && mcid < CBQRI_LOGICAL_ID_COUNT)
+			__set_bit(mcid, ctrl->mcid_assigned);
 		return ret;
+	}
 	if (status == CBQRI_MON_CTL_STATUS_NO_COUNTER)
 		return -ENOSPC;
+	if (status != CBQRI_MON_CTL_STATUS_SUCCESS)
+		return -EIO;
 
-	return status == CBQRI_MON_CTL_STATUS_SUCCESS ? 0 : -EIO;
+	if (ctrl->mcid_assigned) {
+		if (event_id == CBQRI_MON_EVT_NONE)
+			__clear_bit(mcid, ctrl->mcid_assigned);
+		else
+			__set_bit(mcid, ctrl->mcid_assigned);
+	}
+	return 0;
 }
 
 static int cbqri_event_id(struct cbqri_controller *ctrl,
@@ -385,15 +399,6 @@ static int cbqri_read_counter(struct cbqri_controller *ctrl, u32 mcid,
 			   CBQRI_MON_EVT_NONE, &status);
 	if (ret)
 		return ret;
-	if (status == CBQRI_MON_CTL_STATUS_NO_COUNTER) {
-		ret = cbqri_config_event(ctrl, mcid, hw_event);
-		if (ret)
-			return ret;
-		ret = cbqri_mon_op(ctrl, CBQRI_MON_CTL_OP_READ_COUNTER, mcid,
-				   CBQRI_MON_EVT_NONE, &status);
-		if (ret)
-			return ret;
-	}
 	if (status == CBQRI_MON_CTL_STATUS_NO_COUNTER)
 		return -ENOSPC;
 	if (status != CBQRI_MON_CTL_STATUS_SUCCESS)
@@ -434,11 +439,14 @@ static int cbqri_probe_monitor(struct cbqri_controller *ctrl)
 	      status == CBQRI_MON_CTL_STATUS_NO_COUNTER))
 		return 0;
 
+	ctrl->mcid_assigned = bitmap_zalloc(CBQRI_LOGICAL_ID_COUNT,
+					    GFP_KERNEL);
+	if (!ctrl->mcid_assigned)
+		return -ENOMEM;
 	ctrl->mon_capable = true;
-	if (!cbqri_supports_mcid_map(ctrl))
-		return 0;
-
-	for (mcid = 0; mcid < CBQRI_LOGICAL_ID_COUNT; mcid++) {
+	for (mcid = 0; mcid < (cbqri_supports_mcid_map(ctrl) ?
+			      CBQRI_LOGICAL_ID_COUNT : ctrl->info->mcid_count);
+	     mcid++) {
 		ret = cbqri_config_event(ctrl, mcid, CBQRI_MON_EVT_NONE);
 		if (ret)
 			return ret;
@@ -1708,9 +1716,50 @@ int resctrl_arch_rmid_read(struct rdt_resource *r, struct rdt_domain_hdr *hdr,
 }
 
 void resctrl_arch_reset_rmid(struct rdt_resource *r,
-			     struct rdt_l3_mon_domain *domain, u32 closid,
+			     struct rdt_l3_mon_domain *rdt_domain, u32 closid,
 			     u32 rmid, enum resctrl_event_id eventid)
 {
+	struct cbqri_mon_domain *domain;
+	struct cbqri_mon_ctrl *entry;
+	int event, ret;
+
+	if (r != &cbqri_resources[RDT_RESOURCE_L3].res)
+		return;
+	domain = container_of(rdt_domain, struct cbqri_mon_domain, domain);
+
+	list_for_each_entry(entry, &domain->controllers, list) {
+		struct cbqri_controller *ctrl = entry->ctrl;
+
+		event = cbqri_event_id(ctrl, eventid);
+		if (event < 0)
+			continue;
+		if (cbqri_supports_mcid_map(ctrl) &&
+		    !test_bit(rmid, ctrl->mcid_assigned) &&
+		    bitmap_weight(ctrl->mcid_assigned, CBQRI_LOGICAL_ID_COUNT) >=
+		    ctrl->info->mcid_count)
+			return;
+	}
+	list_for_each_entry(entry, &domain->controllers, list) {
+		event = cbqri_event_id(entry->ctrl, eventid);
+		if (event < 0)
+			continue;
+		ret = cbqri_config_event(entry->ctrl, rmid, event);
+		if (ret)
+			goto abort;
+	}
+	return;
+
+abort:
+	list_for_each_entry(entry, &domain->controllers, list) {
+		if (cbqri_event_id(entry->ctrl, eventid) < 0)
+			continue;
+		if (cbqri_config_event(entry->ctrl, rmid, CBQRI_MON_EVT_NONE))
+			pr_warn_ratelimited("failed to undo MCID %u activation\n",
+					    rmid);
+	}
+	if (ret != -ENOSPC)
+		pr_warn_ratelimited("failed to activate MCID %u: %d\n",
+				    rmid, ret);
 }
 
 void resctrl_arch_reset_rmid_all(struct rdt_resource *r,
@@ -2304,17 +2353,33 @@ int resctrl_arch_release_rmid(u32 closid, u32 rmid)
 	list_for_each_entry(ctrl, &cbqri_hw_controllers, list) {
 		if (!ctrl->mon_capable)
 			continue;
+		if (!cbqri_supports_mcid_map(ctrl) &&
+		    ctrl->info->type == CBQRI_CONTROLLER_TYPE_CAPACITY) {
+			u64 occupancy;
+
+			if (!test_bit(rmid, ctrl->mcid_assigned)) {
+				ret = cbqri_config_event(ctrl, rmid,
+							 CBQRI_CC_MON_EVT_OCCUPANCY);
+				if (ret)
+					return ret;
+			}
+			ret = cbqri_read_counter(ctrl, rmid,
+						 QOS_L3_OCCUP_EVENT_ID, &occupancy);
+			if (ret || occupancy)
+				return -EAGAIN;
+		}
 		ret = cbqri_config_event(ctrl, rmid, CBQRI_MON_EVT_NONE);
 		if (ret)
 			return ret;
 	}
+
+	return 0;
 }
 
 u32 resctrl_arch_preconvert_bw(const struct rdt_resource *r,
 			       struct resctrl_ctrl *ctrl, u32 value)
 {
 	return value;
-	return 0;
 }
 
 static void cbqri_init_resources(void)

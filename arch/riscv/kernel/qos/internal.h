@@ -175,6 +175,7 @@ struct cbqri_controller {
 	u16				pending_old_int_rcid;
 	bool				pending_valid;
 	bool				mon_capable;
+	unsigned long			*mcid_assigned;
 };
 
 enum cbqri_ctrl_kind {
