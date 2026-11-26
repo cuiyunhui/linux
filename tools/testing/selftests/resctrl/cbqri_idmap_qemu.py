@@ -13,8 +13,8 @@ import subprocess
 import sys
 import time
 
-PASS_MARKER = "IDMAP_V3_E2E_PASS:logical_ids_full_table_update_sum_release_reuse"
-SHELL_PROMPTS = ("[@orca ~]#", "~ #", "/ #")
+PASS_MARKER = "IDMAP_V3_E2E_PASS:logical_ids_activation_checked_release_reuse"
+SHELL_PROMPTS = ("[@orca ~]#", "[root@~]#", "~ #", "/ #")
 
 GUEST_TEST = r"""
 fail() { echo IDMAP_E2E_FAIL:$1; poweroff -f; }
@@ -28,8 +28,18 @@ map_int() {
     echo $(((value >> 20) & 4095))
 }
 mon_read() {
-    /sbin/devmem $(($1 + 0x08)) 64 $((2 | ($2 << 8))) >/dev/null
-    /sbin/devmem $(($1 + 0x08)) 64
+    attempts=0
+    while [ "$attempts" -lt 20 ]; do
+        /sbin/devmem $(($1 + 0x08)) 64 $((2 | ($2 << 8))) >/dev/null
+        value=$(/sbin/devmem $(($1 + 0x08)) 64)
+        if [ $(((value >> 8) & 4095)) = "$2" ] &&
+           [ $((value & 31)) = "2" ]; then
+            echo "$value"
+            return
+        fi
+        attempts=$((attempts + 1))
+    done
+    fail monitor_register_raced_$1_$2
 }
 write_schema() {
     printf 'MB:0=%s\nMB_NODE_WEIGHT:0=%s\n' $2 $3 > /tmp/schema
@@ -57,8 +67,12 @@ mkdir -p /sys/fs/resctrl || fail mkdir_mountpoint
 mount -t resctrl none /sys/fs/resctrl 2>/dev/null || true
 [ "$(cat /sys/fs/resctrl/info/MB/num_closids)" = "4096" ] || fail mb_closids
 [ "$(cat /sys/fs/resctrl/info/L3_MON/num_rmids)" = "4096" ] || fail rmids
-grep -q 'MB:0=0$' /sys/fs/resctrl/schemata || fail root_mb_default
-grep -q 'MB_NODE_WEIGHT:0=0$' /sys/fs/resctrl/schemata || fail root_weight
+echo ROOT_SCHEMATA
+cat /sys/fs/resctrl/schemata
+root_mb=$(sed -n 's/^[[:space:]]*MB:0=//p' /sys/fs/resctrl/schemata)
+root_weight=$(sed -n 's/^[[:space:]]*MB_NODE_WEIGHT:0=//p' /sys/fs/resctrl/schemata)
+[ "$root_mb" -gt 0 ] || fail root_mb_default
+[ "$root_weight" -gt 0 ] || fail root_weight
 mkdir -p /tmp
 mkdir /sys/fs/resctrl/g1 || fail mkdir_g1
 write_schema /sys/fs/resctrl/g1 25 7 || fail write_g1
@@ -77,7 +91,7 @@ if write_schema /sys/fs/resctrl/g4 25 7; then
 fi
 grep -q 'Failed to prepare control update: -28' \
     /sys/fs/resctrl/info/last_cmd_status || fail last_cmd
-grep -q 'MB:0=0$' /sys/fs/resctrl/g4/schemata || fail g4_default
+grep -q "MB:0=$root_mb$" /sys/fs/resctrl/g4/schemata || fail g4_default
 for base in 0x04828000 0x04829000; do
     for n in 1 2 3; do
         check_ctrl $base $n
@@ -100,6 +114,18 @@ done
 rmdir /sys/fs/resctrl/g1 || fail rmdir_g1
 for base in 0x04828000 0x04829000; do
     [ "$(map_int $base 1)" = "0" ] || fail release_rcid_$base
+done
+if [ "$release_failures" = "2" ]; then
+    [ "$(status $(mon_read 0x04828000 1))" = "1" ] || fail retained_mcid
+    [ "$(status $(mon_read 0x04829000 1))" = "6" ] || fail partial_release
+    mkdir /sys/fs/resctrl/g4/mon_groups/retry1 || fail mkdir_retry1
+    [ "$(cat /sys/fs/resctrl/g4/mon_groups/retry1/mon_data/mon_L3_00/mbm_total_bytes)" = \
+      "Unassigned" ] || fail premature_mcid_reuse
+fi
+mkdir /sys/fs/resctrl/g4/mon_groups/retry2 || fail mkdir_retry2
+[ "$(cat /sys/fs/resctrl/g4/mon_groups/retry2/mon_data/mon_L3_00/mbm_total_bytes)" = \
+  "36" ] || fail explicit_monitor_activation
+for base in 0x04828000 0x04829000; do
     [ "$(status $(mon_read $base 1))" = "6" ] || fail release_mcid_$base
 done
 write_schema /sys/fs/resctrl/g4 20 9 || fail reuse_g4
@@ -108,9 +134,19 @@ grep -q 'MB_NODE_WEIGHT:0=9$' /sys/fs/resctrl/g4/schemata || fail weight_g4
 for base in 0x04828000 0x04829000; do
     [ "$(map_int $base 4)" != "0" ] || fail reuse_map_$base
 done
-[ "$(cat /sys/fs/resctrl/g4/mon_data/mon_L3_00/mbm_total_bytes)" = "36" ] || \
-    fail reuse_mcid_g4
-echo IDMAP_V3_E2E_PASS:logical_ids_full_table_update_sum_release_reuse
+for base in 0x04828000 0x04829000; do
+    [ "$(status $(mon_read $base 4))" = "6" ] || fail read_allocated_mcid_$base
+done
+[ "$release_failures" != "2" ] || rmdir /sys/fs/resctrl/g4/mon_groups/retry1
+rmdir /sys/fs/resctrl/g4/mon_groups/retry2 || fail remove_monitor_child
+for n in 2 3 4; do
+    rmdir /sys/fs/resctrl/g$n || fail remove_g$n
+done
+umount /sys/fs/resctrl || fail unmount
+if dmesg | grep -q 'failed to reset control'; then
+    fail reset_unmapped_entry
+fi
+echo IDMAP_V3_E2E_PASS:logical_ids_activation_checked_release_reuse
 poweroff -f
 """
 
@@ -133,6 +169,8 @@ def parse_args():
                         help="OpenSBI fw_dynamic binary")
     parser.add_argument("--log", default=Path("cbqri-idmap-e2e.log"),
                         type=path_argument, help="console log output path")
+    parser.add_argument("--release-failures", choices=(0, 2), default=0,
+                        type=int, help="inject stop failures for active MCID 1")
     parser.add_argument("--timeout", default=180, type=int,
                         help="timeout in seconds (default: 180)")
     return parser.parse_args()
@@ -151,24 +189,25 @@ def qemu_args(args):
         "-initrd", str(args.initrd),
         "-append",
         "root=/dev/ram rw console=ttyS0 earlycon=sbi loglevel=4 "
-        "rdinit=/init iomem=relaxed",
+        "rdinit=/init iomem=relaxed resctrl.logical_ids=1",
         "-bios", str(args.opensbi),
         "-blockdev",
         "node-name=pflash0,driver=file,read-only=on,"
         f"filename={args.firmware}",
         "-device",
         "riscv.cbqri.bandwidth,max_mcids=2,max_rcids=4,"
-        "nbwblks=16,mrbwb=12,inactive-entry=on,rcid-map=on,mcid-map=on,"
-        "counter-value=17,mmio_base=0x04828000",
+        "nbwblks=16,mrbwb=13,inactive-entry=on,rcid-map=on,mcid-map=on,"
+        f"counter-value=17,release-failures={args.release_failures},"
+        "mmio_base=0x04828000",
         "-device",
         "riscv.cbqri.bandwidth,max_mcids=2,max_rcids=4,"
-        "nbwblks=16,mrbwb=12,inactive-entry=on,rcid-map=on,mcid-map=on,"
+        "nbwblks=16,mrbwb=13,inactive-entry=on,rcid-map=on,mcid-map=on,"
         "counter-value=19,mmio_base=0x04829000",
     ]
 
 
 def clean_console(data):
-    text = data.decode("utf-8", errors="replace").replace("\r", "")
+    text = data.decode("utf-8", errors="replace").replace("\r", "").replace("\x07", "")
     return re.sub(r"\x1b\[[0-9;=?]*[A-Za-z]", "", text)
 
 
@@ -179,17 +218,35 @@ def write_all(fd, data):
         view = view[written:]
 
 
-def send_guest_test(fd):
-    encoded = base64.b64encode(GUEST_TEST.encode()).decode()
-    commands = ["stty -echo", "mkdir -p /tmp", ": > /tmp/idmap-e2e.b64"]
-    commands.extend(
-        f"echo {encoded[offset:offset + 512]} >> /tmp/idmap-e2e.b64"
-        for offset in range(0, len(encoded), 512)
-    )
-    commands.append("base64 -d /tmp/idmap-e2e.b64 | sh")
-    for command in commands:
+def send_guest_test(fd, failures, output):
+    script = f"release_failures={failures}\n" + GUEST_TEST
+    encoded = base64.b64encode(script.encode()).decode()
+
+    def send_and_wait(command, marker):
         write_all(fd, command.encode() + b"\n")
-        time.sleep(0.02)
+        deadline = time.monotonic() + 15
+        received = bytearray()
+        while time.monotonic() < deadline:
+            ready, _, _ = select.select([fd], [], [], 1)
+            if ready:
+                data = os.read(fd, 65536)
+                if not data:
+                    break
+                output.extend(data)
+                received.extend(data)
+                if marker in clean_console(received):
+                    return
+        raise RuntimeError(f"guest upload did not acknowledge {marker}")
+
+    send_and_wait("stty -echo -ixon -ixoff; mkdir -p /tmp; "
+                  ": > /tmp/idmap-e2e.b64; echo IDMAP_UPLOAD_READY",
+                  "IDMAP_UPLOAD_READY")
+    for index, offset in enumerate(range(0, len(encoded), 256)):
+        marker = f"IDMAP_CHUNK_{index}_OK"
+        chunk = encoded[offset:offset + 256]
+        send_and_wait(f"echo {chunk} >> /tmp/idmap-e2e.b64; echo {marker}",
+                      marker)
+    write_all(fd, b"base64 -d /tmp/idmap-e2e.b64 | sh\n")
 
 
 def main():
@@ -226,9 +283,9 @@ def main():
             if not sent_enter and "Please press Enter to activate this console." in current:
                 write_all(master, b"\n")
                 sent_enter = True
-            if (sent_enter and not sent_test and
+            if (not sent_test and
                     any(prompt in current for prompt in SHELL_PROMPTS)):
-                send_guest_test(master)
+                send_guest_test(master, args.release_failures, output)
                 sent_test = True
             if PASS_MARKER in current or "IDMAP_E2E_FAIL:" in current:
                 try:
