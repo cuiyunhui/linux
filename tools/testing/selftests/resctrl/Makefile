@@ -7,6 +7,8 @@ TEST_GEN_PROGS := resctrl_tests
 
 LOCAL_HDRS += $(wildcard *.h)
 
+TEST_PROGS += logical_ctrl_ids.py
+
 include ../lib.mk
 CFLAGS += -I$(top_srcdir)/tools/include
 
