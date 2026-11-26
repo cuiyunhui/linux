@@ -2234,3 +2234,100 @@ http://web.archive.org/web/20191125200531/https://www.intel.com/content/dam/www/
 https://software.intel.com/content/www/us/en/develop/articles/intel-resource-director-technology-rdt-reference-manual.html
 
 for further information.
+
+
+Logical and physical control identifiers
+========================================
+
+Some controllers accept more request identifiers than they have physical
+allocation entries. For example, an MPAM MSC can accept 256 PARTIDs while a
+narrowing RIS has 32 internal entries. Using the internal limit as the
+system CLOSID limit prevents otherwise valid request PARTIDs from being used.
+
+An architecture can use controller-local allocation where the hardware can
+translate request identifiers to physical entries. MPAM does this when every
+RIS in a component supports PARTID narrowing. Components without uniform
+narrowing support retain their existing identity behavior. Intel and AMD keep
+their existing CLOSID and RMID allocation, register programming and monitoring
+mechanisms.
+
+In the controller-local mode, ``num_closids`` describes the logical request
+namespace. It does not guarantee that every group can have an independent
+policy in every domain. Physical entries and allocation constraints remain
+local to their controllers.
+
+This feature does not expand the monitoring identifier namespace. On a
+monitoring-capable system, creating a control group still allocates an RMID.
+If fewer RMIDs than logical CLOSIDs are available, RMID exhaustion can still
+limit the number of control groups.
+
+Group policy lifetime
+---------------------
+
+A new group on a mapped domain initially shares the current root policy.
+Group creation does not reserve a physical entry on that domain. A root
+update therefore affects groups that still share its default.
+
+The first explicit policy write requests an independent configuration,
+including when the supplied value equals the current root value. Reserve
+entries in every affected controller, copy the current root configuration,
+apply all staged controls, and publish the mappings after programming has
+succeeded. Further writes update the group's existing entries.
+
+If a required entry is unavailable, the write returns ``ENOSPC`` and a
+previously unconfigured group continues to use the root policy. The group
+and its logical ID remain valid. Deleting another configured group can
+make an entry available for retry. Exhausting the logical namespace instead
+causes group creation to fail.
+
+An identity domain retains its existing initialization behavior: each group
+has the corresponding hardware identifier and inherits a policy snapshot.
+Root updates do not alter that snapshot.
+
+CDP requires separate data and code defaults. A narrowed component reserves
+both root entries and directs unconfigured data and code PARTIDs to their
+respective defaults. A write can reserve one entry or a data/code pair.
+The original architecture restrictions on CDP continue to apply.
+
+Architecture interface
+----------------------
+
+``RESCTRL_UPDATE_GROUP_INIT`` distinguishes group initialization from an
+explicit ``RESCTRL_UPDATE_USER`` write. ``RESCTRL_UPDATE_PHYSICAL`` identifies
+updates whose CLOSID already names a physical entry, such as the reserved
+``io_alloc`` CLOSID. An architecture can defer physical allocation during
+group initialization without translating direct physical updates.
+
+For mapped control IDs, the prepare hook reserves resources without changing
+request-visible mappings. The commit hook publishes prepared mappings after
+the staged controls have been programmed. The abort hook discards pending
+reservations and retains entries whose state cannot be safely recovered.
+
+These hooks do not make all controller register writes globally atomic.
+Preflight checks entry availability, but hardware constraints or access
+failures can still reject programming or publication. Updating an existing
+entry in place does not provide automatic rollback of all its controls.
+
+The control release hook runs after tasks and CPUs have moved to the default
+group and before the logical CLOSID is freed. An unsuccessful release retains
+the group and logical ID so removal can be retried. Identity architectures
+can leave this hook empty or use it to retire controller allocation state.
+
+Validation
+----------
+
+The ``CTRL_ID`` case in ``resctrl_tests`` creates cache control groups and
+detects identity or controller-local behavior from their response to a root
+policy update. It checks same-value writes, default sharing and CLOSID reuse.
+When the logical namespace is larger than the physical table, it also checks
+entry exhaustion, release and retry::
+
+  tools/testing/selftests/resctrl/resctrl_tests -t ctrl_id
+
+The test does not expose physical entry numbers to user space. It drives the
+same group and ``schemata`` interface used by applications.
+
+``CONFIG_MPAM_KUNIT_TEST=y`` enables software tests for component eligibility,
+request limits, per-RIS allocation, paired preflight, default selection and
+release failure/retry. Hardware tests remain necessary for register access,
+request tagging, policy effects and reset restoration.
