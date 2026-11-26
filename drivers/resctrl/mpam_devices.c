@@ -6,6 +6,7 @@
 #include <linux/acpi.h>
 #include <linux/atomic.h>
 #include <linux/arm_mpam.h>
+#include <linux/resctrl_types.h>
 #include <linux/bitfield.h>
 #include <linux/bitmap.h>
 #include <linux/cacheinfo.h>
@@ -1149,6 +1150,7 @@ static int mpam_ris_hw_probe(struct mpam_msc_ris *ris)
 		partid_max = FIELD_GET(MPAMF_PARTID_NRW_IDR_INTPARTID_MAX, nrwidr);
 
 		mpam_set_feature(mpam_feat_partid_nrw, props);
+		ris->intpartid_max = partid_max;
 		msc->partid_max = min(msc->partid_max, partid_max);
 	}
 
@@ -2834,6 +2836,47 @@ static void mpam_enable_merge_class_features(struct mpam_component *comp)
 		mpam_clear_feature(mpam_feat_mbw_min, &class->props);
 }
 
+static bool mpam_component_all_ris_narrow(struct mpam_component *comp)
+{
+	struct mpam_vmsc *vmsc;
+	bool found = false;
+
+	if (comp->class->type == MPAM_CLASS_UNKNOWN)
+		return false;
+
+	list_for_each_entry(vmsc, &comp->vmsc, comp_list) {
+		struct mpam_msc_ris *ris;
+
+		list_for_each_entry(ris, &vmsc->ris, vmsc_list) {
+			if (!mpam_has_feature(mpam_feat_partid_nrw,
+					      &ris->props))
+				return false;
+			found = true;
+		}
+	}
+
+	return found;
+}
+
+bool mpam_component_uses_partid_narrowing(struct mpam_component *comp)
+{
+	return comp->partid_narrowing;
+}
+
+static void mpam_enable_set_partid_narrowing(struct list_head *classes)
+{
+	struct mpam_component *comp;
+	struct mpam_class *class;
+
+	lockdep_assert_held(&mpam_list_lock);
+
+	list_for_each_entry(class, classes, classes_list) {
+		list_for_each_entry(comp, &class->components, class_list)
+			comp->partid_narrowing = resctrl_use_logical_ids() &&
+				mpam_component_all_ris_narrow(comp);
+	}
+}
+
 /*
  * Merge all the common resource features into class.
  * vmsc features are bitwise-or'd together by mpam_enable_merge_vmsc_features()
@@ -3209,6 +3252,7 @@ static void mpam_enable_once(void)
 	mutex_lock(&mpam_list_lock);
 	do {
 		mpam_enable_merge_features(&mpam_classes);
+		mpam_enable_set_partid_narrowing(&mpam_classes);
 
 		err = mpam_register_irqs();
 		if (err) {
