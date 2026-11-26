@@ -498,6 +498,9 @@ static int cbqri_read_bandwidth_caps(struct cbqri_controller *ctrl)
 		ctrl->bc.supports_mcid_map =
 			(value >> CBQRI_CAPABILITIES_MCID_MAP_SHIFT) & 1;
 	}
+	if (version >= CBQRI_INACTIVE_ENTRY_VERSION)
+		ctrl->bc.supports_inactive_entry =
+			(value >> CBQRI_INACTIVE_ENTRY_SHIFT) & 1;
 	ctrl->bc.nbwblks = (value >> CBQRI_BC_CAPABILITIES_NBWBLKS_SHIFT) &
 			    CBQRI_BC_CAPABILITIES_NBWBLKS_MASK;
 	ctrl->bc.mrbwb = (value >> CBQRI_BC_CAPABILITIES_MRBWB_SHIFT) &
@@ -971,7 +974,7 @@ static void cbqri_init_bandwidth_resource(struct cbqri_resctrl_resource *resourc
 	reserved->scalar.resolution = MAX_MBA_BW;
 	reserved->scalar.scale = 1;
 	reserved->scalar.unit = RESCTRL_CTRL_UNIT_ALL;
-	reserved->scalar.reset_val = 0;
+	reserved->scalar.reset_val = 1;
 	__set_bit(RESCTRL_SCALAR_FLAG_LINEAR, reserved->scalar.flags);
 	resource->reserved_ctrl.kind = CBQRI_CTRL_BANDWIDTH_RESERVED;
 
@@ -986,7 +989,7 @@ static void cbqri_init_bandwidth_resource(struct cbqri_resctrl_resource *resourc
 	weight->scalar.resolution = 1;
 	weight->scalar.scale = 1;
 	weight->scalar.unit = RESCTRL_CTRL_UNIT_WEIGHT;
-	weight->scalar.reset_val = 0;
+	weight->scalar.reset_val = 1;
 	__set_bit(RESCTRL_SCALAR_FLAG_LINEAR, weight->scalar.flags);
 	resource->weight_ctrl.kind = CBQRI_CTRL_BANDWIDTH_WEIGHT;
 }
@@ -1072,6 +1075,9 @@ int cbqri_init_bandwidth_controls(void)
 		if (ctrl->info->type != CBQRI_CONTROLLER_TYPE_BANDWIDTH ||
 		    !ctrl->info->rcid_count)
 			continue;
+
+		if (!ctrl->bc.supports_inactive_entry)
+			resource->reserved_ctrl.r_ctrl.scalar.min = 1;
 
 		list_for_each_entry(info, &ctrl->info->resources, list) {
 			if (info->id_type != CBQRI_RESOURCE_ID_MEMORY_RANGE)
@@ -1841,6 +1847,8 @@ void resctrl_arch_reset_all_ctrls(struct rdt_resource *r)
 				ret = resctrl_arch_update_one(r, ctrl, domain,
 							      closid, CDP_NONE,
 							      resctrl_get_default_ctrlval(ctrl));
+				if (ret == -ENOENT && closid)
+					continue;
 				if (ret) {
 					pr_warn("failed to reset control type %u ID %u in domain %d: %d\n",
 						ctrl->name, closid, domain->hdr.id, ret);
@@ -2325,8 +2333,26 @@ int resctrl_arch_release_ctrl(u32 closid)
 		return closid ? -ERANGE : 0;
 
 	list_for_each_entry(ctrl, &cbqri_hw_controllers, list) {
-		if (!cbqri_supports_rcid_map(ctrl))
+		if (!cbqri_supports_rcid_map(ctrl)) {
+			u64 value;
+
+			if (ctrl->info->type != CBQRI_CONTROLLER_TYPE_BANDWIDTH ||
+			    closid >= ctrl->info->rcid_count)
+				continue;
+			value = ctrl->bc.supports_inactive_entry ? 0 : 1;
+			ret = cbqri_bandwidth_op(ctrl,
+						 CBQRI_BC_ALLOC_CTL_OP_READ_LIMIT,
+						 closid);
+			if (ret)
+				return ret;
+			cbqri_writeq(ctrl, CBQRI_BC_BW_ALLOC_OFF, value);
+			ret = cbqri_bandwidth_op(ctrl,
+						 CBQRI_BC_ALLOC_CTL_OP_CONFIG_LIMIT,
+						 closid);
+			if (ret)
+				return ret;
 			continue;
+		}
 		int_rcid = ctrl->req_to_int[closid];
 		if (!int_rcid)
 			continue;

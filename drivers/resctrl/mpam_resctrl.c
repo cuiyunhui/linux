@@ -1621,6 +1621,12 @@ int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid,
 		return -EINVAL;
 	if (mpam_partid_mapping_failed())
 		return -EIO;
+	if (reason == RESCTRL_UPDATE_GROUP_INIT && closid &&
+	    resctrl_arch_has_id_mapping(RESCTRL_CTRL_ID)) {
+		err = resctrl_arch_release_ctrl(closid);
+		if (err)
+			return err;
+	}
 
 	/*
 	 * FIXME:

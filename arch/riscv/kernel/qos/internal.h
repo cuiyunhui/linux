@@ -36,6 +36,8 @@
 
 #define CBQRI_CAPABILITIES_RCID_MAP_SHIFT	62
 #define CBQRI_CAPABILITIES_MCID_MAP_SHIFT	63
+#define CBQRI_INACTIVE_ENTRY_VERSION		0x11
+#define CBQRI_INACTIVE_ENTRY_SHIFT		61
 #define CBQRI_ID_MAP_VERSION			0x12
 #define CBQRI_LOGICAL_ID_COUNT			4096
 
@@ -151,6 +153,7 @@ struct riscv_cbqri_bandwidth_caps {
 	bool supports_mon_evt_id_rdwr_count;
 	bool supports_mon_evt_id_rdonly_count;
 	bool supports_mon_evt_id_wronly_count;
+	bool supports_inactive_entry;
 	bool supports_rcid_map;
 	bool supports_mcid_map;
 };

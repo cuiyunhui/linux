@@ -4814,7 +4814,11 @@ out_del_list:
 out_rmid_free:
 	mkdir_rdt_prepare_rmid_free(rdtgrp);
 out_closid_free:
-	closid_free(closid);
+	if (resctrl_arch_release_ctrl(closid))
+		rdt_last_cmd_printf("Control ID %u quarantined after failed creation\n",
+				    closid);
+	else
+		closid_free(closid);
 out_common_fail:
 	mkdir_rdt_prepare_clean(rdtgrp);
 out_unlock:
