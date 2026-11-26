@@ -175,6 +175,11 @@ static inline int resctrl_arch_release_ctrl(u32 closid)
 	return 0;
 }
 
+static inline int resctrl_arch_release_rmid(u32 closid, u32 rmid)
+{
+	return 0;
+}
+
 static inline void resctrl_arch_sched_in(struct task_struct *tsk)
 {
 	if (static_branch_likely(&rdt_enable_key))

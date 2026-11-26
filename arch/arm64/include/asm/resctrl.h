@@ -13,3 +13,8 @@ static inline int resctrl_arch_release_ctrl(u32 closid)
 {
 	return 0;
 }
+
+static inline int resctrl_arch_release_rmid(u32 closid, u32 rmid)
+{
+	return 0;
+}
