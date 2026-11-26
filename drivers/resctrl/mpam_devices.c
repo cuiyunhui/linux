@@ -155,6 +155,14 @@ static bool partid_max_init, partid_max_published;
 static DEFINE_SPINLOCK(partid_max_lock);
 static DEFINE_MUTEX(partid_map_lock);
 static bool partid_narrowing_enabled;
+static unsigned int default_partid_count = 1;
+static bool partid_mapping_failed;
+
+static u16 mpam_default_partid(u16 partid, bool cdp)
+{
+	return cdp ? partid & 1 : 0;
+}
+
 
 /*
  * mpam is enabled once all devices have been probed from CPU online callbacks,
@@ -2159,7 +2167,10 @@ static int mpam_reset_ris(void *arg)
 				return ret;
 			map_arg.intpartid = ris->partid_to_intpartid[partid];
 		} else {
-			map_arg.intpartid = ris->partid_to_intpartid[0];
+			bool cdp = READ_ONCE(default_partid_count) == 2;
+			u16 root = mpam_default_partid(partid, cdp);
+
+			map_arg.intpartid = ris->partid_to_intpartid[root];
 		}
 
 		ret = __mpam_set_partid_map(&map_arg);
@@ -2244,7 +2255,10 @@ static void mpam_reprogram_msc(struct mpam_msc *msc)
 
 			if (arg.comp->partid_narrowing &&
 			    !test_bit(partid, ris->partid_private)) {
-				map_arg.intpartid = ris->partid_to_intpartid[0];
+				bool cdp = READ_ONCE(default_partid_count) == 2;
+				u16 root = mpam_default_partid(partid, cdp);
+
+				map_arg.intpartid = ris->partid_to_intpartid[root];
 				mpam_touch_msc(msc, __mpam_set_partid_map,
 					       &map_arg);
 				continue;
@@ -3281,6 +3295,174 @@ int mpam_release_partid(struct mpam_component *comp, u16 partid,
 	return __mpam_unmap_partid(comp, partid, root_partid, false);
 }
 
+bool mpam_partid_mapping_failed(void)
+{
+	return READ_ONCE(partid_mapping_failed);
+}
+
+static int mpam_update_default_ris_mappings(struct mpam_msc_ris *ris)
+{
+	u32 partid;
+
+	for (partid = 0; partid <= mpam_partid_max; partid++) {
+		bool cdp = READ_ONCE(default_partid_count) == 2;
+		u16 root = mpam_default_partid(partid, cdp);
+		int ret;
+
+		if (partid >= default_partid_count &&
+		    test_bit(partid, ris->partid_private))
+			continue;
+		ret = mpam_set_ris_partid_map(ris, partid,
+					      ris->partid_to_intpartid[root]);
+		if (ret)
+			return ret;
+	}
+	return 0;
+}
+
+static int mpam_update_default_component_mappings(struct mpam_component *comp)
+{
+	struct mpam_vmsc *vmsc;
+
+	if (!comp->partid_narrowing)
+		return 0;
+
+	list_for_each_entry(vmsc, &comp->vmsc, comp_list) {
+		struct mpam_msc_ris *ris;
+
+		list_for_each_entry(ris, &vmsc->ris, vmsc_list) {
+			int ret;
+
+			ret = mpam_update_default_ris_mappings(ris);
+			if (ret)
+				return ret;
+		}
+	}
+	return 0;
+}
+
+static int mpam_update_default_partid_mappings(void)
+{
+	struct mpam_class *class;
+
+	guard(srcu)(&mpam_srcu);
+	list_for_each_entry(class, &mpam_classes, classes_list) {
+		struct mpam_component *comp;
+
+		list_for_each_entry(comp, &class->components, class_list) {
+			int ret;
+
+			ret = mpam_update_default_component_mappings(comp);
+			if (ret)
+				return ret;
+		}
+	}
+	return 0;
+}
+
+static int mpam_remove_code_root(bool pending_only)
+{
+	struct mpam_class *class;
+	struct mpam_component *comp;
+	int error = 0;
+
+	list_for_each_entry(class, &mpam_classes, classes_list) {
+		list_for_each_entry(comp, &class->components, class_list) {
+			int ret;
+
+			if (!comp->partid_narrowing)
+				continue;
+			if (pending_only)
+				ret = mpam_abort_partid(comp, 1, 0);
+			else
+				ret = mpam_release_partid(comp, 1, 0);
+			if (ret && !error)
+				error = ret;
+		}
+	}
+	return error;
+}
+
+static void mpam_fail_partid_mapping(void)
+{
+	WRITE_ONCE(partid_mapping_failed, true);
+	mpam_disable_reason = "Failed to restore default PARTID mappings.";
+	schedule_work(&mpam_broken_work);
+}
+
+/*
+ * CDP has separate data and code defaults. Reserve the code root before
+ * publishing the odd-PARTID default mappings. Callers have moved all tasks
+ * and CPUs back to the data root before removing the code root.
+ */
+int mpam_set_cdp_mapping(bool enable)
+{
+	struct mpam_class *class;
+	struct mpam_component *comp;
+	unsigned int count = enable ? 2 : 1;
+	int ret, rollback_ret;
+
+	lockdep_assert_cpus_held();
+	if (!partid_narrowing_enabled || count == default_partid_count)
+		return 0;
+	if (mpam_partid_mapping_failed())
+		return -EIO;
+
+	if (!enable) {
+		WRITE_ONCE(default_partid_count, 1);
+		ret = mpam_update_default_partid_mappings();
+		rollback_ret = mpam_remove_code_root(false);
+		if (!ret)
+			ret = rollback_ret;
+		if (ret)
+			mpam_fail_partid_mapping();
+		return ret;
+	}
+
+	list_for_each_entry(class, &mpam_classes, classes_list) {
+		list_for_each_entry(comp, &class->components, class_list) {
+			if (!comp->partid_narrowing)
+				continue;
+			if (mpam_partid_is_mapped(comp, 1))
+				return -EBUSY;
+			if (!mpam_partid_can_map(comp, 1))
+				return -ENOSPC;
+		}
+	}
+	list_for_each_entry(class, &mpam_classes, classes_list) {
+		list_for_each_entry(comp, &class->components, class_list) {
+			if (!comp->partid_narrowing)
+				continue;
+			ret = mpam_prepare_partid(comp, 1);
+			if (ret)
+				goto abort;
+			ret = mpam_configure_pending_partid(comp, 1, 0);
+			if (ret)
+				goto abort;
+			ret = mpam_commit_partid(comp, 1);
+			if (ret)
+				goto abort;
+		}
+	}
+
+	WRITE_ONCE(default_partid_count, 2);
+	ret = mpam_update_default_partid_mappings();
+	if (ret)
+		goto abort;
+	list_for_each_entry(class, &mpam_classes, classes_list) {
+		list_for_each_entry(comp, &class->components, class_list)
+			mpam_finish_partid(comp, 1);
+	}
+	return 0;
+
+abort:
+	WRITE_ONCE(default_partid_count, 1);
+	rollback_ret = mpam_update_default_partid_mappings();
+	if (mpam_remove_code_root(true) || rollback_ret)
+		mpam_fail_partid_mapping();
+	return ret;
+}
+
 static void mpam_enable_set_partid_narrowing(struct list_head *classes)
 {
 	struct mpam_component *comp;
@@ -3314,7 +3496,11 @@ static int mpam_init_vmsc_partid_mappings(struct mpam_vmsc *vmsc)
 		int ret;
 
 		for (partid = 1; partid <= mpam_partid_max; partid++) {
-			ret = mpam_set_ris_partid_map(ris, partid, 0);
+			bool cdp = READ_ONCE(default_partid_count) == 2;
+			u16 root = mpam_default_partid(partid, cdp);
+
+			ret = mpam_set_ris_partid_map(ris, partid,
+						      ris->partid_to_intpartid[root]);
 			if (ret)
 				return ret;
 		}
