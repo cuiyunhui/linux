@@ -419,6 +419,7 @@ struct mpam_msc_ris {
 	u16			*partid_to_intpartid;
 	unsigned long		*intpartid_busy;
 	unsigned long		*partid_private;
+	unsigned long		*partid_pending;
 
 	cpumask_t		affinity;
 
@@ -530,6 +531,11 @@ bool mpam_partid_can_map(struct mpam_component *comp, u16 partid);
 bool mpam_partids_can_map(struct mpam_component *comp, const u16 *partids,
 			  size_t nr_partids);
 int mpam_prepare_partid(struct mpam_component *comp, u16 partid);
+int mpam_commit_partid(struct mpam_component *comp, u16 partid);
+int mpam_abort_partid(struct mpam_component *comp, u16 partid,
+		      u16 root_partid);
+int mpam_release_partid(struct mpam_component *comp, u16 partid,
+			u16 root_partid);
 
 int mpam_msmon_read(struct mpam_component *comp, struct mon_cfg *ctx,
 		    enum mpam_device_features, u64 *val);

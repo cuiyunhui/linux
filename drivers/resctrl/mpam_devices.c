@@ -2986,10 +2986,151 @@ int mpam_prepare_partid(struct mpam_component *comp, u16 partid)
 			__set_bit(intpartid, ris->intpartid_busy);
 			ris->partid_to_intpartid[partid] = intpartid;
 			__set_bit(partid, ris->partid_private);
+			__set_bit(partid, ris->partid_pending);
 		}
 	}
 
 	return 0;
+}
+
+struct mpam_partid_map_arg {
+	struct mpam_msc_ris	*ris;
+	u16			partid;
+	u16			intpartid;
+};
+
+static int __mpam_set_partid_map(void *_arg)
+{
+	struct mpam_partid_map_arg *arg = _arg;
+	struct mpam_msc *msc = arg->ris->vmsc->msc;
+	int ret;
+
+	guard(mutex)(&msc->part_sel_lock);
+
+	ret = __mpam_part_sel(arg->ris->ris_idx, arg->partid, msc);
+	if (ret)
+		return ret;
+
+	return mpam_write_partsel_reg(msc, INTPARTID,
+			MPAMCFG_INTPARTID_INTERNAL | arg->intpartid);
+}
+
+static int mpam_set_ris_partid_map(struct mpam_msc_ris *ris, u16 partid,
+				   u16 intpartid)
+{
+	struct mpam_msc *msc = ris->vmsc->msc;
+	struct mpam_partid_map_arg arg = {
+		.ris = ris,
+		.partid = partid,
+		.intpartid = intpartid,
+	};
+
+	guard(mutex)(&msc->cfg_lock);
+
+	return mpam_touch_msc(msc, __mpam_set_partid_map, &arg);
+}
+
+int mpam_commit_partid(struct mpam_component *comp, u16 partid)
+{
+	struct mpam_vmsc *vmsc;
+	int ret;
+
+	guard(mutex)(&partid_map_lock);
+	guard(srcu)(&mpam_srcu);
+
+	if (!comp->partid_narrowing || !partid)
+		return 0;
+
+	list_for_each_entry_srcu(vmsc, &comp->vmsc, comp_list,
+				 srcu_read_lock_held(&mpam_srcu)) {
+		struct mpam_msc_ris *ris;
+
+		list_for_each_entry_srcu(ris, &vmsc->ris, vmsc_list,
+					 srcu_read_lock_held(&mpam_srcu)) {
+			u16 intpartid;
+
+			if (!test_bit(partid, ris->partid_pending))
+				continue;
+			intpartid = ris->partid_to_intpartid[partid];
+			ret = mpam_set_ris_partid_map(ris, partid, intpartid);
+			if (ret)
+				return ret;
+		}
+	}
+
+	list_for_each_entry(vmsc, &comp->vmsc, comp_list) {
+		struct mpam_msc_ris *ris;
+
+		list_for_each_entry(ris, &vmsc->ris, vmsc_list)
+			__clear_bit(partid, ris->partid_pending);
+	}
+
+	return 0;
+}
+
+static int __mpam_unmap_partid(struct mpam_component *comp, u16 partid,
+			       u16 root_partid, bool pending_only)
+{
+	struct mpam_vmsc *vmsc;
+	int ret;
+
+	if (!comp->partid_narrowing || !partid)
+		return 0;
+
+	guard(mutex)(&partid_map_lock);
+	guard(srcu)(&mpam_srcu);
+
+	list_for_each_entry_srcu(vmsc, &comp->vmsc, comp_list,
+				 srcu_read_lock_held(&mpam_srcu)) {
+		struct mpam_msc_ris *ris;
+
+		list_for_each_entry_srcu(ris, &vmsc->ris, vmsc_list,
+					 srcu_read_lock_held(&mpam_srcu)) {
+			u16 intpartid;
+
+			if (!test_bit(partid, ris->partid_private) ||
+			    (pending_only &&
+			     !test_bit(partid, ris->partid_pending)))
+				continue;
+			intpartid = ris->partid_to_intpartid[root_partid];
+			ret = mpam_set_ris_partid_map(ris, partid, intpartid);
+			if (ret)
+				return ret;
+		}
+	}
+
+	list_for_each_entry(vmsc, &comp->vmsc, comp_list) {
+		struct mpam_msc_ris *ris;
+
+		list_for_each_entry(ris, &vmsc->ris, vmsc_list) {
+			u16 intpartid;
+
+			if (!test_bit(partid, ris->partid_private) ||
+			    (pending_only &&
+			     !test_bit(partid, ris->partid_pending)))
+				continue;
+			intpartid = ris->partid_to_intpartid[partid];
+			ris->partid_to_intpartid[partid] =
+				ris->partid_to_intpartid[root_partid];
+			__clear_bit(partid, ris->partid_pending);
+			__clear_bit(partid, ris->partid_private);
+			__clear_bit(intpartid, ris->intpartid_busy);
+		}
+	}
+
+	return 0;
+}
+
+int mpam_abort_partid(struct mpam_component *comp, u16 partid,
+		      u16 root_partid)
+{
+	return __mpam_unmap_partid(comp, partid, root_partid, true);
+}
+
+int mpam_release_partid(struct mpam_component *comp, u16 partid,
+			u16 root_partid)
+{
+	return __mpam_unmap_partid(comp, partid, root_partid, false);
 }
 
 static void mpam_enable_set_partid_narrowing(struct list_head *classes)
@@ -3319,7 +3460,7 @@ static int __allocate_component_cfg(struct mpam_component *comp)
 		list_for_each_entry(ris, &vmsc->ris, vmsc_list) {
 			if (comp->partid_narrowing &&
 			    !ris->partid_to_intpartid) {
-				unsigned long *busy, *private;
+				unsigned long *busy, *pending, *private;
 				u16 *partid_map;
 
 				partid_map = devm_kcalloc(&msc->pdev->dev,
@@ -3340,9 +3481,16 @@ static int __allocate_component_cfg(struct mpam_component *comp)
 				if (!private)
 					return -ENOMEM;
 
+				pending = devm_bitmap_zalloc(&msc->pdev->dev,
+							     mpam_partid_max + 1,
+							     GFP_KERNEL);
+				if (!pending)
+					return -ENOMEM;
+
 				ris->partid_to_intpartid = partid_map;
 				ris->intpartid_busy = busy;
 				ris->partid_private = private;
+				ris->partid_pending = pending;
 				__set_bit(0, busy);
 				__set_bit(0, private);
 			}
