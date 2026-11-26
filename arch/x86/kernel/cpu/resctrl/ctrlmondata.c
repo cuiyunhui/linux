@@ -147,7 +147,8 @@ static void _resctrl_arch_update_domains(struct rdt_resource *r,
  * Avoid duplicate control configurations by only checking enabled controls
  * for any staged configurations.
  */
-int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid)
+int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid,
+				enum resctrl_update_reason reason)
 {
 	struct resctrl_ctrl *ctrl;
 

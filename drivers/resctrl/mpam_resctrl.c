@@ -1580,7 +1580,8 @@ static int _resctrl_arch_update_domains(struct rdt_resource *r, struct resctrl_c
 	return 0;
 }
 
-int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid)
+int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid,
+				enum resctrl_update_reason reason)
 {
 	struct resctrl_ctrl *ctrl;
 	int err;
