@@ -154,6 +154,7 @@ u16 mpam_partid_max;
 u8 mpam_pmg_max;
 static bool partid_max_init, partid_max_published;
 static DEFINE_SPINLOCK(partid_max_lock);
+static DEFINE_MUTEX(partid_map_lock);
 
 /*
  * mpam is enabled once all devices have been probed from CPU online callbacks,
@@ -2863,6 +2864,134 @@ bool mpam_component_uses_partid_narrowing(struct mpam_component *comp)
 	return comp->partid_narrowing;
 }
 
+static bool __mpam_partid_is_mapped(struct mpam_component *comp, u16 partid)
+{
+	struct mpam_vmsc *vmsc;
+
+	if (!comp->partid_narrowing || partid == 0)
+		return true;
+
+	list_for_each_entry(vmsc, &comp->vmsc, comp_list) {
+		struct mpam_msc_ris *ris;
+
+		list_for_each_entry(ris, &vmsc->ris, vmsc_list) {
+			if (!test_bit(partid, ris->partid_private))
+				return false;
+		}
+	}
+
+	return true;
+}
+
+bool mpam_partid_is_mapped(struct mpam_component *comp, u16 partid)
+{
+	guard(mutex)(&partid_map_lock);
+
+	return __mpam_partid_is_mapped(comp, partid);
+}
+
+static bool __mpam_partid_can_map(struct mpam_component *comp, u16 partid)
+{
+	struct mpam_vmsc *vmsc;
+
+	if (__mpam_partid_is_mapped(comp, partid))
+		return true;
+
+	list_for_each_entry(vmsc, &comp->vmsc, comp_list) {
+		struct mpam_msc_ris *ris;
+
+		list_for_each_entry(ris, &vmsc->ris, vmsc_list) {
+			u16 intpartid;
+
+			if (test_bit(partid, ris->partid_private))
+				continue;
+			intpartid = find_next_zero_bit(ris->intpartid_busy,
+						       ris->intpartid_max + 1, 1);
+			if (intpartid > ris->intpartid_max)
+				return false;
+		}
+	}
+
+	return true;
+}
+
+bool mpam_partid_can_map(struct mpam_component *comp, u16 partid)
+{
+	guard(mutex)(&partid_map_lock);
+
+	return __mpam_partid_can_map(comp, partid);
+}
+
+bool mpam_partids_can_map(struct mpam_component *comp, const u16 *partids,
+			  size_t nr_partids)
+{
+	struct mpam_vmsc *vmsc;
+
+	guard(mutex)(&partid_map_lock);
+
+	if (!comp->partid_narrowing)
+		return true;
+
+	list_for_each_entry(vmsc, &comp->vmsc, comp_list) {
+		struct mpam_msc_ris *ris;
+
+		list_for_each_entry(ris, &vmsc->ris, vmsc_list) {
+			unsigned int free, needed = 0;
+			size_t i, j;
+
+			for (i = 0; i < nr_partids; i++) {
+				if (!partids[i] ||
+				    test_bit(partids[i], ris->partid_private))
+					continue;
+				for (j = 0; j < i; j++) {
+					if (partids[j] == partids[i])
+						break;
+				}
+				if (j == i)
+					needed++;
+			}
+
+			free = ris->intpartid_max + 1 -
+				bitmap_weight(ris->intpartid_busy,
+					      ris->intpartid_max + 1);
+			if (free < needed)
+				return false;
+		}
+	}
+
+	return true;
+}
+
+int mpam_prepare_partid(struct mpam_component *comp, u16 partid)
+{
+	struct mpam_vmsc *vmsc;
+
+	guard(mutex)(&partid_map_lock);
+
+	if (!__mpam_partid_can_map(comp, partid))
+		return -ENOSPC;
+	if (__mpam_partid_is_mapped(comp, partid))
+		return 0;
+
+	list_for_each_entry(vmsc, &comp->vmsc, comp_list) {
+		struct mpam_msc_ris *ris;
+
+		list_for_each_entry(ris, &vmsc->ris, vmsc_list) {
+			u16 intpartid;
+
+			if (test_bit(partid, ris->partid_private))
+				continue;
+			intpartid = find_next_zero_bit(ris->intpartid_busy,
+						       ris->intpartid_max + 1, 1);
+			__set_bit(intpartid, ris->intpartid_busy);
+			ris->partid_to_intpartid[partid] = intpartid;
+			__set_bit(partid, ris->partid_private);
+		}
+	}
+
+	return 0;
+}
+
 static void mpam_enable_set_partid_narrowing(struct list_head *classes)
 {
 	struct mpam_component *comp;
@@ -3186,11 +3315,38 @@ static int __allocate_component_cfg(struct mpam_component *comp)
 		struct mpam_msc_ris *ris;
 		struct msmon_mbwu_state *mbwu_state;
 
-		if (!vmsc->props.num_mbwu_mon)
-			continue;
-
 		msc = vmsc->msc;
 		list_for_each_entry(ris, &vmsc->ris, vmsc_list) {
+			if (comp->partid_narrowing &&
+			    !ris->partid_to_intpartid) {
+				unsigned long *busy, *private;
+				u16 *partid_map;
+
+				partid_map = devm_kcalloc(&msc->pdev->dev,
+							  mpam_partid_max + 1,
+							  sizeof(*partid_map), GFP_KERNEL);
+				if (!partid_map)
+					return -ENOMEM;
+
+				busy = devm_bitmap_zalloc(&msc->pdev->dev,
+							  ris->intpartid_max + 1,
+							  GFP_KERNEL);
+				if (!busy)
+					return -ENOMEM;
+
+				private = devm_bitmap_zalloc(&msc->pdev->dev,
+							     mpam_partid_max + 1,
+							     GFP_KERNEL);
+				if (!private)
+					return -ENOMEM;
+
+				ris->partid_to_intpartid = partid_map;
+				ris->intpartid_busy = busy;
+				ris->partid_private = private;
+				__set_bit(0, busy);
+				__set_bit(0, private);
+			}
+
 			if (!ris->props.num_mbwu_mon)
 				continue;
 
