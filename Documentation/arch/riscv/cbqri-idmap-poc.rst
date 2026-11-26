@@ -11,79 +11,89 @@ entries and monitoring counters.
 Discovery
 =========
 
-An RCID mapping capable controller reports ``RCID_MAP`` in its capability
-register. An MCID mapping capable controller reports ``MCID_MAP``. The RQSC
-RCID and MCID counts continue to describe internal allocation entries and
-physical counters. Linux exposes 4096 logical CLOSIDs or RMIDs when the
-corresponding mapping capability is present.
+The provisional mapping capability version is 0x12. RCID_MAP and MCID_MAP
+advertise allocation mapping and direct monitoring mapping. RQSC counts still
+describe physical allocation entries and counters. resctrl.logical_ids=1 opts
+into the larger request namespace; default boot retains the legacy limits.
+
+Only direct MCID monitoring is implemented. RCID-prefixed monitoring is not
+advertised or configured. Legacy controllers and mixed components retain safe
+physical identifier limits.
 
 Allocation behavior
 ===================
 
-A newly created control group initially shares internal RCID 0 and consumes no
-private allocation entry. An explicit schemata update reserves one unbound
-internal RCID in every affected controller. Linux copies the current policy to
-the reserved entries, programs every staged control using internal RCIDs, and
-publishes the request-RCID tags only after all programming succeeds::
+Creating a mapped group allocates a logical CLOSID without reserving a physical
+entry. Unconfigured policies use entry 0 and follow the current Root policy.
+Initialization programs valid Root policies into hardware.
+
+The first explicit policy write, including a same-value write, reserves an
+unbound physical entry in each affected controller, copies the Root policy,
+programs staged controls using physical RCIDs, and publishes the bindings::
 
   preflight -> reserve -> program -> publish
 
-An update to an existing private policy also uses a shadow entry. This keeps
-the old mapping available for rollback until all controllers accept the new
-configuration. If publication fails, Linux restores the old tags. Entries
-whose state cannot be recovered are quarantined and are not silently reused.
+An existing binding is updated in place without a spare shadow entry. Its
+mapping stays unchanged. There is no global atomic policy update across
+controllers. Physical exhaustion returns ENOSPC and leaves an unbound RCID
+using entry 0. Failed publication rolls back new tags where possible;
+unrecoverable entries remain quarantined.
 
-Exhaustion is local to the affected controller and is reported through
-``last_cmd_status``. Deleting a control group removes its tags and releases its
-internal entries.
+Release removes tags before freeing physical entries. Reset skips unmapped
+logical IDs. Legacy bandwidth teardown uses inactive entries when supported,
+or the smallest valid reservation otherwise.
 
 Mapping recovery
 ================
 
-At initialization Linux issues ``READ_ENTRY`` for each nonzero internal RCID.
-A recovered valid tag is explicitly removed before the entry joins the free
-pool. An unreadable, duplicate, invalid, or unremovable entry remains busy and
-quarantined. Recovery work is proportional to the physical entry count, not
-the complete 4096-entry request namespace.
+Initialization scans physical entries with READ_ENTRY (OP=3), which returns
+the logical RCID tag and VALID bit. Stale bindings are removed before entries
+enter the free pool. Unreadable or unremovable entries remain quarantined.
 
 Monitoring behavior
 ===================
 
-``CONFIG_EVENT`` binds a logical MCID to an available physical counter. An
-unbound MCID returns ``No_counter``; Linux exposes this as ``Unassigned``.
-``CONFIG_EVENT`` with ``EVT_ID=None`` removes the binding. Linux performs the
-unbind when the logical RMID is actually released, after occupancy limbo when
-that mechanism is active.
+CONFIG_EVENT activates monitoring when Linux resets/enables a group's event,
+before user reads. Preflight covers every controller in the monitor domain.
+Reads never allocate counters. Unbound MCIDs report No_counter, exposed as
+Unassigned.
 
-Controllers that describe the same logical component are grouped behind one
-resctrl domain. Allocation updates program every physical controller in the
-group. Monitoring reads select controllers that implement the requested event
-and report the sum of their counters. A bandwidth-only platform uses its
-memory proximity domain and CPU affinity to create a monitor-only L3 domain.
+CONFIG_EVENT with EVT_ID=None stops monitoring and removes the binding. A
+failed stop retains the logical RMID on the generic pending-release list.
+Later RMID allocations retry release. Partial release can free one physical
+counter while the logical RMID remains unavailable because another controller
+has not completed release.
+
+Successful stop must guarantee safe reuse, including isolation from events
+belonging to the old monitoring lifetime. The deterministic QEMU counters do
+not simulate old cache-line events and cannot prove that hardware guarantee.
+Legacy capacity monitoring retains occupancy-based reuse protection.
+
+Controllers for one logical component share a domain. Allocation updates
+program every controller; monitoring sums their matching counters.
 
 Validated configuration
 =======================
 
-The validation used QEMU ``virt`` with ACPI RQSC, an OCRA initramfs, and the
-RISC-V Linux ``resctrl`` implementation. The controller capability version is
-the provisional value ``0x12``.
+Nine qtests cover legacy allocation, inactive entries, access types, sparse
+RCID/MCID mapping, READ_ENTRY and failed counter release. The Linux test uses
+two bandwidth controllers with four physical entries and two counters each.
+Their deterministic values 17 and 19 make the expected aggregate 36.
 
-The QEMU qtest suite covers legacy behavior, inactive bandwidth entries,
-access types, sparse RCID mapping and sparse MCID mapping for both bandwidth
-and capacity controllers. Eight tests pass.
+Linux end-to-end checks cover:
 
-The Linux end-to-end checks cover:
+* 4096 logical CLOSIDs and creation without physical allocation;
+* explicit policy writes, local exhaustion and last_cmd_status;
+* existing-entry updates with a full physical table;
+* synchronized configuration, release and reuse;
+* activation before reads, counter exhaustion and Unassigned reads;
+* explicit monitor activation after counter release;
+* failed stop, retained RMID, partial release and successful retry;
+* old MCIDs returning No_counter after successful stop; and
+* unmount/reset with unmapped logical identifiers.
 
-* 4096 logical CLOSIDs backed by four internal RCIDs per controller;
-* group creation without allocating an internal RCID;
-* transactional updates of reserved bandwidth and weight in one write;
-* controller-local ``ENOSPC`` and generic ``last_cmd_status`` reporting;
-* release and reuse of an internal RCID;
-* no request-visible mapping after preflight failure;
-* synchronized allocation on two physical bandwidth controllers;
-* 4096 logical RMIDs backed by two physical counters per controller;
-* MCID counter exhaustion, unbind, and reuse; and
-* summing deterministic counters ``17 + 19`` to ``36`` for one logical domain.
+The generic RFC was also validated on arm64 MPAM and AMD x86. Those tests
+validate their architecture adaptations, rather than future CBQRI registers.
 
 Build and run
 =============
@@ -105,7 +115,7 @@ Run the QEMU register tests::
   QTEST_QEMU_BINARY=./qemu-system-riscv64 \
     ./tests/qtest/riscv-cbqri-test --tap -k
 
-The expected result is ``1..8`` followed by eight ``ok`` lines.
+The expected result is ``1..9`` followed by nine ``ok`` lines.
 
 Build the Linux PoC with a RISC-V cross compiler. The following ISA flags were
 used for the validated build::
@@ -132,12 +142,13 @@ Run the end-to-end test from the Linux source tree::
 
 The test succeeds only after observing::
 
-  IDMAP_V3_E2E_PASS:logical_ids_multicontroller_sum_release_reuse
+  IDMAP_V3_E2E_PASS:logical_ids_activation_checked_release_reuse
 
 The script validates capability discovery, logical ID counts, default root
-inheritance, a multi-control transaction, multi-controller programming, RCID
+inheritance, multiple control updates, multi-controller programming, RCID
 exhaustion and reuse, ``last_cmd_status``, MCID exhaustion and reuse, and
-counter summation.
+counter summation. Add --release-failures 2 to exercise failed stop
+and the generic pending-release retry path.
 
 PoC boundaries
 ==============
