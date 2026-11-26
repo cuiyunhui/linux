@@ -632,6 +632,18 @@ static inline u32 resctrl_get_default_ctrlval(struct resctrl_ctrl *ctrl)
 	return WARN_ON_ONCE(1);
 }
 
+/**
+ * resctrl_arch_ctrl_id_mode() - Describe control identifier mapping
+ *
+ * Return: Identity mode or controller-local mapping mode.
+ */
+enum resctrl_id_mode resctrl_arch_ctrl_id_mode(void);
+
+static inline bool resctrl_arch_has_ctrl_id_mapping(void)
+{
+	return resctrl_arch_ctrl_id_mode() != RESCTRL_IDENTITY;
+}
+
 /* The number of closid supported by this resource regardless of CDP */
 u32 resctrl_arch_get_num_closid(struct rdt_resource *r);
 u32 resctrl_arch_system_num_rmid_idx(void);

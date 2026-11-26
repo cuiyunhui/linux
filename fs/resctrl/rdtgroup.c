@@ -12,7 +12,10 @@
 
 #define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
 
+#include <linux/cache.h>
 #include <linux/cpu.h>
+#include <linux/init.h>
+#include <linux/kstrtox.h>
 #include <linux/debugfs.h>
 #include <linux/fs.h>
 #include <linux/fs_parser.h>
@@ -29,6 +32,24 @@
 #include <uapi/linux/magic.h>
 
 #include "internal.h"
+
+static bool logical_ctrl_ids_requested __ro_after_init;
+
+static int __init resctrl_logical_ctrl_ids_setup(char *str)
+{
+	if (!str) {
+		logical_ctrl_ids_requested = true;
+		return 0;
+	}
+
+	return kstrtobool(str, &logical_ctrl_ids_requested);
+}
+early_param("resctrl.logical_ctrl_ids", resctrl_logical_ctrl_ids_setup);
+
+bool resctrl_use_logical_ctrl_ids(void)
+{
+	return logical_ctrl_ids_requested;
+}
 
 /* Mutex to protect rdtgroup access. */
 DEFINE_MUTEX(rdtgroup_mutex);
