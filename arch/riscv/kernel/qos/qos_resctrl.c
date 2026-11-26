@@ -42,7 +42,7 @@ static int cbqri_wait_busy(struct cbqri_controller *ctrl, u32 offset)
 				 1, 1000, false, ctrl, offset);
 }
 
-static bool cbqri_has_rcid_map(struct cbqri_controller *ctrl)
+static bool cbqri_supports_rcid_map(struct cbqri_controller *ctrl)
 {
 	if (ctrl->info->type == CBQRI_CONTROLLER_TYPE_CAPACITY)
 		return ctrl->cc.supports_rcid_map;
@@ -50,12 +50,22 @@ static bool cbqri_has_rcid_map(struct cbqri_controller *ctrl)
 	return ctrl->bc.supports_rcid_map;
 }
 
-static bool cbqri_has_mcid_map(struct cbqri_controller *ctrl)
+static bool cbqri_supports_mcid_map(struct cbqri_controller *ctrl)
 {
 	if (ctrl->info->type == CBQRI_CONTROLLER_TYPE_CAPACITY)
 		return ctrl->cc.supports_mcid_map;
 
 	return ctrl->bc.supports_mcid_map;
+}
+
+static bool cbqri_has_rcid_map(struct cbqri_controller *ctrl)
+{
+	return resctrl_use_logical_ids() && cbqri_supports_rcid_map(ctrl);
+}
+
+static bool cbqri_has_mcid_map(struct cbqri_controller *ctrl)
+{
+	return resctrl_use_logical_ids() && cbqri_supports_mcid_map(ctrl);
 }
 
 enum resctrl_id_mode resctrl_arch_id_mode(enum resctrl_id_type type)
@@ -229,7 +239,7 @@ static int cbqri_init_identifier_map(struct cbqri_controller *ctrl)
 	bool valid;
 	int ret;
 
-	if (!cbqri_has_rcid_map(ctrl))
+	if (!cbqri_supports_rcid_map(ctrl))
 		return 0;
 	if (!ctrl->info->rcid_count ||
 	    ctrl->info->rcid_count > CBQRI_LOGICAL_ID_COUNT)
@@ -275,6 +285,8 @@ static int cbqri_init_identifier_map(struct cbqri_controller *ctrl)
 		}
 
 		ctrl->req_to_int[req_rcid] = int_rcid;
+		if (!cbqri_has_rcid_map(ctrl) && req_rcid == int_rcid)
+			continue;
 		map_int_rcid = 0;
 		ret = cbqri_rcid_map_op(ctrl, CBQRI_RCID_MAP_OP_CONFIG,
 					&req_rcid, &map_int_rcid, NULL);
@@ -408,15 +420,15 @@ static int cbqri_probe_monitor(struct cbqri_controller *ctrl)
 	if (ret)
 		return ret;
 	if (status != CBQRI_MON_CTL_STATUS_SUCCESS &&
-	    !(cbqri_has_mcid_map(ctrl) &&
+	    !(cbqri_supports_mcid_map(ctrl) &&
 	      status == CBQRI_MON_CTL_STATUS_NO_COUNTER))
 		return 0;
 
 	ctrl->mon_capable = true;
-	if (!cbqri_has_mcid_map(ctrl))
+	if (!cbqri_supports_mcid_map(ctrl))
 		return 0;
 
-	for (mcid = 0; mcid < ctrl->info->mcid_count; mcid++) {
+	for (mcid = 0; mcid < CBQRI_LOGICAL_ID_COUNT; mcid++) {
 		ret = cbqri_config_event(ctrl, mcid, CBQRI_MON_EVT_NONE);
 		if (ret)
 			return ret;
@@ -2199,7 +2211,7 @@ int resctrl_arch_release_ctrl(u32 closid)
 		return closid ? -ERANGE : 0;
 
 	list_for_each_entry(ctrl, &cbqri_hw_controllers, list) {
-		if (!cbqri_has_rcid_map(ctrl))
+		if (!cbqri_supports_rcid_map(ctrl))
 			continue;
 		int_rcid = ctrl->req_to_int[closid];
 		if (!int_rcid)
@@ -2219,7 +2231,7 @@ int resctrl_arch_release_ctrl(u32 closid)
 	return 0;
 }
 
-void resctrl_arch_release_rmid(u32 closid, u32 rmid)
+int resctrl_arch_release_rmid(u32 closid, u32 rmid)
 {
 	struct cbqri_controller *ctrl;
 	int ret;
@@ -2229,8 +2241,7 @@ void resctrl_arch_release_rmid(u32 closid, u32 rmid)
 			continue;
 		ret = cbqri_config_event(ctrl, rmid, CBQRI_MON_EVT_NONE);
 		if (ret)
-			pr_warn_ratelimited("failed to release MCID %u: %d\n",
-					    rmid, ret);
+			return ret;
 	}
 }
 
@@ -2238,6 +2249,7 @@ u32 resctrl_arch_preconvert_bw(const struct rdt_resource *r,
 			       struct resctrl_ctrl *ctrl, u32 value)
 {
 	return value;
+	return 0;
 }
 
 static void cbqri_init_resources(void)

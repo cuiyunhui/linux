@@ -12,7 +12,10 @@
 
 #define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
 
+#include <linux/cache.h>
 #include <linux/cpu.h>
+#include <linux/init.h>
+#include <linux/kstrtox.h>
 #include <linux/debugfs.h>
 #include <linux/fs.h>
 #include <linux/fs_parser.h>
@@ -29,6 +32,24 @@
 #include <uapi/linux/magic.h>
 
 #include "internal.h"
+
+static bool logical_ids_requested __ro_after_init;
+
+static int __init resctrl_logical_ids_setup(char *str)
+{
+	if (!str) {
+		logical_ids_requested = true;
+		return 0;
+	}
+
+	return kstrtobool(str, &logical_ids_requested);
+}
+early_param("resctrl.logical_ids", resctrl_logical_ids_setup);
+
+bool resctrl_use_logical_ids(void)
+{
+	return logical_ids_requested;
+}
 
 /* Mutex to protect rdtgroup access. */
 DEFINE_MUTEX(rdtgroup_mutex);
@@ -4899,9 +4920,8 @@ static int rdtgroup_rmdir_ctrl(struct rdtgroup *rdtgrp, cpumask_var_t tmpmask)
 	cpumask_or(tmpmask, tmpmask, &rdtgrp->cpu_mask);
 	update_closid_rmid(tmpmask, NULL);
 
-	ret = 0;
-	if (resctrl_arch_has_id_mapping(RESCTRL_CTRL_ID))
-		ret = resctrl_arch_release_ctrl(rdtgrp->closid);
+	ret = resctrl_arch_release_ctrl(rdtgrp->closid);
+	cpumask_clear(&rdtgrp->cpu_mask);
 	cpumask_clear(&rdtgrp->cpu_mask);
 	if (ret) {
 		rdt_last_cmd_printf("Failed to release control ID %u: %d\n",

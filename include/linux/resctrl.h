@@ -654,13 +654,10 @@ enum resctrl_update_reason {
 };
 
 /**
- * resctrl_arch_id_mode() - Get an architecture's ID realization mode
- * @type: Type of identifier being queried
+ * resctrl_arch_id_mode() - Describe the architecture's identifier mapping
+ * @type: Control or monitoring identifier
  *
- * Return how the architecture realizes logical control or monitoring IDs.
- * Architectures can use different modes for control and monitoring IDs.
- *
- * Return: The architecture's realization mode for @type.
+ * Return: Identity mode or controller-local mapping mode.
  */
 enum resctrl_id_mode resctrl_arch_id_mode(enum resctrl_id_type type);
 
@@ -676,7 +673,7 @@ int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid,
 				enum resctrl_update_reason reason);
 
 /**
- * resctrl_arch_prepare_ctrl_update() - Prepare an update transaction
+ * resctrl_arch_prepare_ctrl_update() - Reserve entries for a control update
  * @closid: Logical control group ID being updated
  * @reason: Reason for the update
  *
@@ -689,7 +686,7 @@ int resctrl_arch_prepare_ctrl_update(u32 closid,
 				     enum resctrl_update_reason reason);
 
 /**
- * resctrl_arch_commit_ctrl_update() - Publish a prepared update transaction
+ * resctrl_arch_commit_ctrl_update() - Publish prepared control mappings
  * @closid: Logical control group ID being updated
  * @reason: Reason for the update
  *
@@ -702,7 +699,7 @@ int resctrl_arch_commit_ctrl_update(u32 closid,
 				    enum resctrl_update_reason reason);
 
 /**
- * resctrl_arch_abort_ctrl_update() - Abort a prepared update transaction
+ * resctrl_arch_abort_ctrl_update() - Discard uncommitted control reservations
  * @closid: Logical control group ID being updated
  * @reason: Reason for the update
  *

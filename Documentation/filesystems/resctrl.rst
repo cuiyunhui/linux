@@ -487,8 +487,6 @@ The following properties that are exposed with individual files:
 "unit":
 	When "type" == "scalar":
 		The base unit of the quantity measured by the control value.
-		The unit "weight" denotes a dimensionless proportional weight
-		used to distribute a resource among competing groups.
 
 		The special unit "all" denotes a proportional schema.  In this
 		case, the resource is a finite, physical thing such as a cache
@@ -2236,3 +2234,109 @@ http://web.archive.org/web/20191125200531/https://www.intel.com/content/dam/www/
 https://software.intel.com/content/www/us/en/develop/articles/intel-resource-director-technology-rdt-reference-manual.html
 
 for further information.
+
+
+Logical control identifiers
+===========================
+
+Some controllers accept more request identifiers than they have physical
+allocation entries. For example, an MPAM MSC can accept 256 PARTIDs while a
+narrowing RIS has 32 internal entries. Using the internal limit as the
+system CLOSID limit prevents otherwise valid request PARTIDs from being used.
+
+The ``resctrl.logical_ids=1`` kernel parameter opts into controller-local
+allocation where the architecture supports it. Without this parameter,
+existing identifier limits and group initialization remain unchanged.
+Unsupported components retain their existing identity behavior even when
+the parameter is specified. Intel and AMD keep their existing CLOSID and
+RMID allocation, register programming and monitoring mechanisms.
+
+In the controller-local mode, ``num_closids`` describes the logical request
+namespace. It does not guarantee that every group can have an independent
+policy in every domain. Physical entries and allocation constraints remain
+local to their controllers.
+
+Group policy lifetime
+---------------------
+
+A new group on a mapped domain initially shares the current root policy.
+Group creation does not reserve a physical entry on that domain. A root
+update therefore affects groups that still share its default.
+
+The first explicit policy write requests an independent configuration,
+including when the supplied value equals the current root value. Reserve
+entries in every affected controller, copy the current root configuration,
+apply all staged controls, and publish the mappings after programming has
+succeeded. Further writes update the group's existing entries.
+
+If a required entry is unavailable, the write returns ``ENOSPC`` and a
+previously unconfigured group continues to use the root policy. The group
+and its logical ID remain valid. Deleting another configured group can
+make an entry available for retry. Exhausting the logical namespace instead
+causes group creation to fail.
+
+An identity domain retains its existing initialization behavior: each group
+has the corresponding hardware identifier and inherits a policy snapshot.
+Root updates do not alter that snapshot.
+
+CDP requires separate data and code defaults. A narrowed component reserves
+both root entries and directs unconfigured data and code PARTIDs to their
+respective defaults. A write can reserve one entry or a data/code pair.
+The original architecture restrictions on CDP continue to apply.
+
+Architecture interface
+----------------------
+
+``RESCTRL_UPDATE_GROUP_INIT`` distinguishes group initialization from an
+explicit ``RESCTRL_UPDATE_USER`` write and ``RESCTRL_UPDATE_INTERNAL``
+maintenance. An architecture can defer physical allocation during group
+initialization while ensuring that internal updates use existing entries.
+
+For mapped control IDs, the prepare hook reserves resources without changing
+request-visible mappings. The commit hook publishes prepared mappings after
+the staged controls have been programmed. The abort hook discards pending
+reservations and retains entries whose state cannot be safely recovered.
+
+These hooks do not make all controller register writes globally atomic.
+Preflight checks entry availability, but hardware constraints or access
+failures can still reject programming or publication. Updating an existing
+entry in place does not provide automatic rollback of all its controls.
+
+The control release hook runs after tasks and CPUs have moved to the default
+group and before the logical CLOSID is freed. An unsuccessful release retains
+the group and logical ID so removal can be retried. Identity architectures
+can leave this hook empty or use it to retire controller allocation state.
+
+For persistent mapped monitoring bindings, the architecture release hook
+returns success only when the old binding is safe to reuse. ``EAGAIN`` can
+request occupancy limbo; other failures retain the ID on a pending-release
+list. Pending releases are retried on subsequent RMID allocations.
+Architectures using identity monitoring keep their existing occupancy limbo
+and counter-management mechanisms. Identity monitoring does not imply that
+the physical counter selector is numerically equal to the RMID.
+
+Validation
+----------
+
+The opt-in ``logical_ids.py`` selftest selects a cache domain whose mode and
+physical capacity are known to the caller. It checks creation, a same-value
+write, default inheritance, exhaustion, release and reuse. Its default
+invocation skips testing, and it skips systems with existing control groups.
+
+An identity-path example::
+
+  python3 tools/testing/selftests/resctrl/logical_ids.py --mode identity
+
+A narrowed MPAM example, booted with ``resctrl.logical_ids=1``::
+
+  python3 tools/testing/selftests/resctrl/logical_ids.py \
+    --mode local --resource L3 --domain 1 --physical-entries 32 --groups 255
+
+The physical entry count is supplied as a test fixture, not as a user policy
+identifier. User space continues to configure groups and policies without
+choosing physical IDs.
+
+``CONFIG_MPAM_KUNIT_TEST=y`` enables software tests for component eligibility,
+request limits, per-RIS allocation, paired preflight, default selection and
+release failure/retry. Hardware tests remain necessary for register access,
+request tagging, policy effects and reset restoration.

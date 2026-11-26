@@ -7,13 +7,24 @@
 #ifndef __LINUX_RESCTRL_TYPES_H
 #define __LINUX_RESCTRL_TYPES_H
 
+#include <linux/types.h>
+
+#ifdef CONFIG_RESCTRL_FS
+bool resctrl_use_logical_ids(void);
+#else
+static inline bool resctrl_use_logical_ids(void)
+{
+	return false;
+}
+#endif
+
 #define MAX_MBA_BW			100u
 #define MBM_OVERFLOW_INTERVAL		1000
 
 /**
- * enum resctrl_id_type - Type of resctrl identifier
- * @RESCTRL_CTRL_ID: Control group identifier (CLOSID/PARTID/RCID)
- * @RESCTRL_MON_ID: Monitoring group identifier (RMID/PMG/MCID)
+ * enum resctrl_id_type - Identifier managed by resctrl
+ * @RESCTRL_CTRL_ID: Control group identifier
+ * @RESCTRL_MON_ID: Monitoring group identifier
  */
 enum resctrl_id_type {
 	RESCTRL_CTRL_ID,
@@ -21,19 +32,15 @@ enum resctrl_id_type {
 };
 
 /**
- * enum resctrl_id_mode - Architecture realization of a logical identifier
- * @RESCTRL_IDENTITY: Logical and physical identifiers are equal
- * @RESCTRL_GLOBAL_MAP: Logical identifiers map to one global physical ID
- * @RESCTRL_LOCAL_MAP: Controllers map logical identifiers independently
+ * enum resctrl_id_mode - Relationship between request and physical identifiers
+ * @RESCTRL_IDENTITY: Retain the architecture's existing identifier lifecycle
+ * @RESCTRL_LOCAL_MAP: Each controller maps the request identifier locally
  *
- * Identity architectures program the same identifier in every controller.
- * Global mapping changes the request identifier, but every controller still
- * observes the same value. Local mapping preserves the logical request
- * identifier and lets each controller select a different physical entry.
+ * Local mapping preserves the identifier carried by requests. The physical
+ * allocation entry or monitoring counter binding is owned by the controller.
  */
 enum resctrl_id_mode {
 	RESCTRL_IDENTITY,
-	RESCTRL_GLOBAL_MAP,
 	RESCTRL_LOCAL_MAP,
 };
 

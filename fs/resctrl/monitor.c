@@ -33,7 +33,7 @@
  * @closid:	The CLOSID for this entry.
  * @rmid:	The RMID for this entry.
  * @busy:	The number of domains with cached data using this RMID.
- * @list:	Member of the rmid_free_lru list when busy == 0.
+ * @list:	Member of the free or pending-release list.
  *
  * Depending on the architecture the correct monitor is accessed using
  * both @closid and @rmid, or @rmid only.
@@ -53,6 +53,9 @@ struct rmid_entry {
  *     threshold occupancy
  */
 static LIST_HEAD(rmid_free_lru);
+
+/* Unused RMIDs whose hardware mappings have not been released. */
+static LIST_HEAD(rmid_release_pending);
 
 /*
  * @closid_num_dirty_rmid    The number of dirty RMID each CLOSID has.
@@ -113,12 +116,23 @@ static inline struct rmid_entry *__rmid_entry(u32 idx)
 	return entry;
 }
 
+static int release_rmid_mapping(struct rmid_entry *entry)
+{
+	if (!resctrl_arch_has_id_mapping(RESCTRL_MON_ID))
+		return 0;
+
+	return resctrl_arch_release_rmid(entry->closid, entry->rmid);
+}
+
 static void limbo_release_entry(struct rmid_entry *entry)
 {
 	lockdep_assert_held(&rdtgroup_mutex);
 
-	if (resctrl_arch_has_id_mapping(RESCTRL_MON_ID))
-		resctrl_arch_release_rmid(entry->closid, entry->rmid);
+	if (release_rmid_mapping(entry)) {
+		list_add_tail(&entry->list, &rmid_release_pending);
+		return;
+	}
+
 	rmid_limbo_count--;
 	list_add_tail(&entry->list, &rmid_free_lru);
 
@@ -202,6 +216,24 @@ bool has_busy_rmid(struct rdt_l3_mon_domain *d)
 	u32 idx_limit = resctrl_arch_system_num_rmid_idx();
 
 	return find_first_bit(d->rmid_busy_llc, idx_limit) != idx_limit;
+}
+
+/*
+ * Retry a finite snapshot of pending releases. Failed entries remain dirty
+ * and cannot be selected for a new monitoring group.
+ */
+static void retry_rmid_release(void)
+{
+	struct rmid_entry *entry, *next;
+	LIST_HEAD(retry);
+
+	lockdep_assert_held(&rdtgroup_mutex);
+
+	list_splice_init(&rmid_release_pending, &retry);
+	list_for_each_entry_safe(entry, next, &retry, list) {
+		list_del_init(&entry->list);
+		limbo_release_entry(entry);
+	}
 }
 
 static struct rmid_entry *resctrl_find_free_rmid(u32 closid)
@@ -289,6 +321,7 @@ int alloc_rmid(u32 closid)
 
 	lockdep_assert_held(&rdtgroup_mutex);
 
+	retry_rmid_release();
 	entry = resctrl_find_free_rmid(closid);
 	if (IS_ERR(entry))
 		return PTR_ERR(entry);
@@ -347,11 +380,25 @@ void free_rmid(u32 closid, u32 rmid)
 
 	entry = __rmid_entry(idx);
 
-	if (resctrl_is_mon_event_enabled(QOS_L3_OCCUP_EVENT_ID)) {
+	if (resctrl_arch_has_id_mapping(RESCTRL_MON_ID)) {
+		int ret = release_rmid_mapping(entry);
+
+		if (!ret) {
+			list_add_tail(&entry->list, &rmid_free_lru);
+			return;
+		}
+		if (ret == -EAGAIN &&
+		    resctrl_is_mon_event_enabled(QOS_L3_OCCUP_EVENT_ID)) {
+			add_rmid_to_limbo(entry);
+			return;
+		}
+		rmid_limbo_count++;
+		if (IS_ENABLED(CONFIG_RESCTRL_RMID_DEPENDS_ON_CLOSID))
+			closid_num_dirty_rmid[entry->closid]++;
+		list_add_tail(&entry->list, &rmid_release_pending);
+	} else if (resctrl_is_mon_event_enabled(QOS_L3_OCCUP_EVENT_ID)) {
 		add_rmid_to_limbo(entry);
 	} else {
-		if (resctrl_arch_has_id_mapping(RESCTRL_MON_ID))
-			resctrl_arch_release_rmid(closid, rmid);
 		list_add_tail(&entry->list, &rmid_free_lru);
 	}
 }
@@ -1024,6 +1071,9 @@ void free_rmid_lru_list(void)
 	mutex_lock(&rdtgroup_mutex);
 	kfree(rmid_ptrs);
 	rmid_ptrs = NULL;
+	INIT_LIST_HEAD(&rmid_free_lru);
+	INIT_LIST_HEAD(&rmid_release_pending);
+	rmid_limbo_count = 0;
 	mutex_unlock(&rdtgroup_mutex);
 }
 

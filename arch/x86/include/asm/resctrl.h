@@ -50,7 +50,7 @@ DECLARE_STATIC_KEY_FALSE(rdt_alloc_enable_key);
 DECLARE_STATIC_KEY_FALSE(rdt_mon_enable_key);
 
 static inline enum resctrl_id_mode
-resctrl_arch_id_mode(enum resctrl_id_type ignored)
+resctrl_arch_id_mode(enum resctrl_id_type type)
 {
 	return RESCTRL_IDENTITY;
 }
@@ -175,8 +175,9 @@ static inline int resctrl_arch_release_ctrl(u32 closid)
 	return 0;
 }
 
-static inline void resctrl_arch_release_rmid(u32 closid, u32 rmid)
+static inline int resctrl_arch_release_rmid(u32 closid, u32 rmid)
 {
+	return 0;
 }
 
 static inline void resctrl_arch_sched_in(struct task_struct *tsk)
