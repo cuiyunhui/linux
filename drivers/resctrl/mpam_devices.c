@@ -154,6 +154,7 @@ u8 mpam_pmg_max;
 static bool partid_max_init, partid_max_published;
 static DEFINE_SPINLOCK(partid_max_lock);
 static DEFINE_MUTEX(partid_map_lock);
+static bool partid_narrowing_enabled;
 
 /*
  * mpam is enabled once all devices have been probed from CPU online callbacks,
@@ -1847,15 +1848,27 @@ static int mpam_reprogram_ris_partid(struct mpam_msc_ris *ris, u16 partid,
 {
 	u16 cmax = MPAMCFG_CMAX_CMAX;
 	struct mpam_msc *msc = ris->vmsc->msc;
+	struct mpam_component *comp = ris->vmsc->comp;
 	struct mpam_props *rprops = &ris->props;
+	u16 intpartid = partid;
 	int ret;
 
 	guard(mutex)(&msc->part_sel_lock);
-	ret = __mpam_part_sel(ris->ris_idx, partid, msc);
-	if (ret)
-		return ret;
+	if (comp->partid_narrowing) {
+		if (!test_bit(partid, ris->partid_private))
+			return -EINVAL;
+		intpartid = ris->partid_to_intpartid[partid];
+		ret = __mpam_intpart_sel(ris->ris_idx, intpartid, msc);
+		if (ret)
+			return ret;
+	} else {
+		ret = __mpam_part_sel(ris->ris_idx, partid, msc);
+		if (ret)
+			return ret;
+	}
 
-	if (mpam_has_feature(mpam_feat_partid_nrw, rprops)) {
+	if (!comp->partid_narrowing &&
+	    mpam_has_feature(mpam_feat_partid_nrw, rprops)) {
 		/* Update the intpartid mapping */
 		ret = mpam_write_partsel_reg(msc, INTPARTID,
 					     MPAMCFG_INTPARTID_INTERNAL | partid);
@@ -1976,7 +1989,7 @@ static int mpam_reprogram_ris_partid(struct mpam_msc_ris *ris, u16 partid,
 			return ret;
 	}
 
-	mpam_quirk_post_config_change(ris, partid, cfg);
+	mpam_quirk_post_config_change(ris, intpartid, cfg);
 
 	return 0;
 }
@@ -2095,6 +2108,28 @@ static int mpam_save_mbwu_state(void *arg)
 	return 0;
 }
 
+struct mpam_partid_map_arg {
+	struct mpam_msc_ris	*ris;
+	u16			partid;
+	u16			intpartid;
+};
+
+static int __mpam_set_partid_map(void *_arg)
+{
+	struct mpam_partid_map_arg *arg = _arg;
+	struct mpam_msc *msc = arg->ris->vmsc->msc;
+	int ret;
+
+	guard(mutex)(&msc->part_sel_lock);
+
+	ret = __mpam_part_sel(arg->ris->ris_idx, arg->partid, msc);
+	if (ret)
+		return ret;
+
+	return mpam_write_partsel_reg(msc, INTPARTID,
+			MPAMCFG_INTPARTID_INTERNAL | arg->intpartid);
+}
+
 /*
  * Called via smp_call_on_cpu() to prevent migration, while still being
  * pre-emptible. Caller must hold mpam_srcu.
@@ -2104,6 +2139,7 @@ static int mpam_reset_ris(void *arg)
 	u16 partid_max;
 	struct mpam_config reset_cfg = {};
 	struct mpam_msc_ris *ris = arg;
+	struct mpam_component *comp = ris->vmsc->comp;
 	int ret;
 
 	if (ris->in_reset_state)
@@ -2113,7 +2149,28 @@ static int mpam_reset_ris(void *arg)
 	partid_max = mpam_partid_max;
 	spin_unlock(&partid_max_lock);
 	for (u32 partid = 0; partid <= partid_max; partid++) {
-		ret = mpam_reprogram_ris_partid(ris, partid, &reset_cfg);
+		struct mpam_partid_map_arg map_arg = {
+			.ris = ris,
+			.partid = partid,
+		};
+
+		if (!comp->partid_narrowing) {
+			ret = mpam_reprogram_ris_partid(ris, partid, &reset_cfg);
+			if (ret)
+				return ret;
+			continue;
+		}
+
+		if (test_bit(partid, ris->partid_private)) {
+			ret = mpam_reprogram_ris_partid(ris, partid, &reset_cfg);
+			if (ret)
+				return ret;
+			map_arg.intpartid = ris->partid_to_intpartid[partid];
+		} else {
+			map_arg.intpartid = ris->partid_to_intpartid[0];
+		}
+
+		ret = __mpam_set_partid_map(&map_arg);
 		if (ret)
 			return ret;
 	}
@@ -2188,12 +2245,31 @@ static void mpam_reprogram_msc(struct mpam_msc *msc)
 		arg.ris = ris;
 		reset = true;
 		for (u32 partid = 0; partid <= mpam_partid_max; partid++) {
+			struct mpam_partid_map_arg map_arg = {
+				.ris = ris,
+				.partid = partid,
+			};
+
+			if (arg.comp->partid_narrowing &&
+			    !test_bit(partid, ris->partid_private)) {
+				map_arg.intpartid = ris->partid_to_intpartid[0];
+				mpam_touch_msc(msc, __mpam_set_partid_map,
+					       &map_arg);
+				continue;
+			}
+
 			cfg = &ris->vmsc->comp->cfg[partid];
 			if (!bitmap_empty(cfg->features, MPAM_FEATURE_LAST))
 				reset = false;
 
 			arg.partid = partid;
 			mpam_touch_msc(msc, __write_config, &arg);
+			if (arg.comp->partid_narrowing) {
+				map_arg.intpartid =
+					ris->partid_to_intpartid[partid];
+				mpam_touch_msc(msc, __mpam_set_partid_map,
+					       &map_arg);
+			}
 		}
 		ris->in_reset_state = reset;
 
@@ -2863,6 +2939,11 @@ bool mpam_component_uses_partid_narrowing(struct mpam_component *comp)
 	return comp->partid_narrowing;
 }
 
+bool mpam_has_partid_narrowing(void)
+{
+	return partid_narrowing_enabled;
+}
+
 static bool __mpam_partid_is_mapped(struct mpam_component *comp, u16 partid)
 {
 	struct mpam_vmsc *vmsc;
@@ -2992,28 +3073,6 @@ int mpam_prepare_partid(struct mpam_component *comp, u16 partid)
 	return 0;
 }
 
-struct mpam_partid_map_arg {
-	struct mpam_msc_ris	*ris;
-	u16			partid;
-	u16			intpartid;
-};
-
-static int __mpam_set_partid_map(void *_arg)
-{
-	struct mpam_partid_map_arg *arg = _arg;
-	struct mpam_msc *msc = arg->ris->vmsc->msc;
-	int ret;
-
-	guard(mutex)(&msc->part_sel_lock);
-
-	ret = __mpam_part_sel(arg->ris->ris_idx, arg->partid, msc);
-	if (ret)
-		return ret;
-
-	return mpam_write_partsel_reg(msc, INTPARTID,
-			MPAMCFG_INTPARTID_INTERNAL | arg->intpartid);
-}
-
 static int mpam_set_ris_partid_map(struct mpam_msc_ris *ris, u16 partid,
 				   u16 intpartid)
 {
@@ -3027,6 +3086,72 @@ static int mpam_set_ris_partid_map(struct mpam_msc_ris *ris, u16 partid,
 	guard(mutex)(&msc->cfg_lock);
 
 	return mpam_touch_msc(msc, __mpam_set_partid_map, &arg);
+}
+
+static void mpam_copy_partid_config(struct mpam_config *dst,
+				    const struct mpam_config *src)
+{
+	bitmap_copy(dst->features, src->features, MPAM_FEATURE_LAST);
+	dst->cpbm = src->cpbm;
+	dst->mbw_pbm = src->mbw_pbm;
+	dst->mbw_max = src->mbw_max;
+}
+
+int mpam_configure_pending_partid(struct mpam_component *comp, u16 partid,
+				  u16 root_partid)
+{
+	struct mpam_write_config_arg arg = {
+		.comp = comp,
+		.partid = partid,
+	};
+	struct mpam_vmsc *vmsc;
+	bool pending = false;
+	int ret;
+
+	guard(mutex)(&partid_map_lock);
+
+	if (!comp->partid_narrowing || !partid)
+		return 0;
+	if (!__mpam_partid_is_mapped(comp, partid))
+		return -EINVAL;
+	list_for_each_entry(vmsc, &comp->vmsc, comp_list) {
+		struct mpam_msc_ris *ris;
+
+		list_for_each_entry(ris, &vmsc->ris, vmsc_list) {
+			if (test_bit(partid, ris->partid_pending)) {
+				pending = true;
+				break;
+			}
+		}
+		if (pending)
+			break;
+	}
+	if (!pending)
+		return 0;
+
+	mpam_copy_partid_config(&comp->cfg[partid],
+				&comp->cfg[root_partid]);
+
+	guard(srcu)(&mpam_srcu);
+	list_for_each_entry_srcu(vmsc, &comp->vmsc, comp_list,
+				 srcu_read_lock_held(&mpam_srcu)) {
+		struct mpam_msc *msc = vmsc->msc;
+		struct mpam_msc_ris *ris;
+
+		guard(mutex)(&msc->cfg_lock);
+		list_for_each_entry_srcu(ris, &vmsc->ris, vmsc_list,
+					 srcu_read_lock_held(&mpam_srcu)) {
+			if (!test_bit(partid, ris->partid_pending))
+				continue;
+			arg.ris = ris;
+			ret = mpam_touch_msc(msc, __write_config, &arg);
+			if (ret)
+				return ret;
+			ris->in_reset_state = false;
+		}
+	}
+
+	return 0;
 }
 
 int mpam_commit_partid(struct mpam_component *comp, u16 partid)
@@ -3057,14 +3182,24 @@ int mpam_commit_partid(struct mpam_component *comp, u16 partid)
 		}
 	}
 
+	return 0;
+}
+
+void mpam_finish_partid(struct mpam_component *comp, u16 partid)
+{
+	struct mpam_vmsc *vmsc;
+
+	guard(mutex)(&partid_map_lock);
+
+	if (!comp->partid_narrowing || !partid)
+		return;
+
 	list_for_each_entry(vmsc, &comp->vmsc, comp_list) {
 		struct mpam_msc_ris *ris;
 
 		list_for_each_entry(ris, &vmsc->ris, vmsc_list)
 			__clear_bit(partid, ris->partid_pending);
 	}
-
-	return 0;
 }
 
 static int __mpam_unmap_partid(struct mpam_component *comp, u16 partid,
@@ -3138,11 +3273,60 @@ static void mpam_enable_set_partid_narrowing(struct list_head *classes)
 	struct mpam_class *class;
 
 	lockdep_assert_held(&mpam_list_lock);
+	partid_narrowing_enabled = false;
 
 	list_for_each_entry(class, classes, classes_list) {
-		list_for_each_entry(comp, &class->components, class_list)
+		list_for_each_entry(comp, &class->components, class_list) {
 			comp->partid_narrowing = mpam_component_all_ris_narrow(comp);
+			partid_narrowing_enabled |= comp->partid_narrowing;
+		}
 	}
+}
+
+static int mpam_init_vmsc_partid_mappings(struct mpam_vmsc *vmsc)
+{
+	struct mpam_msc_ris *ris;
+
+	list_for_each_entry_srcu(ris, &vmsc->ris, vmsc_list,
+				 srcu_read_lock_held(&mpam_srcu)) {
+		u32 partid;
+		int ret;
+
+		for (partid = 1; partid <= mpam_partid_max; partid++) {
+			ret = mpam_set_ris_partid_map(ris, partid, 0);
+			if (ret)
+				return ret;
+		}
+	}
+
+	return 0;
+}
+
+static int mpam_init_partid_mappings(void)
+{
+	struct mpam_component *comp;
+	struct mpam_class *class;
+
+	guard(srcu)(&mpam_srcu);
+	list_for_each_entry_srcu(class, &mpam_classes, classes_list,
+				 srcu_read_lock_held(&mpam_srcu)) {
+		list_for_each_entry_srcu(comp, &class->components, class_list,
+					 srcu_read_lock_held(&mpam_srcu)) {
+			struct mpam_vmsc *vmsc;
+			int ret;
+
+			if (!comp->partid_narrowing)
+				continue;
+			list_for_each_entry_srcu(vmsc, &comp->vmsc, comp_list,
+						 srcu_read_lock_held(&mpam_srcu)) {
+				ret = mpam_init_vmsc_partid_mappings(vmsc);
+				if (ret)
+					return ret;
+			}
+		}
+	}
+
+	return 0;
 }
 
 /*
@@ -3570,6 +3754,9 @@ static void mpam_enable_once(void)
 	} while (0);
 	mutex_unlock(&mpam_list_lock);
 	cpus_read_unlock();
+
+	if (!err)
+		err = mpam_init_partid_mappings();
 
 	if (!err) {
 		err = mpam_resctrl_setup();
