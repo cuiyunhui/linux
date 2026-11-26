@@ -10,6 +10,19 @@
 #define MAX_MBA_BW			100u
 #define MBM_OVERFLOW_INTERVAL		1000
 
+/**
+ * enum resctrl_id_mode - Relationship between request and control identifiers
+ * @RESCTRL_IDENTITY: Retain the architecture's existing identifier lifecycle
+ * @RESCTRL_LOCAL_MAP: Each controller maps the request identifier locally
+ *
+ * Local mapping preserves the control identifier carried by requests. The
+ * physical allocation entry is owned by the controller.
+ */
+enum resctrl_id_mode {
+	RESCTRL_IDENTITY,
+	RESCTRL_LOCAL_MAP,
+};
+
 /* Reads to Local DRAM Memory */
 #define READS_TO_LOCAL_MEM		BIT(0)
 
