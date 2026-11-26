@@ -416,6 +416,9 @@ struct mpam_msc_ris {
 	struct mpam_props	props;
 	bool			in_reset_state;
 	u16			intpartid_max;
+	u16			*partid_to_intpartid;
+	unsigned long		*intpartid_busy;
+	unsigned long		*partid_private;
 
 	cpumask_t		affinity;
 
@@ -522,6 +525,11 @@ int mpam_reset_class_locked(struct mpam_class *class);
 int mpam_apply_config(struct mpam_component *comp, u16 partid,
 		      struct mpam_config *cfg);
 bool mpam_component_uses_partid_narrowing(struct mpam_component *comp);
+bool mpam_partid_is_mapped(struct mpam_component *comp, u16 partid);
+bool mpam_partid_can_map(struct mpam_component *comp, u16 partid);
+bool mpam_partids_can_map(struct mpam_component *comp, const u16 *partids,
+			  size_t nr_partids);
+int mpam_prepare_partid(struct mpam_component *comp, u16 partid);
 
 int mpam_msmon_read(struct mpam_component *comp, struct mon_cfg *ctx,
 		    enum mpam_device_features, u64 *val);
