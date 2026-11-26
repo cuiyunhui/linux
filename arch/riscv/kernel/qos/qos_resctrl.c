@@ -85,8 +85,14 @@ enum resctrl_id_mode resctrl_arch_id_mode(enum resctrl_id_type type)
 
 static u32 cbqri_logical_rcid_count(struct cbqri_controller *ctrl)
 {
-	return cbqri_has_rcid_map(ctrl) ? CBQRI_LOGICAL_ID_COUNT :
+	u32 count = cbqri_has_rcid_map(ctrl) ? CBQRI_LOGICAL_ID_COUNT :
 		ctrl->info->rcid_count;
+
+	if (ctrl->mon_prefixed && ctrl->info->mcid_count &&
+	    !cbqri_supports_mcid_map(ctrl))
+		count = min(count, max(1U, ctrl->info->mcid_count >>
+					  ctrl->mon_prefix_bits));
+	return count;
 }
 
 static u32 cbqri_logical_mcid_count(struct cbqri_controller *ctrl)
@@ -452,6 +458,11 @@ static int cbqri_probe_monitor(struct cbqri_controller *ctrl)
 			return ret;
 	}
 
+	if (ctrl->mon_prefixed) {
+		ctrl->mon_capable = false;
+		pr_info("RCID-prefixed monitoring is not exposed by this PoC\n");
+	}
+
 	return 0;
 }
 
@@ -466,12 +477,14 @@ static int cbqri_read_capacity_caps(struct cbqri_controller *ctrl)
 	version = value & GENMASK(7, 0);
 	ctrl->version_minor = value & CBQRI_CAPABILITIES_VER_MINOR_MASK;
 	ctrl->version_major = (value & CBQRI_CAPABILITIES_VER_MAJOR_MASK) >> 4;
-	if (version >= CBQRI_ID_MAP_VERSION) {
+	if (version == CBQRI_ID_MAP_VERSION) {
 		ctrl->cc.supports_rcid_map =
 			(value >> CBQRI_CAPABILITIES_RCID_MAP_SHIFT) & 1;
 		ctrl->cc.supports_mcid_map =
 			(value >> CBQRI_CAPABILITIES_MCID_MAP_SHIFT) & 1;
 	}
+	ctrl->mon_prefixed = value & BIT_ULL(26);
+	ctrl->mon_prefix_bits = (value >> 27) & 0xf;
 	ctrl->cc.ncblks = (value >> CBQRI_CC_CAPABILITIES_NCBLKS_SHIFT) &
 			   CBQRI_CC_CAPABILITIES_NCBLKS_MASK;
 	ctrl->cc.supports_alloc_op_flush_rcid =
@@ -492,15 +505,18 @@ static int cbqri_read_bandwidth_caps(struct cbqri_controller *ctrl)
 	version = value & GENMASK(7, 0);
 	ctrl->version_minor = value & CBQRI_CAPABILITIES_VER_MINOR_MASK;
 	ctrl->version_major = (value & CBQRI_CAPABILITIES_VER_MAJOR_MASK) >> 4;
-	if (version >= CBQRI_ID_MAP_VERSION) {
+	if (version == CBQRI_ID_MAP_VERSION) {
 		ctrl->bc.supports_rcid_map =
 			(value >> CBQRI_CAPABILITIES_RCID_MAP_SHIFT) & 1;
 		ctrl->bc.supports_mcid_map =
 			(value >> CBQRI_CAPABILITIES_MCID_MAP_SHIFT) & 1;
 	}
-	if (version >= CBQRI_INACTIVE_ENTRY_VERSION)
+	if (version == CBQRI_INACTIVE_ENTRY_VERSION ||
+	    version == CBQRI_ID_MAP_VERSION)
 		ctrl->bc.supports_inactive_entry =
 			(value >> CBQRI_INACTIVE_ENTRY_SHIFT) & 1;
+	ctrl->mon_prefixed = value & BIT_ULL(24);
+	ctrl->mon_prefix_bits = (value >> 25) & 0xf;
 	ctrl->bc.nbwblks = (value >> CBQRI_BC_CAPABILITIES_NBWBLKS_SHIFT) &
 			    CBQRI_BC_CAPABILITIES_NBWBLKS_MASK;
 	ctrl->bc.mrbwb = (value >> CBQRI_BC_CAPABILITIES_MRBWB_SHIFT) &
