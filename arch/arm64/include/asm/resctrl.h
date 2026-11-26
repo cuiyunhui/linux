@@ -8,3 +8,8 @@ resctrl_arch_id_mode(enum resctrl_id_type type)
 {
 	return RESCTRL_IDENTITY;
 }
+
+static inline int resctrl_arch_release_ctrl(u32 closid)
+{
+	return 0;
+}
