@@ -6630,6 +6630,17 @@ Kernel parameters
 			Reserves a hole at the top of the kernel virtual
 			address space.
 
+	resctrl.logical_ctrl_ids=
+			[KNL] Opt into controller-local allocation of logical
+			control identifiers on supported architectures.
+			Format: <bool>
+			Default: 0
+			New groups on mapped domains share the current root
+			policy until an explicit write requests an independent
+			physical entry. Unsupported domains retain their existing
+			identifier limits and initialization behavior. Monitoring
+			identifier allocation is unchanged.
+
 	reset_devices	[KNL] Force drivers to reset the underlying device
 			during initialization.
 
