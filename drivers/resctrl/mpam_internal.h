@@ -99,6 +99,7 @@ struct mpam_msc {
 	u16			*partid_to_intpartid;
 	unsigned long		*intpartid_allocated;
 	unsigned long		*partid_has_entry;
+	unsigned long		*partid_pending;
 	u8			pmg_max;
 	unsigned long		ris_idxs;
 	u32			ris_max;
@@ -529,6 +530,14 @@ bool mpam_component_uses_partid_narrowing(struct mpam_component *comp);
 bool mpam_component_has_partid_entry(struct mpam_component *comp, u16 partid);
 int mpam_prepare_partids(struct mpam_component *comp, const u16 *partids,
 			 size_t nr_partids);
+int mpam_configure_pending_partid(struct mpam_component *comp, u16 partid,
+				  u16 root_partid);
+int mpam_commit_partid(struct mpam_component *comp, u16 partid);
+void mpam_finish_partid(struct mpam_component *comp, u16 partid);
+int mpam_abort_partid(struct mpam_component *comp, u16 partid,
+		      u16 root_partid);
+int mpam_release_partid(struct mpam_component *comp, u16 partid,
+			u16 root_partid);
 
 int mpam_msmon_read(struct mpam_component *comp, struct mon_cfg *ctx,
 		    enum mpam_device_features, u64 *val);
