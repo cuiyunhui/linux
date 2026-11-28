@@ -1618,6 +1618,20 @@ int resctrl_arch_update_ctrl_entry(struct rdt_resource *r, u32 entry_id)
 	return resctrl_arch_update_domains_id(r, entry_id);
 }
 
+int resctrl_arch_prepare_ctrl_update(u32 ctrl_id)
+{
+	return 0;
+}
+
+int resctrl_arch_commit_ctrl_update(u32 ctrl_id)
+{
+	return 0;
+}
+
+void resctrl_arch_abort_ctrl_update(u32 ctrl_id)
+{
+}
+
 void resctrl_arch_reset_all_ctrls(struct rdt_resource *r)
 {
 	struct mpam_resctrl_res *res;

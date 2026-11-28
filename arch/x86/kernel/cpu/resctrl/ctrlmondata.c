@@ -172,6 +172,20 @@ int resctrl_arch_update_ctrl_entry(struct rdt_resource *r, u32 entry_id)
 	return resctrl_arch_update_domains_id(r, entry_id);
 }
 
+int resctrl_arch_prepare_ctrl_update(u32 ctrl_id)
+{
+	return 0;
+}
+
+int resctrl_arch_commit_ctrl_update(u32 ctrl_id)
+{
+	return 0;
+}
+
+void resctrl_arch_abort_ctrl_update(u32 ctrl_id)
+{
+}
+
 u32 resctrl_arch_get_config(struct rdt_resource *r, struct resctrl_ctrl *ctrl,
 			    struct rdt_ctrl_domain *d, u32 closid,
 			    enum resctrl_conf_type type)
