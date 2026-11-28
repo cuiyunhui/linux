@@ -96,6 +96,9 @@ struct mpam_msc {
 	u16			partid_max;
 	bool			has_partid_nrw;
 	u16			intpartid_max;
+	u16			*partid_to_intpartid;
+	unsigned long		*intpartid_allocated;
+	unsigned long		*partid_has_entry;
 	u8			pmg_max;
 	unsigned long		ris_idxs;
 	u32			ris_max;
@@ -523,6 +526,9 @@ int mpam_reset_class_locked(struct mpam_class *class);
 int mpam_apply_config(struct mpam_component *comp, u16 partid,
 		      struct mpam_config *cfg);
 bool mpam_component_uses_partid_narrowing(struct mpam_component *comp);
+bool mpam_component_has_partid_entry(struct mpam_component *comp, u16 partid);
+int mpam_prepare_partids(struct mpam_component *comp, const u16 *partids,
+			 size_t nr_partids);
 
 int mpam_msmon_read(struct mpam_component *comp, struct mon_cfg *ctx,
 		    enum mpam_device_features, u64 *val);

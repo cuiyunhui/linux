@@ -153,6 +153,7 @@ u16 mpam_partid_max;
 u8 mpam_pmg_max;
 static bool partid_max_init, partid_max_published;
 static DEFINE_SPINLOCK(partid_max_lock);
+static DEFINE_MUTEX(partid_map_lock);
 
 /*
  * mpam is enabled once all devices have been probed from CPU online callbacks,
@@ -2853,6 +2854,91 @@ bool mpam_component_uses_partid_narrowing(struct mpam_component *comp)
 	return comp->partid_narrowing;
 }
 
+static bool __mpam_component_has_partid_entry(struct mpam_component *comp, u16 partid)
+{
+	struct mpam_vmsc *vmsc;
+
+	if (!comp->partid_narrowing || partid == 0)
+		return true;
+
+	list_for_each_entry(vmsc, &comp->vmsc, comp_list)
+		if (!test_bit(partid, vmsc->msc->partid_has_entry))
+			return false;
+
+	return true;
+}
+
+bool mpam_component_has_partid_entry(struct mpam_component *comp, u16 partid)
+{
+	guard(mutex)(&partid_map_lock);
+
+	return __mpam_component_has_partid_entry(comp, partid);
+}
+
+static unsigned int mpam_partids_needed(struct mpam_msc *msc,
+					const u16 *partids,
+					size_t nr_partids)
+{
+	unsigned int needed = 0;
+	size_t i, j;
+
+	for (i = 0; i < nr_partids; i++) {
+		if (!partids[i] ||
+		    test_bit(partids[i], msc->partid_has_entry))
+			continue;
+		for (j = 0; j < i; j++) {
+			if (partids[j] == partids[i])
+				break;
+		}
+		if (j == i)
+			needed++;
+	}
+
+	return needed;
+}
+
+int mpam_prepare_partids(struct mpam_component *comp, const u16 *partids,
+			 size_t nr_partids)
+{
+	struct mpam_vmsc *vmsc;
+	size_t i;
+
+	guard(mutex)(&partid_map_lock);
+
+	if (!comp->partid_narrowing)
+		return 0;
+
+	list_for_each_entry(vmsc, &comp->vmsc, comp_list) {
+		struct mpam_msc *msc = vmsc->msc;
+		unsigned int free, needed;
+
+		needed = mpam_partids_needed(msc, partids, nr_partids);
+		free = msc->intpartid_max + 1 -
+			bitmap_weight(msc->intpartid_allocated,
+				      msc->intpartid_max + 1);
+		if (free < needed)
+			return -ENOSPC;
+	}
+
+	list_for_each_entry(vmsc, &comp->vmsc, comp_list) {
+		struct mpam_msc *msc = vmsc->msc;
+
+		for (i = 0; i < nr_partids; i++) {
+			u16 intpartid, partid = partids[i];
+
+			if (!partid || test_bit(partid, msc->partid_has_entry))
+				continue;
+			intpartid = find_next_zero_bit(msc->intpartid_allocated,
+						       msc->intpartid_max + 1, 1);
+			__set_bit(intpartid, msc->intpartid_allocated);
+			msc->partid_to_intpartid[partid] = intpartid;
+			__set_bit(partid, msc->partid_has_entry);
+		}
+	}
+
+	return 0;
+}
+
 static void mpam_enable_set_partid_narrowing(struct list_head *classes)
 {
 	struct mpam_component *comp;
@@ -3176,10 +3262,32 @@ static int __allocate_component_cfg(struct mpam_component *comp)
 		struct mpam_msc_ris *ris;
 		struct msmon_mbwu_state *mbwu_state;
 
-		if (!vmsc->props.num_mbwu_mon)
-			continue;
-
 		msc = vmsc->msc;
+		if (comp->partid_narrowing && !msc->partid_to_intpartid) {
+			unsigned long *entries, *intpartids;
+			size_t nr_intpartids = msc->intpartid_max + 1;
+			size_t nr_partids = mpam_partid_max + 1;
+			u16 *partid_map;
+
+			partid_map = devm_kcalloc(&msc->pdev->dev, nr_partids,
+						  sizeof(*partid_map), GFP_KERNEL);
+			if (!partid_map)
+				return -ENOMEM;
+
+			intpartids = devm_bitmap_zalloc(&msc->pdev->dev, nr_intpartids, GFP_KERNEL);
+			if (!intpartids)
+				return -ENOMEM;
+
+			entries = devm_bitmap_zalloc(&msc->pdev->dev, nr_partids, GFP_KERNEL);
+			if (!entries)
+				return -ENOMEM;
+			msc->partid_to_intpartid = partid_map;
+			msc->intpartid_allocated = intpartids;
+			msc->partid_has_entry = entries;
+			__set_bit(0, intpartids);
+			__set_bit(0, entries);
+		}
+
 		list_for_each_entry(ris, &vmsc->ris, vmsc_list) {
 			if (!ris->props.num_mbwu_mon)
 				continue;
