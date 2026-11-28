@@ -207,7 +207,7 @@ int resctrl_arch_set_cdp_enabled(struct rdt_resource *r, struct resctrl_ctrl *ct
 	u32 partid_i = RESCTRL_RESERVED_CLOSID, partid_d = RESCTRL_RESERVED_CLOSID;
 	struct mpam_resctrl_res *res = &mpam_resctrl_controls[RDT_RESOURCE_L3];
 	struct rdt_resource *l3 = &res->resctrl_res;
-	int cpu;
+	int cpu, ret;
 
 	if (!IS_ENABLED(CONFIG_EXPERT) && enable) {
 		/*
@@ -217,8 +217,13 @@ int resctrl_arch_set_cdp_enabled(struct rdt_resource *r, struct resctrl_ctrl *ct
 		pr_warn("CDP not supported\n");
 		return -EOPNOTSUPP;
 	}
-	if (enable && mpam_has_partid_narrowing())
-		return -EOPNOTSUPP;
+	if (enable) {
+		if (mpam_partid_max < 1)
+			return -EINVAL;
+		ret = mpam_set_cdp_mapping(true);
+		if (ret)
+			return ret;
+	}
 
 	if (enable)
 		pr_warn("CDP is an expert feature and may cause MPAM to malfunction.\n");
@@ -269,7 +274,7 @@ int resctrl_arch_set_cdp_enabled(struct rdt_resource *r, struct resctrl_ctrl *ct
 		mpam_set_cpu_defaults(cpu, partid_d, partid_i, 0, 0);
 	on_each_cpu(resctrl_arch_sync_cpu_closid_rmid, NULL, 1);
 
-	return 0;
+	return enable ? 0 : mpam_set_cdp_mapping(false);
 }
 
 static bool mpam_resctrl_hide_cdp(struct rdt_resource *r)
@@ -1598,6 +1603,8 @@ static int resctrl_arch_update_domains_id(struct rdt_resource *r, u32 id)
 
 	if (!mpam_is_enabled())
 		return -EINVAL;
+	if (mpam_partid_mapping_failed())
+		return -EIO;
 
 	/*
 	 * FIXME:
@@ -1616,6 +1623,8 @@ static int resctrl_arch_update_domains_id(struct rdt_resource *r, u32 id)
 
 int resctrl_arch_init_ctrl_domains(struct rdt_resource *r, u32 ctrl_id)
 {
+	if (mpam_partid_mapping_failed())
+		return -EIO;
 	if (ctrl_id && mpam_has_partid_narrowing())
 		return 0;
 
@@ -1795,6 +1804,8 @@ int resctrl_arch_prepare_ctrl_update(u32 ctrl_id)
 	enum resctrl_res_level rid;
 	int ret;
 
+	if (mpam_partid_mapping_failed())
+		return -EIO;
 	if (!ctrl_id)
 		return 0;
 

@@ -528,6 +528,8 @@ int mpam_apply_config(struct mpam_component *comp, u16 partid,
 		      struct mpam_config *cfg);
 bool mpam_component_uses_partid_narrowing(struct mpam_component *comp);
 bool mpam_has_partid_narrowing(void);
+int mpam_set_cdp_mapping(bool enable);
+bool mpam_partid_mapping_failed(void);
 bool mpam_component_has_partid_entry(struct mpam_component *comp, u16 partid);
 int mpam_prepare_partids(struct mpam_component *comp, const u16 *partids,
 			 size_t nr_partids);
