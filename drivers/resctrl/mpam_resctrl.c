@@ -1632,6 +1632,11 @@ void resctrl_arch_abort_ctrl_update(u32 ctrl_id)
 {
 }
 
+int resctrl_arch_release_ctrl(u32 ctrl_id)
+{
+	return 0;
+}
+
 void resctrl_arch_reset_all_ctrls(struct rdt_resource *r)
 {
 	struct mpam_resctrl_res *res;

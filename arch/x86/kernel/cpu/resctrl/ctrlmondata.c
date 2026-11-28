@@ -186,6 +186,11 @@ void resctrl_arch_abort_ctrl_update(u32 ctrl_id)
 {
 }
 
+int resctrl_arch_release_ctrl(u32 ctrl_id)
+{
+	return 0;
+}
+
 u32 resctrl_arch_get_config(struct rdt_resource *r, struct resctrl_ctrl *ctrl,
 			    struct rdt_ctrl_domain *d, u32 closid,
 			    enum resctrl_conf_type type)

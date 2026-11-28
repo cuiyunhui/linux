@@ -703,6 +703,18 @@ int resctrl_arch_commit_ctrl_update(u32 ctrl_id);
  */
 void resctrl_arch_abort_ctrl_update(u32 ctrl_id);
 
+/**
+ * resctrl_arch_release_ctrl() - Release a logical control group's entries
+ * @ctrl_id: Logical control group ID being removed
+ *
+ * Stop physical controller entries from selecting stale policy before
+ * @ctrl_id can be assigned to another control group.
+ *
+ * Return: 0 on success, or a negative error code on failure. On failure the
+ * logical ID must not be reused.
+ */
+int resctrl_arch_release_ctrl(u32 ctrl_id);
+
 bool resctrl_enable_mon_event(enum resctrl_event_id eventid, bool any_cpu,
 			      unsigned int binary_bits, void *arch_priv);
 

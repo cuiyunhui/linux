@@ -4788,7 +4788,11 @@ out_del_list:
 out_rmid_free:
 	mkdir_rdt_prepare_rmid_free(rdtgrp);
 out_closid_free:
-	closid_free(closid);
+	if (resctrl_arch_release_ctrl(closid))
+		rdt_last_cmd_printf("Control ID %u quarantined after failed creation\n",
+				    closid);
+	else
+		closid_free(closid);
 out_common_fail:
 	mkdir_rdt_prepare_clean(rdtgrp);
 out_unlock:
@@ -4872,7 +4876,7 @@ static int rdtgroup_ctrl_remove(struct rdtgroup *rdtgrp)
 static int rdtgroup_rmdir_ctrl(struct rdtgroup *rdtgrp, cpumask_var_t tmpmask)
 {
 	u32 closid, rmid;
-	int cpu;
+	int cpu, ret;
 
 	/* Give any tasks back to the default group */
 	rdt_move_group_tasks(rdtgrp, &rdtgroup_default, tmpmask);
@@ -4893,6 +4897,14 @@ static int rdtgroup_rmdir_ctrl(struct rdtgroup *rdtgrp, cpumask_var_t tmpmask)
 	 */
 	cpumask_or(tmpmask, tmpmask, &rdtgrp->cpu_mask);
 	update_closid_rmid(tmpmask, NULL);
+
+	ret = resctrl_arch_release_ctrl(rdtgrp->closid);
+	cpumask_clear(&rdtgrp->cpu_mask);
+	if (ret) {
+		rdt_last_cmd_printf("Failed to release control ID %u: %d\n",
+				    rdtgrp->closid, ret);
+		return ret;
+	}
 
 	rdtgroup_unassign_cntrs(rdtgrp);
 
