@@ -1131,25 +1131,10 @@ static int mpam_ris_hw_probe(struct mpam_msc_ris *ris)
 		}
 	}
 
-	/*
-	 * RIS with PARTID narrowing don't have enough storage for one
-	 * configuration per PARTID. If these are in a class we could use,
-	 * reduce the supported partid_max to match the number of intpartid.
-	 * If the class is unknown, just ignore it.
-	 */
-	if (FIELD_GET(MPAMF_IDR_HAS_PARTID_NRW, ris->idr) &&
-	    class->type != MPAM_CLASS_UNKNOWN) {
-		u16 partid_max;
-		u32 nrwidr;
-
-		err = mpam_read_partsel_reg(msc, PARTID_NRW_IDR, &nrwidr);
-		if (err)
-			return err;
-
-		partid_max = FIELD_GET(MPAMF_PARTID_NRW_IDR_INTPARTID_MAX, nrwidr);
-
+	/* PARTID narrowing is global to the MSC, not selected by RIS. */
+	if (msc->has_partid_nrw && class->type != MPAM_CLASS_UNKNOWN) {
 		mpam_set_feature(mpam_feat_partid_nrw, props);
-		msc->partid_max = min(msc->partid_max, partid_max);
+		msc->partid_max = min(msc->partid_max, msc->intpartid_max);
 	}
 
 	return 0;
@@ -1159,6 +1144,7 @@ static int mpam_msc_hw_probe(struct mpam_msc *msc)
 {
 	int ret;
 	u64 idr;
+	u32 nrwidr;
 	u16 partid_max;
 	u8 ris_idx, pmg_max;
 	struct mpam_msc_ris *ris;
@@ -1189,6 +1175,17 @@ static int mpam_msc_hw_probe(struct mpam_msc *msc)
 	/* Use these values so partid/pmg always starts with a valid value */
 	msc->partid_max = FIELD_GET(MPAMF_IDR_PARTID_MAX, idr);
 	msc->pmg_max = FIELD_GET(MPAMF_IDR_PMG_MAX, idr);
+	msc->has_partid_nrw = FIELD_GET(MPAMF_IDR_HAS_PARTID_NRW, idr);
+	if (msc->has_partid_nrw) {
+		scoped_guard(mutex, &msc->part_sel_lock) {
+			ret = mpam_read_partsel_reg(msc, PARTID_NRW_IDR,
+						    &nrwidr);
+			if (ret)
+				return ret;
+		}
+		msc->intpartid_max =
+			FIELD_GET(MPAMF_PARTID_NRW_IDR_INTPARTID_MAX, nrwidr);
+	}
 
 	for (ris_idx = 0; ris_idx <= msc->ris_max; ris_idx++) {
 		scoped_guard(mutex, &msc->part_sel_lock) {
@@ -2834,6 +2831,42 @@ static void mpam_enable_merge_class_features(struct mpam_component *comp)
 		mpam_clear_feature(mpam_feat_mbw_min, &class->props);
 }
 
+static bool mpam_component_all_mscs_narrow(struct mpam_component *comp)
+{
+	struct mpam_vmsc *vmsc;
+	bool found = false;
+
+	if (comp->class->type == MPAM_CLASS_UNKNOWN)
+		return false;
+
+	list_for_each_entry(vmsc, &comp->vmsc, comp_list) {
+		if (!vmsc->msc->has_partid_nrw)
+			return false;
+		found = true;
+	}
+
+	return found;
+}
+
+bool mpam_component_uses_partid_narrowing(struct mpam_component *comp)
+{
+	return comp->partid_narrowing;
+}
+
+static void mpam_enable_set_partid_narrowing(struct list_head *classes)
+{
+	struct mpam_component *comp;
+	struct mpam_class *class;
+
+	lockdep_assert_held(&mpam_list_lock);
+
+	list_for_each_entry(class, classes, classes_list) {
+		list_for_each_entry(comp, &class->components, class_list)
+			comp->partid_narrowing =
+				mpam_component_all_mscs_narrow(comp);
+	}
+}
+
 /*
  * Merge all the common resource features into class.
  * vmsc features are bitwise-or'd together by mpam_enable_merge_vmsc_features()
@@ -3209,6 +3242,7 @@ static void mpam_enable_once(void)
 	mutex_lock(&mpam_list_lock);
 	do {
 		mpam_enable_merge_features(&mpam_classes);
+		mpam_enable_set_partid_narrowing(&mpam_classes);
 
 		err = mpam_register_irqs();
 		if (err) {
