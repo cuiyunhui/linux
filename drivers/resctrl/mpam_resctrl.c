@@ -1580,7 +1580,7 @@ static int _resctrl_arch_update_domains(struct rdt_resource *r, struct resctrl_c
 	return 0;
 }
 
-int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid)
+static int resctrl_arch_update_domains_id(struct rdt_resource *r, u32 id)
 {
 	struct resctrl_ctrl *ctrl;
 	int err;
@@ -1595,12 +1595,27 @@ int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid)
 	 * controls? How to communicate to user space?
 	 */
 	for_each_resource_ctrl(ctrl, r) {
-		err = _resctrl_arch_update_domains(r, ctrl, closid);
+		err = _resctrl_arch_update_domains(r, ctrl, id);
 		if (err)
 			return err;
 	}
 
 	return 0;
+}
+
+int resctrl_arch_init_ctrl_domains(struct rdt_resource *r, u32 ctrl_id)
+{
+	return resctrl_arch_update_domains_id(r, ctrl_id);
+}
+
+int resctrl_arch_update_domains(struct rdt_resource *r, u32 ctrl_id)
+{
+	return resctrl_arch_update_domains_id(r, ctrl_id);
+}
+
+int resctrl_arch_update_ctrl_entry(struct rdt_resource *r, u32 entry_id)
+{
+	return resctrl_arch_update_domains_id(r, entry_id);
 }
 
 void resctrl_arch_reset_all_ctrls(struct rdt_resource *r)

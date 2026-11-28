@@ -147,14 +147,29 @@ static void _resctrl_arch_update_domains(struct rdt_resource *r,
  * Avoid duplicate control configurations by only checking enabled controls
  * for any staged configurations.
  */
-int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid)
+static int resctrl_arch_update_domains_id(struct rdt_resource *r, u32 id)
 {
 	struct resctrl_ctrl *ctrl;
 
 	for_each_enabled_ctrl(ctrl, r)
-		_resctrl_arch_update_domains(r, ctrl, closid);
+		_resctrl_arch_update_domains(r, ctrl, id);
 
 	return 0;
+}
+
+int resctrl_arch_init_ctrl_domains(struct rdt_resource *r, u32 ctrl_id)
+{
+	return resctrl_arch_update_domains_id(r, ctrl_id);
+}
+
+int resctrl_arch_update_domains(struct rdt_resource *r, u32 ctrl_id)
+{
+	return resctrl_arch_update_domains_id(r, ctrl_id);
+}
+
+int resctrl_arch_update_ctrl_entry(struct rdt_resource *r, u32 entry_id)
+{
+	return resctrl_arch_update_domains_id(r, entry_id);
 }
 
 u32 resctrl_arch_get_config(struct rdt_resource *r, struct resctrl_ctrl *ctrl,

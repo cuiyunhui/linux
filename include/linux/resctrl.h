@@ -635,7 +635,43 @@ static inline u32 resctrl_get_default_ctrlval(struct resctrl_ctrl *ctrl)
 /* The number of closid supported by this resource regardless of CDP */
 u32 resctrl_arch_get_num_closid(struct rdt_resource *r);
 u32 resctrl_arch_system_num_rmid_idx(void);
-int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid);
+
+/**
+ * resctrl_arch_init_ctrl_domains() - Initialize a logical control group
+ * @r: Resource whose domains should be initialized
+ * @ctrl_id: Logical control group ID
+ *
+ * Initialize the architecture state inherited by a newly created control
+ * group. Architectures whose requests use a logical ID can leave the group
+ * using their default physical entries.
+ *
+ * Return: 0 on success, or a negative error code on failure.
+ */
+int resctrl_arch_init_ctrl_domains(struct rdt_resource *r, u32 ctrl_id);
+
+/**
+ * resctrl_arch_update_domains() - Update a logical control group's policy
+ * @r: Resource whose domains should be updated
+ * @ctrl_id: Logical control group ID
+ *
+ * Apply staged configuration to the physical entries selected for @ctrl_id.
+ *
+ * Return: 0 on success, or a negative error code on failure.
+ */
+int resctrl_arch_update_domains(struct rdt_resource *r, u32 ctrl_id);
+
+/**
+ * resctrl_arch_update_ctrl_entry() - Update a physical control entry
+ * @r: Resource whose domains should be updated
+ * @entry_id: Architecture physical control entry ID
+ *
+ * Apply staged configuration directly to @entry_id. This is for
+ * architecture-managed entries, such as an I/O allocation entry, that do not
+ * belong to a logical resctrl control group.
+ *
+ * Return: 0 on success, or a negative error code on failure.
+ */
+int resctrl_arch_update_ctrl_entry(struct rdt_resource *r, u32 entry_id);
 
 bool resctrl_enable_mon_event(enum resctrl_event_id eventid, bool any_cpu,
 			      unsigned int binary_bits, void *arch_priv);

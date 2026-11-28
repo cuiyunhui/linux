@@ -971,7 +971,7 @@ static int resctrl_io_alloc_init_cbm(struct rdt_resource_final *f,
 			       sizeof(d->staged_config[0]));
 	}
 
-	ret = resctrl_arch_update_domains(r, closid);
+	ret = resctrl_arch_update_ctrl_entry(r, closid);
 out:
 	rdt_staged_configs_clear();
 	return ret;
@@ -1226,7 +1226,7 @@ ssize_t resctrl_io_alloc_cbm_write(struct kernfs_open_file *of, char *buf,
 	if (ret)
 		goto out_clear_configs;
 
-	ret = resctrl_arch_update_domains(r, io_alloc_closid);
+	ret = resctrl_arch_update_ctrl_entry(r, io_alloc_closid);
 
 out_clear_configs:
 	rdt_staged_configs_clear();
